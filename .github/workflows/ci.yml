@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: cargo install wasm-pack --version 0.15.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - run: pnpm build
+
+  reproducibility-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser:
+          - id: chrome
+            name: Chrome
+            engine: chromium
+            channel: chrome
+          - id: edge
+            name: Edge
+            engine: chromium
+            channel: msedge
+          - id: safari
+            name: Safari
+            engine: webkit
+            channel: webkit-safari-compat
+    env:
+      CROWDSIM_REPRO_BROWSER_ID: ${{ matrix.browser.id }}
+      CROWDSIM_REPRO_BROWSER_NAME: ${{ matrix.browser.name }}
+      CROWDSIM_REPRO_BROWSER_ENGINE: ${{ matrix.browser.engine }}
+      CROWDSIM_REPRO_BROWSER_CHANNEL: ${{ matrix.browser.channel }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @crowdsim/app test -- benchmarkReproducibility

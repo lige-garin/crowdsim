@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.tmp/
+packages/core-behavior/target/
+packages/app/src/wasm/core-behavior/
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example

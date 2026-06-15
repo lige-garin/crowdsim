@@ -1,0 +1,429 @@
+import {
+  createFlowFieldCpu,
+  createSpatialHashGridLayout,
+  rasterizeWallsToBlockedCells,
+  type FlowField,
+  type SpatialHashGridLayout,
+  type WallSegment,
+} from "@crowdsim/core-gpu";
+import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import {
+  clampPointToWorld,
+  constrainMovement,
+  wallSegmentsFromScene,
+  type SceneWorldBounds,
+} from "./sceneGeometry";
+import { calculateEnvironmentImpact } from "./environmentEffects";
+
+export type SimulationStatus = "paused" | "running";
+
+export type SimulationAgent = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  targetX: number;
+  targetY: number;
+  targetSinkId?: string;
+};
+
+export type SimulationSource = {
+  id: string;
+  position: ScenePoint;
+  width: number;
+  arrivalRatePerSecond: number;
+};
+
+export type SimulationSink = {
+  id: string;
+  position: ScenePoint;
+  radius: number;
+};
+
+export type SimulationEngineConfig = {
+  fixedDtSeconds?: number;
+  maxAgents?: number;
+  seed?: number;
+  speedMetersPerSecond?: number;
+  sources: SimulationSource[];
+  sinks: SimulationSink[];
+  walls?: WallSegment[];
+  world?: SceneWorldBounds;
+};
+
+export type SimulationSnapshot = {
+  status: SimulationStatus;
+  elapsedSeconds: number;
+  stepCount: number;
+  timeScale: number;
+  agentCount: number;
+  spawnedCount: number;
+  exitedCount: number;
+  agents: SimulationAgent[];
+};
+
+export type SimulationEngine = {
+  pause: () => SimulationSnapshot;
+  reset: () => SimulationSnapshot;
+  setTimeScale: (timeScale: number) => SimulationSnapshot;
+  snapshot: () => SimulationSnapshot;
+  start: () => SimulationSnapshot;
+  step: (steps?: number) => SimulationSnapshot;
+  tick: (realDeltaSeconds: number) => SimulationSnapshot;
+};
+
+const defaultFixedDtSeconds = 1 / 60;
+const defaultMaxAgents = 2_000;
+const defaultSpeedMetersPerSecond = 8;
+const maxRealDeltaSeconds = 0.25;
+const navigationCellSize = 2;
+
+export const simulationRuntimeProfile = {
+  decisionBackend: "rule-ts",
+  decisionHz: 10,
+  maxAgents: defaultMaxAgents,
+  movementBackend: "cpu-compat",
+  movementHz: 60,
+} as const;
+
+type SinkNavigationField = {
+  flowField: FlowField;
+  layout: SpatialHashGridLayout;
+  sinkId: string;
+};
+
+export function createSimulationEngineFromScene(
+  scene: CrowdSimScene,
+  overrides: Partial<SimulationEngineConfig> = {},
+): SimulationEngine {
+  const environmentImpact = calculateEnvironmentImpact(scene, 0);
+  const baseSpeed = overrides.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
+  const sources = scene.entrances
+    .filter((entrance) => entrance.kind !== "sink" && entrance.arrivalRatePerMinute > 0)
+    .map((entrance) => ({
+      id: entrance.id,
+      position: entrance.position,
+      width: entrance.width,
+      arrivalRatePerSecond: entrance.arrivalRatePerMinute / 60,
+    }));
+  const sinks = scene.entrances
+    .filter((entrance) => entrance.kind !== "source")
+    .map((entrance) => ({
+      id: entrance.id,
+      position: entrance.position,
+      radius: Math.max(1, entrance.width / 2),
+    }));
+
+  return createSimulationEngine({
+    seed: scene.seed,
+    sources,
+    sinks,
+    walls: wallSegmentsFromScene(scene),
+    world: scene.world,
+    ...overrides,
+    speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
+  });
+}
+
+export function createSimulationEngine(
+  config: SimulationEngineConfig,
+): SimulationEngine {
+  const fixedDtSeconds = config.fixedDtSeconds ?? defaultFixedDtSeconds;
+  const maxAgents = config.maxAgents ?? defaultMaxAgents;
+  const speedMetersPerSecond =
+    config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
+  const sources = config.sources;
+  const sinks = config.sinks;
+  const seed = config.seed ?? 1;
+  const walls = config.walls ?? [];
+  const world = config.world;
+  const navigationFields = buildNavigationFields(world, walls, sinks);
+
+  let rng = createSeededRng(seed);
+  let status: SimulationStatus = "paused";
+  let elapsedSeconds = 0;
+  let accumulatorSeconds = 0;
+  let stepCount = 0;
+  let timeScale = 1;
+  let nextAgentId = 1;
+  let spawnedCount = 0;
+  let exitedCount = 0;
+  let agents: SimulationAgent[] = [];
+
+  function makeSnapshot(): SimulationSnapshot {
+    return {
+      status,
+      elapsedSeconds,
+      stepCount,
+      timeScale,
+      agentCount: agents.length,
+      spawnedCount,
+      exitedCount,
+      agents: agents.map((agent) => ({ ...agent })),
+    };
+  }
+
+  function spawnAgent(source: SimulationSource) {
+    if (agents.length >= maxAgents || sinks.length === 0) {
+      return;
+    }
+
+    const jitter = (rng() - 0.5) * source.width;
+    const spawnPoint = clampPointToWorld(
+      {
+        x: source.position.x,
+        y: source.position.y + jitter,
+      },
+      world,
+    );
+    const x = spawnPoint.x;
+    const y = spawnPoint.y;
+    const sink = nearestSink({ x, y });
+
+    agents.push({
+      id: nextAgentId++,
+      x,
+      y,
+      vx: 0,
+      vy: 0,
+      targetX: sink.position.x,
+      targetY: sink.position.y,
+      targetSinkId: sink.id,
+    });
+    spawnedCount++;
+  }
+
+  function nearestSink(point: ScenePoint): SimulationSink {
+    let best = sinks[0];
+    let bestDistanceSq = Number.POSITIVE_INFINITY;
+
+    for (const sink of sinks) {
+      const dx = sink.position.x - point.x;
+      const dy = sink.position.y - point.y;
+      const distanceSq = dx * dx + dy * dy;
+
+      if (distanceSq < bestDistanceSq) {
+        best = sink;
+        bestDistanceSq = distanceSq;
+      }
+    }
+
+    return best;
+  }
+
+  function runFixedStep() {
+    for (const source of sources) {
+      const arrivals = samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
+
+      for (let index = 0; index < arrivals; index++) {
+        spawnAgent(source);
+      }
+    }
+
+    const nextAgents: SimulationAgent[] = [];
+
+    for (const agent of agents) {
+      const dx = agent.targetX - agent.x;
+      const dy = agent.targetY - agent.y;
+      const distance = Math.hypot(dx, dy);
+      const sinkRadius = nearestSink(agent).radius;
+
+      if (distance <= sinkRadius) {
+        exitedCount++;
+        continue;
+      }
+
+      const direction = movementDirection(agent, dx, dy, distance);
+      const travelDistance = Math.min(distance, speedMetersPerSecond * fixedDtSeconds);
+      const proposed = {
+        x: agent.x + direction.x * travelDistance,
+        y: agent.y + direction.y * travelDistance,
+      };
+      const resolved = constrainMovement(agent, proposed, walls, world);
+      const vx = (resolved.x - agent.x) / fixedDtSeconds;
+      const vy = (resolved.y - agent.y) / fixedDtSeconds;
+
+      nextAgents.push({
+        ...agent,
+        vx,
+        vy,
+        x: resolved.x,
+        y: resolved.y,
+      });
+    }
+
+    agents = nextAgents;
+    elapsedSeconds += fixedDtSeconds;
+    stepCount++;
+  }
+
+  function movementDirection(
+    agent: SimulationAgent,
+    dx: number,
+    dy: number,
+    distance: number,
+  ) {
+    const fieldDirection = sampleNavigationDirection(agent);
+
+    if (fieldDirection) {
+      return fieldDirection;
+    }
+
+    const invDistance = distance > 0 ? 1 / distance : 0;
+
+    return {
+      x: dx * invDistance,
+      y: dy * invDistance,
+    };
+  }
+
+  function sampleNavigationDirection(agent: SimulationAgent) {
+    if (!world || navigationFields.length === 0) {
+      return undefined;
+    }
+
+    const field =
+      navigationFields.find((candidate) => candidate.sinkId === agent.targetSinkId) ??
+      navigationFields.find(
+        (candidate) =>
+          candidate.sinkId === nearestSink({ x: agent.targetX, y: agent.targetY }).id,
+      );
+
+    if (!field) {
+      return undefined;
+    }
+
+    const cell = pointToCellId(agent, field.layout);
+    const direction = {
+      x: field.flowField.directions[cell * 2],
+      y: field.flowField.directions[cell * 2 + 1],
+    };
+
+    return Math.hypot(direction.x, direction.y) > 0 ? direction : undefined;
+  }
+
+  return {
+    pause() {
+      status = "paused";
+      return makeSnapshot();
+    },
+    reset() {
+      rng = createSeededRng(seed);
+      status = "paused";
+      elapsedSeconds = 0;
+      accumulatorSeconds = 0;
+      stepCount = 0;
+      timeScale = 1;
+      nextAgentId = 1;
+      spawnedCount = 0;
+      exitedCount = 0;
+      agents = [];
+      return makeSnapshot();
+    },
+    setTimeScale(nextTimeScale: number) {
+      timeScale = Math.max(0.25, Math.min(8, nextTimeScale));
+      return makeSnapshot();
+    },
+    snapshot: makeSnapshot,
+    start() {
+      status = "running";
+      return makeSnapshot();
+    },
+    step(steps = 1) {
+      for (let index = 0; index < steps; index++) {
+        runFixedStep();
+      }
+
+      return makeSnapshot();
+    },
+    tick(realDeltaSeconds: number) {
+      if (status !== "running") {
+        return makeSnapshot();
+      }
+
+      accumulatorSeconds +=
+        Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
+
+      while (accumulatorSeconds >= fixedDtSeconds) {
+        runFixedStep();
+        accumulatorSeconds -= fixedDtSeconds;
+      }
+
+      return makeSnapshot();
+    },
+  };
+}
+
+function buildNavigationFields(
+  world: SceneWorldBounds | undefined,
+  walls: readonly WallSegment[],
+  sinks: readonly SimulationSink[],
+): SinkNavigationField[] {
+  if (!world || walls.length === 0 || sinks.length === 0) {
+    return [];
+  }
+
+  const layout = createSpatialHashGridLayout({
+    width: world.width,
+    height: world.height,
+    cellSize: navigationCellSize,
+  });
+  const blocked = rasterizeWallsToBlockedCells(layout, [...walls]);
+
+  return sinks.map((sink) => {
+    const sinkCell = pointToCellId(sink.position, layout);
+    const sinkBlocked = new Uint8Array(blocked);
+    sinkBlocked[sinkCell] = 0;
+
+    return {
+      flowField: createFlowFieldCpu({
+        layout,
+        targetCell: sinkCell,
+        blocked: sinkBlocked,
+      }),
+      layout,
+      sinkId: sink.id,
+    };
+  });
+}
+
+function pointToCellId(point: ScenePoint, layout: SpatialHashGridLayout): number {
+  const column = clamp(Math.floor(point.x / layout.cellSize), 0, layout.columns - 1);
+  const row = clamp(Math.floor(point.y / layout.cellSize), 0, layout.rows - 1);
+
+  return row * layout.columns + column;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function samplePoisson(lambda: number, rng: () => number): number {
+  if (lambda <= 0) {
+    return 0;
+  }
+
+  const limit = Math.exp(-lambda);
+  let product = 1;
+  let count = 0;
+
+  do {
+    count++;
+    product *= rng();
+  } while (product > limit);
+
+  return count - 1;
+}
+
+function createSeededRng(seed: number) {
+  let state = seed >>> 0;
+
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
+  };
+}

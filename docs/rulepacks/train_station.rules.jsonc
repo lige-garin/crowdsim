@@ -1,0 +1,203 @@
+// train_station.rules.json — 火车站规则包
+// 范式特点：截止时间驱动（deadline-driven）。乘客行为围绕"赶上某趟车"组织，
+// 而非纯效用游逛。需要 schema 扩展①：deadline 型需求（见文末说明）。
+{
+  "rulepackId": "train_station_v1",
+  "name": "火车站（高铁站房）",
+
+  // ───────────────────────── ① 空间语义层 ─────────────────────────
+  "spaceTypes": {
+    "entrance_security": {
+      "serviceMode": "queue_service",
+      "servicePoints": 6, // 安检通道数，编辑器可按实例覆盖
+      "serviceTime": { "dist": "lognormal", "meanMin": 0.4, "sigma": 0.4 },
+      "grants": ["security_passed"],
+      "satisfies": {},
+      "notes": "进站安检。高峰期排队是全站最大瓶颈，参数要可调",
+    },
+    "ticket_office": {
+      "serviceMode": "queue_service",
+      "servicePoints": 4,
+      "serviceTime": { "dist": "normal", "meanMin": 3, "sdMin": 1 },
+      "grants": ["has_ticket"],
+      "satisfies": { "ticketing": 1.0 },
+    },
+    "ticket_machine": {
+      "serviceMode": "queue_service",
+      "servicePoints": 8,
+      "serviceTime": { "dist": "normal", "meanMin": 1.2, "sdMin": 0.4 },
+      "grants": ["has_ticket"],
+      "satisfies": { "ticketing": 1.0 },
+    },
+    "waiting_hall": {
+      "serviceMode": "dwell",
+      "capacity": 2000,
+      "seats": 800, // 座位满后 agent 站立等待，舒适度下降
+      "dwellTime": { "dist": "passthrough" }, // 停留由 deadline 控制，非分布
+      "comfortDensity": 1.0,
+      "satisfies": { "wait_for_train": 1.0 },
+    },
+    "boarding_gate": {
+      "serviceMode": "gate",
+      "throughputPerMin": 35, // 每个闸机组的通行能力（人/分钟）
+      "requires": ["security_passed", "has_ticket", "gate_open"],
+      "grants": ["checked_in_gate"],
+      "notes": "gate_open 不是 agent flag，是空间状态，由 DES 事件开关（扩展②）",
+    },
+    "platform": {
+      "serviceMode": "dwell",
+      "capacity": 1500,
+      "requires": ["checked_in_gate"],
+      "dwellTime": { "dist": "passthrough" },
+      "satisfies": { "board_train": 1.0 },
+      "isExitFor": ["departing"], // 上车=离场（乘客 sink）
+    },
+    "convenience_store": {
+      "serviceMode": "queue_service",
+      "servicePoints": 2,
+      "browseBeforeQueue": { "dist": "lognormal", "meanMin": 3, "sigma": 0.5 },
+      "serviceTime": { "dist": "normal", "meanMin": 1, "sdMin": 0.3 },
+      "satisfies": { "shopping": 0.8, "hunger": 0.3 },
+    },
+    "fast_food": {
+      "serviceMode": "queue_service",
+      "servicePoints": 3,
+      "seats": 80,
+      "serviceTime": { "dist": "normal", "meanMin": 18, "sdMin": 6 },
+      "satisfies": { "hunger": 1.0 },
+      "openHours": [[6.0, 22.0]],
+    },
+    "restroom": {
+      "serviceMode": "queue_service",
+      "servicePoints": 12,
+      "serviceTime": { "dist": "lognormal", "meanMin": 3, "sigma": 0.4 },
+      "satisfies": { "toilet": 1.0 },
+    },
+    "exit_corridor": {
+      "serviceMode": "transit",
+      "isExitFor": ["arriving", "seeing_off"], // 出站口（到达客与送站者的 sink）
+    },
+  },
+
+  // ───────────────────────── ② 流程约束层 ─────────────────────────
+  "constraints": {
+    "agentFlags": ["security_passed", "has_ticket", "checked_in_gate"],
+    "rules": [
+      { "activity": "enter_zone:paid_area", "requires": ["security_passed"] },
+      // 软规则：deadline 临近时，非赶车活动效用全面衰减
+      {
+        "scope": "global",
+        "deadlinePressure": {
+          "need": "board_train",
+          "graceMin": 20, // 距检票截止 <20 分钟：购物/餐饮效用 ×0.2
+          "panicMin": 8, // <8 分钟：除赶往闸机外所有活动效用归零，步速 ×1.3
+        },
+      },
+      // 软规则：候车时间充裕（>40min）时购物/餐饮效用加成
+      {
+        "scope": "global",
+        "slackBonus": {
+          "thresholdMin": 40,
+          "boost": { "shopping": 0.3, "hunger": 0.2 },
+        },
+      },
+    ],
+  },
+
+  // ───────────────────────── ③ 决策层：画像 ─────────────────────────
+  "agentProfiles": {
+    "business_commuter": {
+      "ratio": 0.3,
+      "groupSize": { "dist": "fixed", "value": 1 },
+      "arrivalBeforeDepartureMin": { "dist": "normal", "mean": 35, "sd": 12 },
+      "needs": { "board_train": 1.0, "hunger": 0.2, "shopping": 0.1, "toilet": 0.3 },
+      "needGrowth": { "hunger": 0.1, "toilet": 0.15 },
+      "walkSpeedMps": { "dist": "normal", "mean": 1.5, "sd": 0.15 },
+      "flagsAtSpawn": ["has_ticket"], // 电子票，跳过取票
+    },
+    "leisure_traveler": {
+      "ratio": 0.4,
+      "groupSize": {
+        "dist": "discrete",
+        "values": [1, 2, 3],
+        "weights": [0.4, 0.4, 0.2],
+      },
+      "arrivalBeforeDepartureMin": { "dist": "normal", "mean": 65, "sd": 20 },
+      "needs": { "board_train": 1.0, "hunger": 0.5, "shopping": 0.5, "toilet": 0.3 },
+      "needGrowth": { "hunger": 0.15, "toilet": 0.15 },
+      "walkSpeedMps": { "dist": "normal", "mean": 1.25, "sd": 0.2 },
+      "flagsAtSpawn": ["has_ticket"],
+      "luggageFactor": 0.85, // 行李拖慢步速、增大占用半径
+    },
+    "family_group": {
+      "ratio": 0.18,
+      "groupSize": {
+        "dist": "discrete",
+        "values": [3, 4, 5],
+        "weights": [0.5, 0.35, 0.15],
+      },
+      "groupRule": "leader_follow",
+      "arrivalBeforeDepartureMin": { "dist": "normal", "mean": 80, "sd": 25 },
+      "needs": { "board_train": 1.0, "hunger": 0.6, "shopping": 0.3, "toilet": 0.5 },
+      "walkSpeedMps": { "dist": "normal", "mean": 1.0, "sd": 0.15 },
+      "needsTicketPickup": 0.3, // 30% 需先去取票机
+    },
+    "elderly_traveler": {
+      "ratio": 0.12,
+      "arrivalBeforeDepartureMin": { "dist": "normal", "mean": 95, "sd": 30 },
+      "needs": { "board_train": 1.0, "hunger": 0.3, "shopping": 0.1, "toilet": 0.6 },
+      "walkSpeedMps": { "dist": "normal", "mean": 0.9, "sd": 0.15 },
+      "needsTicketPickup": 0.6,
+    },
+  },
+
+  // ───────────────────── ④ 列车时刻表（DES 事件，扩展②） ─────────────────────
+  "events": {
+    "trainSchedule": [
+      // 每趟车定义：到点自动触发"开检→截止→发车"事件链，乘客在 spawn 时被分配车次
+      {
+        "trainId": "G101",
+        "departure": "08:00",
+        "gateId": "gate_A",
+        "passengers": 800,
+        "gateOpenBeforeMin": 25,
+        "gateCloseBeforeMin": 5,
+      },
+      {
+        "trainId": "G103",
+        "departure": "08:20",
+        "gateId": "gate_B",
+        "passengers": 950,
+        "gateOpenBeforeMin": 25,
+        "gateCloseBeforeMin": 5,
+      },
+      {
+        "trainId": "D205",
+        "departure": "08:35",
+        "gateId": "gate_A",
+        "passengers": 600,
+        "gateOpenBeforeMin": 25,
+        "gateCloseBeforeMin": 5,
+      },
+      // 乘客生成：departure - arrivalBeforeDepartureMin 的分布反推每个 agent 的进站时刻
+    ],
+    "arrivalTrains": [
+      // 到达客流：瞬时脉冲式生成（一车人 3 分钟内涌出站台→出站通道）
+      {
+        "trainId": "G102",
+        "arrival": "08:10",
+        "platformId": "platform_2",
+        "passengers": 700,
+        "dischargeMin": 3,
+      },
+    ],
+  },
+
+  // ─────────────────────── 验收断言（进 CI） ───────────────────────
+  "acceptance": [
+    "开检事件后 2 分钟内对应闸机出现排队峰值",
+    "panic 状态 agent 占比 < 5%（若超出说明到站时间分布或检票窗口参数不合理）",
+    "安检口排队峰值出现在发车密集时段前 30~50 分钟",
+    "到达脉冲时出站通道密度 < 2.5 人/㎡（超出则通道宽度不足，这正是工具要暴露的问题）",
+  ],
+}

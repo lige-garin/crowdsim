@@ -1,0 +1,230 @@
+// hospital.rules.json — 医院门诊规则包
+// 范式特点：流程链驱动（process-chain）。患者沿"挂号→候诊→就诊→检查→复诊→缴费→取药"
+// 的 DAG 流转，且存在概率分支（是否需要检查）。需要 schema 扩展③：概率性授予 grantsProb。
+{
+  "rulepackId": "hospital_outpatient_v1",
+  "name": "医院门诊楼",
+
+  // ───────────────────────── ① 空间语义层 ─────────────────────────
+  "spaceTypes": {
+    "registration_desk": {
+      "serviceMode": "queue_service",
+      "servicePoints": 5,
+      "serviceTime": { "dist": "normal", "meanMin": 2.5, "sdMin": 1 },
+      "grants": ["registered"],
+      "satisfies": { "register": 1.0 },
+    },
+    "self_service_kiosk": {
+      "serviceMode": "queue_service",
+      "servicePoints": 10,
+      "serviceTime": { "dist": "normal", "meanMin": 1, "sdMin": 0.3 },
+      "grants": ["registered"],
+      "satisfies": { "register": 1.0 },
+      "notes": "年轻患者偏好自助机，老年患者偏好人工窗口——由画像的 spacePreference 控制",
+    },
+    "triage_desk": {
+      "serviceMode": "queue_service",
+      "servicePoints": 2,
+      "serviceTime": { "dist": "normal", "meanMin": 1.5, "sdMin": 0.5 },
+      "requires": ["registered"],
+      "grants": ["triaged"],
+      "satisfies": { "triage": 1.0 },
+    },
+    "waiting_area": {
+      "serviceMode": "dwell",
+      "seats": 200,
+      "dwellTime": { "dist": "passthrough" }, // 等待时长由诊室叫号决定
+      "comfortDensity": 1.2,
+      "satisfies": { "wait_consult": 1.0 },
+      "notes": "叫号模式：agent 在此等待绑定诊室的 queue token，被叫到才移动",
+    },
+    "consultation_room": {
+      "serviceMode": "queue_service",
+      "queueDiscipline": "ticket_call", // 叫号制：排队不在门口物理排，而在候诊区虚拟排
+      "servicePoints": 1, // 每间诊室 1 医生；编辑器中放 N 个实例
+      "serviceTime": { "dist": "lognormal", "meanMin": 8, "sigma": 0.5 },
+      "requires": ["triaged"],
+      "grantsProb": [
+        // ★扩展③：概率分支
+        { "p": 0.55, "grants": ["needs_test"] }, // 55% 开检查单
+        { "p": 0.45, "grants": ["consulted"] }, // 45% 直接看完
+      ],
+      "reentry": {
+        // 检查完回来复诊
+        "when": ["test_done"],
+        "priorityBoost": true, // 复诊优先叫号
+        "serviceTime": { "dist": "normal", "meanMin": 4, "sdMin": 1.5 },
+        "grants": ["consulted"],
+      },
+      "satisfies": { "consult": 1.0 },
+    },
+    "blood_test_lab": {
+      "serviceMode": "queue_service",
+      "servicePoints": 6,
+      "serviceTime": { "dist": "normal", "meanMin": 3, "sdMin": 1 },
+      "requires": ["needs_test", "test_paid"],
+      "grantsProb": [
+        {
+          "p": 1.0,
+          "grants": ["test_done"],
+          "delayMin": { "dist": "normal", "mean": 30, "sd": 10 },
+        },
+      ], // 抽完血等报告 30 分钟（期间 agent 回候诊区/休息区）
+      "openHours": [
+        [7.5, 11.5],
+        [13.5, 16.0],
+      ],
+      "satisfies": { "do_test": 1.0 },
+    },
+    "imaging_center": {
+      "serviceMode": "queue_service",
+      "servicePoints": 3,
+      "serviceTime": { "dist": "normal", "meanMin": 12, "sdMin": 4 },
+      "requires": ["needs_test", "test_paid"],
+      "grants": ["test_done"],
+      "satisfies": { "do_test": 1.0 },
+    },
+    "cashier": {
+      "serviceMode": "queue_service",
+      "servicePoints": 4,
+      "serviceTime": { "dist": "normal", "meanMin": 1.5, "sdMin": 0.5 },
+      "satisfies": { "pay": 1.0 },
+      "grantsByContext": [
+        // 同一窗口按来意授予不同 flag
+        { "ifHas": ["needs_test"], "ifNot": ["test_paid"], "grants": ["test_paid"] },
+        { "ifHas": ["consulted"], "ifNot": ["bill_paid"], "grants": ["bill_paid"] },
+      ],
+      "notes": "移动支付普及率由画像 mobilePayRate 控制——支付完成的 agent 跳过收费窗口",
+    },
+    "pharmacy": {
+      "serviceMode": "queue_service",
+      "servicePoints": 4,
+      "serviceTime": { "dist": "normal", "meanMin": 2.5, "sdMin": 1 },
+      "requires": ["consulted", "bill_paid"],
+      "grants": ["meds_collected"],
+      "satisfies": { "get_meds": 1.0 },
+    },
+    "restroom": {
+      "serviceMode": "queue_service",
+      "servicePoints": 8,
+      "serviceTime": { "dist": "lognormal", "meanMin": 3, "sigma": 0.4 },
+      "satisfies": { "toilet": 1.0 },
+    },
+    "cafe_corner": {
+      "serviceMode": "queue_service",
+      "servicePoints": 1,
+      "seats": 30,
+      "serviceTime": { "dist": "normal", "meanMin": 12, "sdMin": 5 },
+      "satisfies": { "hunger": 0.8 },
+      "notes": "等报告的 30 分钟里，这里和候诊区是主要去处",
+    },
+    "main_exit": { "serviceMode": "transit", "isExitFor": ["*"] },
+  },
+
+  // ───────────────────────── ② 流程约束层 ─────────────────────────
+  "constraints": {
+    "agentFlags": [
+      "registered",
+      "triaged",
+      "needs_test",
+      "test_paid",
+      "test_done",
+      "consulted",
+      "bill_paid",
+      "meds_collected",
+    ],
+    "rules": [
+      // 主流程 DAG 由各空间的 requires/grants 已经表达，这里只写跨空间规则：
+      {
+        "scope": "global",
+        "exitCondition": {
+          "anyOf": [
+            ["meds_collected"], // 取完药走人
+            ["consulted", "bill_paid", "no_meds"], // 无需取药（概率在画像中）
+          ],
+        },
+      },
+      // 软规则：等待报告期间（has needs_test+延时未到），candidate 活动限定低承诺类型
+      {
+        "scope": "global",
+        "pendingDelay": { "preferTags": ["waiting", "food", "toilet"] },
+      },
+      // 陪护规则：patient 为 leader，陪护 follower；排队/就诊时陪护在候诊区等待
+      {
+        "scope": "group",
+        "escortWaitsAt": "waiting_area",
+        "exceptIn": ["imaging_center"],
+      }, // 影像科陪护可陪同到门口
+    ],
+  },
+
+  // ───────────────────────── ③ 决策层：画像 ─────────────────────────
+  "agentProfiles": {
+    "adult_patient_solo": {
+      "ratio": 0.35,
+      "groupSize": { "dist": "fixed", "value": 1 },
+      "needs": { "register": 1.0, "consult": 1.0, "toilet": 0.3, "hunger": 0.2 },
+      "needGrowth": { "toilet": 0.15, "hunger": 0.12 },
+      "walkSpeedMps": { "dist": "normal", "mean": 1.2, "sd": 0.15 },
+      "spacePreference": { "self_service_kiosk": 0.8, "registration_desk": 0.2 },
+      "mobilePayRate": 0.85,
+      "noMedsProb": 0.25,
+    },
+    "elderly_patient_escorted": {
+      "ratio": 0.3,
+      "groupSize": { "dist": "discrete", "values": [2, 3], "weights": [0.8, 0.2] },
+      "groupRule": "leader_follow",
+      "needs": { "register": 1.0, "consult": 1.0, "toilet": 0.5, "hunger": 0.3 },
+      "walkSpeedMps": { "dist": "normal", "mean": 0.8, "sd": 0.15 },
+      "spacePreference": { "registration_desk": 0.7, "self_service_kiosk": 0.3 },
+      "mobilePayRate": 0.3,
+      "noMedsProb": 0.1,
+      "needsTestProbOverride": 0.7, // 老年患者开检查比例更高
+    },
+    "elderly_patient_solo": {
+      "ratio": 0.15,
+      "walkSpeedMps": { "dist": "normal", "mean": 0.75, "sd": 0.12 },
+      "spacePreference": { "registration_desk": 0.9, "self_service_kiosk": 0.1 },
+      "mobilePayRate": 0.15,
+      "confusionFactor": 0.2, // 20% 概率走错区域后求助分诊台（重定向）
+      "needs": { "register": 1.0, "consult": 1.0, "toilet": 0.5 },
+    },
+    "parent_with_child": {
+      "ratio": 0.2,
+      "groupSize": { "dist": "discrete", "values": [2, 3], "weights": [0.7, 0.3] },
+      "groupRule": "leader_follow", // 家长是 leader，患儿 follower
+      "needs": { "register": 1.0, "consult": 1.0, "toilet": 0.6, "hunger": 0.4 },
+      "walkSpeedMps": { "dist": "normal", "mean": 1.0, "sd": 0.15 },
+      "mobilePayRate": 0.9,
+    },
+  },
+
+  // ───────────────────── ④ 到达模式与事件 ─────────────────────
+  "events": {
+    "arrivalProfile": [
+      // 门诊典型双峰：早高峰陡峭（开诊即峰值），午后平缓
+      { "from": "07:30", "to": "08:30", "ratePerHour": 600 },
+      { "from": "08:30", "to": "10:30", "ratePerHour": 450 },
+      { "from": "10:30", "to": "13:30", "ratePerHour": 150 },
+      { "from": "13:30", "to": "15:30", "ratePerHour": 300 },
+      { "from": "15:30", "to": "17:00", "ratePerHour": 100 },
+    ],
+    "scheduled": [
+      {
+        "time": "11:30",
+        "action": "close_space",
+        "target": "blood_test_lab",
+        "note": "检验科午休关闭——观察候诊区滞留增量",
+      },
+    ],
+  },
+
+  // ─────────────────────── 验收断言（进 CI） ───────────────────────
+  "acceptance": [
+    "8:00-9:00 挂号区排队峰值，且自助机:人工窗口分流比约 6:4",
+    "候诊区峰值人数出现在 9:00-10:30（叫号制下患者滞留于此）",
+    "药房排队峰值滞后挂号峰值 60~120 分钟（流程链传导延迟）",
+    "检验科 11:30 关闭后，候诊区出现等报告患者滞留小高峰",
+    "全天患者平均在院时长：无检查 60±20 分钟，有检查 130±40 分钟",
+  ],
+}

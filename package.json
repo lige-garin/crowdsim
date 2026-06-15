@@ -1,0 +1,30 @@
+{
+  "name": "crowdsim",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm build:wasm && pnpm --filter @crowdsim/app dev",
+    "dev:e2e": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm build:wasm && pnpm --filter @crowdsim/app dev -- --host 127.0.0.1 --port 5173",
+    "build": "pnpm build:wasm && pnpm -r build",
+    "build:wasm": "wasm-pack build packages/core-behavior --target web --out-dir ../app/src/wasm/core-behavior --release",
+    "e2e": "playwright test",
+    "lint": "eslint .",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "test": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm build:wasm && pnpm test:rust && pnpm -r test",
+    "test:rust": "cargo test --manifest-path packages/core-behavior/Cargo.toml",
+    "typecheck": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm build:wasm && pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@playwright/test": "^1.61.0",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "prettier": "latest",
+    "typescript-eslint": "latest"
+  }
+}

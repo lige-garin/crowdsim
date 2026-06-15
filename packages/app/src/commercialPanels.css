@@ -1,0 +1,123 @@
+.dashboard-panel,
+.dashboard-v2-panel,
+.brand-intelligence-panel,
+.probe-panel,
+.evacuation-panel {
+  gap: 11px;
+  padding: 14px;
+  border: 1px solid #dce3ee;
+  border-radius: var(--product-radius);
+  background: #ffffff;
+  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.03);
+}
+
+.dashboard-panel::before,
+.dashboard-v2-panel::before,
+.brand-intelligence-panel::before,
+.probe-panel::before,
+.evacuation-panel::before {
+  display: none;
+}
+
+.dashboard-metrics {
+  gap: 8px;
+}
+
+.dashboard-metric,
+.brand-agent-strip article,
+.brand-choice-card,
+.brand-rank-list article,
+.comparison-card,
+.workspace-row,
+.template-row {
+  border-color: #e0e6ef;
+  border-radius: var(--product-radius-sm);
+  background: #f9fbfe;
+}
+
+.dashboard-metric {
+  min-height: 76px;
+  padding: 11px;
+}
+
+.dashboard-metric span,
+.brand-agent-strip span,
+.brand-choice-card span,
+.brand-rank-list span,
+.comparison-card span,
+.workspace-row span,
+.template-row span {
+  color: #697586;
+  font-size: 0.66rem;
+  font-weight: 760;
+}
+
+.dashboard-metric strong,
+.brand-agent-strip strong,
+.brand-choice-card strong,
+.brand-rank-list strong,
+.comparison-card strong,
+.workspace-row strong,
+.template-row strong {
+  color: #172033;
+  font-weight: 760;
+}
+
+.dashboard-chart,
+.dashboard-v2-chart,
+.brand-field-map,
+.evacuation-panel svg {
+  border-color: #e0e6ef;
+  border-radius: var(--product-radius-sm);
+  background: #ffffff;
+}
+
+.dashboard-v2-chart polyline {
+  stroke: var(--lab-blue);
+  stroke-width: 2.4;
+}
+
+.probe-panel p,
+.evacuation-panel p {
+  color: #667085;
+}
+
+.probe-panel code,
+.evacuation-panel code,
+.dashboard-summary,
+.comparison-card code,
+.brand-reasons code {
+  border-color: #e0e6ef;
+  border-radius: var(--product-radius-sm);
+  background: #f7f9fc;
+  color: #29384d;
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.brand-choice-card {
+  border-color: #cfd9ea;
+  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
+}
+
+.brand-field-halo {
+  fill: rgba(37, 87, 214, 0.1);
+  stroke: rgba(37, 87, 214, 0.24);
+}
+
+.brand-field-core {
+  fill: var(--lab-blue);
+  opacity: 0.82;
+}
+
+.brand-rank-list meter {
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.comparison-card::before,
+.workspace-row::before,
+.template-row::before {
+  background: #9aa9bf;
+  opacity: 0.42;
+}

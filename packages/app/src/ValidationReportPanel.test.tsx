@@ -1,0 +1,47 @@
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "./i18n";
+import { ValidationReportPanel } from "./ValidationReportPanel";
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
+describe("ValidationReportPanel", () => {
+  it("summarizes the M5 calibration report export bundle", () => {
+    render(
+      <I18nProvider>
+        <ValidationReportPanel />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "校准报告" })).toBeInTheDocument();
+    expect(screen.getByText(/4\/4\s+通过/)).toBeInTheDocument();
+    expect(screen.getByText(/PDF-ready yes/)).toBeInTheDocument();
+    expect(screen.getByText(/Chrome\/Edge\/Safari/)).toBeInTheDocument();
+    expect(screen.getByText(/physics error/)).toBeInTheDocument();
+    expect(screen.getByText(/AI 校准摘要/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打印 / 导出 PDF" })).toBeInTheDocument();
+  });
+
+  it("opens a printable HTML report bundle", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockImplementation(() => "blob:report");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+
+    render(
+      <I18nProvider>
+        <ValidationReportPanel />
+      </I18nProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打印 / 导出 PDF" }));
+
+    expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob));
+    expect(open).toHaveBeenCalledWith("blob:report", "_blank", "noopener,noreferrer");
+    expect(screen.getByText("已打开报告")).toBeInTheDocument();
+  });
+});

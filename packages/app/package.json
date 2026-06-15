@@ -1,0 +1,37 @@
+{
+  "name": "@crowdsim/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "@crowdsim/collab": "workspace:*",
+    "@crowdsim/core-gpu": "workspace:*",
+    "@crowdsim/scene-schema": "workspace:*",
+    "echarts": "^6.1.0",
+    "react": "latest",
+    "react-dom": "latest",
+    "three": "^0.184.0",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/three": "^0.184.1",
+    "@vitejs/plugin-react": "latest",
+    "@webgpu/types": "^0.1.70",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}

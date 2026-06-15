@@ -1,0 +1,198 @@
+.contact-network-view {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(185, 199, 214, 0.88);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(0, 91, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 91, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(135deg, #ffffff 0%, #f7fbff 58%, #eef7ff 100%);
+  background-size:
+    28px 28px,
+    28px 28px,
+    auto;
+  box-shadow: var(--lab-shadow);
+  color: var(--lab-ink);
+}
+
+.contact-network-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.5fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.contact-network-header h2 {
+  color: var(--lab-ink);
+  font-size: 1.35rem;
+}
+
+.contact-network-header p:not(.eyebrow) {
+  max-width: 56ch;
+  margin: 8px 0 0;
+  color: var(--lab-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.contact-network-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.contact-network-stats article {
+  display: grid;
+  gap: 4px;
+  min-height: 62px;
+  padding: 9px 10px;
+  border: 1px solid rgba(219, 228, 238, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.contact-network-stats span {
+  color: var(--lab-muted);
+  font-family: var(--lab-mono);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.contact-network-stats strong {
+  color: var(--lab-blue);
+  font-family: var(--lab-mono);
+  font-size: 1.18rem;
+  line-height: 1;
+}
+
+.contact-network-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: visible;
+}
+
+.contact-edge {
+  fill: none;
+  stroke-linecap: round;
+  opacity: 0.84;
+  vector-effect: non-scaling-stroke;
+  animation: contact-edge-flow 3.2s linear infinite;
+}
+
+.contact-edge-care {
+  stroke: var(--lab-blue);
+  stroke-dasharray: 0.8 1.35;
+}
+
+.contact-edge-group {
+  stroke: #91b000;
+  stroke-dasharray: 1.7 0.9;
+}
+
+.contact-edge-proximity {
+  stroke: var(--lab-cyan);
+  stroke-dasharray: 0.35 1.1;
+}
+
+.contact-edge-label {
+  fill: #24506f;
+  font-family: var(--lab-mono);
+  font-size: 1.45px;
+  font-weight: 850;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.45px;
+  text-anchor: middle;
+}
+
+.contact-node {
+  filter: url("#contact-node-glow");
+}
+
+.contact-node-halo {
+  opacity: 0.22;
+}
+
+.contact-node-core {
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 0.34;
+}
+
+.contact-node-doctor .contact-node-halo,
+.contact-node-doctor .contact-node-core {
+  fill: var(--lab-blue);
+}
+
+.contact-node-nurse .contact-node-halo,
+.contact-node-nurse .contact-node-core {
+  fill: var(--lab-green);
+}
+
+.contact-node-patient .contact-node-halo,
+.contact-node-patient .contact-node-core {
+  fill: var(--lab-acid);
+}
+
+.contact-node-family .contact-node-halo,
+.contact-node-family .contact-node-core,
+.contact-node-visitor .contact-node-halo,
+.contact-node-visitor .contact-node-core {
+  fill: var(--lab-cyan);
+}
+
+.contact-node text {
+  fill: #10253d;
+  font-family: var(--lab-mono);
+  font-size: 1.78px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 0.55px;
+  text-anchor: middle;
+}
+
+.contact-network-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #36506d;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.contact-network-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.contact-legend-line {
+  display: inline-block;
+  width: 28px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.contact-legend-line-care {
+  background: var(--lab-blue);
+}
+
+.contact-legend-line-group {
+  background: #91b000;
+}
+
+.contact-legend-line-proximity {
+  background: var(--lab-cyan);
+}
+
+@keyframes contact-edge-flow {
+  to {
+    stroke-dashoffset: -8;
+  }
+}

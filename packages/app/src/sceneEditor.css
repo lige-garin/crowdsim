@@ -1,0 +1,447 @@
+.scene-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-filebar,
+.editor-toolbar,
+.editor-status,
+.editor-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.editor-filebar {
+  align-items: center;
+}
+
+.editor-filebar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-filebar label span,
+.editor-filebar > span,
+.editor-status {
+  color: var(--lab-muted);
+  font-family: var(--lab-mono);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.editor-toolbar button {
+  min-width: 64px;
+  padding: 0 10px;
+}
+
+.editor-filebar button:disabled,
+.editor-toolbar button:disabled,
+.editor-draft-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.editor-canvas-wrap {
+  overflow: hidden;
+  border: 1px solid rgba(185, 199, 214, 0.88);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(0, 91, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 91, 255, 0.045) 1px, transparent 1px), #ffffff;
+  box-shadow: 0 18px 46px rgba(29, 55, 89, 0.08);
+}
+
+.editor-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  touch-action: none;
+}
+
+.editor-floor {
+  fill: #ffffff;
+}
+
+.editor-basemap {
+  opacity: 0.36;
+  pointer-events: none;
+}
+
+.editor-grid line {
+  stroke: rgba(0, 91, 255, 0.08);
+  stroke-width: 0.045;
+}
+
+.editor-heatmap {
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.editor-heatmap rect {
+  fill: rgba(0, 183, 255, 0.42);
+  stroke: rgba(0, 91, 255, 0.18);
+  stroke-width: 0.04;
+}
+
+.editor-live-agents {
+  pointer-events: none;
+}
+
+.editor-live-agent {
+  transition: transform 90ms linear;
+}
+
+.editor-live-agent-shadow {
+  fill: rgba(15, 23, 42, 0.18);
+}
+
+.editor-live-agent-body {
+  fill: #118672;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.18;
+}
+
+.editor-live-agent-heading {
+  stroke: #1d4ed8;
+  stroke-linecap: round;
+  stroke-width: 0.16;
+}
+
+.ai-image-overlay {
+  pointer-events: none;
+}
+
+.ai-image-overlay-title {
+  fill: var(--lab-blue);
+  font-size: 1.35px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.35;
+}
+
+.ai-image-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 0.38;
+}
+
+.ai-image-line-wall {
+  stroke: var(--lab-cyan);
+}
+
+.ai-image-line-count-line {
+  stroke: var(--lab-blue);
+  stroke-dasharray: 0.7 0.4;
+}
+
+.ai-image-entrance {
+  fill: rgba(0, 183, 255, 0.16);
+  stroke: var(--lab-cyan);
+  stroke-width: 0.25;
+}
+
+.ai-image-entrance-sink {
+  fill: rgba(255, 77, 61, 0.13);
+  stroke: var(--lab-red);
+}
+
+.ai-image-label {
+  fill: #064f7c;
+  font-size: 1.1px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.3;
+  text-anchor: middle;
+}
+
+.ai-image-item.needs-review .ai-image-line,
+.ai-image-item.needs-review .ai-image-entrance {
+  stroke: #89a800;
+  stroke-dasharray: 0.8 0.42;
+  stroke-width: 0.55;
+}
+
+.ai-image-item.needs-review .ai-image-label {
+  fill: #4b6100;
+}
+
+.editor-wall-hit {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.editor-zone {
+  cursor: grab;
+}
+
+.editor-zone polygon {
+  fill: rgba(0, 183, 255, 0.12);
+  pointer-events: all;
+  stroke: rgba(5, 76, 120, 0.45);
+  stroke-width: 0.2;
+}
+
+.editor-zone-jewelry polygon,
+.editor-zone-luxury polygon {
+  fill: rgba(201, 255, 45, 0.18);
+}
+
+.editor-zone-cosmetics polygon {
+  fill: rgba(255, 72, 173, 0.13);
+}
+
+.editor-zone-dining polygon,
+.editor-zone-restaurant polygon {
+  fill: rgba(255, 161, 67, 0.16);
+}
+
+.editor-zone-corridor polygon,
+.editor-zone-atrium polygon {
+  fill: rgba(148, 163, 184, 0.12);
+}
+
+.editor-zone text {
+  fill: #12324a;
+  font-size: 1.25px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-store-lots {
+  pointer-events: none;
+}
+
+.editor-store-lots polygon {
+  fill: rgba(255, 255, 255, 0.16);
+  stroke: rgba(32, 51, 73, 0.52);
+  stroke-dasharray: 0.6 0.35;
+  stroke-width: 0.18;
+}
+
+.editor-wall,
+.editor-wall-draft {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-wall {
+  stroke: #203349;
+  stroke-width: 0.4;
+}
+
+.editor-wall-draft {
+  stroke: #7b9700;
+  stroke-dasharray: 1.2 0.8;
+  stroke-width: 0.35;
+}
+
+.editor-count-line {
+  fill: none;
+  pointer-events: none;
+  stroke: var(--lab-blue);
+  stroke-dasharray: 0.8 0.45;
+  stroke-linecap: round;
+  stroke-width: 0.35;
+}
+
+.editor-count-label {
+  fill: var(--lab-blue);
+  font-size: 1.35px;
+  font-weight: 850;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-shop,
+.editor-service {
+  cursor: grab;
+}
+
+.editor-shop rect,
+.editor-service rect {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+}
+
+.editor-shop rect {
+  fill: #c8ff2d;
+}
+
+.editor-shop-category-jewelry rect,
+.editor-shop-category-luxury rect {
+  fill: #d6f76f;
+}
+
+.editor-shop-category-cosmetics rect {
+  fill: #ffd0e8;
+}
+
+.editor-shop-category-dining rect,
+.editor-shop-category-restaurant rect {
+  fill: #ffd28a;
+}
+
+.editor-shop-category-fastFashion rect {
+  fill: #bdf4ff;
+}
+
+.editor-shop-extrusions {
+  pointer-events: none;
+}
+
+.editor-shop-volume polygon {
+  fill: rgba(200, 255, 45, 0.42);
+  stroke: rgba(17, 24, 39, 0.28);
+  stroke-width: 0.12;
+}
+
+.editor-shop-volume .editor-shop-side {
+  fill: rgba(37, 99, 235, 0.18);
+}
+
+.editor-shop-volume .editor-shop-front {
+  fill: rgba(255, 255, 255, 0.38);
+}
+
+.editor-shop-volume text {
+  fill: #132033;
+  font-size: 1.05px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.22;
+  text-anchor: middle;
+}
+
+.editor-shop-volume.editor-shop-category-jewelry polygon,
+.editor-shop-volume.editor-shop-category-luxury polygon {
+  fill: rgba(214, 247, 111, 0.46);
+}
+
+.editor-shop-volume.editor-shop-category-cosmetics polygon {
+  fill: rgba(255, 208, 232, 0.48);
+}
+
+.editor-shop-volume.editor-shop-category-dining polygon,
+.editor-shop-volume.editor-shop-category-restaurant polygon {
+  fill: rgba(255, 210, 138, 0.5);
+}
+
+.editor-service-counter {
+  fill: var(--lab-blue);
+}
+
+.editor-service-gate {
+  fill: #334155;
+}
+
+.editor-shop text,
+.editor-service text {
+  fill: #111827;
+  font-size: 1.35px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-service text {
+  fill: #ffffff;
+}
+
+.editor-source,
+.editor-sink,
+.editor-target {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+}
+
+.editor-source {
+  fill: var(--lab-cyan);
+}
+
+.editor-sink {
+  fill: var(--lab-red);
+}
+
+.editor-target {
+  fill: var(--lab-acid);
+}
+
+.editor-node {
+  cursor: grab;
+}
+
+.editor-node text {
+  fill: #111827;
+  font-size: 1.5px;
+  font-weight: 850;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-node.selected .editor-source,
+.editor-node.selected .editor-sink,
+.editor-node.selected .editor-target,
+.editor-zone.selected polygon,
+.editor-wall.selected,
+.editor-shop.selected rect,
+.editor-service.selected rect,
+.editor-count-line.selected {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-param-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(219, 228, 238, 0.92);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--lab-muted);
+  font-size: 0.78rem;
+}
+
+.editor-param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 8px;
+}
+
+.editor-param-grid > span,
+.editor-param-grid label {
+  display: grid;
+  gap: 4px;
+  font-weight: 780;
+}
+
+.editor-param-grid input,
+.editor-param-grid select {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--lab-line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-weight: 800;
+}
+
+.editor-param-grid button {
+  min-height: 32px;
+}

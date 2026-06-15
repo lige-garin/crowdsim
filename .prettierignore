@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+.tmp
+pnpm-lock.yaml
+projectplan.md
+packages/core-behavior/target/
+packages/app/src/wasm/
