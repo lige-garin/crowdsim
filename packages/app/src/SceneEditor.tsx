@@ -27,10 +27,15 @@ import {
 } from "./sceneEditorBasemap";
 import {
   addCountLine,
+  addBuilding,
   addEntrance,
+  addHazard,
+  addObstacle,
+  addRoad,
   addServicePoint,
   addShop,
   addTarget,
+  addTransitStop,
   addWall,
   addZone,
   createEditorDocumentFromScene,
@@ -72,14 +77,19 @@ const gridSize = 2;
 const storageKey = "crowdsim.scene.v1";
 const editorTools: readonly EditorTool[] = [
   "select",
+  "road",
   "zone",
   "wall",
+  "building",
   "source",
   "sink",
   "target",
   "shop",
+  "transitStop",
   "counter",
   "gate",
+  "obstacle",
+  "hazard",
   "countLine",
 ];
 
@@ -263,6 +273,16 @@ export function SceneEditor({
       return;
     }
 
+    if (tool === "road") {
+      commit(addRoad(document, point));
+      return;
+    }
+
+    if (tool === "building") {
+      commit(addBuilding(document, point));
+      return;
+    }
+
     if (tool === "source" || tool === "sink") {
       commit(addEntrance(document, tool, point));
       return;
@@ -273,8 +293,23 @@ export function SceneEditor({
       return;
     }
 
+    if (tool === "transitStop") {
+      commit(addTransitStop(document, point));
+      return;
+    }
+
     if (tool === "counter" || tool === "gate") {
       commit(addServicePoint(document, tool, point));
+      return;
+    }
+
+    if (tool === "obstacle") {
+      commit(addObstacle(document, point));
+      return;
+    }
+
+    if (tool === "hazard") {
+      commit(addHazard(document, point));
       return;
     }
 

@@ -242,11 +242,16 @@ export function SceneEditorLayout({
 
 function countDocumentObjects(document: EditorDocument) {
   return {
+    buildings: document.buildings.length,
     countLines: document.countLines.length,
     entrances: document.entrances.length,
+    hazards: document.hazards.length,
+    obstacles: document.obstacles.length,
+    roads: document.roads.length,
     servicePoints: document.servicePoints.length,
     shops: document.shops.length,
     targets: document.targets.length,
+    transitStops: document.transitStops.length,
     walls: document.walls.length,
     zones: document.zones.length,
   };

@@ -6,14 +6,19 @@ import {
 
 export type EditorTool =
   | "select"
+  | "road"
   | "zone"
   | "wall"
+  | "building"
   | "source"
   | "sink"
   | "target"
   | "shop"
+  | "transitStop"
   | "counter"
   | "gate"
+  | "obstacle"
+  | "hazard"
   | "countLine";
 
 export type EditorWall = {
@@ -75,19 +80,110 @@ export type EditorCountLine = {
   points: [ScenePoint, ScenePoint];
 };
 
+type EditorRoadDirection = CrowdSimScene["roads"][number]["direction"];
+type EditorBuildingKind = CrowdSimScene["buildings"][number]["kind"];
+type EditorTransitStopKind = CrowdSimScene["transitStops"][number]["kind"];
+type EditorObstacleKind = CrowdSimScene["obstacles"][number]["kind"];
+type EditorHazardKind = CrowdSimScene["hazards"][number]["kind"];
+
+export type EditorRoad = {
+  id: string;
+  name?: string;
+  points: ScenePoint[];
+  widthMeters: number;
+  direction: EditorRoadDirection;
+  speedLimitMetersPerSecond: number;
+  capacityPerMinute: number;
+  walkable: boolean;
+  transitOnly: boolean;
+};
+
+export type EditorBuilding = {
+  id: string;
+  name?: string;
+  kind: EditorBuildingKind;
+  points: ScenePoint[];
+  entrancePosition?: ScenePoint;
+  heightMeters: number;
+  floors: number;
+  residentCapacity: number;
+  workerCapacity: number;
+  visitorCapacity: number;
+};
+
+export type EditorTransitStop = {
+  id: string;
+  name?: string;
+  roadId?: string;
+  kind: EditorTransitStopKind;
+  position: ScenePoint;
+  capacity: number;
+  arrivalIntervalSeconds: number;
+  alightingPerArrival: number;
+  boardingCapacityPerMinute: number;
+  delayFactor: number;
+  active: boolean;
+};
+
+export type EditorObstacle = {
+  id: string;
+  name?: string;
+  kind: EditorObstacleKind;
+  geometryType: "polygon" | "polyline";
+  points: ScenePoint[];
+  blocksMovement: boolean;
+  routeCostMultiplier: number;
+};
+
+export type EditorHazard = {
+  id: string;
+  name?: string;
+  kind: EditorHazardKind;
+  position: ScenePoint;
+  radiusMeters: number;
+  affectedRoadId?: string;
+  affectedZoneId?: string;
+  startsAtSeconds: number;
+  endsAtSeconds?: number;
+  severity: number;
+  speedMultiplier: number;
+  visibilityMultiplier: number;
+  routeCostMultiplier: number;
+  riskScore: number;
+};
+
 export type EditorDocument = {
+  buildings: EditorBuilding[];
   countLines: EditorCountLine[];
   entrances: EditorEntrance[];
+  hazards: EditorHazard[];
   nextId: number;
+  obstacles: EditorObstacle[];
+  roads: EditorRoad[];
   servicePoints: EditorServicePoint[];
   shops: EditorShop[];
   targets: EditorTarget[];
+  transitStops: EditorTransitStop[];
   walls: EditorWall[];
   zones: EditorZone[];
 };
 
 export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocument {
   return {
+    buildings: scene.buildings.map((building) => ({
+      id: building.id,
+      name: building.name,
+      kind: building.kind,
+      points: building.footprint.points.map((point) => ({ ...point })),
+      entrancePosition: building.entrancePosition
+        ? { ...building.entrancePosition }
+        : undefined,
+      heightMeters: building.heightMeters,
+      floors: building.floors,
+      residentCapacity: building.residentCapacity,
+      workerCapacity: building.workerCapacity,
+      visitorCapacity: building.visitorCapacity,
+    })),
     countLines: scene.countLines.map((line) => ({
       id: line.id,
       points: [{ ...line.geometry.points[0] }, { ...line.geometry.points[1] }],
@@ -104,7 +200,43 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
             },
           ],
     ),
+    hazards: scene.hazards.map((hazard) => ({
+      id: hazard.id,
+      name: hazard.name,
+      kind: hazard.kind,
+      position: { ...hazard.position },
+      radiusMeters: hazard.radiusMeters,
+      affectedRoadId: hazard.affectedRoadId,
+      affectedZoneId: hazard.affectedZoneId,
+      startsAtSeconds: hazard.startsAtSeconds,
+      endsAtSeconds: hazard.endsAtSeconds,
+      severity: hazard.severity,
+      speedMultiplier: hazard.speedMultiplier,
+      visibilityMultiplier: hazard.visibilityMultiplier,
+      routeCostMultiplier: hazard.routeCostMultiplier,
+      riskScore: hazard.riskScore,
+    })),
     nextId: 1,
+    obstacles: scene.obstacles.map((obstacle) => ({
+      id: obstacle.id,
+      name: obstacle.name,
+      kind: obstacle.kind,
+      geometryType: obstacle.geometry.type,
+      points: obstacle.geometry.points.map((point) => ({ ...point })),
+      blocksMovement: obstacle.blocksMovement,
+      routeCostMultiplier: obstacle.routeCostMultiplier,
+    })),
+    roads: scene.roads.map((road) => ({
+      id: road.id,
+      name: road.name,
+      points: road.geometry.points.map((point) => ({ ...point })),
+      widthMeters: road.widthMeters,
+      direction: road.direction,
+      speedLimitMetersPerSecond: road.speedLimitMetersPerSecond,
+      capacityPerMinute: road.capacityPerMinute,
+      walkable: road.walkable,
+      transitOnly: road.transitOnly,
+    })),
     servicePoints: scene.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
       kind: servicePoint.kind,
@@ -137,6 +269,19 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       position: { ...target.position },
       radius: target.radius,
     })),
+    transitStops: scene.transitStops.map((stop) => ({
+      id: stop.id,
+      name: stop.name,
+      roadId: stop.roadId,
+      kind: stop.kind,
+      position: { ...stop.position },
+      capacity: stop.capacity,
+      arrivalIntervalSeconds: stop.arrivalIntervalSeconds,
+      alightingPerArrival: stop.alightingPerArrival,
+      boardingCapacityPerMinute: stop.boardingCapacityPerMinute,
+      delayFactor: stop.delayFactor,
+      active: stop.active,
+    })),
     walls: scene.walls.map((wall) => ({
       id: wall.id,
       points: wall.geometry.points.map((point) => ({ ...point })),
@@ -159,6 +304,32 @@ export function snapPoint(
   };
 }
 
+export function addRoad(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    roads: [
+      ...document.roads,
+      {
+        id: `road-${document.nextId}`,
+        points: [
+          { x: position.x - 10, y: position.y },
+          { x: position.x + 10, y: position.y },
+        ],
+        widthMeters: 6,
+        direction: "twoWay",
+        speedLimitMetersPerSecond: 1.4,
+        capacityPerMinute: 180,
+        walkable: true,
+        transitOnly: false,
+      },
+    ],
+  };
+}
+
 export function addWall(
   document: EditorDocument,
   points: ScenePoint[],
@@ -171,6 +342,30 @@ export function addWall(
       {
         id: `wall-${document.nextId}`,
         points: points.map((point) => ({ ...point })),
+      },
+    ],
+  };
+}
+
+export function addBuilding(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    buildings: [
+      ...document.buildings,
+      {
+        id: `building-${document.nextId}`,
+        kind: "mixedUse",
+        points: rectangleAround(position, 16, 10),
+        entrancePosition: { x: position.x, y: position.y + 5 },
+        heightMeters: 18,
+        floors: 5,
+        residentCapacity: 0,
+        workerCapacity: 80,
+        visitorCapacity: 120,
       },
     ],
   };
@@ -259,6 +454,31 @@ export function addShop(
   };
 }
 
+export function addTransitStop(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    transitStops: [
+      ...document.transitStops,
+      {
+        id: `transit-stop-${document.nextId}`,
+        roadId: document.roads.at(-1)?.id,
+        kind: "bus",
+        position: { ...position },
+        capacity: 80,
+        arrivalIntervalSeconds: 300,
+        alightingPerArrival: 24,
+        boardingCapacityPerMinute: 60,
+        delayFactor: 1,
+        active: true,
+      },
+    ],
+  };
+}
+
 export function addServicePoint(
   document: EditorDocument,
   kind: EditorServicePoint["kind"],
@@ -276,6 +496,56 @@ export function addServicePoint(
         width: kind === "gate" ? 4 : 3,
         serviceMeanSeconds: kind === "gate" ? 8 : 30,
         capacityPerMinute: kind === "gate" ? 120 : 30,
+      },
+    ],
+  };
+}
+
+export function addObstacle(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    obstacles: [
+      ...document.obstacles,
+      {
+        id: `obstacle-${document.nextId}`,
+        kind: "constructionBarrier",
+        geometryType: "polyline",
+        points: [
+          { x: position.x - 5, y: position.y },
+          { x: position.x + 5, y: position.y },
+        ],
+        blocksMovement: true,
+        routeCostMultiplier: 4,
+      },
+    ],
+  };
+}
+
+export function addHazard(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    hazards: [
+      ...document.hazards,
+      {
+        id: `hazard-${document.nextId}`,
+        kind: "roadClosure",
+        position: { ...position },
+        radiusMeters: 8,
+        affectedRoadId: document.roads.at(-1)?.id,
+        startsAtSeconds: 0,
+        severity: 0.5,
+        speedMultiplier: 0.6,
+        visibilityMultiplier: 0.8,
+        routeCostMultiplier: 2,
+        riskScore: 0.3,
       },
     ],
   };
@@ -311,6 +581,17 @@ export function moveEntity(
 ): EditorDocument {
   return {
     ...document,
+    buildings: document.buildings.map((building) =>
+      building.id === id
+        ? {
+            ...building,
+            points: building.points.map((point) => translatePoint(point, delta)),
+            entrancePosition: building.entrancePosition
+              ? translatePoint(building.entrancePosition, delta)
+              : undefined,
+          }
+        : building,
+    ),
     entrances: document.entrances.map((entrance) =>
       entrance.id === id
         ? {
@@ -318,6 +599,30 @@ export function moveEntity(
             position: translatePoint(entrance.position, delta),
           }
         : entrance,
+    ),
+    hazards: document.hazards.map((hazard) =>
+      hazard.id === id
+        ? {
+            ...hazard,
+            position: translatePoint(hazard.position, delta),
+          }
+        : hazard,
+    ),
+    obstacles: document.obstacles.map((obstacle) =>
+      obstacle.id === id
+        ? {
+            ...obstacle,
+            points: obstacle.points.map((point) => translatePoint(point, delta)),
+          }
+        : obstacle,
+    ),
+    roads: document.roads.map((road) =>
+      road.id === id
+        ? {
+            ...road,
+            points: road.points.map((point) => translatePoint(point, delta)),
+          }
+        : road,
     ),
     countLines: document.countLines.map((line) =>
       line.id === id
@@ -354,6 +659,14 @@ export function moveEntity(
           }
         : target,
     ),
+    transitStops: document.transitStops.map((stop) =>
+      stop.id === id
+        ? {
+            ...stop,
+            position: translatePoint(stop.position, delta),
+          }
+        : stop,
+    ),
     zones: document.zones.map((zone) =>
       zone.id === id
         ? {
@@ -376,13 +689,18 @@ export function moveEntity(
 export function removeEntity(document: EditorDocument, id: string): EditorDocument {
   return {
     ...document,
+    buildings: document.buildings.filter((building) => building.id !== id),
     countLines: document.countLines.filter((line) => line.id !== id),
     entrances: document.entrances.filter((entrance) => entrance.id !== id),
+    hazards: document.hazards.filter((hazard) => hazard.id !== id),
+    obstacles: document.obstacles.filter((obstacle) => obstacle.id !== id),
+    roads: document.roads.filter((road) => road.id !== id),
     servicePoints: document.servicePoints.filter(
       (servicePoint) => servicePoint.id !== id,
     ),
     shops: document.shops.filter((shop) => shop.id !== id),
     targets: document.targets.filter((target) => target.id !== id),
+    transitStops: document.transitStops.filter((stop) => stop.id !== id),
     walls: document.walls.filter((wall) => wall.id !== id),
     zones: document.zones.filter((zone) => zone.id !== id),
   };
@@ -394,6 +712,20 @@ export function createSceneFromEditorDocument(
 ): CrowdSimScene {
   return parseScene({
     ...baseScene,
+    roads: document.roads.map((road) => ({
+      id: road.id,
+      name: road.name,
+      geometry: {
+        type: "polyline",
+        points: road.points.map((point) => ({ ...point })),
+      },
+      widthMeters: road.widthMeters,
+      direction: road.direction,
+      speedLimitMetersPerSecond: road.speedLimitMetersPerSecond,
+      capacityPerMinute: road.capacityPerMinute,
+      walkable: road.walkable,
+      transitOnly: road.transitOnly,
+    })),
     walls: document.walls.map((wall) => ({
       id: wall.id,
       geometry: {
@@ -426,6 +758,23 @@ export function createSceneFromEditorDocument(
       name: zone.name,
       walkable: zone.walkable,
     })),
+    buildings: document.buildings.map((building) => ({
+      id: building.id,
+      name: building.name,
+      kind: building.kind,
+      footprint: {
+        type: "polygon",
+        points: building.points.map((point) => ({ ...point })),
+      },
+      entrancePosition: building.entrancePosition
+        ? { ...building.entrancePosition }
+        : undefined,
+      heightMeters: building.heightMeters,
+      floors: building.floors,
+      residentCapacity: building.residentCapacity,
+      workerCapacity: building.workerCapacity,
+      visitorCapacity: building.visitorCapacity,
+    })),
     shops: document.shops.map((shop) => ({
       id: shop.id,
       brand: copyBrand(shop.brand),
@@ -443,6 +792,46 @@ export function createSceneFromEditorDocument(
       width: servicePoint.width,
       serviceMeanSeconds: servicePoint.serviceMeanSeconds,
       capacityPerMinute: servicePoint.capacityPerMinute,
+    })),
+    transitStops: document.transitStops.map((stop) => ({
+      id: stop.id,
+      name: stop.name,
+      roadId: stop.roadId,
+      kind: stop.kind,
+      position: { ...stop.position },
+      capacity: stop.capacity,
+      arrivalIntervalSeconds: stop.arrivalIntervalSeconds,
+      alightingPerArrival: stop.alightingPerArrival,
+      boardingCapacityPerMinute: stop.boardingCapacityPerMinute,
+      delayFactor: stop.delayFactor,
+      active: stop.active,
+    })),
+    obstacles: document.obstacles.map((obstacle) => ({
+      id: obstacle.id,
+      name: obstacle.name,
+      kind: obstacle.kind,
+      geometry: {
+        type: obstacle.geometryType,
+        points: obstacle.points.map((point) => ({ ...point })),
+      },
+      blocksMovement: obstacle.blocksMovement,
+      routeCostMultiplier: obstacle.routeCostMultiplier,
+    })),
+    hazards: document.hazards.map((hazard) => ({
+      id: hazard.id,
+      name: hazard.name,
+      kind: hazard.kind,
+      position: { ...hazard.position },
+      radiusMeters: hazard.radiusMeters,
+      affectedRoadId: hazard.affectedRoadId,
+      affectedZoneId: hazard.affectedZoneId,
+      startsAtSeconds: hazard.startsAtSeconds,
+      endsAtSeconds: hazard.endsAtSeconds,
+      severity: hazard.severity,
+      speedMultiplier: hazard.speedMultiplier,
+      visibilityMultiplier: hazard.visibilityMultiplier,
+      routeCostMultiplier: hazard.routeCostMultiplier,
+      riskScore: hazard.riskScore,
     })),
     countLines: document.countLines.map((line) => ({
       id: line.id,

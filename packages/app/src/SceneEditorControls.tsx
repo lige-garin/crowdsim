@@ -10,11 +10,16 @@ import {
 import type { EditorTool } from "./sceneEditorState";
 
 type DocumentCounts = {
+  buildings: number;
   countLines: number;
   entrances: number;
+  hazards: number;
+  obstacles: number;
+  roads: number;
   servicePoints: number;
   shops: number;
   targets: number;
+  transitStops: number;
   walls: number;
   zones: number;
 };
@@ -190,6 +195,12 @@ export function SceneEditorControls({
           {t("selected")} {selectedLabel}
         </span>
         <span>
+          {t("roads")} {documentCounts.roads}
+        </span>
+        <span>
+          {t("buildings")} {documentCounts.buildings}
+        </span>
+        <span>
           {t("walls")} {documentCounts.walls}
         </span>
         <span>
@@ -206,6 +217,15 @@ export function SceneEditorControls({
         </span>
         <span>
           {t("service")} {documentCounts.servicePoints}
+        </span>
+        <span>
+          {t("transitStops")} {documentCounts.transitStops}
+        </span>
+        <span>
+          {t("obstacles")} {documentCounts.obstacles}
+        </span>
+        <span>
+          {t("hazards")} {documentCounts.hazards}
         </span>
         <span>
           {t("countLines")} {documentCounts.countLines}

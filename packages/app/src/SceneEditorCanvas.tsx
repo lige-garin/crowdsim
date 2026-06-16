@@ -77,6 +77,12 @@ export function SceneEditorCanvas({
             draft={aiImageOverlay.draft}
           />
         ) : null}
+        <EditorBioCityObjects
+          document={document}
+          onEntityPointerDown={onEntityPointerDown}
+          selectedId={selectedId}
+          t={t}
+        />
         <EditorStoreLots scene={baseScene} />
         {viewMode === "isometric" ? <EditorShopExtrusions document={document} /> : null}
         <EditorLines
@@ -89,6 +95,128 @@ export function SceneEditorCanvas({
         <EditorLiveAgents agents={liveAgents} scene={baseScene} />
       </svg>
     </div>
+  );
+}
+
+function EditorBioCityObjects({
+  document,
+  onEntityPointerDown,
+  selectedId,
+  t,
+}: {
+  document: EditorDocument;
+  onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
+  selectedId: string | null;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <g className="editor-biocity-objects">
+      {document.roads.map((road) => (
+        <g key={road.id} onPointerDown={(event) => onEntityPointerDown(event, road.id)}>
+          <polyline
+            className="editor-road-hit"
+            points={pointsToSvg(road.points)}
+            strokeWidth={Math.max(road.widthMeters, 2)}
+          />
+          <polyline
+            className={road.id === selectedId ? "editor-road selected" : "editor-road"}
+            points={pointsToSvg(road.points)}
+            strokeWidth={Math.max(road.widthMeters * 0.42, 0.7)}
+          />
+          <text
+            className="editor-road-label"
+            x={(road.points[0].x + road.points.at(-1)!.x) / 2}
+            y={(road.points[0].y + road.points.at(-1)!.y) / 2 - 1.2}
+          >
+            {t("roadShort")}
+          </text>
+        </g>
+      ))}
+      {document.buildings.map((building) => (
+        <g
+          key={building.id}
+          className={
+            building.id === selectedId ? "editor-building selected" : "editor-building"
+          }
+          onPointerDown={(event) => onEntityPointerDown(event, building.id)}
+        >
+          <polygon points={pointsToSvg(building.points)} />
+          <text
+            x={
+              building.points.reduce((sum, point) => sum + point.x, 0) /
+              building.points.length
+            }
+            y={
+              building.points.reduce((sum, point) => sum + point.y, 0) /
+              building.points.length
+            }
+          >
+            {t("buildingShort")}
+          </text>
+        </g>
+      ))}
+      {document.obstacles.map((obstacle) => (
+        <g
+          key={obstacle.id}
+          className={
+            obstacle.id === selectedId ? "editor-obstacle selected" : "editor-obstacle"
+          }
+          onPointerDown={(event) => onEntityPointerDown(event, obstacle.id)}
+        >
+          {obstacle.geometryType === "polygon" ? (
+            <polygon points={pointsToSvg(obstacle.points)} />
+          ) : (
+            <>
+              <polyline
+                className="editor-road-hit"
+                points={pointsToSvg(obstacle.points)}
+              />
+              <polyline points={pointsToSvg(obstacle.points)} />
+            </>
+          )}
+          <text
+            x={
+              obstacle.points.reduce((sum, point) => sum + point.x, 0) /
+              obstacle.points.length
+            }
+            y={
+              obstacle.points.reduce((sum, point) => sum + point.y, 0) /
+              obstacle.points.length
+            }
+          >
+            {t("obstacleShort")}
+          </text>
+        </g>
+      ))}
+      {document.transitStops.map((stop) => (
+        <g
+          key={stop.id}
+          className={
+            stop.id === selectedId
+              ? "editor-transit-stop selected"
+              : "editor-transit-stop"
+          }
+          transform={`translate(${stop.position.x} ${stop.position.y})`}
+          onPointerDown={(event) => onEntityPointerDown(event, stop.id)}
+        >
+          <circle r={2.6} />
+          <text y={0.45}>{t("transitStopShort")}</text>
+        </g>
+      ))}
+      {document.hazards.map((hazard) => (
+        <g
+          key={hazard.id}
+          className={
+            hazard.id === selectedId ? "editor-hazard selected" : "editor-hazard"
+          }
+          transform={`translate(${hazard.position.x} ${hazard.position.y})`}
+          onPointerDown={(event) => onEntityPointerDown(event, hazard.id)}
+        >
+          <circle r={hazard.radiusMeters} />
+          <text y={0.45}>{t("hazardShort")}</text>
+        </g>
+      ))}
+    </g>
   );
 }
 

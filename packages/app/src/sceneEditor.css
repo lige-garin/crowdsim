@@ -179,6 +179,74 @@
   stroke-width: 3;
 }
 
+.editor-road-hit {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-biocity-objects {
+  cursor: grab;
+}
+
+.editor-road {
+  fill: none;
+  pointer-events: none;
+  stroke: rgba(32, 51, 73, 0.46);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-road-label,
+.editor-building text,
+.editor-obstacle text,
+.editor-transit-stop text,
+.editor-hazard text {
+  fill: #132033;
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(255, 255, 255, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-building polygon {
+  fill: rgba(79, 70, 229, 0.13);
+  pointer-events: all;
+  stroke: rgba(79, 70, 229, 0.62);
+  stroke-width: 0.22;
+}
+
+.editor-obstacle polygon,
+.editor-obstacle polyline {
+  fill: rgba(100, 116, 139, 0.18);
+  pointer-events: all;
+  stroke: rgba(51, 65, 85, 0.74);
+  stroke-dasharray: 0.75 0.38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.38;
+}
+
+.editor-transit-stop circle {
+  fill: #38bdf8;
+  pointer-events: all;
+  stroke: rgba(12, 74, 110, 0.76);
+  stroke-width: 0.2;
+}
+
+.editor-hazard circle {
+  fill: rgba(255, 77, 61, 0.14);
+  pointer-events: all;
+  stroke: rgba(220, 38, 38, 0.72);
+  stroke-dasharray: 0.8 0.42;
+  stroke-width: 0.28;
+}
+
 .editor-zone {
   cursor: grab;
 }
@@ -396,6 +464,12 @@
 .editor-node.selected .editor-source,
 .editor-node.selected .editor-sink,
 .editor-node.selected .editor-target,
+.editor-building.selected polygon,
+.editor-hazard.selected circle,
+.editor-obstacle.selected polygon,
+.editor-obstacle.selected polyline,
+.editor-road.selected,
+.editor-transit-stop.selected circle,
 .editor-zone.selected polygon,
 .editor-wall.selected,
 .editor-shop.selected rect,

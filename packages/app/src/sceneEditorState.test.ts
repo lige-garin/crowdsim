@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  addBuilding,
   addCountLine,
   addEntrance,
+  addHazard,
+  addObstacle,
+  addRoad,
   addServicePoint,
   addShop,
   addTarget,
+  addTransitStop,
   addWall,
   addZone,
   createEditorDocumentFromScene,
@@ -18,6 +23,7 @@ import {
   updateDocumentZoneCategory,
   updateDocumentZoneNumber,
 } from "./sceneEditorMutations";
+import { bioCityDemoScene } from "./bioCityDemoScene";
 import { demoScene } from "./demoScene";
 import { exampleScenes } from "./exampleScenes";
 
@@ -73,6 +79,62 @@ describe("scene editor state", () => {
     ]);
   });
 
+  it("loads BioCity editor objects from schema scenes", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+
+    expect(document.roads.map((road) => road.id)).toContain("rain-market-avenue");
+    expect(document.buildings.map((building) => building.id)).toContain("glass-arcade");
+    expect(document.transitStops[0]).toMatchObject({
+      id: "rain-market-bus-stop",
+      roadId: "bus-loop",
+      kind: "bus",
+    });
+    expect(document.obstacles[0]).toMatchObject({
+      id: "umbrella-queue-rails",
+      geometryType: "polyline",
+    });
+    expect(document.hazards[0]).toMatchObject({
+      id: "curbside-pooling",
+      affectedRoadId: "rain-market-avenue",
+    });
+  });
+
+  it("adds BioCity editor objects with stable defaults", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+
+    document = addRoad(document, { x: 20, y: 20 });
+    document = addBuilding(document, { x: 38, y: 20 });
+    document = addTransitStop(document, { x: 24, y: 22 });
+    document = addObstacle(document, { x: 48, y: 22 });
+    document = addHazard(document, { x: 56, y: 22 });
+
+    expect(document.roads.at(-1)).toMatchObject({
+      id: "road-1",
+      direction: "twoWay",
+      widthMeters: 6,
+    });
+    expect(document.buildings.at(-1)).toMatchObject({
+      id: "building-2",
+      kind: "mixedUse",
+      floors: 5,
+    });
+    expect(document.transitStops.at(-1)).toMatchObject({
+      id: "transit-stop-3",
+      roadId: "road-1",
+      kind: "bus",
+    });
+    expect(document.obstacles.at(-1)).toMatchObject({
+      id: "obstacle-4",
+      kind: "constructionBarrier",
+      blocksMovement: true,
+    });
+    expect(document.hazards.at(-1)).toMatchObject({
+      id: "hazard-5",
+      affectedRoadId: "road-1",
+      kind: "roadClosure",
+    });
+  });
+
   it("adds, updates, moves, and exports commercial zones", () => {
     let document = addZone(createEditorDocumentFromScene(demoScene), {
       x: 30,
@@ -114,6 +176,20 @@ describe("scene editor state", () => {
     expect(document.targets.some((target) => target.id === targetId)).toBe(false);
   });
 
+  it("moves and removes BioCity entities", () => {
+    let document = addRoad(createEditorDocumentFromScene(demoScene), {
+      x: 20,
+      y: 20,
+    });
+    const roadId = document.roads.at(-1)!.id;
+
+    document = moveEntity(document, roadId, { x: 2, y: -4 });
+    expect(document.roads.at(-1)?.points[0]).toEqual({ x: 12, y: 16 });
+
+    document = removeEntity(document, roadId);
+    expect(document.roads.some((road) => road.id === roadId)).toBe(false);
+  });
+
   it("exports editor documents back to valid scene json", () => {
     const document = addWall(createEditorDocumentFromScene(demoScene), [
       { x: 2, y: 2 },
@@ -143,6 +219,38 @@ describe("scene editor state", () => {
     );
     expect(scene.servicePoints[0].kind).toBe("gate");
     expect(scene.countLines[0].geometry.points).toHaveLength(2);
+  });
+
+  it("exports BioCity editor objects back to valid scene json", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+
+    document = addRoad(document, { x: 20, y: 20 });
+    document = addBuilding(document, { x: 38, y: 20 });
+    document = addTransitStop(document, { x: 24, y: 22 });
+    document = addObstacle(document, { x: 48, y: 22 });
+    document = addHazard(document, { x: 56, y: 22 });
+
+    const scene = createSceneFromEditorDocument(demoScene, document);
+
+    expect(scene.roads[0]).toMatchObject({
+      id: "road-1",
+      direction: "twoWay",
+    });
+    expect(scene.buildings[0]).toMatchObject({
+      id: "building-2",
+      kind: "mixedUse",
+      visitorCapacity: 120,
+    });
+    expect(scene.transitStops[0]).toMatchObject({
+      id: "transit-stop-3",
+      roadId: "road-1",
+    });
+    expect(scene.obstacles[0].geometry.points).toHaveLength(2);
+    expect(scene.hazards[0]).toMatchObject({
+      id: "hazard-5",
+      affectedRoadId: "road-1",
+      routeCostMultiplier: 2,
+    });
   });
 
   it("ships three importable example scenes", () => {

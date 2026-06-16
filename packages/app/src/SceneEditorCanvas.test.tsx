@@ -2,6 +2,7 @@ import { createRef } from "react";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { demoScene } from "./demoScene";
+import { bioCityDemoScene } from "./bioCityDemoScene";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
 import { createEditorDocumentFromScene } from "./sceneEditorState";
 
@@ -44,5 +45,34 @@ describe("SceneEditorCanvas", () => {
 
     expect(container.querySelector('[data-agent-id="7"]')).toBeInTheDocument();
     expect(container.querySelector(".editor-live-agent-heading")).toBeInTheDocument();
+  });
+
+  it("renders BioCity roads, buildings, stops, obstacles, and hazards", () => {
+    const { container } = render(
+      <SceneEditorCanvas
+        aiImageOverlay={null}
+        baseScene={bioCityDemoScene}
+        basemap={null}
+        document={createEditorDocumentFromScene(bioCityDemoScene)}
+        draftWallPoints={[]}
+        gridSize={2}
+        liveAgents={[]}
+        onCanvasPointerDown={vi.fn()}
+        onEntityPointerDown={vi.fn()}
+        onPointerMove={vi.fn()}
+        onPointerUp={vi.fn()}
+        selectedId="curbside-pooling"
+        svgRef={createRef<SVGSVGElement>()}
+        t={(key) => key}
+        visibleHeatmapCells={[]}
+        viewMode="topDown"
+      />,
+    );
+
+    expect(container.querySelector(".editor-road")).toBeInTheDocument();
+    expect(container.querySelector(".editor-building")).toBeInTheDocument();
+    expect(container.querySelector(".editor-transit-stop")).toBeInTheDocument();
+    expect(container.querySelector(".editor-obstacle")).toBeInTheDocument();
+    expect(container.querySelector(".editor-hazard.selected")).toBeInTheDocument();
   });
 });
