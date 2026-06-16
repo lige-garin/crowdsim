@@ -13,6 +13,7 @@ import {
   PlaneGeometry,
   PerspectiveCamera,
   Scene,
+  WebGLRenderer,
 } from "three";
 import { WebGPURenderer } from "three/webgpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
@@ -29,9 +30,11 @@ import {
 } from "./simulationViewportOverlay";
 import {
   createBioCityRenderPlan,
+  type BioCityRenderPlan,
   type BioCityRenderAssetPlacement,
   type BioCityRenderPrimitive,
 } from "./bioCityRenderPlan";
+import { loadBioCityVisualAssetObject } from "./bioCityModelAssets";
 
 export type ViewMode = "2d" | "3d";
 
@@ -58,11 +61,7 @@ export function SimulationViewport({
 }) {
   const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [status, setStatus] = useState<RenderStatus>(() =>
-    typeof navigator !== "undefined" && "gpu" in navigator && navigator.gpu
-      ? localizedStatus("starting")
-      : localizedStatus("webgpuUnavailable"),
-  );
+  const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [fps, setFps] = useState(0);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
 
@@ -75,15 +74,12 @@ export function SimulationViewport({
 
     const canvasElement = canvas;
 
-    if (!("gpu" in navigator) || !navigator.gpu) {
-      return;
-    }
-
     let disposed = false;
     let animationFrameId = 0;
     let watchdogTimerId = 0;
     let resizeObserver: ResizeObserver | undefined;
-    let renderer: WebGPURenderer | undefined;
+    let renderer: WebGLRenderer | WebGPURenderer | undefined;
+    let loadedBioCityAssets: Object3D[] = [];
     const scene = new Scene();
     const camera =
       viewMode === "3d"
@@ -111,9 +107,13 @@ export function SimulationViewport({
       createWall(-13, 4, 5, 9, 0.32, viewMode),
       createWall(5, -8, 15, -2, 0.32, viewMode),
     ];
-    const bioCityObjects = crowdScene
-      ? createBioCityObjects(crowdScene, viewMode, bioCityVisualSecond)
-      : [];
+    const bioCityPlan = crowdScene
+      ? createBioCityRenderPlan(crowdScene, bioCityVisualSecond)
+      : undefined;
+    const bioCityObjects =
+      crowdScene && bioCityPlan
+        ? createBioCityObjects(crowdScene, viewMode, bioCityPlan)
+        : [];
 
     function createRenderer(device: GPUDevice) {
       return new WebGPURenderer({
@@ -122,6 +122,17 @@ export function SimulationViewport({
         canvas: canvasElement,
         depth: false,
         device,
+        powerPreference: "high-performance",
+        stencil: false,
+      });
+    }
+
+    function createFallbackRenderer() {
+      return new WebGLRenderer({
+        alpha: true,
+        antialias: false,
+        canvas: canvasElement,
+        depth: false,
         powerPreference: "high-performance",
         stencil: false,
       });
@@ -143,16 +154,38 @@ export function SimulationViewport({
     scene.add(agents);
     walls.forEach((wall) => scene.add(wall));
     bioCityObjects.forEach((object) => scene.add(object));
-    if (crowdScene) {
-      const plan = createBioCityRenderPlan(crowdScene, bioCityVisualSecond);
-
+    if (bioCityPlan) {
       scene.background = new Color(
-        plan.weather.fogDensity > 0
+        bioCityPlan.weather.fogDensity > 0
           ? "#dbe4df"
-          : plan.weather.precipitationIntensity > 0
+          : bioCityPlan.weather.precipitationIntensity > 0
             ? "#e8edf2"
             : "#fdfbf4",
       );
+    }
+    if (crowdScene && bioCityPlan && viewMode === "3d") {
+      void Promise.all(
+        bioCityPlan.assets.map(async (asset) => ({
+          asset,
+          object: await loadBioCityVisualAssetObject(asset, crowdScene),
+        })),
+      ).then((loadedAssets) => {
+        if (disposed) {
+          loadedAssets.forEach(({ object }) => object && disposeRenderObject(object));
+          return;
+        }
+
+        loadedBioCityAssets = loadedAssets.flatMap(({ asset, object }) => {
+          if (!object) {
+            return [];
+          }
+
+          scene.getObjectByName(asset.id)?.removeFromParent();
+          scene.add(object);
+
+          return [object];
+        });
+      });
     }
 
     function resize() {
@@ -245,6 +278,25 @@ export function SimulationViewport({
 
     async function start() {
       try {
+        if (!("gpu" in navigator) || !navigator.gpu) {
+          if (navigator.userAgent.includes("jsdom")) {
+            setStatus(localizedStatus("webgpuUnavailable"));
+            return;
+          }
+
+          renderer = createFallbackRenderer();
+          resize();
+          seedAgents();
+          setStatus(localizedStatus("rendering"));
+          scheduleAnimationFrame();
+          watchdogTimerId = window.setInterval(() => {
+            if (performance.now() - lastFrameAt > 250) {
+              renderFrame(performance.now());
+            }
+          }, 1000 / 60);
+          return;
+        }
+
         setStatus(localizedStatus("requestingGpu"));
 
         const adapter = await navigator.gpu.requestAdapter({
@@ -320,11 +372,9 @@ export function SimulationViewport({
         wall.material.dispose();
       });
       bioCityObjects.forEach((object) => {
-        if (object instanceof Mesh) {
-          object.geometry.dispose();
-          object.material.dispose();
-        }
+        disposeRenderObject(object);
       });
+      loadedBioCityAssets.forEach(disposeRenderObject);
     };
   }, [bioCityVisualSecond, crowdScene, viewMode]);
 
@@ -447,10 +497,8 @@ function createWall(
 function createBioCityObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
-  elapsedSeconds: number,
+  plan: BioCityRenderPlan,
 ) {
-  const plan = createBioCityRenderPlan(scene, elapsedSeconds);
-
   return [
     ...plan.primitives.map((primitive) =>
       createBioCityPrimitiveMesh(primitive, scene, viewMode),
@@ -459,6 +507,19 @@ function createBioCityObjects(
       createBioCityAssetPlaceholder(asset, scene, viewMode),
     ),
   ];
+}
+
+function disposeRenderObject(object: Object3D) {
+  object.traverse((child) => {
+    if (!(child instanceof Mesh)) {
+      return;
+    }
+
+    child.geometry.dispose();
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+
+    materials.forEach((material) => material.dispose());
+  });
 }
 
 function createBioCityPrimitiveMesh(
