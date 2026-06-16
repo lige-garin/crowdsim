@@ -1,0 +1,280 @@
+import { parseScene } from "@crowdsim/scene-schema";
+
+export const bioCityDemoScene = parseScene({
+  schemaVersion: "1.0.0",
+  id: "biocity-rainy-high-street",
+  name: "BioCity Rainy High Street",
+  seed: 31,
+  world: {
+    width: 160,
+    height: 96,
+  },
+  areas: [
+    {
+      id: "downtown-walkable",
+      geometry: {
+        type: "polygon",
+        points: [
+          { x: 0, y: 0 },
+          { x: 160, y: 0 },
+          { x: 160, y: 96 },
+          { x: 0, y: 96 },
+        ],
+      },
+    },
+  ],
+  entrances: [
+    {
+      id: "west-arrivals",
+      kind: "source",
+      position: { x: 6, y: 52 },
+      width: 8,
+      arrivalRatePerMinute: 180,
+    },
+    {
+      id: "metro-return",
+      kind: "sink",
+      position: { x: 150, y: 52 },
+      width: 10,
+    },
+  ],
+  roads: [
+    {
+      id: "rain-market-avenue",
+      name: "Rain Market Avenue",
+      geometry: {
+        type: "polyline",
+        points: [
+          { x: 8, y: 54 },
+          { x: 152, y: 54 },
+        ],
+      },
+      widthMeters: 10,
+      capacityPerMinute: 420,
+    },
+    {
+      id: "bus-loop",
+      name: "Bus Loop",
+      geometry: {
+        type: "polyline",
+        points: [
+          { x: 92, y: 72 },
+          { x: 126, y: 72 },
+          { x: 144, y: 58 },
+        ],
+      },
+      widthMeters: 7,
+      transitOnly: true,
+    },
+  ],
+  buildings: [
+    {
+      id: "glass-arcade",
+      name: "Glass Arcade",
+      kind: "retail",
+      footprint: {
+        type: "polygon",
+        points: [
+          { x: 22, y: 16 },
+          { x: 64, y: 16 },
+          { x: 64, y: 40 },
+          { x: 22, y: 40 },
+        ],
+      },
+      entrancePosition: { x: 42, y: 40 },
+      floors: 4,
+      heightMeters: 18,
+      visitorCapacity: 650,
+      visual: {
+        style: "glass-retail",
+        signText: "Arcade",
+      },
+    },
+    {
+      id: "food-hall-south",
+      name: "Food Hall South",
+      kind: "mixedUse",
+      footprint: {
+        type: "polygon",
+        points: [
+          { x: 72, y: 18 },
+          { x: 112, y: 18 },
+          { x: 112, y: 42 },
+          { x: 72, y: 42 },
+        ],
+      },
+      entrancePosition: { x: 92, y: 42 },
+      workerCapacity: 90,
+      visitorCapacity: 520,
+      visual: {
+        style: "food-hall",
+        signText: "Food Hall",
+      },
+    },
+  ],
+  transitStops: [
+    {
+      id: "rain-market-bus-stop",
+      name: "Rain Market Bus Stop",
+      roadId: "bus-loop",
+      kind: "bus",
+      position: { x: 122, y: 72 },
+      capacity: 140,
+      arrivalIntervalSeconds: 240,
+      alightingPerArrival: 38,
+      delayFactor: 1.25,
+    },
+  ],
+  obstacles: [
+    {
+      id: "umbrella-queue-rails",
+      name: "Umbrella Queue Rails",
+      kind: "securityLine",
+      geometry: {
+        type: "polyline",
+        points: [
+          { x: 116, y: 64 },
+          { x: 136, y: 64 },
+        ],
+      },
+      routeCostMultiplier: 2.2,
+    },
+  ],
+  hazards: [
+    {
+      id: "curbside-pooling",
+      name: "Curbside Pooling",
+      kind: "flood",
+      position: { x: 98, y: 58 },
+      radiusMeters: 9,
+      affectedRoadId: "rain-market-avenue",
+      startsAtSeconds: 900,
+      endsAtSeconds: 3600,
+      severity: 0.42,
+      speedMultiplier: 0.76,
+      routeCostMultiplier: 1.8,
+      riskScore: 0.24,
+    },
+  ],
+  weatherProfile: {
+    id: "rainy-commute-profile",
+    name: "Rainy Commute Profile",
+    source: "manual",
+    location: {
+      name: "BioCity Downtown",
+      latitude: 31.2304,
+      longitude: 121.4737,
+      timezone: "Asia/Shanghai",
+    },
+    samples: [
+      {
+        startsAtSeconds: 0,
+        durationSeconds: 1800,
+        condition: "rain",
+        temperatureC: 21,
+        apparentTemperatureC: 19,
+        precipitationMmPerHour: 4.8,
+        windSpeedMetersPerSecond: 5.2,
+        windDirectionDegrees: 130,
+        humidityPercent: 86,
+        visibilityMeters: 4200,
+      },
+      {
+        startsAtSeconds: 1800,
+        durationSeconds: 2400,
+        condition: "heavyRain",
+        temperatureC: 20,
+        apparentTemperatureC: 18,
+        precipitationMmPerHour: 13.5,
+        windSpeedMetersPerSecond: 8.4,
+        windDirectionDegrees: 145,
+        humidityPercent: 92,
+        visibilityMeters: 1800,
+      },
+    ],
+  },
+  eventTimeline: {
+    id: "rainy-ops-timeline",
+    startsAtIso: "2026-06-16T00:00:00.000Z",
+    events: [
+      {
+        id: "bus-delay-start",
+        kind: "transitDelay",
+        startsAtSeconds: 600,
+        endsAtSeconds: 2400,
+        targetId: "rain-market-bus-stop",
+        payload: {
+          delayFactor: 1.45,
+        },
+      },
+      {
+        id: "pooling-warning",
+        kind: "hazardStart",
+        startsAtSeconds: 900,
+        targetId: "curbside-pooling",
+      },
+    ],
+  },
+  bioAgentProfiles: [
+    {
+      id: "commuter-rain-sensitive",
+      name: "Rain-sensitive Commuter",
+      kind: "commuter",
+      spendingIntent: 0.18,
+      weatherSensitivity: 0.86,
+      riskTolerance: 0.32,
+      shelterPreference: 0.78,
+    },
+    {
+      id: "shopper-shelter-seeker",
+      name: "Shelter-seeking Shopper",
+      kind: "shopper",
+      spendingIntent: 0.64,
+      weatherSensitivity: 0.72,
+      riskTolerance: 0.44,
+      shelterPreference: 0.82,
+    },
+  ],
+  shops: [
+    {
+      id: "brew-under-canopy",
+      name: "Brew Under Canopy",
+      position: { x: 36, y: 34 },
+      entrancePosition: { x: 36, y: 40 },
+      queueAnchor: { x: 38, y: 45 },
+      size: { width: 12, height: 8 },
+      attraction: 1.32,
+      brand: {
+        profileId: "brew-under-canopy",
+        category: "coffee",
+        visibility: 0.88,
+        promotion: 0.18,
+        personaAffinity: {
+          commuter: 0.84,
+          browser: 0.45,
+        },
+      },
+    },
+    {
+      id: "raincoat-pop-up",
+      name: "Raincoat Pop-up",
+      position: { x: 86, y: 36 },
+      entrancePosition: { x: 86, y: 42 },
+      size: { width: 10, height: 7 },
+      attraction: 1.48,
+      brand: {
+        profileId: "raincoat-pop-up",
+        category: "service",
+        novelty: 0.78,
+        promotion: 0.35,
+        personaAffinity: {
+          commuter: 0.62,
+          serviceSeeker: 0.9,
+        },
+      },
+    },
+  ],
+  visual: {
+    defaultView: "isometric",
+  },
+});
