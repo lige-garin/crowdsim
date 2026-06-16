@@ -1,4 +1,8 @@
 import type { SimulationSnapshot } from "./simulationEngine";
+import {
+  createSimulationRuntimeArtifact,
+  type SimulationRuntimeArtifact,
+} from "./simulationRuntimeArtifact";
 
 export type RecordedAgent = {
   id: number;
@@ -17,6 +21,7 @@ export type TrajectoryRecording = {
   durationSeconds: number;
   frames: TrajectoryFrame[];
   id: string;
+  runtime: SimulationRuntimeArtifact;
   sceneId: string;
   seed: number;
   startedAtIso: string;
@@ -24,6 +29,7 @@ export type TrajectoryRecording = {
 
 export type TrajectoryRecordingInput = {
   id: string;
+  runtime?: Partial<SimulationRuntimeArtifact>;
   sceneId: string;
   seed: number;
   startedAtIso?: string;
@@ -47,6 +53,7 @@ export type PackedTrajectoryRecording = {
   frames: PackedTrajectoryFrame[];
   id: string;
   q: number;
+  runtime: SimulationRuntimeArtifact;
   sceneId: string;
   seed: number;
   startedAtIso: string;
@@ -60,6 +67,7 @@ export function createTrajectoryRecording(
     durationSeconds: 0,
     frames: [],
     id: input.id,
+    runtime: createSimulationRuntimeArtifact(input.runtime),
     sceneId: input.sceneId,
     seed: input.seed,
     startedAtIso: input.startedAtIso ?? new Date().toISOString(),
@@ -167,6 +175,7 @@ export function packTrajectoryRecording(
     })),
     id: recording.id,
     q: quantization,
+    runtime: recording.runtime,
     sceneId: recording.sceneId,
     seed: recording.seed,
     startedAtIso: recording.startedAtIso,
@@ -205,6 +214,7 @@ export function unpackTrajectoryRecording(
       elapsedSeconds: round(frame.t / packed.q),
     })),
     id: packed.id,
+    runtime: packed.runtime,
     sceneId: packed.sceneId,
     seed: packed.seed,
     startedAtIso: packed.startedAtIso,

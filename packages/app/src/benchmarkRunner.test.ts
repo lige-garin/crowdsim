@@ -29,6 +29,24 @@ describe("benchmark runner", () => {
     });
   });
 
+  it("binds benchmark results to the runtime profile", () => {
+    const mainRun = runBenchmarkScenario(rimeaCoreScenarios[0]);
+    const workerRun = runBenchmarkScenario(rimeaCoreScenarios[0], {
+      runtime: {
+        decisionBackend: "wasm-ready",
+        sharedMemory: "sab",
+        thread: "worker",
+      },
+    });
+
+    expect(workerRun.runtime).toMatchObject({
+      decisionBackend: "wasm-ready",
+      sharedMemory: "sab",
+      thread: "worker",
+    });
+    expect(workerRun.reproducibilityHash).not.toBe(mainRun.reproducibilityHash);
+  });
+
   it("reports failed comparisons without hiding the measured value", () => {
     const scenario = {
       ...rimeaCoreScenarios[0],

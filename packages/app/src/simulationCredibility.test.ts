@@ -26,6 +26,11 @@ describe("simulationCredibility", () => {
           elapsedSeconds: 3,
         },
       ],
+      runtime: {
+        decisionBackend: "wasm-ready",
+        sharedMemory: "sab",
+        thread: "worker",
+      },
       scene: demoScene,
       simulationSnapshot: snapshot({ agentCount: 12 }),
     });
@@ -34,6 +39,8 @@ describe("simulationCredibility", () => {
     expect(report.constraints).toContain("scene=atrium-demo");
     expect(report.metricExplanation).toContain("densityPeak=4");
     expect(report.exportReplay).toContain("trajectoryWindow=2 samples/2s");
+    expect(report.runtime).toContain("decision=wasm-ready@10Hz");
+    expect(report.runtime).toContain("thread=worker");
     expect(report.riskNotes[0]).toContain("not certified evacuation approval");
   });
 

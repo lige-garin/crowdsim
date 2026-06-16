@@ -115,10 +115,23 @@ function AppContent() {
         dashboardStats,
         evacuation,
         heatmapSamples,
+        runtime: {
+          decisionBackend: "wasm-ready",
+          movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
+          sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
+          thread: simulation === workerSimulation ? "worker" : "main",
+        },
         scene: demoScene,
         simulationSnapshot: simulation.snapshot,
       }),
-    [dashboardStats, evacuation, heatmapSamples, simulation.snapshot],
+    [
+      dashboardStats,
+      evacuation,
+      heatmapSamples,
+      simulation,
+      webGpuMovementBackend.backend?.id,
+      workerSimulation,
+    ],
   );
 
   useEffect(() => {

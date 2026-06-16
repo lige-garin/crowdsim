@@ -87,6 +87,29 @@ describe("trajectory recording", () => {
       y: 1.5,
     });
   });
+
+  it("preserves the runtime profile through packed replay export", () => {
+    const recording = createTrajectoryRecording({
+      id: "recording-runtime",
+      runtime: {
+        decisionBackend: "wasm-ready",
+        sharedMemory: "sab",
+        thread: "worker",
+      },
+      sceneId: "demo",
+      seed: 42,
+      startedAtIso: "2026-06-12T00:00:00.000Z",
+    });
+    const packed = packTrajectoryRecording(recording);
+    const unpacked = unpackTrajectoryRecording(packed);
+
+    expect(packed.runtime).toMatchObject({
+      decisionBackend: "wasm-ready",
+      sharedMemory: "sab",
+      thread: "worker",
+    });
+    expect(unpacked.runtime).toEqual(packed.runtime);
+  });
 });
 
 function snapshot(elapsedSeconds: number, agentId: number): SimulationSnapshot {

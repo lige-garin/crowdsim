@@ -5,11 +5,17 @@ import type {
   BenchmarkRunResult,
   BenchmarkScenario,
 } from "./benchmarkTypes";
+import {
+  createSimulationRuntimeArtifact,
+  formatSimulationRuntimeArtifact,
+  type SimulationRuntimeArtifact,
+} from "./simulationRuntimeArtifact";
 
 const defaultDensityCellSizeMeters = 4;
 
 export type BenchmarkRunnerOptions = {
   densityCellSizeMeters?: number;
+  runtime?: Partial<SimulationRuntimeArtifact>;
 };
 
 export function runBenchmarkScenario(
@@ -25,6 +31,7 @@ export function runBenchmarkScenario(
       ? densityCellSizeMeters * densityCellSizeMeters
       : defaultDensityCellSizeMeters * defaultDensityCellSizeMeters;
   const engine = createSimulationEngineFromScene(scenario.scene, scenario.simulation);
+  const runtime = createSimulationRuntimeArtifact(options.runtime);
 
   engine.start();
 
@@ -77,7 +84,13 @@ export function runBenchmarkScenario(
     meanSpeedMetersPerSecond,
     pass: comparisons.every((comparison) => comparison.pass),
     remainingAgents: snapshot.agentCount,
-    reproducibilityHash: createBenchmarkHash(scenario.id, metrics, snapshot.stepCount),
+    reproducibilityHash: createBenchmarkHash(
+      scenario.id,
+      metrics,
+      snapshot.stepCount,
+      runtime,
+    ),
+    runtime,
     scenarioId: scenario.id,
     scenarioName: scenario.name,
     spawnedCount: snapshot.spawnedCount,
@@ -144,9 +157,11 @@ function createBenchmarkHash(
   scenarioId: string,
   metrics: Record<BenchmarkMetric, number>,
   stepCount: number,
+  runtime: SimulationRuntimeArtifact,
 ) {
   const payload = [
     scenarioId,
+    formatSimulationRuntimeArtifact(runtime),
     stepCount,
     metrics.spawnedCount,
     metrics.exitedCount,

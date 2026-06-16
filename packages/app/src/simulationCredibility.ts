@@ -3,12 +3,18 @@ import type { DashboardStats } from "./dashboardStats";
 import type { EvacuationState } from "./AppTypes";
 import type { HeatmapSample } from "./heatmap";
 import { simulationRuntimeProfile, type SimulationSnapshot } from "./simulationEngine";
+import {
+  createSimulationRuntimeArtifact,
+  formatSimulationRuntimeArtifact,
+  type SimulationRuntimeArtifact,
+} from "./simulationRuntimeArtifact";
 
 export type SimulationCredibilityReport = {
   constraints: string;
   exportReplay: string;
   metricExplanation: string;
   riskNotes: string[];
+  runtime: string;
   status: "limited" | "operational" | "warming-up";
 };
 
@@ -18,9 +24,17 @@ export function createSimulationCredibilityReport(options: {
   heatmapSamples: readonly HeatmapSample[];
   scene: CrowdSimScene;
   simulationSnapshot: SimulationSnapshot;
+  runtime?: Partial<SimulationRuntimeArtifact>;
 }): SimulationCredibilityReport {
-  const { dashboardStats, evacuation, heatmapSamples, scene, simulationSnapshot } =
-    options;
+  const {
+    dashboardStats,
+    evacuation,
+    heatmapSamples,
+    runtime,
+    scene,
+    simulationSnapshot,
+  } = options;
+  const runtimeArtifact = createSimulationRuntimeArtifact(runtime);
   const hasLiveSamples = heatmapSamples.length > 0;
   const atAgentLimit =
     simulationSnapshot.agentCount >= simulationRuntimeProfile.maxAgents;
@@ -63,6 +77,7 @@ export function createSimulationCredibilityReport(options: {
       hasLiveSamples,
       scene,
     }),
+    runtime: formatSimulationRuntimeArtifact(runtimeArtifact),
     status,
   };
 }

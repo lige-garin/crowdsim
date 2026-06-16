@@ -1,5 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { SimulationEngineConfig } from "./simulationEngine";
+import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 
 export type BenchmarkMetric =
   | "densityPeak"
@@ -46,6 +47,7 @@ export type BenchmarkRunResult = {
   pass: boolean;
   remainingAgents: number;
   reproducibilityHash: string;
+  runtime: SimulationRuntimeArtifact;
   scenarioId: string;
   scenarioName: string;
   spawnedCount: number;

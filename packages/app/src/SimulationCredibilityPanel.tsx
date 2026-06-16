@@ -18,6 +18,7 @@ export function SimulationCredibilityPanel({
       <h3>{title}</h3>
       <p>{statusLabel}</p>
       <code>{report.constraints}</code>
+      <code>{report.runtime}</code>
       <code>{report.metricExplanation}</code>
       <code>{report.exportReplay}</code>
       <ul>
