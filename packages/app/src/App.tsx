@@ -415,6 +415,8 @@ function AppContent() {
           </div>
         </header>
         <AppSidebar
+          agentCount={simulation.snapshot.agentCount}
+          exitedCount={simulation.snapshot.exitedCount}
           heatmapWindowSeconds={heatmapWindowSeconds}
           language={language}
           onClearEvacuation={() => void clearEvacuation()}
@@ -426,6 +428,7 @@ function AppContent() {
           onSetTimeScale={simulation.setTimeScale}
           onStart={simulation.start}
           simulationStatus={simulation.snapshot.status}
+          spawnedCount={simulation.snapshot.spawnedCount}
           t={t}
           timeScale={simulation.snapshot.timeScale}
         />

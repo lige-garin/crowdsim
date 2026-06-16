@@ -3,6 +3,8 @@ import { heatmapWindows, milestones } from "./appUi";
 import type { SimulationStatus } from "./simulationEngine";
 
 type AppSidebarProps = {
+  agentCount: number;
+  exitedCount: number;
   heatmapWindowSeconds: number;
   language: Language;
   onClearEvacuation: () => void;
@@ -14,11 +16,14 @@ type AppSidebarProps = {
   onSetTimeScale: (speed: number) => void;
   onStart: () => void;
   simulationStatus: SimulationStatus;
+  spawnedCount: number;
   t: (key: TranslationKey) => string;
   timeScale: number;
 };
 
 export function AppSidebar({
+  agentCount,
+  exitedCount,
   heatmapWindowSeconds,
   language,
   onClearEvacuation,
@@ -30,6 +35,7 @@ export function AppSidebar({
   onSetTimeScale,
   onStart,
   simulationStatus,
+  spawnedCount,
   t,
   timeScale,
 }: AppSidebarProps) {
@@ -55,6 +61,20 @@ export function AppSidebar({
           </button>
         </div>
       </div>
+      <section className="sidebar-summary" aria-label={t("systemSignals")}>
+        <article>
+          <span>{t("agents")}</span>
+          <strong>{agentCount.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>{t("spawned")}</span>
+          <strong>{spawnedCount.toLocaleString()}</strong>
+        </article>
+        <article>
+          <span>{t("exited")}</span>
+          <strong>{exitedCount.toLocaleString()}</strong>
+        </article>
+      </section>
       <ol className="task-list">
         {milestones.map((milestone) => (
           <li key={milestone.id}>
@@ -71,11 +91,11 @@ export function AppSidebar({
         </div>
         <div className="control-row">
           {simulationStatus === "running" ? (
-            <button type="button" onClick={onPause}>
+            <button type="button" className="sim-primary" onClick={onPause}>
               {t("pause")}
             </button>
           ) : (
-            <button type="button" onClick={onStart}>
+            <button type="button" className="sim-primary" onClick={onStart}>
               {t("start")}
             </button>
           )}

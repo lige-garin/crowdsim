@@ -398,6 +398,41 @@ h3 {
   gap: 8px;
 }
 
+.sidebar-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sidebar-summary article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 9px;
+  border: 1px solid #dce3ee;
+  border-radius: var(--product-radius-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.82)),
+    #ffffff;
+}
+
+.sidebar-summary span {
+  color: #667085;
+  font-size: 0.66rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-summary strong {
+  color: #172033;
+  font-family: var(--lab-mono);
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .task-list li {
   min-height: 52px;
   border-color: #dce3ee;
@@ -422,6 +457,19 @@ h3 {
   border: 1px solid #dce3ee;
   border-radius: var(--product-radius);
   background: #ffffff;
+}
+
+.sim-primary {
+  border-color: #2557d6;
+  background: #2557d6;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(37, 87, 214, 0.18);
+}
+
+.sim-primary:hover {
+  border-color: #1f48ad;
+  background: #1f48ad;
+  color: #ffffff;
 }
 
 .stage {
