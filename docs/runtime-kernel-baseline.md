@@ -1,205 +1,155 @@
 # CrowdSim runtime kernel baseline
 
-This document freezes the current runtime truth for phase 2 work. It is the
-contract for the next implementation steps: WebGPU movement as an optional
-backend, WASM decision ticks that mutate agent behavior, worker simulation, SAB
-transport, and live replay/validation.
+This document tracks the current phase 2 runtime truth after the kernel
+convergence work. It is intentionally about implementation evidence, not product
+marketing.
 
 ## Current runtime profile
 
-Source of truth: `packages/app/src/simulationEngine.ts`.
+Source of truth:
 
-- Movement backend: `cpu-compat`
-- Movement cadence: 60 Hz fixed step (`fixedDtSeconds = 1 / 60`)
-- Decision backend exposed by the static profile: `rule-ts`
-- Decision cadence: 10 Hz
-- Browser simulation cap: 2,000 agents
-- Render benchmark cap: 100,000 visual agents, separate from live simulation
+- `packages/app/src/simulationEngine.ts`
+- `packages/app/src/useSimulationController.ts`
+- `packages/app/src/useSimulationWorkerController.ts`
+- `packages/app/src/simulationRuntimeArtifact.ts`
 
-The product UI now exposes the distinction between live simulation and visual
-render benchmark. The runtime still needs a dynamic profile once phase 2 turns
-WebGPU/WASM/worker paths into selectable active backends.
+Current profile:
 
-## Main-thread simulation flow
+- Movement cadence: 60 Hz fixed step.
+- Decision cadence: 10 Hz.
+- Live simulation cap: 2,000 agents.
+- Render benchmark cap: 100,000 visual agents, separate from live simulation.
+- Default live thread: worker controller with structured-clone snapshots.
+- Default live decision runtime: worker-created WASM decision backend.
+- Shared memory: optional SAB metrics header when cross-origin isolation allows
+  it; otherwise postMessage snapshots remain authoritative.
+- WebGPU movement: optional active backend when CPU/WebGPU alignment passes.
 
-Current app flow:
+## Runtime selection
 
 ```mermaid
 flowchart LR
-  UI["App controls"] --> Controller["useSimulationController"]
-  Controller --> Engine["createSimulationEngineFromScene"]
-  Engine --> Tick["engine.tick(realDeltaSeconds)"]
-  Tick --> CPU["CPU fixed-step movement"]
-  CPU --> Snapshot["SimulationSnapshot"]
-  Snapshot --> Panels["HUD, heatmap samples, dashboard samples"]
+  App["App runtime"] --> WgpuHook["useWebGpuMovementBackend"]
+  WgpuHook -->|ready| MainController["useSimulationController"]
+  WgpuHook -->|not ready| WorkerController["useSimulationWorkerController"]
+  WorkerController --> LiveWorker["simulation.worker.ts"]
+  LiveWorker --> WasmDecision["createWasmSimulationDecisionBackend"]
+  WorkerController --> SabMetrics["SAB metrics header or postMessage fallback"]
+  MainController --> WebGpuMovement["webgpu-ready movement backend"]
 ```
 
 Evidence:
 
-- `packages/app/src/useSimulationController.ts` keeps `engine` in React state and
-  advances it on `requestAnimationFrame`, with a 30 Hz watchdog.
-- `packages/app/src/simulationEngine.ts` owns agent spawning, target selection,
-  wall constraints, flow-field sampling, and position/velocity updates.
-- `SimulationSnapshot` is copied out of the engine on every update.
+- `packages/app/src/App.tsx` chooses the worker controller unless WebGPU movement
+  is active, in which case it preserves the main-thread GPU device path.
+- `packages/app/src/useWebGpuMovementBackend.ts` creates a persistent GPUDevice,
+  verifies CPU/GPU movement alignment, and exposes an active movement backend.
+- `packages/app/src/useSimulationWorkerController.ts` initializes the live worker
+  with `runtime: { wasmDecisionBackend: true }` and publishes SAB metrics when
+  available.
 
-Limitations:
+## Movement backend
 
-- The engine owns mutable agent arrays internally, not a shared SoA transport.
-- Movement writes are CPU-only.
-- The controller runs on the main thread.
-- Dashboard and heatmap samples are sampled from snapshots at 1 Hz, not from a
-  continuous recording channel.
+The movement backend contract lives in `packages/app/src/movementBackend.ts`.
 
-## CPU movement contract
+Implemented paths:
 
-Current CPU movement step:
+- `cpu-compat`: active CPU compatibility backend.
+- `webgpu-ready`: WebGPU social-force backend. It is first used in ready mode for
+  alignment, then active mode when injected into the app runtime.
 
-1. Sample arrivals from each source with seeded Poisson sampling.
-2. Spawn up to `maxAgents`.
-3. For each agent, choose the nearest sink on spawn.
-4. Sample a precomputed CPU flow field when available.
-5. Move toward target with a fixed speed.
-6. Resolve walls/world bounds with `constrainMovement`.
-7. Remove agents that enter sink radius.
+Live app behavior:
 
-Evidence:
+- If WebGPU movement alignment succeeds, App injects the WebGPU backend into
+  `useSimulationController`.
+- If WebGPU is unsupported or alignment fails, App uses the worker controller and
+  CPU movement fallback.
 
-- `createSimulationEngine` in `packages/app/src/simulationEngine.ts`
-- `wallSegmentsFromScene`, `constrainMovement`, and `clampPointToWorld` in
-  `packages/app/src/sceneGeometry.ts`
-- flow-field helpers from `@crowdsim/core-gpu`
+Verification:
 
-This is deterministic for a fixed seed and fixed-step sequence. Phase 2 WebGPU
-movement must preserve this determinism for small alignment fixtures before it
-can become an active backend.
+- `packages/app/src/movementBackend.test.ts`
+- `packages/app/src/movementBackendProbe.test.ts`
+- `packages/app/src/useWebGpuMovementBackend.test.tsx`
+- `packages/app/src/simulationEngine.test.ts`
 
-## WebGPU movement boundary
+## WASM decision backend
 
-Current WebGPU movement state:
+The decision backend contract lives in
+`packages/app/src/simulationDecisionBackend.ts`.
 
-```mermaid
-flowchart LR
-  Probe["runMovementBackendProbe"] --> CpuRef["stepSocialForceCpu"]
-  Probe --> GpuReadback["stepSocialForceGpu"]
-  CpuRef --> Compare["epsilon compare"]
-  GpuReadback --> Compare
-  Compare --> Signal["active=cpu-compat, ready=webgpu-ready"]
-```
+Implemented behavior:
 
-Evidence:
+- Decision ticks run at 10 Hz against the 60 Hz movement clock.
+- WASM `ShopDecisionModel` can select live shop targets.
+- Decisions write `lifecycleState`, `selectedStoreId`, `targetX`, and `targetY`
+  back onto live `SimulationAgent` snapshots.
+- The worker creates its own WASM decision backend during `init`, avoiding
+  structured-clone of functions or class instances.
 
-- `packages/app/src/movementBackendProbe.ts`
-- `packages/core-gpu/src/motionGpu.ts`
-- `packages/core-gpu/src/socialForceCpu.ts`
+Verification:
 
-The WebGPU path currently proves readback correctness for a 4-agent social-force
-fixture. It does not own the app's live agent positions and does not update
-`SimulationSnapshot`.
+- `packages/app/src/simulationEngine.test.ts`
+- `packages/app/src/useSimulationController.test.tsx`
+- `packages/app/src/useWasmSimulationDecisionBackend.test.tsx`
+- `packages/app/src/useSimulationWorkerController.test.tsx`
 
-Required phase 2 transition:
+## Worker and SAB transport
 
-- Extract a movement backend interface that can accept a live agent set, targets,
-  walls, and fixed `dt`.
-- Implement a CPU backend first as a compatibility wrapper around current logic.
-- Add a WebGPU backend that can run the same fixture and report fallback reasons.
-- Only after CPU/GPU alignment tests pass should the app allow GPU as an active
-  movement backend.
+Live worker files:
 
-## WASM decision boundary
+- `packages/app/src/simulation.worker.ts`
+- `packages/app/src/simulationWorkerClient.ts`
+- `packages/app/src/useSimulationWorkerController.ts`
 
-Current WASM decision state:
+Implemented behavior:
 
-```mermaid
-flowchart LR
-  App["App evacuation buttons"] --> Runtime["useWasmDecisionRuntime"]
-  Runtime --> Wasm["core-behavior WASM BehaviorState"]
-  Runtime --> Signal["wasm-ready @ 10Hz, decision ticks"]
-  Runtime --> Evacuation["Evacuation UI state"]
-```
+- Worker protocol supports `init`, `start`, `pause`, `reset`, `set-time-scale`,
+  `tick`, and `snapshot`.
+- Worker fallback is an inline client when `Worker` is unavailable.
+- SAB is used for a metrics header, not for full agent SoA transport yet.
+- The SAB header currently stores status, step count, agent count, spawned count,
+  exited count, and elapsed milliseconds.
 
-Evidence:
+Verification:
 
-- `packages/app/src/wasmDecisionRuntime.ts`
-- `packages/app/src/behaviorWasm.ts`
-- `packages/core-behavior/src/*`
+- `packages/app/src/simulationWorkerClient.test.ts`
+- `packages/app/src/useSimulationWorkerController.test.tsx`
+- `packages/app/src/sharedArrayBufferProbe.test.ts`
 
-WASM is now in the control flow for evacuation mode and reset, and it exposes a
-decision tick count derived from `SimulationSnapshot.stepCount`.
+Remaining transport limitation:
 
-Limitations:
+- Full agent SoA transport is still not backed by SAB. Agent snapshots are still
+  copied through structured clone for UI rendering.
 
-- Decision ticks do not mutate per-agent behavior/state.
-- Shop choice, queue choice, and DES scheduling are still probe/panel paths.
-- Agent targets remain sink-oriented and are not assigned by WASM behavior.
+## Replay, benchmark, and validation binding
 
-Required phase 2 transition:
+Runtime artifact:
 
-- Define an agent decision state payload that can round-trip between the engine
-  and WASM.
-- On each 10 Hz decision tick, update at least evacuation/browse/queue state.
-- Feed WASM decisions back into `targetX`, `targetY`, and dashboard metrics.
+- `packages/app/src/simulationRuntimeArtifact.ts`
 
-## Worker and SAB boundary
+Implemented behavior:
 
-Current worker state:
+- Benchmark results include a runtime profile and include that profile in the
+  reproducibility hash.
+- Packed trajectory recording preserves the runtime profile.
+- The App now records live trajectory frames from the current
+  `SimulationSnapshot` stream instead of using synthetic replay panel fixtures.
+- The credibility report includes runtime profile evidence alongside constraints,
+  metrics, and replay export readiness.
 
-- `packages/app/src/experimentWorkerClient.ts` runs experiment queues in a worker.
-- `packages/app/src/experiment.worker.ts` handles headless experiment requests.
-- The live simulation controller does not use a worker.
+Verification:
 
-Current SAB state:
+- `packages/app/src/benchmarkRunner.test.ts`
+- `packages/app/src/trajectoryRecording.test.ts`
+- `packages/app/src/TrajectoryReplayPanel.test.tsx`
+- `packages/app/src/simulationCredibility.test.ts`
 
-- `packages/app/src/sharedArrayBufferProbe.ts` checks `SharedArrayBuffer`,
-  `Atomics`, and `crossOriginIsolated`.
-- Vite dev/preview sets COOP/COEP headers in `packages/app/vite.config.ts`.
-- No live simulation data travels through SAB yet.
+## Known remaining gaps before final UI redesign
 
-Required phase 2 transition:
-
-1. Move live simulation tick into a worker with structured-clone snapshots.
-2. Keep start/pause/reset/timeScale controls equivalent.
-3. Add SAB only after the worker fallback path is stable.
-4. Represent agent state as SoA buffers for positions, velocities, targets, and
-   behavior states.
-
-## Replay and validation boundary
-
-Current replay state:
-
-- `packages/app/src/trajectoryRecording.ts` can append frames from
-  `SimulationSnapshot`, interpolate replay, pack, unpack, and estimate size.
-- `TrajectoryReplayPanel` still demonstrates the mechanism with synthetic sample
-  snapshots.
-- App heatmap/dashboard sampling is live, but trajectory recording is not yet
-  wired to the live controller.
-
-Current benchmark state:
-
-- `packages/app/src/benchmarkRunner.ts` runs scenarios through
-  `createSimulationEngineFromScene`.
-- Reproducibility hash covers scenario id, step count, and metrics.
-- The runner has no runtime backend selector yet.
-
-Required phase 2 transition:
-
-- Record live snapshots behind a bounded recording window.
-- Expose replay/export from the live run, not a synthetic panel fixture.
-- Extend benchmark options with runtime backend metadata.
-- Include runtime profile in validation reports and reproducibility artifacts.
-
-## Phase 2 dependency order
-
-1. Movement backend interface with CPU compatibility behavior.
-2. WebGPU movement backend active only behind readiness/alignment gates.
-3. WASM decision tick mutating agent behavior and targets.
-4. Worker controller using structured clone snapshots.
-5. SAB SoA transport as an optimization and synchronization contract.
-6. Live trajectory recording and replay/export.
-7. Benchmark/validation runtime profile binding.
-
-## Non-goals for phase 2 core work
-
-- Full visual redesign.
-- Raising live agent counts by hiding the current engine limit.
-- Treating render benchmark agents as simulated behavior agents.
-- Treating current validation fixtures as formal evacuation certification.
+- Full SAB agent SoA transport is still a future optimization; only runtime
+  metrics are shared through SAB today.
+- WebGPU movement is active only when the readiness hook succeeds. Worker runtime
+  intentionally keeps CPU movement because GPUDevice cannot be structured-cloned
+  into the current worker path.
+- The current UI exposes necessary runtime status, but the final productized UI
+  redesign is intentionally deferred until the kernel paths are stable.

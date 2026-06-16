@@ -30,6 +30,7 @@ import { TilesBackdropPanel } from "./TilesBackdropPanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
+import type { TrajectoryRecording } from "./trajectoryRecording";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
@@ -58,6 +59,7 @@ type AppInspectorProps = {
   signals: readonly SystemSignal[];
   simulationCredibility: SimulationCredibilityReport;
   socialForceProbe: SocialForceProbeResult;
+  trajectoryRecording: TrajectoryRecording;
   webGpuProbe: WebGpuProbeResult;
 };
 
@@ -75,6 +77,7 @@ export function AppInspector({
   signals,
   simulationCredibility,
   socialForceProbe,
+  trajectoryRecording,
   webGpuProbe,
 }: AppInspectorProps) {
   const { language, t, text } = useI18n();
@@ -95,7 +98,7 @@ export function AppInspector({
         }
       />
       <SimulationCredibilityPanel report={simulationCredibility} />
-      <TrajectoryReplayPanel />
+      <TrajectoryReplayPanel recording={trajectoryRecording} />
       <CollaborationStatusPanel />
       <ProjectWorkspacePanel />
       <TemplateLibraryPanel />

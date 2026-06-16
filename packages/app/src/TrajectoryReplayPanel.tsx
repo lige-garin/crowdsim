@@ -1,74 +1,50 @@
 import { useMemo } from "react";
 import { useI18n } from "./i18n";
-import type { SimulationSnapshot } from "./simulationEngine";
 import {
-  appendTrajectoryFrame,
-  createTrajectoryRecording,
   estimatePackedTrajectoryBytes,
   packTrajectoryRecording,
   replayTrajectoryAt,
   summarizeTrajectoryRecording,
+  type TrajectoryRecording,
 } from "./trajectoryRecording";
 
-export function TrajectoryReplayPanel() {
+type TrajectoryReplayPanelProps = {
+  recording: TrajectoryRecording;
+};
+
+export function TrajectoryReplayPanel({ recording }: TrajectoryReplayPanelProps) {
   const { language } = useI18n();
   const summary = useMemo(() => {
-    const recording = [snapshot(0, 1), snapshot(2, 1), snapshot(3, 2)].reduce(
-      (current, item) => appendTrajectoryFrame(current, item),
-      createTrajectoryRecording({
-        id: "demo-recording",
-        sceneId: "atrium-demo",
-        seed: 1,
-      }),
-    );
-    const replay = replayTrajectoryAt(recording, 1);
+    const replayAtSeconds =
+      recording.frames.length > 0
+        ? recording.frames[Math.floor((recording.frames.length - 1) / 2)].elapsedSeconds
+        : 0;
+    const replay = replayTrajectoryAt(recording, replayAtSeconds);
     const packed = packTrajectoryRecording(recording);
 
     return {
       packedBytes: estimatePackedTrajectoryBytes(packed),
       replayAgentCount: replay.agents.length,
       replayAtSeconds: replay.elapsedSeconds,
+      runtime: `${recording.runtime.thread}/${recording.runtime.sharedMemory}`,
       ...summarizeTrajectoryRecording(recording),
     };
-  }, []);
-  const title = language === "zh" ? "录制 / 回放" : "Record / replay";
+  }, [recording]);
+  const title = language === "zh" ? "记录 / 回放" : "Record / replay";
 
   return (
     <section className="probe-panel" aria-label={title}>
       <h3>{title}</h3>
       <p>
         {language === "zh"
-          ? "轨迹记录、插值回放、摘要统计已可用。"
-          : "Trajectory recording, interpolated replay, and summary stats are ready."}
+          ? "实时轨迹记录、插值回放和导出摘要已绑定当前仿真运行。"
+          : "Live trajectory recording, interpolated replay, and export summary are bound to the current simulation run."}
       </p>
       <code>
         frames {summary.frameCount} | agents {summary.uniqueAgentCount} | replay{" "}
         {summary.replayAtSeconds}s/{summary.replayAgentCount} | packed{" "}
-        {summary.packedBytes}b
+        {summary.packedBytes}b | runtime {summary.runtime}
       </code>
     </section>
   );
-}
-
-function snapshot(elapsedSeconds: number, agentId: number): SimulationSnapshot {
-  return {
-    agentCount: 1,
-    agents: [
-      {
-        id: agentId,
-        targetX: 10,
-        targetY: 0,
-        vx: 1,
-        vy: 0,
-        x: elapsedSeconds,
-        y: elapsedSeconds / 2,
-      },
-    ],
-    elapsedSeconds,
-    exitedCount: 0,
-    spawnedCount: agentId,
-    status: "running",
-    stepCount: elapsedSeconds * 10,
-    timeScale: 1,
-  };
 }

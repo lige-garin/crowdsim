@@ -12,6 +12,11 @@ import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
 import { I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
+import { createSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
+import {
+  appendTrajectoryFrame,
+  createTrajectoryRecording,
+} from "./trajectoryRecording";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
@@ -27,6 +32,19 @@ export function App() {
   );
 }
 
+type RuntimeArtifact = ReturnType<typeof createSimulationRuntimeArtifact>;
+
+function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
+  return (
+    left.decisionBackend === right.decisionBackend &&
+    left.decisionHz === right.decisionHz &&
+    left.movementBackend === right.movementBackend &&
+    left.movementHz === right.movementHz &&
+    left.sharedMemory === right.sharedMemory &&
+    left.thread === right.thread
+  );
+}
+
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
   const probes = useAppProbes();
@@ -37,9 +55,22 @@ function AppContent() {
     movementBackend: webGpuMovementBackend.backend,
   });
   const workerSimulation = useSimulationWorkerController(demoScene);
-  const simulation = webGpuMovementBackend.backend
-    ? mainThreadSimulation
-    : workerSimulation;
+  const usesWorkerSimulation = !webGpuMovementBackend.backend;
+  const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
+  const currentRuntime = useMemo(
+    () =>
+      createSimulationRuntimeArtifact({
+        decisionBackend: "wasm-ready",
+        movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
+        sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
+        thread: usesWorkerSimulation ? "worker" : "main",
+      }),
+    [
+      usesWorkerSimulation,
+      webGpuMovementBackend.backend?.id,
+      workerSimulation.worker.sharedMemory,
+    ],
+  );
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
   const [dashboardSamples, setDashboardSamples] = useState<DashboardSample[]>([
@@ -50,6 +81,14 @@ function AppContent() {
     },
   ]);
   const [heatmapSamples, setHeatmapSamples] = useState<HeatmapSample[]>([]);
+  const [trajectoryRecording, setTrajectoryRecording] = useState(() =>
+    createTrajectoryRecording({
+      id: "live-recording",
+      runtime: currentRuntime,
+      sceneId: demoScene.id,
+      seed: demoScene.seed,
+    }),
+  );
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
   const [showHome, setShowHome] = useState(true);
   const [viewMode, setViewMode] = useState<StageViewMode>("2d");
@@ -115,23 +154,11 @@ function AppContent() {
         dashboardStats,
         evacuation,
         heatmapSamples,
-        runtime: {
-          decisionBackend: "wasm-ready",
-          movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
-          sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
-          thread: simulation === workerSimulation ? "worker" : "main",
-        },
+        runtime: currentRuntime,
         scene: demoScene,
         simulationSnapshot: simulation.snapshot,
       }),
-    [
-      dashboardStats,
-      evacuation,
-      heatmapSamples,
-      simulation,
-      webGpuMovementBackend.backend?.id,
-      workerSimulation,
-    ],
+    [dashboardStats, evacuation, heatmapSamples, currentRuntime, simulation.snapshot],
   );
 
   useEffect(() => {
@@ -224,10 +251,24 @@ function AppContent() {
           },
         ].slice(-120);
       });
+
+      setTrajectoryRecording((recording) =>
+        appendTrajectoryFrame(
+          sameRuntime(recording.runtime, currentRuntime)
+            ? recording
+            : createTrajectoryRecording({
+                id: "live-recording",
+                runtime: currentRuntime,
+                sceneId: demoScene.id,
+                seed: demoScene.seed,
+              }),
+          snapshot,
+        ),
+      );
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [currentRuntime]);
 
   function resetSimulation() {
     simulation.reset();
@@ -239,6 +280,14 @@ function AppContent() {
       },
     ]);
     setHeatmapSamples([]);
+    setTrajectoryRecording(
+      createTrajectoryRecording({
+        id: "live-recording",
+        runtime: currentRuntime,
+        sceneId: demoScene.id,
+        seed: demoScene.seed,
+      }),
+    );
   }
 
   async function triggerEvacuation() {
@@ -394,6 +443,7 @@ function AppContent() {
         signals={signals}
         simulationCredibility={simulationCredibility}
         socialForceProbe={probes.socialForceProbe}
+        trajectoryRecording={trajectoryRecording}
         webGpuProbe={probes.webGpuProbe}
       />
     </main>
