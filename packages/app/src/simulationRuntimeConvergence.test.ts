@@ -18,10 +18,11 @@ describe("simulation runtime convergence", () => {
       "webgpu-movement",
       "wasm-decision",
       "worker-thread",
+      "sab-metrics",
       "benchmark-replay-validation",
     ]);
     expect(report.find((item) => item.id === "sab-metrics")).toMatchObject({
-      status: "partial",
+      status: "complete",
     });
     expect(report.every((item) => item.evidence.length > 0)).toBe(true);
   });

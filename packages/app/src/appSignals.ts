@@ -210,6 +210,9 @@ function formatSimulationThread(workerRuntime: SimulationWorkerControllerState) 
   const metrics = workerRuntime.sharedMetrics
     ? `step ${workerRuntime.sharedMetrics.stepCount} | agents ${workerRuntime.sharedMetrics.agentCount}`
     : workerRuntime.message;
+  const soa = workerRuntime.sharedAgentSample
+    ? ` | soa ${workerRuntime.sharedAgentSample.sharedAgentCount}/${workerRuntime.sharedAgentSample.capacity}`
+    : "";
 
-  return `${workerRuntime.mode} | ${shared} | ${metrics}`;
+  return `${workerRuntime.mode} | ${shared} | ${metrics}${soa}`;
 }

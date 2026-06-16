@@ -35,16 +35,17 @@ it is an override that stores the previous state and writes `Evacuate`.
 
 All lanes are sized to `agentCapacity`. Offsets are 4-byte aligned.
 
-| Lane            | Type           | Writer | Readers        | Notes                                |
-| --------------- | -------------- | ------ | -------------- | ------------------------------------ |
-| `positionX`     | `Float32Array` | GPU    | renderer, WASM | World-space meters                   |
-| `positionY`     | `Float32Array` | GPU    | renderer, WASM | World-space meters                   |
-| `velocityX`     | `Float32Array` | GPU    | renderer, WASM | World-space meters/second            |
-| `velocityY`     | `Float32Array` | GPU    | renderer, WASM | World-space meters/second            |
-| `targetFieldId` | `Uint32Array`  | WASM   | GPU            | Flow-field/target index for movement |
-| `behaviorState` | `Uint32Array`  | WASM   | UI, GPU        | Uses the stable state codes above    |
-| `agentType`     | `Uint32Array`  | WASM   | UI, GPU        | Persona/type id                      |
-| `flags`         | `Uint32Array`  | WASM   | UI, GPU        | Bit flags below                      |
+| Lane            | Type           | Writer      | Readers        | Notes                             |
+| --------------- | -------------- | ----------- | -------------- | --------------------------------- |
+| `agentId`       | `Int32Array`   | worker      | UI, renderer   | Stable simulation agent id        |
+| `behaviorState` | `Int32Array`   | WASM/worker | UI, GPU        | Uses the stable state codes above |
+| `flags`         | `Int32Array`   | worker      | UI, GPU        | Bit flags below                   |
+| `positionX`     | `Float32Array` | movement    | renderer, WASM | World-space meters                |
+| `positionY`     | `Float32Array` | movement    | renderer, WASM | World-space meters                |
+| `velocityX`     | `Float32Array` | movement    | renderer, WASM | World-space meters/second         |
+| `velocityY`     | `Float32Array` | movement    | renderer, WASM | World-space meters/second         |
+| `targetX`       | `Float32Array` | WASM/worker | movement, UI   | World-space movement target       |
+| `targetY`       | `Float32Array` | WASM/worker | movement, UI   | World-space movement target       |
 
 `flags` bits:
 
@@ -52,22 +53,28 @@ All lanes are sized to `agentCapacity`. Offsets are 4-byte aligned.
 | --- | -------------------- | ---------------------------------------- |
 | 0   | `active`             | Slot contains a live agent               |
 | 1   | `evacuationOverride` | State machine is currently overridden    |
-| 2   | `targetDirty`        | GPU should re-read `targetFieldId`       |
+| 2   | `targetDirty`        | GPU should re-read target coordinates    |
 | 3   | `behaviorDirty`      | UI/debug views should re-read state data |
 
 ## Ownership Rules
 
-- WASM is the only writer for `behaviorState`, `targetFieldId`, `agentType`, and
-  `flags`.
-- GPU is the only writer for `positionX`, `positionY`, `velocityX`, and
-  `velocityY`.
+- WASM is the semantic owner for `behaviorState`, `targetX`, and `targetY`; the
+  worker copies the current snapshot values into SAB after each simulation tick.
+- The movement backend is the semantic owner for `positionX`, `positionY`,
+  `velocityX`, and `velocityY`; the worker copies the current snapshot values
+  into SAB after each simulation tick.
+- The worker writes `agentId` and `flags` while publishing each frame.
 - The UI reads every lane but does not write shared agent memory.
 - The orchestrator may allocate, resize, and zero buffers only while simulation
   is paused.
-- Cross-thread writes to `Uint32Array` lanes must use `Atomics.store`; readers
+- Cross-thread writes to integer lanes must use `Atomics.store`; readers
   that need frame-perfect consistency use `Atomics.load`.
 - Float lanes are double-buffered by frame ownership: GPU completes its movement
   pass before WASM reads positions for the next 10 Hz decision tick.
+
+`targetFieldId` and `agentType` are reserved future lanes. The implemented phase
+2.11 transport uses coordinate targets because the current live movement contract
+already consumes `targetX` and `targetY`.
 
 ## Event Ownership
 

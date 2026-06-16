@@ -7,7 +7,10 @@ import type {
   SimulationWorkerResponse,
   SimulationWorkerSharedMemory,
 } from "./simulationWorkerClient";
-import { writeSimulationSharedMemory } from "./simulationWorkerClient";
+import {
+  createSimulationSharedMemoryView,
+  writeSimulationSharedMemory,
+} from "./simulationWorkerClient";
 
 const workerScope = globalThis as unknown as {
   onmessage: ((event: MessageEvent<SimulationWorkerRequest>) => void) | null;
@@ -37,10 +40,7 @@ async function handleMessage(message: SimulationWorkerRequest) {
         decisionBackend,
       });
       sharedMemory = message.sharedBuffer
-        ? {
-            buffer: message.sharedBuffer,
-            view: new Int32Array(message.sharedBuffer),
-          }
+        ? createSimulationSharedMemoryView(message.sharedBuffer)
         : undefined;
       postSnapshot(message.id, engine.snapshot());
       return;

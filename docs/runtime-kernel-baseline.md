@@ -19,10 +19,12 @@ Current profile:
 - Decision cadence: 10 Hz.
 - Live simulation cap: 2,000 agents.
 - Render benchmark cap: 100,000 visual agents, separate from live simulation.
-- Default live thread: worker controller with structured-clone snapshots.
+- Default live thread: worker controller with structured-clone snapshots plus
+  shared agent SoA lanes when available.
 - Default live decision runtime: worker-created WASM decision backend.
-- Shared memory: optional SAB metrics header when cross-origin isolation allows
-  it; otherwise postMessage snapshots remain authoritative.
+- Shared memory: optional SAB metrics header and agent SoA lanes when
+  cross-origin isolation allows it; otherwise postMessage snapshots remain
+  authoritative.
 - WebGPU movement: optional active backend when CPU/WebGPU alignment passes.
 
 ## Runtime selection
@@ -45,8 +47,8 @@ Evidence:
 - `packages/app/src/useWebGpuMovementBackend.ts` creates a persistent GPUDevice,
   verifies CPU/GPU movement alignment, and exposes an active movement backend.
 - `packages/app/src/useSimulationWorkerController.ts` initializes the live worker
-  with `runtime: { wasmDecisionBackend: true }` and publishes SAB metrics when
-  available.
+  with `runtime: { wasmDecisionBackend: true }` and publishes SAB metrics plus
+  shared agent SoA status when available.
 
 ## Movement backend
 
@@ -106,9 +108,14 @@ Implemented behavior:
 - Worker protocol supports `init`, `start`, `pause`, `reset`, `set-time-scale`,
   `tick`, and `snapshot`.
 - Worker fallback is an inline client when `Worker` is unavailable.
-- SAB is used for a metrics header, not for full agent SoA transport yet.
+- SAB is used for a metrics header and parallel agent SoA lanes.
 - The SAB header currently stores status, step count, agent count, spawned count,
-  exited count, and elapsed milliseconds.
+  exited count, elapsed milliseconds, capacity, and protocol version.
+- Agent SoA lanes currently store id, behavior state, active flags, position,
+  velocity, and target coordinates for each live slot.
+- Structured-clone snapshots remain the authoritative React/rendering data path,
+  while SAB provides a shared-memory evidence and fast-read channel for runtime
+  status and future renderer/kernel consumers.
 
 Verification:
 
@@ -118,8 +125,9 @@ Verification:
 
 Remaining transport limitation:
 
-- Full agent SoA transport is still not backed by SAB. Agent snapshots are still
-  copied through structured clone for UI rendering.
+- The app still publishes full `SimulationSnapshot` objects through postMessage
+  for UI state. The SAB lane contract now exists, but React rendering has not
+  been switched to consume only shared memory.
 
 ## Replay, benchmark, and validation binding
 
@@ -146,8 +154,8 @@ Verification:
 
 ## Known remaining gaps before final UI redesign
 
-- Full SAB agent SoA transport is still a future optimization; only runtime
-  metrics are shared through SAB today.
+- SAB agent SoA transport is implemented as a parallel channel, but the final
+  rendering state path still uses structured-clone snapshots.
 - WebGPU movement is active only when the readiness hook succeeds. Worker runtime
   intentionally keeps CPU movement because GPUDevice cannot be structured-cloned
   into the current worker path.

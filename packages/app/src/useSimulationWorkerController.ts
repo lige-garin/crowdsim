@@ -3,6 +3,7 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import {
   createSimulationSharedMemory,
   createSimulationWorkerClient,
+  readSimulationSharedAgents,
   readSimulationSharedMemory,
   type SimulationWorkerClient,
   type SimulationWorkerSharedMemory,
@@ -12,6 +13,7 @@ import type { SimulationController } from "./useSimulationController";
 
 export type SimulationWorkerControllerState = {
   mode: "inline" | "worker";
+  sharedAgentSample?: ReturnType<typeof readAgentSample>;
   sharedMetrics?: ReturnType<typeof readSimulationSharedMemory>;
   sharedMemory: boolean;
   status: "checking" | "error" | "ready";
@@ -48,6 +50,7 @@ export function useSimulationWorkerController(
     setSnapshot(nextSnapshot);
     setWorker((current) => ({
       ...current,
+      sharedAgentSample: readAgentSample(sharedMemoryRef.current),
       sharedMetrics: readMetrics(sharedMemoryRef.current),
     }));
   }, []);
@@ -70,6 +73,7 @@ export function useSimulationWorkerController(
         setWorker((current) => ({
           ...current,
           message: "Simulation worker ready",
+          sharedAgentSample: readAgentSample(sharedMemoryRef.current),
           sharedMetrics: readMetrics(sharedMemoryRef.current),
           status: "ready",
         }));
@@ -185,6 +189,20 @@ export function useSimulationWorkerController(
 
 function readMetrics(sharedMemory: SimulationWorkerSharedMemory | undefined) {
   return sharedMemory ? readSimulationSharedMemory(sharedMemory) : undefined;
+}
+
+function readAgentSample(sharedMemory: SimulationWorkerSharedMemory | undefined) {
+  if (!sharedMemory) {
+    return undefined;
+  }
+
+  const frame = readSimulationSharedAgents(sharedMemory);
+
+  return {
+    firstAgentId: frame.agents[0]?.id ?? null,
+    sharedAgentCount: frame.agents.length,
+    capacity: frame.capacity,
+  };
 }
 
 function createEmptySnapshot(): SimulationSnapshot {

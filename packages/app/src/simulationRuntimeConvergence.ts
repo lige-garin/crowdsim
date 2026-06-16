@@ -40,12 +40,13 @@ export function createRuntimeConvergenceReport(): RuntimeConvergenceItem[] {
     },
     {
       evidence: [
-        "simulationWorkerClient creates a SAB metrics header under cross-origin isolation",
-        "SAB header covers status, step, agent, spawned, exited, elapsed metrics",
-        "Full agent SoA transport is still structured-clone snapshots",
+        "simulationWorkerClient creates a SAB metrics header and agent SoA lanes under cross-origin isolation",
+        "SAB header covers status, step, agent, spawned, exited, elapsed, capacity, and version metrics",
+        "Agent SoA lanes cover id, behavior state, flags, position, velocity, and target coordinates",
+        "useSimulationWorkerController reads shared agent count and capacity from SAB for live runtime status",
       ],
       id: "sab-metrics",
-      status: "partial",
+      status: "complete",
     },
     {
       evidence: [

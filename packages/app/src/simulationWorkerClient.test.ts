@@ -3,7 +3,9 @@ import { demoScene } from "./demoScene";
 import {
   createSimulationSharedMemory,
   createSimulationWorkerClient,
+  readSimulationSharedAgents,
   readSimulationSharedMemory,
+  writeSimulationSharedMemory,
   type SimulationWorkerLike,
   type SimulationWorkerRequest,
   type SimulationWorkerResponse,
@@ -17,11 +19,87 @@ describe("simulation worker client", () => {
       crossOriginIsolated: true,
     } as typeof globalThis);
 
-    expect(sharedMemory?.buffer.byteLength).toBe(24);
+    expect(sharedMemory?.capacity).toBe(2000);
+    expect(sharedMemory!.buffer.byteLength).toBeGreaterThan(24);
     expect(readSimulationSharedMemory(sharedMemory!)).toMatchObject({
       agentCount: 0,
+      capacity: 2000,
       status: "paused",
+      version: 1,
     });
+  });
+
+  it("writes live agent SoA lanes into SharedArrayBuffer", () => {
+    const sharedMemory = createSimulationSharedMemory(
+      {
+        Atomics,
+        SharedArrayBuffer,
+        crossOriginIsolated: true,
+      } as typeof globalThis,
+      2,
+    )!;
+
+    writeSimulationSharedMemory(sharedMemory, {
+      agentCount: 2,
+      agents: [
+        {
+          id: 11,
+          lifecycleState: "queue",
+          targetX: 9,
+          targetY: 4,
+          vx: 1.5,
+          vy: -0.5,
+          x: 2,
+          y: 3,
+        },
+        {
+          id: 12,
+          lifecycleState: "evacuate",
+          targetX: 7,
+          targetY: 8,
+          vx: 0,
+          vy: 2,
+          x: 5,
+          y: 6,
+        },
+      ],
+      elapsedSeconds: 1.25,
+      exitedCount: 1,
+      spawnedCount: 3,
+      status: "running",
+      stepCount: 75,
+      timeScale: 1,
+    });
+
+    expect(readSimulationSharedMemory(sharedMemory)).toMatchObject({
+      agentCount: 2,
+      elapsedMilliseconds: 1250,
+      stepCount: 75,
+    });
+    expect(readSimulationSharedAgents(sharedMemory).agents).toEqual([
+      {
+        behaviorState: 3,
+        flags: 1,
+        id: 11,
+        targetX: 9,
+        targetY: 4,
+        vx: 1.5,
+        vy: -0.5,
+        x: 2,
+        y: 3,
+      },
+      {
+        behaviorState: 6,
+        flags: 1,
+        id: 12,
+        targetX: 7,
+        targetY: 8,
+        vx: 0,
+        vy: 2,
+        x: 5,
+        y: 6,
+      },
+    ]);
   });
 
   it("falls back to inline simulation when Worker is unavailable", async () => {
@@ -46,6 +124,9 @@ describe("simulation worker client", () => {
       status: "running",
       stepCount: 1,
     });
+    expect(readSimulationSharedAgents(sharedMemory!).agents.length).toBe(
+      snapshot.agentCount,
+    );
 
     client.dispose();
   });

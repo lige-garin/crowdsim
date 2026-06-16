@@ -3,14 +3,38 @@ import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
 import {
   createSimulationEngineFromScene,
   type SimulationEngineConfig,
+  type SimulationAgent,
   type SimulationSnapshot,
 } from "./simulationEngine";
 
-const sharedMetricCount = 6;
+const sharedHeaderIntCount = 8;
+const sharedIntLaneCount = 3;
+const sharedFloatLaneCount = 6;
+const sharedVersion = 1;
+
+const headerStatusIndex = 0;
+const headerStepCountIndex = 1;
+const headerAgentCountIndex = 2;
+const headerSpawnedCountIndex = 3;
+const headerExitedCountIndex = 4;
+const headerElapsedMillisecondsIndex = 5;
+const headerCapacityIndex = 6;
+const headerVersionIndex = 7;
 
 export type SimulationWorkerSharedMemory = {
   buffer: SharedArrayBuffer;
+  capacity: number;
   view: Int32Array;
+};
+
+export type SimulationSharedAgentFrame = {
+  agents: Array<
+    Pick<SimulationAgent, "id" | "targetX" | "targetY" | "vx" | "vy" | "x" | "y"> & {
+      behaviorState: number;
+      flags: number;
+    }
+  >;
+  capacity: number;
 };
 
 export type SimulationWorkerRuntimeOptions = {
@@ -101,6 +125,7 @@ export function createSimulationWorker(): SimulationWorkerLike {
 
 export function createSimulationSharedMemory(
   runtime: typeof globalThis = globalThis,
+  capacity = 2_000,
 ): SimulationWorkerSharedMemory | undefined {
   if (
     typeof runtime.SharedArrayBuffer !== "function" ||
@@ -110,13 +135,34 @@ export function createSimulationSharedMemory(
     return undefined;
   }
 
+  const safeCapacity = Math.max(1, Math.floor(capacity));
   const buffer = new runtime.SharedArrayBuffer(
-    Int32Array.BYTES_PER_ELEMENT * sharedMetricCount,
+    Int32Array.BYTES_PER_ELEMENT *
+      (sharedHeaderIntCount +
+        safeCapacity * sharedIntLaneCount +
+        safeCapacity * sharedFloatLaneCount),
   );
+
+  return createSimulationSharedMemoryView(buffer);
+}
+
+export function createSimulationSharedMemoryView(
+  buffer: SharedArrayBuffer,
+): SimulationWorkerSharedMemory {
+  const intLength = buffer.byteLength / Int32Array.BYTES_PER_ELEMENT;
+  const capacity = Math.max(
+    0,
+    Math.floor((intLength - sharedHeaderIntCount) / lanesPerAgent()),
+  );
+  const view = new Int32Array(buffer);
+
+  Atomics.store(view, headerCapacityIndex, capacity);
+  Atomics.store(view, headerVersionIndex, sharedVersion);
 
   return {
     buffer,
-    view: new Int32Array(buffer),
+    capacity,
+    view,
   };
 }
 
@@ -128,23 +174,190 @@ export function writeSimulationSharedMemory(
     return;
   }
 
-  Atomics.store(sharedMemory.view, 0, snapshot.status === "running" ? 1 : 0);
-  Atomics.store(sharedMemory.view, 1, snapshot.stepCount);
-  Atomics.store(sharedMemory.view, 2, snapshot.agentCount);
-  Atomics.store(sharedMemory.view, 3, snapshot.spawnedCount);
-  Atomics.store(sharedMemory.view, 4, snapshot.exitedCount);
-  Atomics.store(sharedMemory.view, 5, Math.round(snapshot.elapsedSeconds * 1000));
+  Atomics.store(
+    sharedMemory.view,
+    headerStatusIndex,
+    snapshot.status === "running" ? 1 : 0,
+  );
+  Atomics.store(sharedMemory.view, headerStepCountIndex, snapshot.stepCount);
+  Atomics.store(sharedMemory.view, headerAgentCountIndex, snapshot.agentCount);
+  Atomics.store(sharedMemory.view, headerSpawnedCountIndex, snapshot.spawnedCount);
+  Atomics.store(sharedMemory.view, headerExitedCountIndex, snapshot.exitedCount);
+  Atomics.store(
+    sharedMemory.view,
+    headerElapsedMillisecondsIndex,
+    Math.round(snapshot.elapsedSeconds * 1000),
+  );
+  Atomics.store(sharedMemory.view, headerCapacityIndex, sharedMemory.capacity);
+  Atomics.store(sharedMemory.view, headerVersionIndex, sharedVersion);
+
+  writeSimulationSharedAgents(sharedMemory, snapshot.agents);
 }
 
 export function readSimulationSharedMemory(sharedMemory: SimulationWorkerSharedMemory) {
   return {
-    agentCount: Atomics.load(sharedMemory.view, 2),
-    elapsedMilliseconds: Atomics.load(sharedMemory.view, 5),
-    exitedCount: Atomics.load(sharedMemory.view, 4),
-    spawnedCount: Atomics.load(sharedMemory.view, 3),
-    status: Atomics.load(sharedMemory.view, 0) === 1 ? "running" : "paused",
-    stepCount: Atomics.load(sharedMemory.view, 1),
+    agentCount: Atomics.load(sharedMemory.view, headerAgentCountIndex),
+    capacity: Atomics.load(sharedMemory.view, headerCapacityIndex),
+    elapsedMilliseconds: Atomics.load(
+      sharedMemory.view,
+      headerElapsedMillisecondsIndex,
+    ),
+    exitedCount: Atomics.load(sharedMemory.view, headerExitedCountIndex),
+    spawnedCount: Atomics.load(sharedMemory.view, headerSpawnedCountIndex),
+    status:
+      Atomics.load(sharedMemory.view, headerStatusIndex) === 1 ? "running" : "paused",
+    stepCount: Atomics.load(sharedMemory.view, headerStepCountIndex),
+    version: Atomics.load(sharedMemory.view, headerVersionIndex),
   };
+}
+
+export function readSimulationSharedAgents(
+  sharedMemory: SimulationWorkerSharedMemory,
+  limit = sharedMemory.capacity,
+): SimulationSharedAgentFrame {
+  const count = Math.min(
+    Math.max(0, Atomics.load(sharedMemory.view, headerAgentCountIndex)),
+    sharedMemory.capacity,
+    Math.max(0, Math.floor(limit)),
+  );
+  const floatView = new Float32Array(sharedMemory.buffer);
+  const agents: SimulationSharedAgentFrame["agents"] = [];
+
+  for (let index = 0; index < count; index++) {
+    const flags = Atomics.load(
+      sharedMemory.view,
+      intLaneOffset("flags", index, sharedMemory.capacity),
+    );
+
+    if ((flags & 1) === 0) {
+      continue;
+    }
+
+    agents.push({
+      behaviorState: Atomics.load(
+        sharedMemory.view,
+        intLaneOffset("behaviorState", index, sharedMemory.capacity),
+      ),
+      flags,
+      id: Atomics.load(
+        sharedMemory.view,
+        intLaneOffset("agentId", index, sharedMemory.capacity),
+      ),
+      targetX: floatView[floatLaneOffset("targetX", index, sharedMemory.capacity)],
+      targetY: floatView[floatLaneOffset("targetY", index, sharedMemory.capacity)],
+      vx: floatView[floatLaneOffset("velocityX", index, sharedMemory.capacity)],
+      vy: floatView[floatLaneOffset("velocityY", index, sharedMemory.capacity)],
+      x: floatView[floatLaneOffset("positionX", index, sharedMemory.capacity)],
+      y: floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)],
+    });
+  }
+
+  return {
+    agents,
+    capacity: sharedMemory.capacity,
+  };
+}
+
+function writeSimulationSharedAgents(
+  sharedMemory: SimulationWorkerSharedMemory,
+  agents: readonly SimulationAgent[],
+) {
+  const floatView = new Float32Array(sharedMemory.buffer);
+  const count = Math.min(agents.length, sharedMemory.capacity);
+
+  for (let index = 0; index < sharedMemory.capacity; index++) {
+    if (index >= count) {
+      Atomics.store(
+        sharedMemory.view,
+        intLaneOffset("flags", index, sharedMemory.capacity),
+        0,
+      );
+      continue;
+    }
+
+    const agent = agents[index];
+
+    Atomics.store(
+      sharedMemory.view,
+      intLaneOffset("agentId", index, sharedMemory.capacity),
+      agent.id,
+    );
+    Atomics.store(
+      sharedMemory.view,
+      intLaneOffset("behaviorState", index, sharedMemory.capacity),
+      lifecycleStateCode(agent.lifecycleState),
+    );
+    Atomics.store(
+      sharedMemory.view,
+      intLaneOffset("flags", index, sharedMemory.capacity),
+      1,
+    );
+    floatView[floatLaneOffset("positionX", index, sharedMemory.capacity)] = agent.x;
+    floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)] = agent.y;
+    floatView[floatLaneOffset("velocityX", index, sharedMemory.capacity)] = agent.vx;
+    floatView[floatLaneOffset("velocityY", index, sharedMemory.capacity)] = agent.vy;
+    floatView[floatLaneOffset("targetX", index, sharedMemory.capacity)] = agent.targetX;
+    floatView[floatLaneOffset("targetY", index, sharedMemory.capacity)] = agent.targetY;
+  }
+}
+
+type IntLane = "agentId" | "behaviorState" | "flags";
+type FloatLane =
+  | "positionX"
+  | "positionY"
+  | "targetX"
+  | "targetY"
+  | "velocityX"
+  | "velocityY";
+
+function intLaneOffset(lane: IntLane, agentIndex: number, capacity: number) {
+  const laneIndex: Record<IntLane, number> = {
+    agentId: 0,
+    behaviorState: 1,
+    flags: 2,
+  };
+
+  return sharedHeaderIntCount + laneIndex[lane] * capacity + agentIndex;
+}
+
+function floatLaneOffset(lane: FloatLane, agentIndex: number, capacity: number) {
+  const laneIndex: Record<FloatLane, number> = {
+    positionX: 0,
+    positionY: 1,
+    velocityX: 2,
+    velocityY: 3,
+    targetX: 4,
+    targetY: 5,
+  };
+  return (
+    sharedHeaderIntCount +
+    capacity * sharedIntLaneCount +
+    laneIndex[lane] * capacity +
+    agentIndex
+  );
+}
+
+function lanesPerAgent() {
+  return sharedIntLaneCount + sharedFloatLaneCount;
+}
+
+function lifecycleStateCode(state: SimulationAgent["lifecycleState"]) {
+  switch (state) {
+    case "walk":
+      return 1;
+    case "browse":
+      return 2;
+    case "queue":
+      return 3;
+    case "enterStore":
+      return 4;
+    case "leave":
+      return 5;
+    case "evacuate":
+      return 6;
+    default:
+      return 0;
+  }
 }
 
 export function createSimulationWorkerClient(
