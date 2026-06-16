@@ -192,6 +192,11 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: /control room/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/simulation viewport/i)).toBeInTheDocument();
+    const simulationControls = within(screen.getByLabelText("Simulation controls"));
+    expect(simulationControls.getByText("Run controls")).toBeInTheDocument();
+    expect(simulationControls.getByText("Evacuation")).toBeInTheDocument();
+    expect(simulationControls.getByText("Simulation speed")).toBeInTheDocument();
+    expect(simulationControls.getByText("Heatmap window")).toBeInTheDocument();
     expect(
       within(screen.getByLabelText("Live telemetry")).getByText("Kernel"),
     ).toBeInTheDocument();

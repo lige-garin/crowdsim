@@ -1,5 +1,6 @@
 import type { Language, TranslationKey } from "./i18n";
 import { heatmapWindows, milestones } from "./appUi";
+import type { ReactNode } from "react";
 import type { SimulationStatus } from "./simulationEngine";
 
 type AppSidebarProps = {
@@ -39,6 +40,21 @@ export function AppSidebar({
   t,
   timeScale,
 }: AppSidebarProps) {
+  const controlLabels =
+    language === "zh"
+      ? {
+          heatmap: "热力窗口",
+          incident: "疏散",
+          run: "运行控制",
+          speed: "仿真倍率",
+        }
+      : {
+          heatmap: "Heatmap window",
+          incident: "Evacuation",
+          run: "Run controls",
+          speed: "Simulation speed",
+        };
+
   return (
     <aside className="sidebar" aria-label={t("milestoneQueue")}>
       <div>
@@ -85,60 +101,80 @@ export function AppSidebar({
         ))}
       </ol>
       <section className="sim-controls" aria-label={t("simulationControls")}>
-        <div>
+        <header className="sim-controls-header">
           <p className="eyebrow">{t("engine")}</p>
           <h2>{simulationStatus === "running" ? t("running") : t("paused")}</h2>
-        </div>
-        <div className="control-row">
-          {simulationStatus === "running" ? (
-            <button type="button" className="sim-primary" onClick={onPause}>
-              {t("pause")}
+          <span data-state={simulationStatus}>
+            {simulationStatus === "running" ? t("running") : t("paused")}
+          </span>
+        </header>
+        <ControlGroup title={controlLabels.run}>
+          <div className="control-row">
+            {simulationStatus === "running" ? (
+              <button type="button" className="sim-primary" onClick={onPause}>
+                {t("pause")}
+              </button>
+            ) : (
+              <button type="button" className="sim-primary" onClick={onStart}>
+                {t("start")}
+              </button>
+            )}
+            <button type="button" onClick={onReset}>
+              {t("reset")}
             </button>
-          ) : (
-            <button type="button" className="sim-primary" onClick={onStart}>
-              {t("start")}
+          </div>
+        </ControlGroup>
+        <ControlGroup title={controlLabels.incident}>
+          <div className="control-row">
+            <button type="button" onClick={onEvacuate}>
+              {t("evacuate")}
             </button>
-          )}
-          <button type="button" onClick={onReset}>
-            {t("reset")}
-          </button>
-        </div>
-        <div className="speed-group" aria-label={t("simulationSpeed")}>
-          {[1, 2, 4, 8].map((speed) => (
-            <button
-              type="button"
-              key={speed}
-              aria-pressed={timeScale === speed}
-              onClick={() => onSetTimeScale(speed)}
-            >
-              {speed}x
+            <button type="button" onClick={onClearEvacuation}>
+              {t("clear")}
             </button>
-          ))}
-        </div>
-        <div className="control-row">
-          <button type="button" onClick={onEvacuate}>
-            {t("evacuate")}
-          </button>
-          <button type="button" onClick={onClearEvacuation}>
-            {t("clear")}
-          </button>
-        </div>
-        <div className="heatmap-window" aria-label={t("heatmapTimeWindow")}>
-          <span>{t("heatmap")}</span>
-          <div className="window-group">
-            {heatmapWindows.map((seconds) => (
+          </div>
+        </ControlGroup>
+        <ControlGroup title={controlLabels.speed}>
+          <div className="speed-group" aria-label={t("simulationSpeed")}>
+            {[1, 2, 4, 8].map((speed) => (
               <button
                 type="button"
-                key={seconds}
-                aria-pressed={heatmapWindowSeconds === seconds}
-                onClick={() => onHeatmapWindowChange(seconds)}
+                key={speed}
+                aria-pressed={timeScale === speed}
+                onClick={() => onSetTimeScale(speed)}
               >
-                {seconds}s
+                {speed}x
               </button>
             ))}
           </div>
-        </div>
+        </ControlGroup>
+        <ControlGroup title={controlLabels.heatmap}>
+          <div className="heatmap-window" aria-label={t("heatmapTimeWindow")}>
+            <span>{t("heatmap")}</span>
+            <div className="window-group">
+              {heatmapWindows.map((seconds) => (
+                <button
+                  type="button"
+                  key={seconds}
+                  aria-pressed={heatmapWindowSeconds === seconds}
+                  onClick={() => onHeatmapWindowChange(seconds)}
+                >
+                  {seconds}s
+                </button>
+              ))}
+            </div>
+          </div>
+        </ControlGroup>
       </section>
     </aside>
+  );
+}
+
+function ControlGroup({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section className="control-group">
+      <h3>{title}</h3>
+      {children}
+    </section>
   );
 }
