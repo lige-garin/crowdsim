@@ -277,25 +277,55 @@ button[aria-pressed="true"],
   font-size: 0.74rem;
 }
 
-.command-status span {
-  min-height: 28px;
-  border-color: #d6deea;
-  border-radius: 999px;
-  background: #f7f9fc;
-  color: #42526b;
-  font-size: 0.68rem;
+.command-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(88px, auto));
+  gap: 7px;
 }
 
-.command-status span[data-state="running"] {
-  border-color: rgba(40, 122, 84, 0.25);
-  background: rgba(40, 122, 84, 0.08);
+.command-status article {
+  display: grid;
+  grid-template-columns: auto;
+  gap: 2px;
+  min-width: 88px;
+  min-height: 34px;
+  padding: 6px 10px;
+  min-height: 28px;
+  border-color: #d6deea;
+  border: 1px solid #d6deea;
+  border-radius: var(--product-radius-sm);
+  background: #f7f9fc;
+  color: #42526b;
+}
+
+.command-status article span {
+  color: #7a8698;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.command-status article strong {
+  color: #1f2a3a;
+  font-family: var(--lab-mono);
+  font-size: 0.72rem;
+  font-weight: 820;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.command-status article strong[data-state="running"] {
   color: #245f43;
 }
 
-.command-status span[data-state="paused"] {
+.command-status article:has(strong[data-state="running"]) {
+  border-color: rgba(40, 122, 84, 0.25);
+  background: rgba(40, 122, 84, 0.08);
+}
+
+.command-status article:has(strong[data-state="paused"]) {
   border-color: #d6deea;
   background: #f7f9fc;
-  color: #42526b;
 }
 
 .sidebar {

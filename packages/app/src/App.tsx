@@ -407,11 +407,22 @@ function AppContent() {
             </button>
           </div>
           <div className="command-status" aria-label={t("systemSignals")}>
-            <span data-state={simulation.snapshot.status}>{runState}</span>
-            <span>WebGPU {probes.webGpuProbe.status}</span>
-            <span>{language === "zh" ? "品牌模型" : "Brand model"}</span>
-            <span>{language === "zh" ? "证据层" : "Evidence"}</span>
-            <span>{language === "zh" ? "验证通过" : "Verified"}</span>
+            <article>
+              <span>{language === "zh" ? "运行" : "Runtime"}</span>
+              <strong data-state={simulation.snapshot.status}>{runState}</strong>
+            </article>
+            <article>
+              <span>WebGPU</span>
+              <strong>{probes.webGpuProbe.status}</strong>
+            </article>
+            <article>
+              <span>{language === "zh" ? "内核" : "Kernel"}</span>
+              <strong>WASM + SAB</strong>
+            </article>
+            <article>
+              <span>{language === "zh" ? "证据" : "Evidence"}</span>
+              <strong>{language === "zh" ? "已验证" : "Verified"}</strong>
+            </article>
           </div>
         </header>
         <AppSidebar
