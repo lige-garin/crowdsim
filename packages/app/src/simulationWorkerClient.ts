@@ -1,4 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
 import {
   createSimulationEngineFromScene,
   type SimulationEngineConfig,
@@ -12,8 +13,13 @@ export type SimulationWorkerSharedMemory = {
   view: Int32Array;
 };
 
+export type SimulationWorkerRuntimeOptions = {
+  wasmDecisionBackend?: boolean;
+};
+
 export type SimulationWorkerInitRequest = {
   id: number;
+  runtime?: SimulationWorkerRuntimeOptions;
   scene: CrowdSimScene;
   sharedBuffer?: SharedArrayBuffer;
   simulation?: Partial<SimulationEngineConfig>;
@@ -73,6 +79,7 @@ export type SimulationWorkerClient = {
   init: (
     scene: CrowdSimScene,
     options?: {
+      runtime?: SimulationWorkerRuntimeOptions;
       sharedMemory?: SimulationWorkerSharedMemory;
       simulation?: Partial<SimulationEngineConfig>;
     },
@@ -205,6 +212,7 @@ export function createSimulationWorkerClient(
     init: (scene, options) =>
       send({
         scene,
+        runtime: options?.runtime,
         sharedBuffer: options?.sharedMemory?.buffer,
         simulation: options?.simulation,
         type: "init",
@@ -240,9 +248,15 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
       engine = undefined;
       sharedMemory = undefined;
     },
-    init(scene, options) {
+    async init(scene, options) {
       sharedMemory = options?.sharedMemory;
-      engine = createSimulationEngineFromScene(scene, options?.simulation);
+      const decisionBackend = options?.runtime?.wasmDecisionBackend
+        ? await createWasmSimulationDecisionBackend(scene)
+        : undefined;
+      engine = createSimulationEngineFromScene(scene, {
+        ...options?.simulation,
+        decisionBackend,
+      });
       return publish(engine.snapshot());
     },
     pause: () => publish(requireEngine().pause()),

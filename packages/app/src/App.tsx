@@ -14,6 +14,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
+import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
@@ -31,10 +32,14 @@ function AppContent() {
   const probes = useAppProbes();
   const wasmSimulationDecisionBackend = useWasmSimulationDecisionBackend(demoScene);
   const webGpuMovementBackend = useWebGpuMovementBackend();
-  const simulation = useSimulationController(demoScene, {
+  const mainThreadSimulation = useSimulationController(demoScene, {
     decisionBackend: wasmSimulationDecisionBackend.backend,
     movementBackend: webGpuMovementBackend.backend,
   });
+  const workerSimulation = useSimulationWorkerController(demoScene);
+  const simulation = webGpuMovementBackend.backend
+    ? mainThreadSimulation
+    : workerSimulation;
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
   const [dashboardSamples, setDashboardSamples] = useState<DashboardSample[]>([
@@ -284,6 +289,15 @@ function AppContent() {
     viewMode,
     wasmDecisionRuntime,
     webGpuProbe: probes.webGpuProbe,
+    workerRuntime:
+      simulation === workerSimulation
+        ? workerSimulation.worker
+        : {
+            message: "Main thread GPU movement active",
+            mode: "inline",
+            sharedMemory: false,
+            status: "ready",
+          },
   });
   const labTitle = language === "zh" ? "商业客流运营台" : "Commercial crowd console";
   const runState =

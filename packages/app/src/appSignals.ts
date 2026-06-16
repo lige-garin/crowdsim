@@ -26,6 +26,7 @@ import type { MovementBackendId } from "./movementBackend";
 import { simulationRuntimeProfile, type SimulationSnapshot } from "./simulationEngine";
 import { createSharedArrayBufferSummary } from "./sharedArrayBufferProbe";
 import type { SocialForceProbeResult } from "./socialForceProbe";
+import type { SimulationWorkerControllerState } from "./useSimulationWorkerController";
 import { createDecisionBackendValue } from "./wasmDecisionRuntime";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
@@ -51,6 +52,7 @@ type SystemSignalOptions = {
   viewMode: StageViewMode;
   wasmDecisionRuntime: DecisionRuntimeState;
   webGpuProbe: WebGpuProbeResult;
+  workerRuntime: SimulationWorkerControllerState;
 };
 
 export function createSystemSignals({
@@ -75,6 +77,7 @@ export function createSystemSignals({
   viewMode,
   wasmDecisionRuntime,
   webGpuProbe,
+  workerRuntime,
 }: SystemSignalOptions): SystemSignal[] {
   return [
     {
@@ -118,6 +121,10 @@ export function createSystemSignals({
     {
       label: "Shared memory",
       value: createSharedArrayBufferSummary(sharedArrayBufferProbe),
+    },
+    {
+      label: "Simulation thread",
+      value: formatSimulationThread(workerRuntime),
     },
     {
       label: t("simulationAgentLimit"),
@@ -196,4 +203,13 @@ export function createSystemSignals({
     { label: t("heatmap"), value: heatmapValue },
     { label: t("viewMode"), value: formatStageViewMode(viewMode, language, t) },
   ];
+}
+
+function formatSimulationThread(workerRuntime: SimulationWorkerControllerState) {
+  const shared = workerRuntime.sharedMemory ? "SAB" : "postMessage";
+  const metrics = workerRuntime.sharedMetrics
+    ? `step ${workerRuntime.sharedMetrics.stepCount} | agents ${workerRuntime.sharedMetrics.agentCount}`
+    : workerRuntime.message;
+
+  return `${workerRuntime.mode} | ${shared} | ${metrics}`;
 }

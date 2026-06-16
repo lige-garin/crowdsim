@@ -20,9 +20,22 @@ let sharedMemory: SimulationWorkerSharedMemory | undefined;
 workerScope.onmessage = (event) => {
   const message = event.data;
 
+  void handleMessage(message);
+};
+
+async function handleMessage(message: SimulationWorkerRequest) {
   try {
     if (message.type === "init") {
-      engine = createSimulationEngineFromScene(message.scene, message.simulation);
+      const decisionBackend = message.runtime?.wasmDecisionBackend
+        ? await import("./behaviorWasm").then(
+            ({ createWasmSimulationDecisionBackend }) =>
+              createWasmSimulationDecisionBackend(message.scene),
+          )
+        : undefined;
+      engine = createSimulationEngineFromScene(message.scene, {
+        ...message.simulation,
+        decisionBackend,
+      });
       sharedMemory = message.sharedBuffer
         ? {
             buffer: message.sharedBuffer,
@@ -70,7 +83,7 @@ workerScope.onmessage = (event) => {
       type: "error",
     });
   }
-};
+}
 
 function postSnapshot(id: number, snapshot: ReturnType<SimulationEngine["snapshot"]>) {
   writeSimulationSharedMemory(sharedMemory, snapshot);
