@@ -15,12 +15,22 @@ import {
 } from "./sceneGeometry";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 import type { MovementBackend } from "./movementBackend";
+import {
+  applySimulationAgentDecisions,
+  calculateSimulationDecisionTick,
+  shouldRunDecisionTick,
+  type SimulationAgentDecisionState,
+  type SimulationDecisionBackend,
+} from "./simulationDecisionBackend";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 
 export type SimulationStatus = "paused" | "running";
 
 export type SimulationAgent = {
+  decisionTick?: number;
   id: number;
+  lifecycleState?: SimulationAgentDecisionState;
+  selectedStoreId?: string;
   x: number;
   y: number;
   vx: number;
@@ -44,6 +54,7 @@ export type SimulationSink = {
 };
 
 export type SimulationEngineConfig = {
+  decisionBackend?: SimulationDecisionBackend;
   fixedDtSeconds?: number;
   maxAgents?: number;
   movementBackend?: MovementBackend;
@@ -135,6 +146,7 @@ export function createSimulationEngine(
   config: SimulationEngineConfig,
 ): SimulationEngine {
   const fixedDtSeconds = config.fixedDtSeconds ?? defaultFixedDtSeconds;
+  const decisionBackend = config.decisionBackend;
   const maxAgents = config.maxAgents ?? defaultMaxAgents;
   const speedMetersPerSecond =
     config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
@@ -220,6 +232,7 @@ export function createSimulationEngine(
 
   function runFixedStep() {
     spawnArrivals();
+    runDecisionTickIfNeeded();
     advanceAgentsCpu();
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
@@ -232,6 +245,7 @@ export function createSimulationEngine(
     }
 
     spawnArrivals();
+    runDecisionTickIfNeeded();
 
     const result = await stepAgentsWithMovementBackend({
       agents,
@@ -247,6 +261,41 @@ export function createSimulationEngine(
     exitedCount += result.exitedCount;
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
+  }
+
+  function runDecisionTickIfNeeded() {
+    if (!decisionBackend || agents.length === 0) {
+      return;
+    }
+
+    const nextStepCount = stepCount + 1;
+
+    if (
+      !shouldRunDecisionTick({
+        decisionHz: decisionBackend.decisionHz,
+        movementHz: simulationRuntimeProfile.movementHz,
+        nextStepCount,
+      })
+    ) {
+      return;
+    }
+
+    const decisionTick = calculateSimulationDecisionTick({
+      decisionHz: decisionBackend.decisionHz,
+      movementHz: simulationRuntimeProfile.movementHz,
+      stepCount: nextStepCount,
+    });
+
+    agents = applySimulationAgentDecisions(
+      agents,
+      decisionBackend.decideAgents({
+        agents,
+        decisionTick,
+        elapsedSeconds,
+        sinks,
+      }),
+      decisionTick,
+    );
   }
 
   function spawnArrivals() {

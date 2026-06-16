@@ -13,6 +13,12 @@ import {
   type BrandDecisionInsight,
 } from "./brandDecisionProbe";
 import { demoScene } from "./demoScene";
+import { simulationRuntimeProfile } from "./simulationEngine";
+import type {
+  SimulationAgentDecision,
+  SimulationDecisionBackend,
+} from "./simulationDecisionBackend";
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 
 let behaviorWasmReady: Promise<void> | undefined;
 let behaviorState: BehaviorState | undefined;
@@ -78,6 +84,63 @@ export type QueueSystemProbeResult = {
   serviceTimes: number[];
   throughput: number;
 };
+
+export async function createWasmSimulationDecisionBackend(
+  scene: CrowdSimScene,
+): Promise<SimulationDecisionBackend> {
+  await initBehaviorWasm();
+
+  const model = new ShopDecisionModel();
+  const shopsById = new Map(scene.shops.map((shop) => [shop.id, shop]));
+
+  for (const shop of scene.shops) {
+    model.add_shop(
+      shop.id,
+      shop.entrancePosition?.x ?? shop.position.x,
+      shop.entrancePosition?.y ?? shop.position.y,
+      shop.attraction,
+      shop.capacity,
+      shop.dwellMeanSeconds,
+    );
+  }
+
+  return {
+    decisionHz: simulationRuntimeProfile.decisionHz,
+    dispose: () => model.free(),
+    id: "wasm-ready",
+    decideAgents: ({ agents, decisionTick }) =>
+      agents.flatMap<SimulationAgentDecision>((agent) => {
+        const profileCode = agent.id % 3;
+        const selectedStoreId = model.best_shop_label(agent.x, agent.y, profileCode);
+
+        if (!selectedStoreId) {
+          return [
+            {
+              agentId: agent.id,
+              nextState: "walk",
+            },
+          ];
+        }
+
+        const shop = shopsById.get(selectedStoreId);
+
+        if (!shop) {
+          return [];
+        }
+
+        const target = shop.entrancePosition ?? shop.position;
+
+        return [
+          {
+            agentId: agent.id,
+            nextState: decisionTick % 2 === 0 ? "queue" : "enterStore",
+            selectedStoreId,
+            target,
+          },
+        ];
+      }),
+  };
+}
 
 export async function runDiscreteEventWasmProbe(): Promise<DiscreteEventProbeResult> {
   await initBehaviorWasm();

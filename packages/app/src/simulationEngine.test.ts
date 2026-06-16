@@ -5,6 +5,7 @@ import {
   createSimulationEngineFromScene,
 } from "./simulationEngine";
 import type { MovementBackend } from "./movementBackend";
+import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
 
 const source = {
   id: "entry",
@@ -69,6 +70,90 @@ describe("simulation engine", () => {
     expect(snapshot.stepCount).toBe(2);
     expect(snapshot.elapsedSeconds).toBe(1);
     expect(snapshot.spawnedCount).toBeGreaterThan(0);
+  });
+
+  it("applies decision backend output at the configured decision tick", () => {
+    const decisionBackend = createTargetDecisionBackend();
+    const engine = createSimulationEngine({
+      decisionBackend,
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [
+        {
+          ...source,
+          arrivalRatePerSecond: 6000,
+        },
+      ],
+      sinks: [sink],
+      speedMetersPerSecond: 0,
+    });
+
+    engine.start();
+    const beforeDecision = engine.step(5);
+
+    expect(decisionBackend.calls).toBe(0);
+    expect(beforeDecision.agents.every((agent) => !agent.lifecycleState)).toBe(true);
+
+    const afterDecision = engine.step(1);
+
+    expect(decisionBackend.calls).toBe(1);
+    expect(afterDecision.agents.length).toBeGreaterThan(0);
+    expect(
+      afterDecision.agents.every(
+        (agent) =>
+          agent.decisionTick === 1 &&
+          agent.lifecycleState === "enterStore" &&
+          agent.selectedStoreId === "shop-a" &&
+          agent.targetX === 3 &&
+          agent.targetY === 4,
+      ),
+    ).toBe(true);
+  });
+
+  it("applies async decision backend output before async movement", async () => {
+    const movementBackend = createOffsetMovementBackend(1, 0);
+    const decisionBackend = createTargetDecisionBackend();
+    const engine = createSimulationEngine({
+      decisionBackend,
+      fixedDtSeconds: 1 / 60,
+      movementBackend,
+      seed: 11,
+      sources: [
+        {
+          ...source,
+          arrivalRatePerSecond: 6000,
+        },
+      ],
+      sinks: [sink],
+      speedMetersPerSecond: 0,
+    });
+
+    engine.start();
+    const snapshot = await engine.stepAsync(6);
+
+    expect(decisionBackend.calls).toBe(1);
+    expect(movementBackend.calls).toBe(6);
+    expect(snapshot.agents.length).toBeGreaterThan(0);
+    expect(
+      snapshot.agents.every((agent) => agent.lifecycleState === "enterStore"),
+    ).toBe(true);
+    expect(snapshot.agents.some((agent) => agent.x > 0)).toBe(true);
+  });
+
+  it("does not run the decision backend while paused", async () => {
+    const decisionBackend = createTargetDecisionBackend();
+    const engine = createSimulationEngine({
+      decisionBackend,
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+
+    await engine.tickAsync(1);
+
+    expect(decisionBackend.calls).toBe(0);
+    expect(engine.snapshot().stepCount).toBe(0);
   });
 
   it("writes async movement backend output into live agents", async () => {
@@ -240,6 +325,29 @@ function createOffsetMovementBackend(offsetX: number, offsetY: number) {
       }
 
       return { positions, velocities };
+    },
+  };
+
+  return backend;
+}
+
+function createTargetDecisionBackend() {
+  let calls = 0;
+  const backend: SimulationDecisionBackend & { calls: number } = {
+    decisionHz: 10,
+    id: "wasm-ready",
+    get calls() {
+      return calls;
+    },
+    decideAgents: ({ agents }) => {
+      calls++;
+
+      return agents.map((agent) => ({
+        agentId: agent.id,
+        nextState: "enterStore",
+        selectedStoreId: "shop-a",
+        target: { x: 3, y: 4 },
+      }));
     },
   };
 
