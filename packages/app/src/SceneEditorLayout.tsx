@@ -12,7 +12,14 @@ import type {
   EditorTool,
   EditorZoneCategory,
 } from "./sceneEditorState";
-import type { ZoneNumberField } from "./sceneEditorMutations";
+import type {
+  BuildingNumberField,
+  HazardNumberField,
+  ObstacleNumberField,
+  RoadNumberField,
+  TransitStopNumberField,
+  ZoneNumberField,
+} from "./sceneEditorMutations";
 import { pointsToSvg } from "./sceneEditorUtils";
 import type { SimulationAgent } from "./simulationEngine";
 
@@ -39,6 +46,8 @@ type SceneEditorLayoutProps = {
   onAiDraft: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
+  onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
+  onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onDeleteSelected: () => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
@@ -46,11 +55,19 @@ type SceneEditorLayoutProps = {
   onFinishWall: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
+  onHazardKindChange: (kind: EditorDocument["hazards"][number]["kind"]) => void;
+  onHazardNumberChange: (field: HazardNumberField, value: number) => void;
   onLoadSavedScene: () => void;
+  onObstacleKindChange: (kind: EditorDocument["obstacles"][number]["kind"]) => void;
+  onObstacleNumberChange: (field: ObstacleNumberField, value: number) => void;
   onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerUp: () => void;
   onRedo: () => void;
   onResetDraftWall: () => void;
+  onRoadDirectionChange: (
+    direction: EditorDocument["roads"][number]["direction"],
+  ) => void;
+  onRoadNumberChange: (field: RoadNumberField, value: number) => void;
   onSaveScene: () => void;
   onSceneChange: (sceneId: string) => void;
   onServiceNumberChange: (
@@ -66,18 +83,31 @@ type SceneEditorLayoutProps = {
   onToggleEditorViewMode: () => void;
   onToggleBasemapLocked: () => void;
   onToggleBasemapVisible: () => void;
+  onToggleObstacleBlocksMovement: () => void;
+  onToggleRoadTransitOnly: () => void;
+  onToggleRoadWalkable: () => void;
   onToggleZoneWalkable: () => void;
+  onToggleTransitStopActive: () => void;
   onGenerateZoneStores: () => void;
   onToolChange: (tool: EditorTool) => void;
+  onTransitStopKindChange: (
+    kind: EditorDocument["transitStops"][number]["kind"],
+  ) => void;
+  onTransitStopNumberChange: (field: TransitStopNumberField, value: number) => void;
   onUndo: () => void;
   onZoneCategoryChange: (category: EditorZoneCategory) => void;
   onZoneNumberChange: (field: ZoneNumberField, value: number) => void;
   selectableScenes: readonly CrowdSimScene[];
+  selectedBuilding: EditorDocument["buildings"][number] | undefined;
   selectedCountLine: EditorDocument["countLines"][number] | undefined;
+  selectedHazard: EditorDocument["hazards"][number] | undefined;
   selectedId: string | null;
   selectedLabel: string;
+  selectedObstacle: EditorDocument["obstacles"][number] | undefined;
+  selectedRoad: EditorDocument["roads"][number] | undefined;
   selectedServicePoint: EditorDocument["servicePoints"][number] | undefined;
   selectedShop: EditorDocument["shops"][number] | undefined;
+  selectedTransitStop: EditorDocument["transitStops"][number] | undefined;
   selectedZone: EditorDocument["zones"][number] | undefined;
   snapEnabled: boolean;
   storageStatus: LocalizedText;
@@ -108,6 +138,8 @@ export function SceneEditorLayout({
   onAiDraft,
   onBasemapImport,
   onBasemapNumberChange,
+  onBuildingKindChange,
+  onBuildingNumberChange,
   onCanvasPointerDown,
   onDeleteSelected,
   onEntityPointerDown,
@@ -115,11 +147,17 @@ export function SceneEditorLayout({
   onFinishWall,
   onGeoJsonImport,
   onImportScene,
+  onHazardKindChange,
+  onHazardNumberChange,
   onLoadSavedScene,
+  onObstacleKindChange,
+  onObstacleNumberChange,
   onPointerMove,
   onPointerUp,
   onRedo,
   onResetDraftWall,
+  onRoadDirectionChange,
+  onRoadNumberChange,
   onSaveScene,
   onSceneChange,
   onServiceNumberChange,
@@ -129,18 +167,29 @@ export function SceneEditorLayout({
   onToggleEditorViewMode,
   onToggleBasemapLocked,
   onToggleBasemapVisible,
+  onToggleObstacleBlocksMovement,
+  onToggleRoadTransitOnly,
+  onToggleRoadWalkable,
   onToggleZoneWalkable,
+  onToggleTransitStopActive,
   onGenerateZoneStores,
   onToolChange,
+  onTransitStopKindChange,
+  onTransitStopNumberChange,
   onUndo,
   onZoneCategoryChange,
   onZoneNumberChange,
   selectableScenes,
+  selectedBuilding,
   selectedCountLine,
+  selectedHazard,
   selectedId,
   selectedLabel,
+  selectedObstacle,
+  selectedRoad,
   selectedServicePoint,
   selectedShop,
+  selectedTransitStop,
   selectedZone,
   snapEnabled,
   storageStatus,
@@ -212,19 +261,38 @@ export function SceneEditorLayout({
       <SceneEditorParamPanel
         basemap={basemap}
         onBasemapNumberChange={onBasemapNumberChange}
+        onBuildingKindChange={onBuildingKindChange}
+        onBuildingNumberChange={onBuildingNumberChange}
+        onHazardKindChange={onHazardKindChange}
+        onHazardNumberChange={onHazardNumberChange}
+        onObstacleKindChange={onObstacleKindChange}
+        onObstacleNumberChange={onObstacleNumberChange}
+        onRoadDirectionChange={onRoadDirectionChange}
+        onRoadNumberChange={onRoadNumberChange}
         onServiceNumberChange={onServiceNumberChange}
         onShopNumberChange={onShopNumberChange}
         onShopSizeChange={onShopSizeChange}
+        onToggleObstacleBlocksMovement={onToggleObstacleBlocksMovement}
+        onToggleRoadTransitOnly={onToggleRoadTransitOnly}
+        onToggleRoadWalkable={onToggleRoadWalkable}
         onToggleBasemapLocked={onToggleBasemapLocked}
         onToggleBasemapVisible={onToggleBasemapVisible}
+        onToggleTransitStopActive={onToggleTransitStopActive}
         onToggleZoneWalkable={onToggleZoneWalkable}
         onGenerateZoneStores={onGenerateZoneStores}
+        onTransitStopKindChange={onTransitStopKindChange}
+        onTransitStopNumberChange={onTransitStopNumberChange}
         onZoneCategoryChange={onZoneCategoryChange}
         onZoneNumberChange={onZoneNumberChange}
         pointsToSvg={pointsToSvg}
+        selectedBuilding={selectedBuilding}
         selectedCountLine={selectedCountLine}
+        selectedHazard={selectedHazard}
+        selectedObstacle={selectedObstacle}
+        selectedRoad={selectedRoad}
         selectedServicePoint={selectedServicePoint}
         selectedShop={selectedShop}
+        selectedTransitStop={selectedTransitStop}
         selectedZone={selectedZone}
         t={t}
       />

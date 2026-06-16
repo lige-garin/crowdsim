@@ -49,15 +49,33 @@ import {
 } from "./sceneEditorState";
 import { downloadSceneJson } from "./sceneFileExport";
 import {
+  toggleDocumentObstacleBlocksMovement,
+  toggleDocumentRoadBoolean,
+  toggleDocumentTransitStopActive,
   toggleDocumentZoneWalkable,
+  updateDocumentBuildingKind,
+  updateDocumentBuildingNumber,
+  updateDocumentHazardKind,
+  updateDocumentHazardNumber,
+  updateDocumentObstacleKind,
+  updateDocumentObstacleNumber,
+  updateDocumentRoadDirection,
+  updateDocumentRoadNumber,
   updateDocumentServiceNumber,
   updateDocumentShopNumber,
   updateDocumentShopSize,
+  updateDocumentTransitStopKind,
+  updateDocumentTransitStopNumber,
   updateDocumentZoneCategory,
   updateDocumentZoneNumber,
+  type BuildingNumberField,
+  type HazardNumberField,
+  type ObstacleNumberField,
+  type RoadNumberField,
   type ServiceNumberField,
   type ShopNumberField,
   type ShopSizeField,
+  type TransitStopNumberField,
   type ZoneNumberField,
 } from "./sceneEditorMutations";
 import { fileNameValues, makeStatus, sceneNameValues } from "./sceneEditorStatus";
@@ -161,6 +179,17 @@ export function SceneEditor({
     };
   }, [aiImageOverlayVisible]);
   const selectedShop = document.shops.find((shop) => shop.id === selectedId);
+  const selectedRoad = document.roads.find((road) => road.id === selectedId);
+  const selectedBuilding = document.buildings.find(
+    (building) => building.id === selectedId,
+  );
+  const selectedTransitStop = document.transitStops.find(
+    (stop) => stop.id === selectedId,
+  );
+  const selectedObstacle = document.obstacles.find(
+    (obstacle) => obstacle.id === selectedId,
+  );
+  const selectedHazard = document.hazards.find((hazard) => hazard.id === selectedId);
   const selectedZone = document.zones.find((zone) => zone.id === selectedId);
   const selectedServicePoint = document.servicePoints.find(
     (point) => point.id === selectedId,
@@ -516,6 +545,99 @@ export function SceneEditor({
     );
   }
 
+  function updateRoadNumber(field: RoadNumberField, value: number) {
+    if (!selectedRoad || !Number.isFinite(value)) return;
+    setDocument((current) =>
+      updateDocumentRoadNumber(current, selectedRoad.id, field, value),
+    );
+  }
+
+  function updateRoadDirection(
+    direction: EditorDocument["roads"][number]["direction"],
+  ) {
+    if (!selectedRoad) return;
+    setDocument((current) =>
+      updateDocumentRoadDirection(current, selectedRoad.id, direction),
+    );
+  }
+
+  function toggleRoadBoolean(field: "transitOnly" | "walkable") {
+    if (!selectedRoad) return;
+    setDocument((current) =>
+      toggleDocumentRoadBoolean(current, selectedRoad.id, field),
+    );
+  }
+
+  function updateBuildingNumber(field: BuildingNumberField, value: number) {
+    if (!selectedBuilding || !Number.isFinite(value)) return;
+    setDocument((current) =>
+      updateDocumentBuildingNumber(current, selectedBuilding.id, field, value),
+    );
+  }
+
+  function updateBuildingKind(kind: EditorDocument["buildings"][number]["kind"]) {
+    if (!selectedBuilding) return;
+    setDocument((current) =>
+      updateDocumentBuildingKind(current, selectedBuilding.id, kind),
+    );
+  }
+
+  function updateTransitStopNumber(field: TransitStopNumberField, value: number) {
+    if (!selectedTransitStop || !Number.isFinite(value)) return;
+    setDocument((current) =>
+      updateDocumentTransitStopNumber(current, selectedTransitStop.id, field, value),
+    );
+  }
+
+  function updateTransitStopKind(kind: EditorDocument["transitStops"][number]["kind"]) {
+    if (!selectedTransitStop) return;
+    setDocument((current) =>
+      updateDocumentTransitStopKind(current, selectedTransitStop.id, kind),
+    );
+  }
+
+  function toggleTransitStopActive() {
+    if (!selectedTransitStop) return;
+    setDocument((current) =>
+      toggleDocumentTransitStopActive(current, selectedTransitStop.id),
+    );
+  }
+
+  function updateObstacleNumber(field: ObstacleNumberField, value: number) {
+    if (!selectedObstacle || !Number.isFinite(value)) return;
+    setDocument((current) =>
+      updateDocumentObstacleNumber(current, selectedObstacle.id, field, value),
+    );
+  }
+
+  function updateObstacleKind(kind: EditorDocument["obstacles"][number]["kind"]) {
+    if (!selectedObstacle) return;
+    setDocument((current) =>
+      updateDocumentObstacleKind(current, selectedObstacle.id, kind),
+    );
+  }
+
+  function toggleObstacleBlocksMovement() {
+    if (!selectedObstacle) return;
+    setDocument((current) =>
+      toggleDocumentObstacleBlocksMovement(current, selectedObstacle.id),
+    );
+  }
+
+  function updateHazardNumber(field: HazardNumberField, value: number) {
+    if (!selectedHazard || !Number.isFinite(value)) return;
+    setDocument((current) =>
+      updateDocumentHazardNumber(current, selectedHazard.id, field, value),
+    );
+  }
+
+  function updateHazardKind(kind: EditorDocument["hazards"][number]["kind"]) {
+    if (!selectedHazard) return;
+    setDocument((current) =>
+      updateDocumentHazardKind(current, selectedHazard.id, kind),
+    );
+  }
+
   function updateZoneNumber(field: ZoneNumberField, value: number) {
     if (!selectedZone || !Number.isFinite(value)) return;
     setDocument((current) =>
@@ -577,6 +699,8 @@ export function SceneEditor({
       onAiDraft={applyAiDraft}
       onBasemapImport={importBasemap}
       onBasemapNumberChange={updateBasemap}
+      onBuildingKindChange={updateBuildingKind}
+      onBuildingNumberChange={updateBuildingNumber}
       onCanvasPointerDown={handleCanvasPointerDown}
       onDeleteSelected={deleteSelected}
       onEntityPointerDown={handleEntityPointerDown}
@@ -584,12 +708,18 @@ export function SceneEditor({
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
       onGenerateZoneStores={generateStoresForSelectedZone}
+      onHazardKindChange={updateHazardKind}
+      onHazardNumberChange={updateHazardNumber}
       onImportScene={importScene}
       onLoadSavedScene={loadSavedScene}
+      onObstacleKindChange={updateObstacleKind}
+      onObstacleNumberChange={updateObstacleNumber}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onRedo={redo}
       onResetDraftWall={() => setDraftWallPoints([])}
+      onRoadDirectionChange={updateRoadDirection}
+      onRoadNumberChange={updateRoadNumber}
       onSaveScene={saveScene}
       onSceneChange={selectExampleScene}
       onServiceNumberChange={updateServiceNumber}
@@ -599,17 +729,28 @@ export function SceneEditor({
       onToggleBasemapLocked={() => toggleBasemap("locked")}
       onToggleBasemapVisible={() => toggleBasemap("visible")}
       onToggleEditorViewMode={toggleViewMode}
+      onToggleObstacleBlocksMovement={toggleObstacleBlocksMovement}
+      onToggleRoadTransitOnly={() => toggleRoadBoolean("transitOnly")}
+      onToggleRoadWalkable={() => toggleRoadBoolean("walkable")}
       onToggleSnap={() => setSnapEnabled((value) => !value)}
+      onToggleTransitStopActive={toggleTransitStopActive}
       onToolChange={switchTool}
+      onTransitStopKindChange={updateTransitStopKind}
+      onTransitStopNumberChange={updateTransitStopNumber}
       onUndo={undo}
       onZoneCategoryChange={updateZoneCategory}
       onZoneNumberChange={updateZoneNumber}
       selectableScenes={selectableScenes}
+      selectedBuilding={selectedBuilding}
       selectedCountLine={selectedCountLine}
+      selectedHazard={selectedHazard}
       selectedId={selectedId}
       selectedLabel={selectedLabel}
+      selectedObstacle={selectedObstacle}
+      selectedRoad={selectedRoad}
       selectedServicePoint={selectedServicePoint}
       selectedShop={selectedShop}
+      selectedTransitStop={selectedTransitStop}
       selectedZone={selectedZone}
       snapEnabled={snapEnabled}
       storageStatus={storageStatus}

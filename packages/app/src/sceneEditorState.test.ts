@@ -19,7 +19,20 @@ import {
   snapPoint,
 } from "./sceneEditorState";
 import {
+  toggleDocumentObstacleBlocksMovement,
+  toggleDocumentRoadBoolean,
+  toggleDocumentTransitStopActive,
   toggleDocumentZoneWalkable,
+  updateDocumentBuildingKind,
+  updateDocumentBuildingNumber,
+  updateDocumentHazardKind,
+  updateDocumentHazardNumber,
+  updateDocumentObstacleKind,
+  updateDocumentObstacleNumber,
+  updateDocumentRoadDirection,
+  updateDocumentRoadNumber,
+  updateDocumentTransitStopKind,
+  updateDocumentTransitStopNumber,
   updateDocumentZoneCategory,
   updateDocumentZoneNumber,
 } from "./sceneEditorMutations";
@@ -250,6 +263,70 @@ describe("scene editor state", () => {
       id: "hazard-5",
       affectedRoadId: "road-1",
       routeCostMultiplier: 2,
+    });
+  });
+
+  it("updates BioCity object properties and exports them", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+
+    document = addRoad(document, { x: 20, y: 20 });
+    document = addBuilding(document, { x: 38, y: 20 });
+    document = addTransitStop(document, { x: 24, y: 22 });
+    document = addObstacle(document, { x: 48, y: 22 });
+    document = addHazard(document, { x: 56, y: 22 });
+
+    document = updateDocumentRoadDirection(document, "road-1", "oneWayForward");
+    document = updateDocumentRoadNumber(document, "road-1", "widthMeters", 12);
+    document = toggleDocumentRoadBoolean(document, "road-1", "transitOnly");
+    document = updateDocumentBuildingKind(document, "building-2", "retail");
+    document = updateDocumentBuildingNumber(document, "building-2", "floors", 9);
+    document = updateDocumentTransitStopKind(document, "transit-stop-3", "tram");
+    document = updateDocumentTransitStopNumber(
+      document,
+      "transit-stop-3",
+      "delayFactor",
+      1.35,
+    );
+    document = toggleDocumentTransitStopActive(document, "transit-stop-3");
+    document = updateDocumentObstacleKind(document, "obstacle-4", "water");
+    document = updateDocumentObstacleNumber(
+      document,
+      "obstacle-4",
+      "routeCostMultiplier",
+      6,
+    );
+    document = toggleDocumentObstacleBlocksMovement(document, "obstacle-4");
+    document = updateDocumentHazardKind(document, "hazard-5", "flood");
+    document = updateDocumentHazardNumber(document, "hazard-5", "severity", 0.82);
+    document = updateDocumentHazardNumber(
+      document,
+      "hazard-5",
+      "routeCostMultiplier",
+      3.4,
+    );
+
+    const scene = createSceneFromEditorDocument(demoScene, document);
+
+    expect(scene.roads[0]).toMatchObject({
+      direction: "oneWayForward",
+      transitOnly: true,
+      widthMeters: 12,
+    });
+    expect(scene.buildings[0]).toMatchObject({ floors: 9, kind: "retail" });
+    expect(scene.transitStops[0]).toMatchObject({
+      active: false,
+      delayFactor: 1.35,
+      kind: "tram",
+    });
+    expect(scene.obstacles[0]).toMatchObject({
+      blocksMovement: false,
+      kind: "water",
+      routeCostMultiplier: 6,
+    });
+    expect(scene.hazards[0]).toMatchObject({
+      kind: "flood",
+      routeCostMultiplier: 3.4,
+      severity: 0.82,
     });
   });
 

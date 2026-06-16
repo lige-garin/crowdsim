@@ -1,10 +1,241 @@
 import type { EditorDocument } from "./sceneEditorState";
 import type { EditorZoneCategory } from "./sceneEditorState";
 
+export type RoadNumberField =
+  | "capacityPerMinute"
+  | "speedLimitMetersPerSecond"
+  | "widthMeters";
+export type BuildingNumberField =
+  | "floors"
+  | "heightMeters"
+  | "residentCapacity"
+  | "visitorCapacity"
+  | "workerCapacity";
+export type TransitStopNumberField =
+  | "alightingPerArrival"
+  | "arrivalIntervalSeconds"
+  | "boardingCapacityPerMinute"
+  | "capacity"
+  | "delayFactor";
+export type ObstacleNumberField = "routeCostMultiplier";
+export type HazardNumberField =
+  | "radiusMeters"
+  | "riskScore"
+  | "routeCostMultiplier"
+  | "severity"
+  | "speedMultiplier"
+  | "startsAtSeconds"
+  | "visibilityMultiplier";
 export type ShopNumberField = "attraction" | "capacity" | "dwellMeanSeconds";
 export type ShopSizeField = "height" | "width";
 export type ServiceNumberField = "capacityPerMinute" | "serviceMeanSeconds" | "width";
 export type ZoneNumberField = "attraction" | "dwellMeanSeconds";
+
+type RoadDirection = EditorDocument["roads"][number]["direction"];
+type BuildingKind = EditorDocument["buildings"][number]["kind"];
+type TransitStopKind = EditorDocument["transitStops"][number]["kind"];
+type ObstacleKind = EditorDocument["obstacles"][number]["kind"];
+type HazardKind = EditorDocument["hazards"][number]["kind"];
+
+export function updateDocumentRoadNumber(
+  document: EditorDocument,
+  roadId: string,
+  field: RoadNumberField,
+  value: number,
+) {
+  const minValue = field === "capacityPerMinute" ? 0 : 0.1;
+
+  return {
+    ...document,
+    roads: document.roads.map((road) =>
+      road.id === roadId ? { ...road, [field]: Math.max(minValue, value) } : road,
+    ),
+  };
+}
+
+export function updateDocumentRoadDirection(
+  document: EditorDocument,
+  roadId: string,
+  direction: RoadDirection,
+) {
+  return {
+    ...document,
+    roads: document.roads.map((road) =>
+      road.id === roadId ? { ...road, direction } : road,
+    ),
+  };
+}
+
+export function toggleDocumentRoadBoolean(
+  document: EditorDocument,
+  roadId: string,
+  field: "transitOnly" | "walkable",
+) {
+  return {
+    ...document,
+    roads: document.roads.map((road) =>
+      road.id === roadId ? { ...road, [field]: !road[field] } : road,
+    ),
+  };
+}
+
+export function updateDocumentBuildingKind(
+  document: EditorDocument,
+  buildingId: string,
+  kind: BuildingKind,
+) {
+  return {
+    ...document,
+    buildings: document.buildings.map((building) =>
+      building.id === buildingId ? { ...building, kind } : building,
+    ),
+  };
+}
+
+export function updateDocumentBuildingNumber(
+  document: EditorDocument,
+  buildingId: string,
+  field: BuildingNumberField,
+  value: number,
+) {
+  const minValue = field === "heightMeters" || field === "floors" ? 1 : 0;
+  const nextValue =
+    field === "floors" ||
+    field === "residentCapacity" ||
+    field === "visitorCapacity" ||
+    field === "workerCapacity"
+      ? Math.round(value)
+      : value;
+
+  return {
+    ...document,
+    buildings: document.buildings.map((building) =>
+      building.id === buildingId
+        ? { ...building, [field]: Math.max(minValue, nextValue) }
+        : building,
+    ),
+  };
+}
+
+export function updateDocumentTransitStopKind(
+  document: EditorDocument,
+  stopId: string,
+  kind: TransitStopKind,
+) {
+  return {
+    ...document,
+    transitStops: document.transitStops.map((stop) =>
+      stop.id === stopId ? { ...stop, kind } : stop,
+    ),
+  };
+}
+
+export function updateDocumentTransitStopNumber(
+  document: EditorDocument,
+  stopId: string,
+  field: TransitStopNumberField,
+  value: number,
+) {
+  const minValue =
+    field === "alightingPerArrival" || field === "boardingCapacityPerMinute" ? 0 : 1;
+  const nextValue =
+    field === "alightingPerArrival" || field === "capacity" ? Math.round(value) : value;
+
+  return {
+    ...document,
+    transitStops: document.transitStops.map((stop) =>
+      stop.id === stopId ? { ...stop, [field]: Math.max(minValue, nextValue) } : stop,
+    ),
+  };
+}
+
+export function toggleDocumentTransitStopActive(
+  document: EditorDocument,
+  stopId: string,
+) {
+  return {
+    ...document,
+    transitStops: document.transitStops.map((stop) =>
+      stop.id === stopId ? { ...stop, active: !stop.active } : stop,
+    ),
+  };
+}
+
+export function updateDocumentObstacleKind(
+  document: EditorDocument,
+  obstacleId: string,
+  kind: ObstacleKind,
+) {
+  return {
+    ...document,
+    obstacles: document.obstacles.map((obstacle) =>
+      obstacle.id === obstacleId ? { ...obstacle, kind } : obstacle,
+    ),
+  };
+}
+
+export function updateDocumentObstacleNumber(
+  document: EditorDocument,
+  obstacleId: string,
+  field: ObstacleNumberField,
+  value: number,
+) {
+  return {
+    ...document,
+    obstacles: document.obstacles.map((obstacle) =>
+      obstacle.id === obstacleId
+        ? { ...obstacle, [field]: Math.max(0, value) }
+        : obstacle,
+    ),
+  };
+}
+
+export function toggleDocumentObstacleBlocksMovement(
+  document: EditorDocument,
+  obstacleId: string,
+) {
+  return {
+    ...document,
+    obstacles: document.obstacles.map((obstacle) =>
+      obstacle.id === obstacleId
+        ? { ...obstacle, blocksMovement: !obstacle.blocksMovement }
+        : obstacle,
+    ),
+  };
+}
+
+export function updateDocumentHazardKind(
+  document: EditorDocument,
+  hazardId: string,
+  kind: HazardKind,
+) {
+  return {
+    ...document,
+    hazards: document.hazards.map((hazard) =>
+      hazard.id === hazardId ? { ...hazard, kind } : hazard,
+    ),
+  };
+}
+
+export function updateDocumentHazardNumber(
+  document: EditorDocument,
+  hazardId: string,
+  field: HazardNumberField,
+  value: number,
+) {
+  const minValue = field === "radiusMeters" ? 1 : 0;
+  const maxValue =
+    field === "riskScore" || field === "severity" ? 1 : Number.POSITIVE_INFINITY;
+
+  return {
+    ...document,
+    hazards: document.hazards.map((hazard) =>
+      hazard.id === hazardId
+        ? { ...hazard, [field]: Math.min(maxValue, Math.max(minValue, value)) }
+        : hazard,
+    ),
+  };
+}
 
 export function updateDocumentShopNumber(
   document: EditorDocument,
