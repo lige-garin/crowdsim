@@ -1,4 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { getActiveCityEvents } from "./bioCityWeatherSystem";
 
 export type BioCityRouteNodeKind =
   | "buildingEntrance"
@@ -65,6 +66,7 @@ export function compileBioCityRouteGraph(
   const activeHazards = scene.hazards.filter((hazard) =>
     isHazardActive(hazard, elapsedSeconds),
   );
+  const activeEvents = getActiveCityEvents(scene, elapsedSeconds);
   const nodes: BioCityRouteNode[] = [
     ...routeNodesFromRoads(scene),
     ...routeNodesFromEntrances(scene),
@@ -72,7 +74,7 @@ export function compileBioCityRouteGraph(
     ...routeNodesFromBuildings(scene),
     ...routeNodesFromTransitStops(scene),
   ];
-  const edges = routeEdgesFromRoads(scene, activeHazards);
+  const edges = routeEdgesFromRoads(scene, activeHazards, activeEvents);
 
   return {
     activeHazardIds: activeHazards.map((hazard) => hazard.id),
@@ -203,8 +205,12 @@ function routeNodesFromTransitStops(scene: CrowdSimScene): BioCityRouteNode[] {
 function routeEdgesFromRoads(
   scene: CrowdSimScene,
   activeHazards: CrowdSimScene["hazards"],
+  activeEvents: CrowdSimScene["eventTimeline"]["events"],
 ): BioCityRouteEdge[] {
   return scene.roads.flatMap((road) => {
+    const roadClosed = activeEvents.some(
+      (event) => event.kind === "roadClose" && event.targetId === road.id,
+    );
     const roadHazards = activeHazards.filter(
       (hazard) =>
         hazard.affectedRoadId === road.id ||
@@ -226,6 +232,7 @@ function routeEdgesFromRoads(
       const distanceMeters = distance(from, point);
       const routeCostMultiplier =
         (road.walkable ? 1 : 99) *
+        (roadClosed ? 99 : 1) *
         (road.transitOnly ? 1.25 : 1) *
         hazardImpact.routeCostMultiplier;
       const speedMultiplier = hazardImpact.speedMultiplier;

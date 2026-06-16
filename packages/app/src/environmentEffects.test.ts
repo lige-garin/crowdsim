@@ -6,6 +6,7 @@ import {
   createEnvironmentComparisonExperiment,
   environmentScenarioPresets,
 } from "./environmentEffects";
+import { bioCityDemoScene } from "./bioCityDemoScene";
 
 const scene = parseScene({
   schemaVersion: "1.0.0",
@@ -65,5 +66,21 @@ describe("environment effects", () => {
     expect(experiment.variants.map((variant) => variant.id)).toContain("smoke");
     expect(experiment.variants[0].id).toBe("clear");
     expect(experiment.replications).toBe(2);
+  });
+
+  it("includes BioCity weather profile, events, and hazards in environment impact", () => {
+    const impact = calculateEnvironmentImpact(bioCityDemoScene, 1200);
+
+    expect(impact.activeFactorIds).toEqual(
+      expect.arrayContaining([
+        "weather-profile-rain-0",
+        "event-bus-delay-start",
+        "event-pooling-warning",
+        "hazard-curbside-pooling",
+      ]),
+    );
+    expect(impact.routeCostMultiplier).toBeGreaterThan(1);
+    expect(impact.speedMultiplier).toBeLessThan(1);
+    expect(impact.riskScore).toBeGreaterThan(0);
   });
 });

@@ -95,6 +95,93 @@ describe("bio agent behavior", () => {
     expect(decision.explanation.join(" ")).toContain("spending intent");
   });
 
+  it("uses weather sensitivity when deciding to evacuate under severe weather", () => {
+    const weatherScene = parseScene({
+      ...bioCityDemoScene,
+      hazards: [],
+      transitStops: [],
+      weatherProfile: {
+        source: "manual",
+        samples: [
+          {
+            startsAtSeconds: 0,
+            condition: "storm",
+            durationSeconds: 1800,
+            temperatureC: 22,
+            precipitationMmPerHour: 18,
+            windSpeedMetersPerSecond: 20,
+          },
+        ],
+      },
+      bioAgentProfiles: [
+        {
+          id: "weather-sensitive",
+          name: "Weather Sensitive",
+          kind: "commuter",
+          riskTolerance: 0.35,
+          weatherSensitivity: 0.9,
+        },
+      ],
+    });
+    const decision = decideBioAgentBehavior({
+      agent: {
+        id: 1,
+        targetX: 0,
+        targetY: 0,
+        vx: 0,
+        vy: 0,
+        x: 20,
+        y: 20,
+      },
+      elapsedSeconds: 60,
+      scene: weatherScene,
+      sinks,
+    });
+
+    expect(decision.nextState).toBe("evacuate");
+    expect(decision.explanation.join(" ")).toContain("perceived risk");
+  });
+
+  it("uses transit delay events when evaluating transit stops", () => {
+    const delayedScene = parseScene({
+      ...bioCityDemoScene,
+      hazards: [],
+      weatherProfile: {
+        source: "manual",
+        samples: [],
+      },
+      eventTimeline: {
+        events: [
+          {
+            id: "bus-delay",
+            kind: "transitDelay",
+            startsAtSeconds: 0,
+            targetId: "rain-market-bus-stop",
+            payload: {
+              delayFactor: 2,
+            },
+          },
+        ],
+      },
+    });
+    const decision = decideBioAgentBehavior({
+      agent: {
+        id: 1,
+        targetX: 0,
+        targetY: 0,
+        vx: 0,
+        vy: 0,
+        x: 110,
+        y: 70,
+      },
+      elapsedSeconds: 60,
+      scene: delayedScene,
+      sinks,
+    });
+
+    expect(decision.explanation.join(" ")).toContain("delay x2.50");
+  });
+
   it("adapts BioCity decisions to the simulation decision backend", () => {
     const backend = createBioCityDecisionBackend(bioCityDemoScene);
     const decisions = backend.decideAgents({

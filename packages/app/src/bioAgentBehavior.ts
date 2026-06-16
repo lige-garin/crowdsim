@@ -6,6 +6,10 @@ import {
   estimateBioCityRouteInfluence,
   nearestBioCityRouteNode,
 } from "./bioCityRouteGraph";
+import {
+  createBioCityWeatherRuntimeState,
+  getActiveCityEvents,
+} from "./bioCityWeatherSystem";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import type {
   SimulationAgentDecision,
@@ -68,9 +72,23 @@ export function decideBioAgentBehavior({
 }: BioAgentBehaviorContext): BioAgentBehaviorDecision {
   const profile = pickBioAgentProfile(scene, agent.id);
   const influence = estimateBioCityRouteInfluence(scene, agent, elapsedSeconds);
+  const weatherState = createBioCityWeatherRuntimeState(scene, elapsedSeconds);
+  const weatherFactors = weatherState.environmentFactors.filter(
+    (factor) => factor.customParameters.source === "weatherProfile",
+  );
+  const weatherRisk = weatherFactors.reduce(
+    (risk, factor) => Math.max(risk, factor.riskScore),
+    0,
+  );
+  const weatherRouteCostStress = weatherFactors.reduce(
+    (stress, factor) => Math.max(stress, Math.max(0, factor.routeCostMultiplier - 1)),
+    0,
+  );
   const perceivedRisk =
     influence.riskScore +
-    activeHazardSeverityAtPoint(scene, agent, elapsedSeconds) *
+    (weatherRisk +
+      weatherRouteCostStress * 0.55 +
+      activeHazardSeverityAtPoint(scene, agent, elapsedSeconds)) *
       profile.weatherSensitivity;
   const evacuation = chooseEvacuationTarget(agent, sinks);
 
@@ -182,6 +200,7 @@ function chooseTransitStop(
   const candidates = scene.transitStops
     .filter((stop) => stop.active)
     .map((stop) => {
+      const eventDelayFactor = activeTransitDelayFactor(scene, stop.id, elapsedSeconds);
       const influence = estimateBioCityRouteInfluence(
         scene,
         stop.position,
@@ -189,7 +208,9 @@ function chooseTransitStop(
       );
       const distance = distanceBetween(agent, stop.position);
       const queuePressure =
-        stop.alightingPerArrival / Math.max(1, stop.capacity) + stop.delayFactor - 1;
+        stop.alightingPerArrival / Math.max(1, stop.capacity) +
+        stop.delayFactor * eventDelayFactor -
+        1;
       const score =
         profile.baseSpeedMetersPerSecond * 0.4 -
         Math.log1p(distance) * 0.12 -
@@ -199,6 +220,7 @@ function chooseTransitStop(
       return {
         score,
         stop,
+        delayFactor: stop.delayFactor * eventDelayFactor,
         influence,
         queuePressure,
       };
@@ -213,12 +235,29 @@ function chooseTransitStop(
   return {
     explanation: [
       `transit ${best.stop.kind}`,
-      `delay x${best.stop.delayFactor.toFixed(2)}`,
+      `delay x${best.delayFactor.toFixed(2)}`,
       `risk ${best.influence.riskScore.toFixed(2)}`,
     ],
     queue: best.queuePressure > 0.45,
     target: best.stop.position,
   };
+}
+
+function activeTransitDelayFactor(
+  scene: CrowdSimScene,
+  stopId: string,
+  elapsedSeconds: number,
+) {
+  return getActiveCityEvents(scene, elapsedSeconds)
+    .filter((event) => event.kind === "transitDelay" && event.targetId === stopId)
+    .reduce((factor, event) => {
+      const delayFactor =
+        typeof event.payload.delayFactor === "number"
+          ? event.payload.delayFactor
+          : 1.35;
+
+      return factor * delayFactor;
+    }, 1);
 }
 
 function chooseStore(

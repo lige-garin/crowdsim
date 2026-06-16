@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseScene } from "@crowdsim/scene-schema";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import {
   compileBioCityRouteGraph,
@@ -64,5 +65,30 @@ describe("bioCityRouteGraph", () => {
     expect(influence.routeCostMultiplier).toBeGreaterThan(1);
     expect(influence.riskScore).toBeGreaterThan(0);
     expect(influence.speedMultiplier).toBeLessThan(1);
+  });
+
+  it("raises road edge cost while a road close event is active", () => {
+    const scene = parseScene({
+      ...bioCityDemoScene,
+      eventTimeline: {
+        events: [
+          {
+            id: "close-avenue",
+            kind: "roadClose",
+            startsAtSeconds: 60,
+            endsAtSeconds: 300,
+            targetId: "rain-market-avenue",
+          },
+        ],
+      },
+    });
+    const open = compileBioCityRouteGraph(scene, 30);
+    const closed = compileBioCityRouteGraph(scene, 120);
+    const openRoad = open.edges.find((edge) => edge.sourceId === "rain-market-avenue")!;
+    const closedRoad = closed.edges.find(
+      (edge) => edge.sourceId === "rain-market-avenue",
+    )!;
+
+    expect(closedRoad.cost).toBeGreaterThan(openRoad.cost * 50);
   });
 });
