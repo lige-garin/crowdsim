@@ -4,6 +4,12 @@ import { App } from "./App";
 
 vi.mock("./behaviorWasm", () => ({
   addWithBehaviorWasm: vi.fn().mockResolvedValue(42),
+  createWasmSimulationDecisionBackend: vi.fn().mockResolvedValue({
+    decisionHz: 10,
+    decideAgents: vi.fn(() => []),
+    dispose: vi.fn(),
+    id: "wasm-ready",
+  }),
   initBehaviorWasm: vi.fn().mockResolvedValue(undefined),
   runAgentStateMachineWasmProbe: vi.fn().mockResolvedValue({
     finalCode: 5,

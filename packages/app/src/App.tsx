@@ -15,6 +15,7 @@ import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
+import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
 
 export function App() {
   return (
@@ -27,7 +28,10 @@ export function App() {
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
   const probes = useAppProbes();
-  const simulation = useSimulationController(demoScene);
+  const wasmSimulationDecisionBackend = useWasmSimulationDecisionBackend(demoScene);
+  const simulation = useSimulationController(demoScene, {
+    decisionBackend: wasmSimulationDecisionBackend.backend,
+  });
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
   const [dashboardSamples, setDashboardSamples] = useState<DashboardSample[]>([

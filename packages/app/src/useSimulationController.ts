@@ -4,6 +4,7 @@ import {
   createSimulationEngineFromScene,
   type SimulationSnapshot,
 } from "./simulationEngine";
+import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
 import type { MovementBackend } from "./movementBackend";
 
 export type SimulationController = {
@@ -15,6 +16,7 @@ export type SimulationController = {
 };
 
 export type SimulationControllerOptions = {
+  decisionBackend?: SimulationDecisionBackend;
   movementBackend?: MovementBackend;
 };
 
@@ -22,10 +24,10 @@ export function useSimulationController(
   scene: CrowdSimScene,
   options: SimulationControllerOptions = {},
 ): SimulationController {
-  const { movementBackend } = options;
+  const { decisionBackend, movementBackend } = options;
   const engine = useMemo(
-    () => createSimulationEngineFromScene(scene, { movementBackend }),
-    [movementBackend, scene],
+    () => createSimulationEngineFromScene(scene, { decisionBackend, movementBackend }),
+    [decisionBackend, movementBackend, scene],
   );
   const frameRef = useRef(0);
   const watchdogRef = useRef(0);

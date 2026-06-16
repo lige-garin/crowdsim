@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
 import type { MovementBackend } from "./movementBackend";
+import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
 import { useSimulationController } from "./useSimulationController";
 
 const fastScene = parseScene({
@@ -97,6 +98,36 @@ describe("useSimulationController", () => {
 
     unmount();
   });
+
+  it("applies injected decision backend output during live controller ticks", async () => {
+    const decisionBackend = createDecisionBackend();
+    const { result, unmount } = renderHook(() =>
+      useSimulationController(fastScene, { decisionBackend }),
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      rafCallbacks[0](1_000);
+      rafCallbacks[1](1_200);
+    });
+
+    await waitFor(() => expect(decisionBackend.calls).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(
+        result.current.snapshot.agents.some(
+          (agent) =>
+            agent.lifecycleState === "enterStore" &&
+            agent.selectedStoreId === "shop-a" &&
+            agent.targetX === 3 &&
+            agent.targetY === 4,
+        ),
+      ).toBe(true),
+    );
+
+    unmount();
+  });
 });
 
 function createOffsetMovementBackend(offsetX: number, offsetY: number) {
@@ -135,6 +166,29 @@ function createDeferredMovementBackend() {
         pendingResolves.push(resolve);
       });
       return offsetAgentPositions(agents.positions, agents.count, 1, 0);
+    },
+  };
+
+  return backend;
+}
+
+function createDecisionBackend() {
+  let calls = 0;
+  const backend: SimulationDecisionBackend & { calls: number } = {
+    decisionHz: 10,
+    id: "wasm-ready",
+    get calls() {
+      return calls;
+    },
+    decideAgents: ({ agents }) => {
+      calls++;
+
+      return agents.map((agent) => ({
+        agentId: agent.id,
+        nextState: "enterStore",
+        selectedStoreId: "shop-a",
+        target: { x: 3, y: 4 },
+      }));
     },
   };
 
