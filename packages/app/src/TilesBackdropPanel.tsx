@@ -1,4 +1,10 @@
 import { useMemo } from "react";
+import { bioCityDemoScene } from "./bioCityDemoScene";
+import {
+  createBioCityAssetLoadPlans,
+  summarizeBioCityAssetLoading,
+} from "./bioCityModelAssets";
+import { createBioCityRenderPlan } from "./bioCityRenderPlan";
 import { useI18n } from "./i18n";
 import {
   assertTilesConfigHasNoClientSecret,
@@ -19,8 +25,13 @@ export function TilesBackdropPanel() {
     });
 
     assertTilesConfigHasNoClientSecret(tilesConfig);
+    const bioCityAssetLoading = summarizeBioCityAssetLoading(
+      createBioCityAssetLoadPlans(createBioCityRenderPlan(bioCityDemoScene).assets),
+    );
+
     return {
       assets: summarizeVisualAssetManifest(demoVisualAssetManifest),
+      bioCityAssetLoading,
       rendererPlan: createTilesRendererIntegrationPlan(tilesConfig),
       tilesConfig,
     };
@@ -43,6 +54,11 @@ export function TilesBackdropPanel() {
         {summary.rendererPlan.renderLoopHook} | collision{" "}
         {summary.rendererPlan.collisionGeometry} | visual-only{" "}
         {summary.rendererPlan.visualOnly && summary.assets.visualOnly ? "yes" : "no"}
+      </code>
+      <code>
+        GLB assets {summary.bioCityAssetLoading.gltfCount} | unique URLs{" "}
+        {summary.bioCityAssetLoading.uniqueSourceCount} | fallback{" "}
+        {summary.bioCityAssetLoading.fallbackCount} placeholders
       </code>
     </section>
   );

@@ -25,5 +25,8 @@ describe("TilesBackdropPanel", () => {
     expect(screen.getByText(/tilesRenderer\.update/)).toBeInTheDocument();
     expect(screen.getByText(/collision \.csim\.json/)).toBeInTheDocument();
     expect(screen.getByText(/visual-only yes/)).toBeInTheDocument();
+    expect(screen.getByText(/GLB assets 2/)).toBeInTheDocument();
+    expect(screen.getByText(/unique URLs 2/)).toBeInTheDocument();
+    expect(screen.getByText(/fallback 2 placeholders/)).toBeInTheDocument();
   });
 });

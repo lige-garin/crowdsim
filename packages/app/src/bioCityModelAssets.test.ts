@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { bioCityDemoScene } from "./bioCityDemoScene";
-import { createBioCityAssetLoadPlans } from "./bioCityModelAssets";
+import {
+  createBioCityAssetLoadPlans,
+  summarizeBioCityAssetLoading,
+} from "./bioCityModelAssets";
 import { createBioCityRenderPlan } from "./bioCityRenderPlan";
 
 describe("bioCityModelAssets", () => {
@@ -50,6 +53,32 @@ describe("bioCityModelAssets", () => {
       fallback: "placeholder",
       id: "asset-city-tiles",
       loader: "tileset-renderer",
+    });
+  });
+
+  it("summarizes loader readiness and source URL de-duplication", () => {
+    const renderPlan = createBioCityRenderPlan(
+      {
+        ...bioCityDemoScene,
+        visualAssets: [
+          ...bioCityDemoScene.visualAssets,
+          {
+            ...bioCityDemoScene.visualAssets[1],
+            id: "bus-stop-shelter-copy",
+          },
+        ],
+      },
+      0,
+    );
+
+    expect(
+      summarizeBioCityAssetLoading(createBioCityAssetLoadPlans(renderPlan.assets)),
+    ).toEqual({
+      assetCount: 3,
+      fallbackCount: 3,
+      gltfCount: 3,
+      tilesetCount: 0,
+      uniqueSourceCount: 2,
     });
   });
 });
