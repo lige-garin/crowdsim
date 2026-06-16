@@ -27,6 +27,33 @@ body {
   background-size: auto;
 }
 
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  padding: 9px 12px;
+  border: 1px solid #b9c7d6;
+  border-radius: var(--product-radius-sm);
+  background: #ffffff;
+  color: #172033;
+  font-weight: 750;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.skip-link:focus-visible {
+  opacity: 1;
+  outline: 2px solid rgba(37, 87, 214, 0.42);
+  outline-offset: 2px;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 button,
 select {
   border-color: #cfd7e4;
@@ -406,6 +433,56 @@ h3 {
   color: #1e47ad;
 }
 
+.render-viewport-skeleton {
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  padding: 18px;
+}
+
+.render-viewport-skeleton span,
+.panel-skeleton span {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--product-radius-sm);
+  background: linear-gradient(90deg, #eef3f9 0%, #f9fbff 42%, #eef3f9 100%);
+  background-size: 220% 100%;
+  animation: skeletonSweep 1.4s ease-in-out infinite;
+}
+
+.render-viewport-skeleton span {
+  width: min(420px, 72%);
+  height: 16px;
+}
+
+.render-viewport-skeleton span:nth-child(2) {
+  width: min(320px, 56%);
+}
+
+.render-viewport-skeleton span:nth-child(3) {
+  width: min(220px, 42%);
+}
+
+.panel-skeleton {
+  min-height: 96px;
+}
+
+.panel-skeleton span {
+  height: 14px;
+}
+
+.panel-skeleton span:nth-child(1) {
+  width: 52%;
+}
+
+.panel-skeleton span:nth-child(2) {
+  width: 86%;
+}
+
+.panel-skeleton span:nth-child(3) {
+  width: 68%;
+}
+
 dl div {
   min-height: 38px;
   padding: 8px 0;
@@ -431,5 +508,15 @@ dd {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes skeletonSweep {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
   }
 }

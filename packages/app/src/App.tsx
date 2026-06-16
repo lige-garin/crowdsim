@@ -372,85 +372,95 @@ function AppContent() {
 
   if (showHome) {
     return (
-      <AppHome
-        language={language}
-        onEnterLab={() => enterLab()}
-        onOpenNetwork={() => enterLab("network")}
-        onSetLanguage={setLanguage}
-        runState={runState}
-        webGpuStatus={probes.webGpuProbe.status}
-      />
+      <>
+        <a className="skip-link" href="#main-content">
+          {language === "zh" ? "跳到主内容" : "Skip to main content"}
+        </a>
+        <AppHome
+          language={language}
+          onEnterLab={() => enterLab()}
+          onOpenNetwork={() => enterLab("network")}
+          onSetLanguage={setLanguage}
+          runState={runState}
+          webGpuStatus={probes.webGpuProbe.status}
+        />
+      </>
     );
   }
 
   return (
-    <main className="workspace">
-      <header className="command-bar" aria-label={labTitle}>
-        <div className="command-brand">
-          <span>CrowdSim</span>
-          <strong>{labTitle}</strong>
-          <button
-            type="button"
-            className="command-home"
-            onClick={() => setShowHome(true)}
-          >
-            {language === "zh" ? "首页" : "Home"}
-          </button>
-        </div>
-        <div className="command-status" aria-label={t("systemSignals")}>
-          <span data-state={simulation.snapshot.status}>{runState}</span>
-          <span>WebGPU {probes.webGpuProbe.status}</span>
-          <span>{language === "zh" ? "品牌模型" : "Brand model"}</span>
-          <span>{language === "zh" ? "证据层" : "Evidence"}</span>
-          <span>{language === "zh" ? "验证通过" : "Verified"}</span>
-        </div>
-      </header>
-      <AppSidebar
-        heatmapWindowSeconds={heatmapWindowSeconds}
-        language={language}
-        onClearEvacuation={() => void clearEvacuation()}
-        onEvacuate={() => void triggerEvacuation()}
-        onHeatmapWindowChange={setHeatmapWindowSeconds}
-        onPause={simulation.pause}
-        onReset={resetSimulation}
-        onSetLanguage={setLanguage}
-        onSetTimeScale={simulation.setTimeScale}
-        onStart={simulation.start}
-        simulationStatus={simulation.snapshot.status}
-        t={t}
-        timeScale={simulation.snapshot.timeScale}
-      />
-      <AppStage
-        heatmapCells={heatmapCells}
-        language={language}
-        onViewModeChange={setViewMode}
-        scene={demoScene}
-        sharedAgentOverlay={
-          simulation === workerSimulation
-            ? workerSimulation.worker.sharedAgentOverlay
-            : undefined
-        }
-        simulationSnapshot={simulation.snapshot}
-        t={t}
-        viewMode={viewMode}
-      />
-      <AppInspector
-        agentStateProbe={probes.agentStateProbe}
-        dashboardStats={dashboardStats}
-        dashboardV2Stats={dashboardV2Stats}
-        discreteEventProbe={probes.discreteEventProbe}
-        evacuation={evacuation}
-        flowFieldProbe={probes.flowFieldProbe}
-        gridProbe={probes.gridProbe}
-        heatmapProbe={probes.heatmapProbe}
-        queueSystemProbe={probes.queueSystemProbe}
-        shopDecisionProbe={probes.shopDecisionProbe}
-        signals={signals}
-        simulationCredibility={simulationCredibility}
-        socialForceProbe={probes.socialForceProbe}
-        trajectoryRecording={trajectoryRecording}
-        webGpuProbe={probes.webGpuProbe}
-      />
-    </main>
+    <>
+      <a className="skip-link" href="#main-content">
+        {language === "zh" ? "跳到主内容" : "Skip to main content"}
+      </a>
+      <main id="main-content" className="workspace">
+        <header className="command-bar" aria-label={labTitle}>
+          <div className="command-brand">
+            <span>CrowdSim</span>
+            <strong>{labTitle}</strong>
+            <button
+              type="button"
+              className="command-home"
+              onClick={() => setShowHome(true)}
+            >
+              {language === "zh" ? "首页" : "Home"}
+            </button>
+          </div>
+          <div className="command-status" aria-label={t("systemSignals")}>
+            <span data-state={simulation.snapshot.status}>{runState}</span>
+            <span>WebGPU {probes.webGpuProbe.status}</span>
+            <span>{language === "zh" ? "品牌模型" : "Brand model"}</span>
+            <span>{language === "zh" ? "证据层" : "Evidence"}</span>
+            <span>{language === "zh" ? "验证通过" : "Verified"}</span>
+          </div>
+        </header>
+        <AppSidebar
+          heatmapWindowSeconds={heatmapWindowSeconds}
+          language={language}
+          onClearEvacuation={() => void clearEvacuation()}
+          onEvacuate={() => void triggerEvacuation()}
+          onHeatmapWindowChange={setHeatmapWindowSeconds}
+          onPause={simulation.pause}
+          onReset={resetSimulation}
+          onSetLanguage={setLanguage}
+          onSetTimeScale={simulation.setTimeScale}
+          onStart={simulation.start}
+          simulationStatus={simulation.snapshot.status}
+          t={t}
+          timeScale={simulation.snapshot.timeScale}
+        />
+        <AppStage
+          heatmapCells={heatmapCells}
+          language={language}
+          onViewModeChange={setViewMode}
+          scene={demoScene}
+          sharedAgentOverlay={
+            simulation === workerSimulation
+              ? workerSimulation.worker.sharedAgentOverlay
+              : undefined
+          }
+          simulationSnapshot={simulation.snapshot}
+          t={t}
+          viewMode={viewMode}
+        />
+        <AppInspector
+          agentStateProbe={probes.agentStateProbe}
+          dashboardStats={dashboardStats}
+          dashboardV2Stats={dashboardV2Stats}
+          discreteEventProbe={probes.discreteEventProbe}
+          evacuation={evacuation}
+          flowFieldProbe={probes.flowFieldProbe}
+          gridProbe={probes.gridProbe}
+          heatmapProbe={probes.heatmapProbe}
+          queueSystemProbe={probes.queueSystemProbe}
+          shopDecisionProbe={probes.shopDecisionProbe}
+          signals={signals}
+          simulationCredibility={simulationCredibility}
+          socialForceProbe={probes.socialForceProbe}
+          trajectoryRecording={trajectoryRecording}
+          webGpuProbe={probes.webGpuProbe}
+        />
+      </main>
+    </>
   );
 }

@@ -32,6 +32,9 @@ test("opens the workbench and starts a live simulation", async ({ page }) => {
   await expect(page.getByText("Simulation agent limit")).toBeVisible();
   await expect(page.getByText("Credibility loop")).toBeVisible();
   await expect(page.getByText(/scene=atrium-demo/)).toBeVisible();
+  await expect(
+    page.getByText(/Main thread GPU movement active|worker \|/),
+  ).toBeVisible();
   const controls = page.getByRole("region", { name: "Simulation controls" });
 
   await expect(controls.getByRole("heading", { name: "Paused" })).toBeVisible();

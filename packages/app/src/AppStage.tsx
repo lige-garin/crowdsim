@@ -58,7 +58,15 @@ export function AppStage({
           <ContactNetworkView />
         ) : (
           <>
-            <Suspense fallback={<div className="render-viewport" />}>
+            <Suspense
+              fallback={
+                <div className="render-viewport render-viewport-skeleton">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              }
+            >
               <SimulationViewport
                 scene={scene}
                 sharedAgentOverlay={sharedAgentOverlay}

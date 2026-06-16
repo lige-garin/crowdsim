@@ -99,7 +99,7 @@ export function AppHome({
   ];
 
   return (
-    <main className="home-shell" aria-label={copy.pageLabel}>
+    <main id="main-content" className="home-shell" aria-label={copy.pageLabel}>
       <header className="home-topbar">
         <div className="home-brand">
           <span>CrowdSim</span>

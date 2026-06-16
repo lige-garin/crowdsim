@@ -84,10 +84,10 @@ export function AppInspector({
 
   return (
     <aside className="inspector" aria-label={t("systemSignals")}>
-      <Suspense fallback={<section className="dashboard-panel" />}>
+      <Suspense fallback={<PanelSkeleton className="dashboard-panel" rows={3} />}>
         <DashboardPanel stats={dashboardStats} />
       </Suspense>
-      <Suspense fallback={<section className="dashboard-v2-panel" />}>
+      <Suspense fallback={<PanelSkeleton className="dashboard-v2-panel" rows={2} />}>
         <DashboardV2Panel stats={dashboardV2Stats} />
       </Suspense>
       <BrandIntelligencePanel
@@ -213,6 +213,16 @@ export function AppInspector({
         </code>
       </section>
     </aside>
+  );
+}
+
+function PanelSkeleton({ className, rows }: { className: string; rows: number }) {
+  return (
+    <section className={`${className} panel-skeleton`} aria-hidden="true">
+      {Array.from({ length: rows }, (_, index) => (
+        <span key={index} />
+      ))}
+    </section>
   );
 }
 
