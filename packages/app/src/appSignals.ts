@@ -22,6 +22,7 @@ import { formatSimulationClock, formatStageViewMode } from "./appUi";
 import type { FlowFieldProbeResult } from "./flowFieldProbe";
 import type { GpuGridProbeResult } from "./gpuGridProbe";
 import type { HeatmapProbeResult } from "./heatmapProbe";
+import type { MovementBackendId } from "./movementBackend";
 import { simulationRuntimeProfile, type SimulationSnapshot } from "./simulationEngine";
 import { createSharedArrayBufferSummary } from "./sharedArrayBufferProbe";
 import type { SocialForceProbeResult } from "./socialForceProbe";
@@ -38,6 +39,7 @@ type SystemSignalOptions = {
   heatmapProbe: HeatmapProbeResult;
   heatmapValue: string;
   language: Language;
+  movementBackend: MovementBackendId;
   movementBackendProbe: MovementBackendProbeState;
   queueSystemProbe: QueueSystemProbeState;
   scene: CrowdSimScene;
@@ -61,6 +63,7 @@ export function createSystemSignals({
   heatmapProbe,
   heatmapValue,
   language,
+  movementBackend,
   movementBackendProbe,
   queueSystemProbe,
   scene,
@@ -95,7 +98,7 @@ export function createSystemSignals({
     },
     {
       label: t("movementBackend"),
-      value: `${simulationRuntimeProfile.movementBackend} active @ ${simulationRuntimeProfile.movementHz}Hz`,
+      value: `${movementBackend} active @ ${simulationRuntimeProfile.movementHz}Hz`,
     },
     {
       label: "WebGPU movement",

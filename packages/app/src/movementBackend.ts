@@ -55,10 +55,13 @@ export function createCpuMovementBackend(): MovementBackend {
   };
 }
 
-export function createWebGpuMovementBackend(device: GPUDevice): MovementBackend {
+export function createWebGpuMovementBackend(
+  device: GPUDevice,
+  mode: MovementBackend["mode"] = "ready",
+): MovementBackend {
   return {
     id: "webgpu-ready",
-    mode: "ready",
+    mode,
     step: ({ agents, params, targetPositions, walls }) =>
       stepSocialForceGpu(device, agents, targetPositions, walls, params),
   };

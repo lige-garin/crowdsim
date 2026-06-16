@@ -14,6 +14,7 @@ import { I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
+import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
 
@@ -29,8 +30,10 @@ function AppContent() {
   const { language, setLanguage, t } = useI18n();
   const probes = useAppProbes();
   const wasmSimulationDecisionBackend = useWasmSimulationDecisionBackend(demoScene);
+  const webGpuMovementBackend = useWebGpuMovementBackend();
   const simulation = useSimulationController(demoScene, {
     decisionBackend: wasmSimulationDecisionBackend.backend,
+    movementBackend: webGpuMovementBackend.backend,
   });
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
@@ -269,6 +272,7 @@ function AppContent() {
     heatmapProbe: probes.heatmapProbe,
     heatmapValue,
     language,
+    movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
     movementBackendProbe: probes.movementBackendProbe,
     queueSystemProbe: probes.queueSystemProbe,
     scene: demoScene,
