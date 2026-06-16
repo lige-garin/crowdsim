@@ -1,10 +1,15 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import {
+  compileBioCityRouteGraph,
+  estimateBioCityRouteInfluence,
+} from "./bioCityRouteGraph";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 
 export type RouteCostCell = {
   attractionScore: number;
   cost: number;
   id: string;
+  roadId?: string;
   riskScore: number;
   zoneId?: string;
 };
@@ -21,12 +26,21 @@ export function createRouteCostMap(
   elapsedSeconds = 0,
 ): RouteCostMap {
   const environment = calculateEnvironmentImpact(scene, elapsedSeconds);
-  const cells = scene.zones.map((zone) => {
+  const graph = compileBioCityRouteGraph(scene, elapsedSeconds);
+  const zoneCells = scene.zones.map((zone) => {
     const attractionScore = attractionForZone(scene, zone.id);
-    const riskScore = environment.riskScore + (zone.walkable ? 0 : 1);
+    const centroid = polygonCentroid(zone.geometry.points);
+    const localInfluence = estimateBioCityRouteInfluence(
+      scene,
+      centroid,
+      elapsedSeconds,
+    );
+    const riskScore =
+      environment.riskScore + localInfluence.riskScore + (zone.walkable ? 0 : 1);
     const cost =
       (zone.walkable ? 1 : 99) *
       environment.routeCostMultiplier *
+      localInfluence.routeCostMultiplier *
       (1 + riskScore) *
       Math.max(0.35, 1 - attractionScore * 0.18);
 
@@ -38,12 +52,20 @@ export function createRouteCostMap(
       zoneId: zone.id,
     };
   });
+  const roadCells = graph.edges.map((edge) => ({
+    attractionScore: 0,
+    cost: edge.cost,
+    id: `cost-${edge.id}`,
+    riskScore: edge.riskScore,
+    roadId: edge.sourceId,
+  }));
+  const cells = [...zoneCells, ...roadCells];
 
   const costs = cells.map((cell) => cell.cost);
 
   return {
     cells,
-    environmentFactorIds: environment.activeFactorIds,
+    environmentFactorIds: [...environment.activeFactorIds, ...graph.activeHazardIds],
     maxCost: costs.length > 0 ? Math.max(...costs) : 1,
     minCost: costs.length > 0 ? Math.min(...costs) : 1,
   };
@@ -60,8 +82,9 @@ export function estimatePointRouteCost(
   );
 
   return (
-    map.cells.find((cell) => cell.zoneId === containingZone?.id)?.cost ??
-    calculateEnvironmentImpact(scene, elapsedSeconds).routeCostMultiplier
+    (map.cells.find((cell) => cell.zoneId === containingZone?.id)?.cost ??
+      calculateEnvironmentImpact(scene, elapsedSeconds).routeCostMultiplier) *
+    estimateBioCityRouteInfluence(scene, point, elapsedSeconds).routeCostMultiplier
   );
 }
 
@@ -104,6 +127,13 @@ function pointInPolygon(point: ScenePoint, polygon: readonly ScenePoint[]) {
   }
 
   return inside;
+}
+
+function polygonCentroid(points: readonly ScenePoint[]): ScenePoint {
+  return {
+    x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+    y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+  };
 }
 
 function round(value: number) {
