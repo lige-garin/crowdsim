@@ -1,0 +1,41 @@
+import { describe, expect, it } from "vitest";
+import { bioCityDemoScene } from "./bioCityDemoScene";
+import { createBioCityRenderPlan } from "./bioCityRenderPlan";
+
+describe("bioCityRenderPlan", () => {
+  it("creates 3D primitives for BioCity roads, buildings, stops, obstacles, and hazards", () => {
+    const plan = createBioCityRenderPlan(bioCityDemoScene, 1200);
+
+    expect(plan.primitives.map((primitive) => primitive.kind)).toEqual(
+      expect.arrayContaining(["road", "building", "transitStop", "obstacle", "hazard"]),
+    );
+    expect(
+      plan.primitives.find((primitive) => primitive.id === "building-glass-arcade"),
+    ).toMatchObject({
+      heightMeters: 18,
+      kind: "building",
+    });
+  });
+
+  it("exposes weather visual state for rain, fog, and wind effects", () => {
+    const plan = createBioCityRenderPlan(bioCityDemoScene, 2100);
+
+    expect(plan.weather.condition).toBe("heavyRain");
+    expect(plan.weather.precipitationIntensity).toBeGreaterThan(0.5);
+    expect(
+      Math.hypot(plan.weather.windVector.x, plan.weather.windVector.y),
+    ).toBeGreaterThan(0);
+  });
+
+  it("marks active hazard visuals more strongly than inactive hazards", () => {
+    const inactive = createBioCityRenderPlan(bioCityDemoScene, 300).primitives.find(
+      (primitive) => primitive.id === "hazard-curbside-pooling",
+    );
+    const active = createBioCityRenderPlan(bioCityDemoScene, 1200).primitives.find(
+      (primitive) => primitive.id === "hazard-curbside-pooling",
+    );
+
+    expect(active).toMatchObject({ color: "#ef4444", opacity: 0.38 });
+    expect(inactive).toMatchObject({ color: "#f97316", opacity: 0.16 });
+  });
+});

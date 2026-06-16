@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   BoxGeometry,
   Color,
+  CylinderGeometry,
   DynamicDrawUsage,
   InstancedMesh,
   Matrix4,
@@ -14,7 +15,7 @@ import {
   Scene,
 } from "three";
 import { WebGPURenderer } from "three/webgpu";
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useI18n, type TranslationKey } from "./i18n";
 import {
   benchmarkAgentPosition,
@@ -26,6 +27,10 @@ import {
   selectViewportOverlayAgents,
   type ViewportAgentOverlayFrame,
 } from "./simulationViewportOverlay";
+import {
+  createBioCityRenderPlan,
+  type BioCityRenderPrimitive,
+} from "./bioCityRenderPlan";
 
 export type ViewMode = "2d" | "3d";
 
@@ -58,6 +63,7 @@ export function SimulationViewport({
       : localizedStatus("webgpuUnavailable"),
   );
   const [fps, setFps] = useState(0);
+  const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -104,6 +110,9 @@ export function SimulationViewport({
       createWall(-13, 4, 5, 9, 0.32, viewMode),
       createWall(5, -8, 15, -2, 0.32, viewMode),
     ];
+    const bioCityObjects = crowdScene
+      ? createBioCityObjects(crowdScene, viewMode, bioCityVisualSecond)
+      : [];
 
     function createRenderer(device: GPUDevice) {
       return new WebGPURenderer({
@@ -132,6 +141,18 @@ export function SimulationViewport({
     scene.add(floor);
     scene.add(agents);
     walls.forEach((wall) => scene.add(wall));
+    bioCityObjects.forEach((object) => scene.add(object));
+    if (crowdScene) {
+      const plan = createBioCityRenderPlan(crowdScene, bioCityVisualSecond);
+
+      scene.background = new Color(
+        plan.weather.fogDensity > 0
+          ? "#dbe4df"
+          : plan.weather.precipitationIntensity > 0
+            ? "#e8edf2"
+            : "#fdfbf4",
+      );
+    }
 
     function resize() {
       const parent = canvasElement.parentElement;
@@ -297,8 +318,14 @@ export function SimulationViewport({
         wall.geometry.dispose();
         wall.material.dispose();
       });
+      bioCityObjects.forEach((object) => {
+        if (object instanceof Mesh) {
+          object.geometry.dispose();
+          object.material.dispose();
+        }
+      });
     };
-  }, [viewMode]);
+  }, [bioCityVisualSecond, crowdScene, viewMode]);
 
   return (
     <div
@@ -414,4 +441,131 @@ function createWall(
   wall.setMatrixAt(0, matrix);
 
   return wall;
+}
+
+function createBioCityObjects(
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+  elapsedSeconds: number,
+) {
+  const plan = createBioCityRenderPlan(scene, elapsedSeconds);
+
+  return plan.primitives.map((primitive) =>
+    createBioCityPrimitiveMesh(primitive, scene, viewMode),
+  );
+}
+
+function createBioCityPrimitiveMesh(
+  primitive: BioCityRenderPrimitive,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  if (primitive.kind === "building") {
+    const bounds = primitiveBounds(primitive.points);
+    const height =
+      viewMode === "3d" ? Math.max(1, primitive.heightMeters * 0.16) : 0.08;
+    const mesh = new Mesh(
+      new BoxGeometry(bounds.width, bounds.height, height),
+      new MeshBasicMaterial({ color: primitive.color }),
+    );
+
+    mesh.position.set(
+      toRenderX(bounds.center.x, scene),
+      toRenderY(bounds.center.y, scene),
+      height / 2,
+    );
+
+    return mesh;
+  }
+
+  if (primitive.kind === "transitStop") {
+    const height = viewMode === "3d" ? 1.6 : 0.08;
+    const mesh = new Mesh(
+      new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, height, 16),
+      new MeshBasicMaterial({ color: primitive.color }),
+    );
+
+    mesh.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      height / 2,
+    );
+
+    return mesh;
+  }
+
+  if (primitive.kind === "hazard") {
+    const mesh = new Mesh(
+      new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, 0.06, 32),
+      new MeshBasicMaterial({
+        color: primitive.color,
+        opacity: primitive.opacity,
+        transparent: true,
+      }),
+    );
+
+    mesh.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      0.04,
+    );
+
+    return mesh;
+  }
+
+  return createLineLikeMesh(
+    toRenderX(primitive.start.x, scene),
+    toRenderY(primitive.start.y, scene),
+    toRenderX(primitive.end.x, scene),
+    toRenderY(primitive.end.y, scene),
+    primitive.widthMeters,
+    primitive.color,
+    primitive.kind === "road" && viewMode === "3d" ? 0.08 : 0.12,
+  );
+}
+
+function createLineLikeMesh(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  width: number,
+  color: string,
+  height: number,
+) {
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const geometry = new BoxGeometry(length, Math.max(0.2, width), height);
+  const material = new MeshBasicMaterial({ color });
+  const mesh = new Mesh(geometry, material);
+
+  mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, height / 2);
+  mesh.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+
+  return mesh;
+}
+
+function primitiveBounds(points: readonly ScenePoint[]) {
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  return {
+    center: {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2,
+    },
+    height: Math.max(0.4, maxY - minY),
+    width: Math.max(0.4, maxX - minX),
+  };
+}
+
+function toRenderX(x: number, scene: CrowdSimScene) {
+  return x - scene.world.width / 2;
+}
+
+function toRenderY(y: number, scene: CrowdSimScene) {
+  return scene.world.height / 2 - y;
 }
