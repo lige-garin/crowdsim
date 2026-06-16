@@ -154,15 +154,15 @@ Verification:
 - `packages/app/src/TrajectoryReplayPanel.test.tsx`
 - `packages/app/src/simulationCredibility.test.ts`
 
-## Known remaining gaps before final UI redesign
+## Runtime constraints retained after UI redesign
 
 - SAB agent SoA transport is implemented and consumed by the 2D live overlay, but
   the final full rendering state path still uses structured-clone snapshots.
 - WebGPU movement is active only when the readiness hook succeeds. Worker runtime
   intentionally keeps CPU movement because GPUDevice cannot be structured-cloned
   into the current worker path.
-- The current UI exposes necessary runtime status, but the final productized UI
-  redesign is intentionally deferred until the kernel paths are stable.
+- These are non-blocking runtime constraints. They do not block the completed
+  productized UI shell or the phase 2 completion gate.
 
 ## Phase 2 completion audit
 
@@ -184,5 +184,29 @@ Audit result:
 - Kernel convergence completion: 5/5 items, 100%.
 - Remaining limitations are non-blocking runtime constraints, not missing phase 2
   kernel work.
-- The project can now enter the deferred final productized UI redesign while
+- The project has completed the deferred final productized UI redesign while
   preserving the verified worker/WASM/SAB/WebGPU runtime paths.
+
+## Final UI productization audit
+
+Source of truth:
+
+- `packages/app/src/uiProductizationAudit.ts`
+- `packages/app/src/uiProductizationAudit.test.ts`
+
+| UI area           | Evidence status | Completion | Blocks completion |
+| ----------------- | --------------- | ---------: | ----------------- |
+| Home              | Complete        |       100% | No                |
+| Command bar       | Complete        |       100% | No                |
+| Sidebar controls  | Complete        |       100% | No                |
+| Stage telemetry   | Complete        |       100% | No                |
+| Inspector         | Complete        |       100% | No                |
+| Mobile responsive | Complete        |       100% | No                |
+
+Audit result:
+
+- Final productized UI completion: 6/6 areas, 100%.
+- Browser checks cover desktop and 390px mobile overflow for command status,
+  stage telemetry, Inspector sections, and Sidebar controls.
+- The UI redesign preserves the verified phase 2 worker/WASM/SAB/WebGPU runtime
+  paths and does not introduce a phase 2 blocker.
