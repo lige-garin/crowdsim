@@ -13,6 +13,7 @@ import type { SimulationController } from "./useSimulationController";
 
 export type SimulationWorkerControllerState = {
   mode: "inline" | "worker";
+  sharedAgentOverlay?: ReturnType<typeof readAgentOverlay>;
   sharedAgentSample?: ReturnType<typeof readAgentSample>;
   sharedMetrics?: ReturnType<typeof readSimulationSharedMemory>;
   sharedMemory: boolean;
@@ -50,6 +51,7 @@ export function useSimulationWorkerController(
     setSnapshot(nextSnapshot);
     setWorker((current) => ({
       ...current,
+      sharedAgentOverlay: readAgentOverlay(sharedMemoryRef.current),
       sharedAgentSample: readAgentSample(sharedMemoryRef.current),
       sharedMetrics: readMetrics(sharedMemoryRef.current),
     }));
@@ -73,6 +75,7 @@ export function useSimulationWorkerController(
         setWorker((current) => ({
           ...current,
           message: "Simulation worker ready",
+          sharedAgentOverlay: readAgentOverlay(sharedMemoryRef.current),
           sharedAgentSample: readAgentSample(sharedMemoryRef.current),
           sharedMetrics: readMetrics(sharedMemoryRef.current),
           status: "ready",
@@ -196,13 +199,17 @@ function readAgentSample(sharedMemory: SimulationWorkerSharedMemory | undefined)
     return undefined;
   }
 
-  const frame = readSimulationSharedAgents(sharedMemory);
+  const frame = readSimulationSharedAgents(sharedMemory, 240);
 
   return {
     firstAgentId: frame.agents[0]?.id ?? null,
     sharedAgentCount: frame.agents.length,
     capacity: frame.capacity,
   };
+}
+
+function readAgentOverlay(sharedMemory: SimulationWorkerSharedMemory | undefined) {
+  return sharedMemory ? readSimulationSharedAgents(sharedMemory, 240) : undefined;
 }
 
 function createEmptySnapshot(): SimulationSnapshot {

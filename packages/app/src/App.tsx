@@ -425,6 +425,11 @@ function AppContent() {
         language={language}
         onViewModeChange={setViewMode}
         scene={demoScene}
+        sharedAgentOverlay={
+          simulation === workerSimulation
+            ? workerSimulation.worker.sharedAgentOverlay
+            : undefined
+        }
         simulationSnapshot={simulation.snapshot}
         t={t}
         viewMode={viewMode}

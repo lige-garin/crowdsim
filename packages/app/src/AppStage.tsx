@@ -7,6 +7,7 @@ import type { Language, TranslationKey } from "./i18n";
 import { SceneEditor } from "./SceneEditor";
 import type { StageViewMode } from "./AppTypes";
 import type { SimulationSnapshot } from "./simulationEngine";
+import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
 
 const SimulationViewport = lazy(() =>
   import("./SimulationViewport").then((module) => ({
@@ -19,6 +20,7 @@ type AppStageProps = {
   language: Language;
   onViewModeChange: (viewMode: StageViewMode) => void;
   scene: CrowdSimScene;
+  sharedAgentOverlay?: ViewportAgentOverlayFrame;
   simulationSnapshot: SimulationSnapshot;
   t: (key: TranslationKey) => string;
   viewMode: StageViewMode;
@@ -29,6 +31,7 @@ export function AppStage({
   language,
   onViewModeChange,
   scene,
+  sharedAgentOverlay,
   simulationSnapshot,
   t,
   viewMode,
@@ -58,6 +61,7 @@ export function AppStage({
             <Suspense fallback={<div className="render-viewport" />}>
               <SimulationViewport
                 scene={scene}
+                sharedAgentOverlay={sharedAgentOverlay}
                 snapshot={simulationSnapshot}
                 viewMode={viewMode}
               />

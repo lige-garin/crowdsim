@@ -44,6 +44,7 @@ export function createRuntimeConvergenceReport(): RuntimeConvergenceItem[] {
         "SAB header covers status, step, agent, spawned, exited, elapsed, capacity, and version metrics",
         "Agent SoA lanes cover id, behavior state, flags, position, velocity, and target coordinates",
         "useSimulationWorkerController reads shared agent count and capacity from SAB for live runtime status",
+        "SimulationViewport can draw its 2D live agent overlay from SAB agent frames",
       ],
       id: "sab-metrics",
       status: "complete",

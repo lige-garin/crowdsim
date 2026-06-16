@@ -12,10 +12,20 @@ vi.mock("./behaviorWasm", () => ({
 }));
 
 describe("useSimulationWorkerController", () => {
+  let originalCrossOriginIsolated: PropertyDescriptor | undefined;
+  let originalSharedArrayBuffer: PropertyDescriptor | undefined;
   let originalWorker: typeof Worker | undefined;
   let rafCallbacks: FrameRequestCallback[];
 
   beforeEach(() => {
+    originalCrossOriginIsolated = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "crossOriginIsolated",
+    );
+    originalSharedArrayBuffer = Object.getOwnPropertyDescriptor(
+      globalThis,
+      "SharedArrayBuffer",
+    );
     originalWorker = globalThis.Worker;
     Reflect.deleteProperty(globalThis, "Worker");
     wasmMocks.createWasmSimulationDecisionBackend.mockResolvedValue({
@@ -33,6 +43,9 @@ describe("useSimulationWorkerController", () => {
   });
 
   afterEach(() => {
+    restoreGlobalProperty("crossOriginIsolated", originalCrossOriginIsolated);
+    restoreGlobalProperty("SharedArrayBuffer", originalSharedArrayBuffer);
+
     if (originalWorker) {
       Object.defineProperty(globalThis, "Worker", {
         configurable: true,
@@ -70,4 +83,63 @@ describe("useSimulationWorkerController", () => {
 
     unmount();
   });
+
+  it("publishes SAB agent overlay frames for viewport consumers", async () => {
+    Object.defineProperty(globalThis, "crossOriginIsolated", {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(globalThis, "SharedArrayBuffer", {
+      configurable: true,
+      value: SharedArrayBuffer,
+    });
+
+    const { result, unmount } = renderHook(() =>
+      useSimulationWorkerController(demoScene),
+    );
+
+    await waitFor(() => expect(result.current.worker.status).toBe("ready"));
+
+    act(() => {
+      result.current.start();
+    });
+
+    await waitFor(() => expect(result.current.snapshot.status).toBe("running"));
+
+    act(() => {
+      rafCallbacks[0](1_000);
+      rafCallbacks[1](1_300);
+    });
+
+    await waitFor(() =>
+      expect(result.current.worker.sharedAgentOverlay?.agents.length).toBeGreaterThan(
+        0,
+      ),
+    );
+    expect(result.current.worker.sharedMemory).toBe(true);
+    expect(result.current.worker.sharedAgentOverlay).toMatchObject({
+      capacity: 2_000,
+    });
+    expect(result.current.worker.sharedAgentOverlay?.agents[0]).toEqual(
+      expect.objectContaining({
+        flags: 1,
+        id: expect.any(Number),
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    );
+
+    unmount();
+  });
 });
+
+function restoreGlobalProperty(
+  key: "SharedArrayBuffer" | "crossOriginIsolated",
+  descriptor: PropertyDescriptor | undefined,
+) {
+  if (descriptor) {
+    Object.defineProperty(globalThis, key, descriptor);
+  } else {
+    Reflect.deleteProperty(globalThis, key);
+  }
+}

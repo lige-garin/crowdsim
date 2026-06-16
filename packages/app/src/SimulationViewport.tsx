@@ -22,6 +22,10 @@ import {
   performanceBenchmarkFrames,
 } from "./renderBenchmark";
 import type { SimulationSnapshot } from "./simulationEngine";
+import {
+  selectViewportOverlayAgents,
+  type ViewportAgentOverlayFrame,
+} from "./simulationViewportOverlay";
 
 export type ViewMode = "2d" | "3d";
 
@@ -37,10 +41,12 @@ type RenderStatus =
 
 export function SimulationViewport({
   scene: crowdScene,
+  sharedAgentOverlay,
   snapshot,
   viewMode = "2d",
 }: {
   scene?: CrowdSimScene;
+  sharedAgentOverlay?: ViewportAgentOverlayFrame;
   snapshot?: SimulationSnapshot;
   viewMode?: ViewMode;
 }) {
@@ -303,6 +309,7 @@ export function SimulationViewport({
       <canvas ref={canvasRef} />
       <ViewportLiveAgentOverlay
         scene={crowdScene}
+        sharedAgentOverlay={sharedAgentOverlay}
         snapshot={snapshot}
         viewMode={viewMode}
       />
@@ -321,20 +328,24 @@ export function SimulationViewport({
 
 function ViewportLiveAgentOverlay({
   scene,
+  sharedAgentOverlay,
   snapshot,
   viewMode,
 }: {
   scene?: CrowdSimScene;
+  sharedAgentOverlay?: ViewportAgentOverlayFrame;
   snapshot?: SimulationSnapshot;
   viewMode: ViewMode;
 }) {
-  if (viewMode !== "2d" || !scene || !snapshot || snapshot.agents.length === 0) {
+  const overlayAgents = selectViewportOverlayAgents(snapshot, sharedAgentOverlay);
+
+  if (viewMode !== "2d" || !scene || overlayAgents.length === 0) {
     return null;
   }
 
   return (
     <div className="render-agent-overlay" aria-hidden="true">
-      {snapshot.agents.slice(0, 240).map((agent) => (
+      {overlayAgents.map((agent) => (
         <span
           key={agent.id}
           className="render-agent-dot"

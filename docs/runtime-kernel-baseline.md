@@ -113,9 +113,11 @@ Implemented behavior:
   exited count, elapsed milliseconds, capacity, and protocol version.
 - Agent SoA lanes currently store id, behavior state, active flags, position,
   velocity, and target coordinates for each live slot.
-- Structured-clone snapshots remain the authoritative React/rendering data path,
-  while SAB provides a shared-memory evidence and fast-read channel for runtime
-  status and future renderer/kernel consumers.
+- `useSimulationWorkerController` reads a bounded SAB agent frame for live status
+  and 2D viewport overlay consumers.
+- Structured-clone snapshots remain the authoritative full React state path,
+  while SAB now provides a shared-memory evidence and fast-read channel for live
+  agent overlay rendering plus future renderer/kernel consumers.
 
 Verification:
 
@@ -126,8 +128,8 @@ Verification:
 Remaining transport limitation:
 
 - The app still publishes full `SimulationSnapshot` objects through postMessage
-  for UI state. The SAB lane contract now exists, but React rendering has not
-  been switched to consume only shared memory.
+  for most UI state. The 2D viewport overlay can consume SAB agent frames, but
+  full React rendering has not been switched to consume only shared memory.
 
 ## Replay, benchmark, and validation binding
 
@@ -154,8 +156,8 @@ Verification:
 
 ## Known remaining gaps before final UI redesign
 
-- SAB agent SoA transport is implemented as a parallel channel, but the final
-  rendering state path still uses structured-clone snapshots.
+- SAB agent SoA transport is implemented and consumed by the 2D live overlay, but
+  the final full rendering state path still uses structured-clone snapshots.
 - WebGPU movement is active only when the readiness hook succeeds. Worker runtime
   intentionally keeps CPU movement because GPUDevice cannot be structured-cloned
   into the current worker path.
