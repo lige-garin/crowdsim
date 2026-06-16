@@ -15,6 +15,19 @@ describe("bioCityRenderPlan", () => {
       heightMeters: 18,
       kind: "building",
     });
+    expect(plan.assets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "asset-rain-market-streetscape",
+          kind: "gltf-scene",
+          sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+        }),
+        expect.objectContaining({
+          id: "asset-bus-stop-shelter",
+          kind: "gltf-prop",
+        }),
+      ]),
+    );
   });
 
   it("exposes weather visual state for rain, fog, and wind effects", () => {

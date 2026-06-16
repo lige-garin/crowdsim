@@ -29,6 +29,7 @@ import {
 } from "./simulationViewportOverlay";
 import {
   createBioCityRenderPlan,
+  type BioCityRenderAssetPlacement,
   type BioCityRenderPrimitive,
 } from "./bioCityRenderPlan";
 
@@ -450,9 +451,14 @@ function createBioCityObjects(
 ) {
   const plan = createBioCityRenderPlan(scene, elapsedSeconds);
 
-  return plan.primitives.map((primitive) =>
-    createBioCityPrimitiveMesh(primitive, scene, viewMode),
-  );
+  return [
+    ...plan.primitives.map((primitive) =>
+      createBioCityPrimitiveMesh(primitive, scene, viewMode),
+    ),
+    ...plan.assets.map((asset) =>
+      createBioCityAssetPlaceholder(asset, scene, viewMode),
+    ),
+  ];
 }
 
 function createBioCityPrimitiveMesh(
@@ -522,6 +528,34 @@ function createBioCityPrimitiveMesh(
     primitive.color,
     primitive.kind === "road" && viewMode === "3d" ? 0.08 : 0.12,
   );
+}
+
+function createBioCityAssetPlaceholder(
+  asset: BioCityRenderAssetPlacement,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  const isSceneAsset = asset.kind === "gltf-scene" || asset.kind === "tileset";
+  const height = viewMode === "3d" ? (isSceneAsset ? 1.2 : 1.8) : 0.08;
+  const footprint = isSceneAsset ? 8 * asset.scale : 2.4 * asset.scale;
+  const mesh = new Mesh(
+    new BoxGeometry(footprint, footprint, height),
+    new MeshBasicMaterial({
+      color: isSceneAsset ? "#94a3b8" : "#f59e0b",
+      opacity: isSceneAsset ? 0.2 : 0.72,
+      transparent: true,
+    }),
+  );
+
+  mesh.name = asset.id;
+  mesh.position.set(
+    toRenderX(asset.anchor.x, scene),
+    toRenderY(asset.anchor.y, scene),
+    asset.anchor.z + height / 2,
+  );
+  mesh.rotation.z = (asset.rotationDegrees * Math.PI) / 180;
+
+  return mesh;
 }
 
 function createLineLikeMesh(

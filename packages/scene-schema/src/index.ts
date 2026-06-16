@@ -135,6 +135,42 @@ const basemapSchema = z.object({
   heightMeters: z.number().positive().optional(),
 });
 
+const visualAssetSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).optional(),
+  kind: z.enum(["gltf-prop", "gltf-scene", "tileset"]),
+  sourceUrl: z
+    .string()
+    .min(1)
+    .refine(
+      (sourceUrl) => sourceUrl.startsWith("/"),
+      "visual asset URL must be a relative application route",
+    )
+    .refine(
+      (sourceUrl) => /\.(gltf|glb|json)$/i.test(sourceUrl),
+      "visual asset URL must reference glTF, GLB, or tileset JSON",
+    )
+    .refine(
+      (sourceUrl) => !/sk-[a-z0-9_-]{12,}/i.test(sourceUrl),
+      "visual asset URL must not expose secrets",
+    ),
+  originalSourceFormat: z
+    .enum(["collada", "fbx", "glb", "gltf", "ifc", "obj", "revit", "sketchup"])
+    .optional(),
+  anchor: z.object({
+    x: z.number().finite(),
+    y: z.number().finite(),
+    z: z.number().finite().default(0),
+  }),
+  rotationDegrees: z.number().finite().default(0),
+  scale: z.number().positive().default(1),
+  visible: z.boolean().default(true),
+  collisionMode: z.literal("none").default("none"),
+  lod: z.enum(["high", "low", "medium"]).default("medium"),
+  attribution: z.string().min(1).optional(),
+  customParameters: customParametersSchema,
+});
+
 const floorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
@@ -574,6 +610,7 @@ export const sceneSchema = z
       width: z.number().positive(),
       height: z.number().positive(),
     }),
+    visualAssets: z.array(visualAssetSchema).default([]),
     basemaps: z.array(basemapSchema).default([]),
     floors: z.array(floorSchema).default([]),
     walls: z.array(wallSchema).default([]),
@@ -627,6 +664,7 @@ export const sceneSchema = z
       ...scene.servicePoints,
       ...scene.countLines,
       ...scene.environmentFactors,
+      ...scene.visualAssets,
       ...scene.roads,
       ...scene.buildings,
       ...scene.transitStops,

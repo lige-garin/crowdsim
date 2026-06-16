@@ -40,7 +40,21 @@ export type BioCityWeatherVisualState = {
   windVector: ScenePoint;
 };
 
+export type BioCityRenderAssetPlacement = {
+  anchor: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  id: string;
+  kind: CrowdSimScene["visualAssets"][number]["kind"];
+  rotationDegrees: number;
+  scale: number;
+  sourceUrl: string;
+};
+
 export type BioCityRenderPlan = {
+  assets: BioCityRenderAssetPlacement[];
   primitives: BioCityRenderPrimitive[];
   weather: BioCityWeatherVisualState;
 };
@@ -97,6 +111,16 @@ export function createBioCityRenderPlan(
   ];
 
   return {
+    assets: scene.visualAssets
+      .filter((asset) => asset.visible)
+      .map((asset) => ({
+        anchor: { ...asset.anchor },
+        id: `asset-${asset.id}`,
+        kind: asset.kind,
+        rotationDegrees: asset.rotationDegrees,
+        scale: asset.scale,
+        sourceUrl: asset.sourceUrl,
+      })),
     primitives,
     weather: {
       condition: weather.currentWeatherSample?.condition ?? "clear",

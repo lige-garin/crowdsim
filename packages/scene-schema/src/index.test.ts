@@ -67,6 +67,7 @@ describe("sceneSchema", () => {
     expect(scene.seed).toBe(1);
     expect(scene.walls[0].thickness).toBe(0.2);
     expect(scene.targets[0].radius).toBe(1);
+    expect(scene.visualAssets).toEqual([]);
     expect(scene.basemaps).toEqual([]);
     expect(scene.floors).toEqual([]);
     expect(scene.zones).toEqual([]);
@@ -270,6 +271,40 @@ describe("sceneSchema", () => {
     expect(scene.environmentFactors[0].visibilityMultiplier).toBe(0.55);
     expect(scene.environmentFactors[1].behaviorTags).toContain("queue-pressure");
     expect(scene.visual.defaultView).toBe("isometric");
+  });
+
+  it("parses visual-only 3D model assets for BioCity rendering", () => {
+    const scene = parseScene({
+      ...validScene,
+      visualAssets: [
+        {
+          id: "sketchup-street-canyon",
+          kind: "gltf-scene",
+          sourceUrl: "/assets/biocity/street-canyon.glb",
+          originalSourceFormat: "sketchup",
+          anchor: { x: 40, y: 24 },
+          rotationDegrees: 12,
+          scale: 0.8,
+          attribution: "Converted from stakeholder SketchUp massing model",
+        },
+        {
+          id: "bus-shelter-prop",
+          kind: "gltf-prop",
+          sourceUrl: "/assets/biocity/bus-shelter.glb",
+          anchor: { x: 58, y: 34, z: 0.1 },
+        },
+      ],
+    });
+
+    expect(scene.visualAssets[0]).toMatchObject({
+      collisionMode: "none",
+      id: "sketchup-street-canyon",
+      lod: "medium",
+      originalSourceFormat: "sketchup",
+      visible: true,
+    });
+    expect(scene.visualAssets[0].anchor.z).toBe(0);
+    expect(scene.visualAssets[1].scale).toBe(1);
   });
 
   it("parses BioCity objects and applies defaults", () => {
@@ -498,6 +533,22 @@ describe("sceneSchema", () => {
           },
         ],
       },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsafe visual asset imports", () => {
+    const result = safeParseScene({
+      ...validScene,
+      visualAssets: [
+        {
+          id: "remote-model",
+          kind: "gltf-prop",
+          sourceUrl: "https://example.com/model.glb",
+          anchor: { x: 10, y: 10 },
+        },
+      ],
     });
 
     expect(result.success).toBe(false);

@@ -1,3 +1,4 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { redactSecret } from "./apiKeySafety";
 
 export type VisualAssetKind = "gltf-scene" | "gltf-prop" | "tileset";
@@ -21,6 +22,14 @@ export type VisualAssetManifest = {
   renderer: "three-webgpu";
 };
 
+export type SketchUpImportPlan = {
+  acceptedInputFormats: readonly ["skp", "dae", "obj"];
+  collisionPolicy: "visual-only";
+  outputFormat: "glb";
+  steps: readonly string[];
+  texturePolicy: "local-app-route";
+};
+
 export function createVisualAssetManifest(
   assets: readonly VisualAssetManifestItem[],
 ): VisualAssetManifest {
@@ -35,12 +44,44 @@ export function createVisualAssetManifest(
   };
 }
 
+export function createVisualAssetManifestFromScene(
+  scene: CrowdSimScene,
+): VisualAssetManifest {
+  return createVisualAssetManifest(
+    scene.visualAssets
+      .filter((asset) => asset.visible)
+      .map((asset) => ({
+        anchor: { ...asset.anchor },
+        collisionMode: asset.collisionMode,
+        id: asset.id,
+        kind: asset.kind,
+        scale: asset.scale,
+        sourceUrl: asset.sourceUrl,
+      })),
+  );
+}
+
 export function summarizeVisualAssetManifest(manifest: VisualAssetManifest) {
   return {
     assetCount: manifest.assets.length,
     gltfCount: manifest.assets.filter((asset) => asset.kind.startsWith("gltf")).length,
     tilesetCount: manifest.assets.filter((asset) => asset.kind === "tileset").length,
     visualOnly: manifest.collisionPolicy === "visual-only",
+  };
+}
+
+export function createSketchUpImportPlan(): SketchUpImportPlan {
+  return {
+    acceptedInputFormats: ["skp", "dae", "obj"],
+    collisionPolicy: "visual-only",
+    outputFormat: "glb",
+    steps: [
+      "Export or convert SketchUp geometry to glTF/GLB before browser import.",
+      "Store the GLB and textures under an application asset route.",
+      "Register the model as a scene visualAsset with collisionMode none.",
+      "Author walkable roads, obstacles, and hazards separately in .csim.json.",
+    ],
+    texturePolicy: "local-app-route",
   };
 }
 

@@ -14,6 +14,15 @@ describe("bioCityDemoScene", () => {
       "glass-arcade",
       "food-hall-south",
     ]);
+    expect(roundTripped.visualAssets.map((asset) => asset.id)).toEqual([
+      "rain-market-streetscape",
+      "bus-stop-shelter",
+    ]);
+    expect(roundTripped.visualAssets[0]).toMatchObject({
+      collisionMode: "none",
+      originalSourceFormat: "sketchup",
+      sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+    });
     expect(roundTripped.transitStops[0]).toMatchObject({
       id: "rain-market-bus-stop",
       roadId: "bus-loop",

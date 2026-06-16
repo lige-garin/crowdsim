@@ -9,6 +9,28 @@ export const bioCityDemoScene = parseScene({
     width: 160,
     height: 96,
   },
+  visualAssets: [
+    {
+      id: "rain-market-streetscape",
+      name: "Rain Market Streetscape",
+      kind: "gltf-scene",
+      sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+      originalSourceFormat: "sketchup",
+      anchor: { x: 80, y: 48, z: 0 },
+      rotationDegrees: 0,
+      scale: 1,
+      attribution: "SketchUp massing model converted to GLB for visual context",
+    },
+    {
+      id: "bus-stop-shelter",
+      name: "Bus Stop Shelter",
+      kind: "gltf-prop",
+      sourceUrl: "/assets/biocity/bus-stop-shelter.glb",
+      originalSourceFormat: "glb",
+      anchor: { x: 122, y: 72, z: 0 },
+      scale: 0.9,
+    },
+  ],
   areas: [
     {
       id: "downtown-walkable",
