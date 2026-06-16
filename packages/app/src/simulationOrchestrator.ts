@@ -3,6 +3,10 @@ import {
   calculateEnvironmentImpact,
   type EnvironmentImpact,
 } from "./environmentEffects";
+import {
+  createBioCityDecisionBackend,
+  shouldUseBioCityDecisionBackend,
+} from "./bioAgentBehavior";
 import { createRouteCostMap, type RouteCostMap } from "./routeCostMap";
 import {
   createSimulationEngineFromScene,
@@ -36,7 +40,10 @@ const decisionEverySteps = movementHz / decisionHz;
 export function createSimulationOrchestrator(
   scene: CrowdSimScene,
 ): SimulationOrchestrator {
-  const engine = createSimulationEngineFromScene(scene);
+  const decisionBackend = shouldUseBioCityDecisionBackend(scene)
+    ? createBioCityDecisionBackend(scene)
+    : undefined;
+  const engine = createSimulationEngineFromScene(scene, { decisionBackend });
   let decisionTickCount = 0;
 
   function wrap(snapshot: SimulationSnapshot): SimulationOrchestratorSnapshot {

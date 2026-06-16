@@ -4,6 +4,7 @@ import {
   createOrchestratorReadinessSummary,
   createSimulationOrchestrator,
 } from "./simulationOrchestrator";
+import { bioCityDemoScene } from "./bioCityDemoScene";
 
 const scene = parseScene({
   schemaVersion: "1.0.0",
@@ -49,5 +50,39 @@ describe("simulation orchestrator", () => {
     expect(snapshot.decisionTickCount).toBe(2);
     expect(snapshot.routeCostMap.cells).toHaveLength(1);
     expect(createOrchestratorReadinessSummary(snapshot)).toContain("routeCostCells=1");
+  });
+
+  it("runs BioCity decision ticks for BioCity scenes", () => {
+    const orchestrator = createSimulationOrchestrator(
+      parseScene({
+        ...bioCityDemoScene,
+        hazards: bioCityDemoScene.hazards.map((hazard) => ({
+          ...hazard,
+          startsAtSeconds: 0,
+        })),
+        entrances: [
+          {
+            id: "bio-entry",
+            kind: "source",
+            position: { x: 110, y: 70 },
+            width: 4,
+            arrivalRatePerMinute: 6000,
+          },
+          {
+            id: "bio-exit",
+            kind: "sink",
+            position: { x: 150, y: 52 },
+            width: 6,
+          },
+        ],
+      }),
+    );
+
+    orchestrator.start();
+    const snapshot = orchestrator.step(6);
+
+    expect(snapshot.agents.length).toBeGreaterThan(0);
+    expect(snapshot.agents.some((agent) => agent.lifecycleState)).toBe(true);
+    expect(snapshot.routeCostMap.environmentFactorIds).toContain("curbside-pooling");
   });
 });
