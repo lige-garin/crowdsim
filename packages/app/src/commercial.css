@@ -527,6 +527,44 @@ h3 {
   display: none;
 }
 
+.stage-telemetry {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.stage-telemetry article {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid #dce3ee;
+  border-radius: var(--product-radius-sm);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.86)),
+    #ffffff;
+}
+
+.stage-telemetry span {
+  color: #6b7788;
+  font-size: 0.68rem;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.stage-telemetry strong {
+  min-width: 0;
+  color: #172033;
+  font-family: var(--lab-mono);
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .view-mode-toggle {
   grid-template-columns: repeat(3, minmax(70px, 1fr));
   padding: 3px;

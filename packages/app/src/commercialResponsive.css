@@ -124,12 +124,17 @@
     align-items: stretch;
     flex-direction: column;
   }
+
+  .stage-telemetry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 520px) {
   .home-actions,
   .view-mode-toggle,
   .command-status,
+  .stage-telemetry,
   .brand-agent-strip,
   .dashboard-metrics {
     grid-template-columns: minmax(0, 1fr);

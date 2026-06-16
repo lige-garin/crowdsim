@@ -1,11 +1,16 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { lazy, Suspense } from "react";
 import { ContactNetworkView } from "./ContactNetworkView";
-import { formatStageViewButton, formatStageViewMode } from "./appUi";
+import {
+  formatSimulationClock,
+  formatStageViewButton,
+  formatStageViewMode,
+} from "./appUi";
 import type { HeatmapCell } from "./heatmap";
 import type { Language, TranslationKey } from "./i18n";
 import { SceneEditor } from "./SceneEditor";
 import type { StageViewMode } from "./AppTypes";
+import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
 
@@ -22,6 +27,7 @@ type AppStageProps = {
   scene: CrowdSimScene;
   sharedAgentOverlay?: ViewportAgentOverlayFrame;
   simulationSnapshot: SimulationSnapshot;
+  runtime: SimulationRuntimeArtifact;
   t: (key: TranslationKey) => string;
   viewMode: StageViewMode;
 };
@@ -33,9 +39,29 @@ export function AppStage({
   scene,
   sharedAgentOverlay,
   simulationSnapshot,
+  runtime,
   t,
   viewMode,
 }: AppStageProps) {
+  const telemetry = [
+    {
+      label: language === "zh" ? "人数" : "Agents",
+      value: simulationSnapshot.agentCount.toLocaleString(),
+    },
+    {
+      label: language === "zh" ? "离场" : "Exited",
+      value: simulationSnapshot.exitedCount.toLocaleString(),
+    },
+    {
+      label: language === "zh" ? "时钟" : "Clock",
+      value: formatSimulationClock(simulationSnapshot.elapsedSeconds),
+    },
+    {
+      label: language === "zh" ? "内核" : "Kernel",
+      value: `${runtime.thread}/${runtime.sharedMemory}`,
+    },
+  ];
+
   return (
     <section className="stage" aria-label={t("simulationViewport")}>
       <div className="stage-stack">
@@ -53,6 +79,14 @@ export function AppStage({
               </button>
             ))}
           </div>
+        </div>
+        <div className="stage-telemetry" aria-label="Live telemetry">
+          {telemetry.map((item) => (
+            <article key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+            </article>
+          ))}
         </div>
         {viewMode === "network" ? (
           <ContactNetworkView />

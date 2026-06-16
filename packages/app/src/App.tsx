@@ -453,6 +453,7 @@ function AppContent() {
               : undefined
           }
           simulationSnapshot={simulation.snapshot}
+          runtime={currentRuntime}
           t={t}
           viewMode={viewMode}
         />
