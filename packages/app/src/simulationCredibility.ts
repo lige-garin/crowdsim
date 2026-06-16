@@ -4,7 +4,7 @@ import type { EvacuationState } from "./AppTypes";
 import type { HeatmapSample } from "./heatmap";
 import { simulationRuntimeProfile, type SimulationSnapshot } from "./simulationEngine";
 import {
-  createSimulationRuntimeArtifact,
+  createLiveSimulationRuntimeArtifact,
   formatSimulationRuntimeArtifact,
   type SimulationRuntimeArtifact,
 } from "./simulationRuntimeArtifact";
@@ -34,7 +34,7 @@ export function createSimulationCredibilityReport(options: {
     scene,
     simulationSnapshot,
   } = options;
-  const runtimeArtifact = createSimulationRuntimeArtifact(runtime);
+  const runtimeArtifact = createLiveSimulationRuntimeArtifact(runtime);
   const hasLiveSamples = heatmapSamples.length > 0;
   const atAgentLimit =
     simulationSnapshot.agentCount >= simulationRuntimeProfile.maxAgents;

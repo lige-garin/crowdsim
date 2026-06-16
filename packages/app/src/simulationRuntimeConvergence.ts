@@ -53,6 +53,7 @@ export function createRuntimeConvergenceReport(): RuntimeConvergenceItem[] {
       evidence: [
         "Benchmark results include runtime profile in the reproducibility hash",
         "Trajectory recordings and packed replay preserve runtime profile",
+        "createLiveSimulationRuntimeArtifact models phase 2 live worker/WASM runtime evidence",
         "App records live trajectory frames from SimulationSnapshot",
         "Credibility report displays runtime profile evidence",
       ],

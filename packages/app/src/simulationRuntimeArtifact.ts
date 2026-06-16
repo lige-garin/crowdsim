@@ -24,6 +24,17 @@ export function createSimulationRuntimeArtifact(
   };
 }
 
+export function createLiveSimulationRuntimeArtifact(
+  overrides: Partial<SimulationRuntimeArtifact> = {},
+): SimulationRuntimeArtifact {
+  return createSimulationRuntimeArtifact({
+    decisionBackend: "wasm-ready",
+    sharedMemory: "fallback",
+    thread: "worker",
+    ...overrides,
+  });
+}
+
 export function formatSimulationRuntimeArtifact(runtime: SimulationRuntimeArtifact) {
   return [
     `movement=${runtime.movementBackend}@${runtime.movementHz}Hz`,

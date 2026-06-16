@@ -61,6 +61,8 @@ describe("simulationCredibility", () => {
     });
 
     expect(report.status).toBe("limited");
+    expect(report.runtime).toContain("decision=wasm-ready@10Hz");
+    expect(report.runtime).toContain("thread=worker");
     expect(report.riskNotes).toContain(
       "Agent cap reached; arrivals are throttled by the browser runtime limit.",
     );

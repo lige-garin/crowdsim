@@ -12,7 +12,7 @@ import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
 import { I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
-import { createSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
+import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import {
   appendTrajectoryFrame,
   createTrajectoryRecording,
@@ -32,7 +32,7 @@ export function App() {
   );
 }
 
-type RuntimeArtifact = ReturnType<typeof createSimulationRuntimeArtifact>;
+type RuntimeArtifact = ReturnType<typeof createLiveSimulationRuntimeArtifact>;
 
 function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
   return (
@@ -59,8 +59,7 @@ function AppContent() {
   const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
   const currentRuntime = useMemo(
     () =>
-      createSimulationRuntimeArtifact({
-        decisionBackend: "wasm-ready",
+      createLiveSimulationRuntimeArtifact({
         movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
         sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
         thread: usesWorkerSimulation ? "worker" : "main",
