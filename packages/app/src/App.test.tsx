@@ -186,8 +186,8 @@ describe("App", () => {
 
     expect(screen.getByRole("heading", { name: /control room/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/simulation viewport/i)).toBeInTheDocument();
-    expect(screen.getByText("100,000 visual agents")).toBeInTheDocument();
-    expect(screen.getByText("WebGPU render benchmark")).toBeInTheDocument();
+    expect(await screen.findByText("100,000 visual agents")).toBeInTheDocument();
+    expect(await screen.findByText("WebGPU render benchmark")).toBeInTheDocument();
     expect(screen.getByText("Movement backend")).toBeInTheDocument();
     expect(screen.getByText("cpu-compat active @ 60Hz")).toBeInTheDocument();
     expect(screen.getByText("WebGPU movement")).toBeInTheDocument();

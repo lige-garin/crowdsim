@@ -11,10 +11,10 @@ import { demoScene } from "./demoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
 import { I18nProvider, useI18n } from "./i18n";
+import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
-import { createSimulationCredibilityReport } from "./simulationCredibility";
 
 export function App() {
   return (
@@ -93,8 +93,8 @@ function AppContent() {
       dashboardSamples,
       heatmapSamples,
       probes.queueSystemProbe.status,
-      probes.shopDecisionProbe,
       probes.queueSystemProbe.throughput,
+      probes.shopDecisionProbe,
     ],
   );
   const simulationCredibility = useMemo(
@@ -280,7 +280,6 @@ function AppContent() {
   const labTitle = language === "zh" ? "商业客流运营台" : "Commercial crowd console";
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
-  const displayLabTitle = language === "zh" ? "商业客流运营台" : labTitle;
 
   function enterLab(nextViewMode: StageViewMode = viewMode) {
     setViewMode(nextViewMode);
@@ -302,10 +301,10 @@ function AppContent() {
 
   return (
     <main className="workspace">
-      <header className="command-bar" aria-label={displayLabTitle}>
+      <header className="command-bar" aria-label={labTitle}>
         <div className="command-brand">
           <span>CrowdSim</span>
-          <strong>{displayLabTitle}</strong>
+          <strong>{labTitle}</strong>
           <button
             type="button"
             className="command-home"

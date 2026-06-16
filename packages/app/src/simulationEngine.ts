@@ -14,6 +14,8 @@ import {
   type SceneWorldBounds,
 } from "./sceneGeometry";
 import { calculateEnvironmentImpact } from "./environmentEffects";
+import type { MovementBackend } from "./movementBackend";
+import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 
 export type SimulationStatus = "paused" | "running";
 
@@ -44,6 +46,7 @@ export type SimulationSink = {
 export type SimulationEngineConfig = {
   fixedDtSeconds?: number;
   maxAgents?: number;
+  movementBackend?: MovementBackend;
   seed?: number;
   speedMetersPerSecond?: number;
   sources: SimulationSource[];
@@ -70,7 +73,9 @@ export type SimulationEngine = {
   snapshot: () => SimulationSnapshot;
   start: () => SimulationSnapshot;
   step: (steps?: number) => SimulationSnapshot;
+  stepAsync: (steps?: number) => Promise<SimulationSnapshot>;
   tick: (realDeltaSeconds: number) => SimulationSnapshot;
+  tickAsync: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
 };
 
 const defaultFixedDtSeconds = 1 / 60;
@@ -135,6 +140,7 @@ export function createSimulationEngine(
     config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
   const sources = config.sources;
   const sinks = config.sinks;
+  const movementBackend = config.movementBackend;
   const seed = config.seed ?? 1;
   const walls = config.walls ?? [];
   const world = config.world;
@@ -213,6 +219,37 @@ export function createSimulationEngine(
   }
 
   function runFixedStep() {
+    spawnArrivals();
+    advanceAgentsCpu();
+    elapsedSeconds += fixedDtSeconds;
+    stepCount++;
+  }
+
+  async function runFixedStepAsync() {
+    if (!movementBackend) {
+      runFixedStep();
+      return;
+    }
+
+    spawnArrivals();
+
+    const result = await stepAgentsWithMovementBackend({
+      agents,
+      backend: movementBackend,
+      fixedDtSeconds,
+      sinks,
+      speedMetersPerSecond,
+      walls,
+      world,
+    });
+
+    agents = result.agents;
+    exitedCount += result.exitedCount;
+    elapsedSeconds += fixedDtSeconds;
+    stepCount++;
+  }
+
+  function spawnArrivals() {
     for (const source of sources) {
       const arrivals = samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
 
@@ -220,7 +257,9 @@ export function createSimulationEngine(
         spawnAgent(source);
       }
     }
+  }
 
+  function advanceAgentsCpu() {
     const nextAgents: SimulationAgent[] = [];
 
     for (const agent of agents) {
@@ -254,8 +293,6 @@ export function createSimulationEngine(
     }
 
     agents = nextAgents;
-    elapsedSeconds += fixedDtSeconds;
-    stepCount++;
   }
 
   function movementDirection(
@@ -337,6 +374,13 @@ export function createSimulationEngine(
 
       return makeSnapshot();
     },
+    async stepAsync(steps = 1) {
+      for (let index = 0; index < steps; index++) {
+        await runFixedStepAsync();
+      }
+
+      return makeSnapshot();
+    },
     tick(realDeltaSeconds: number) {
       if (status !== "running") {
         return makeSnapshot();
@@ -347,6 +391,21 @@ export function createSimulationEngine(
 
       while (accumulatorSeconds >= fixedDtSeconds) {
         runFixedStep();
+        accumulatorSeconds -= fixedDtSeconds;
+      }
+
+      return makeSnapshot();
+    },
+    async tickAsync(realDeltaSeconds: number) {
+      if (status !== "running") {
+        return makeSnapshot();
+      }
+
+      accumulatorSeconds +=
+        Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
+
+      while (accumulatorSeconds >= fixedDtSeconds) {
+        await runFixedStepAsync();
         accumulatorSeconds -= fixedDtSeconds;
       }
 

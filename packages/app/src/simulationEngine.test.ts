@@ -4,6 +4,7 @@ import {
   createSimulationEngine,
   createSimulationEngineFromScene,
 } from "./simulationEngine";
+import type { MovementBackend } from "./movementBackend";
 
 const source = {
   id: "entry",
@@ -34,6 +35,25 @@ describe("simulation engine", () => {
     expect(after.spawnedCount).toBe(0);
   });
 
+  it("does not advance async ticks while paused", async () => {
+    const backend = createOffsetMovementBackend(2, 0);
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      movementBackend: backend,
+      seed: 7,
+      sources: [source],
+      sinks: [sink],
+    });
+
+    const before = engine.snapshot();
+    const after = await engine.tickAsync(10);
+
+    expect(after.elapsedSeconds).toBe(before.elapsedSeconds);
+    expect(after.agentCount).toBe(0);
+    expect(after.spawnedCount).toBe(0);
+    expect(backend.calls).toBe(0);
+  });
+
   it("runs fixed-step simulation with time scale", () => {
     const engine = createSimulationEngine({
       fixedDtSeconds: 0.5,
@@ -49,6 +69,47 @@ describe("simulation engine", () => {
     expect(snapshot.stepCount).toBe(2);
     expect(snapshot.elapsedSeconds).toBe(1);
     expect(snapshot.spawnedCount).toBeGreaterThan(0);
+  });
+
+  it("writes async movement backend output into live agents", async () => {
+    const backend = createOffsetMovementBackend(2, 0);
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      movementBackend: backend,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+      speedMetersPerSecond: 1,
+    });
+
+    engine.start();
+    const snapshot = await engine.stepAsync(1);
+
+    expect(backend.calls).toBe(1);
+    expect(snapshot.spawnedCount).toBeGreaterThan(0);
+    expect(snapshot.agentCount).toBe(snapshot.spawnedCount);
+    expect(snapshot.agents.every((agent) => agent.x === 2)).toBe(true);
+    expect(snapshot.agents.every((agent) => agent.vx === 2)).toBe(true);
+  });
+
+  it("keeps async backend movement constrained by walls", async () => {
+    const backend = createOffsetMovementBackend(2, 0);
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      movementBackend: backend,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+      walls: [{ x1: 1, y1: -10, x2: 1, y2: 10 }],
+      speedMetersPerSecond: 1,
+    });
+
+    engine.start();
+    const snapshot = await engine.stepAsync(1);
+
+    expect(backend.calls).toBe(1);
+    expect(snapshot.spawnedCount).toBeGreaterThan(0);
+    expect(Math.max(...snapshot.agents.map((agent) => agent.x))).toBeLessThan(1);
   });
 
   it("removes agents once they reach a sink", () => {
@@ -157,3 +218,30 @@ describe("simulation engine", () => {
     expect(maxX).toBeLessThan(5);
   });
 });
+
+function createOffsetMovementBackend(offsetX: number, offsetY: number) {
+  let calls = 0;
+  const backend: MovementBackend & { calls: number } = {
+    id: "webgpu-ready",
+    mode: "active",
+    get calls() {
+      return calls;
+    },
+    step: async ({ agents }) => {
+      calls++;
+      const positions = new Float32Array(agents.positions.length);
+      const velocities = new Float32Array(agents.velocities.length);
+
+      for (let index = 0; index < agents.count; index++) {
+        positions[index * 2] = agents.positions[index * 2] + offsetX;
+        positions[index * 2 + 1] = agents.positions[index * 2 + 1] + offsetY;
+        velocities[index * 2] = offsetX;
+        velocities[index * 2 + 1] = offsetY;
+      }
+
+      return { positions, velocities };
+    },
+  };
+
+  return backend;
+}

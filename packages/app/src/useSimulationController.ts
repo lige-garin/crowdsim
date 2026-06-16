@@ -4,6 +4,7 @@ import {
   createSimulationEngineFromScene,
   type SimulationSnapshot,
 } from "./simulationEngine";
+import type { MovementBackend } from "./movementBackend";
 
 export type SimulationController = {
   pause: () => void;
@@ -13,10 +14,22 @@ export type SimulationController = {
   start: () => void;
 };
 
-export function useSimulationController(scene: CrowdSimScene): SimulationController {
-  const engine = useMemo(() => createSimulationEngineFromScene(scene), [scene]);
+export type SimulationControllerOptions = {
+  movementBackend?: MovementBackend;
+};
+
+export function useSimulationController(
+  scene: CrowdSimScene,
+  options: SimulationControllerOptions = {},
+): SimulationController {
+  const { movementBackend } = options;
+  const engine = useMemo(
+    () => createSimulationEngineFromScene(scene, { movementBackend }),
+    [movementBackend, scene],
+  );
   const frameRef = useRef(0);
   const watchdogRef = useRef(0);
+  const tickInFlightRef = useRef(false);
   const lastFrameAtRef = useRef<number | null>(null);
 
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
@@ -37,10 +50,30 @@ export function useSimulationController(scene: CrowdSimScene): SimulationControl
         return;
       }
 
+      if (movementBackend && tickInFlightRef.current) {
+        return;
+      }
+
       const lastFrameAt = lastFrameAtRef.current ?? frameTime;
       const deltaSeconds = (frameTime - lastFrameAt) / 1000;
 
       lastFrameAtRef.current = frameTime;
+
+      if (movementBackend) {
+        tickInFlightRef.current = true;
+        void engine
+          .tickAsync(deltaSeconds)
+          .then((nextSnapshot) => {
+            if (!cancelled) {
+              setSnapshot(nextSnapshot);
+            }
+          })
+          .finally(() => {
+            tickInFlightRef.current = false;
+          });
+        return;
+      }
+
       setSnapshot(engine.tick(deltaSeconds));
     }
 
@@ -69,7 +102,7 @@ export function useSimulationController(scene: CrowdSimScene): SimulationControl
 
       window.clearInterval(watchdogRef.current);
     };
-  }, [engine, snapshot.status, snapshot.timeScale]);
+  }, [engine, movementBackend, snapshot.status, snapshot.timeScale]);
 
   const start = useCallback(() => {
     lastFrameAtRef.current = null;
