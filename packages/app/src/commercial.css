@@ -388,12 +388,33 @@ button[aria-pressed="true"],
 
 .inspector-group {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   scroll-margin-top: 64px;
 }
 
 .inspector-group + .inspector-group {
-  padding-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid #edf1f6;
+}
+
+.inspector-group-header {
+  display: grid;
+  gap: 3px;
+  padding: 2px 2px 0;
+}
+
+.inspector-group-header span {
+  color: #748196;
+  font-size: 0.66rem;
+  font-weight: 780;
+  line-height: 1.1;
+}
+
+.inspector-group-header h2 {
+  color: #172033;
+  font-size: 1.05rem;
+  font-weight: 760;
+  line-height: 1.1;
 }
 
 .eyebrow {

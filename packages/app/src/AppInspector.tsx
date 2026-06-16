@@ -95,6 +95,20 @@ export function AppInspector({
           overview: "Overview",
           probes: "Probes",
         };
+  const sectionDetails =
+    language === "zh"
+      ? {
+          evidence: "运行证据与回放",
+          operations: "协作、报告与实验",
+          overview: "现场经营摘要",
+          probes: "内核探针读数",
+        }
+      : {
+          evidence: "Runtime proof and replay",
+          operations: "Collaboration, reports, and experiments",
+          overview: "Live operating summary",
+          probes: "Kernel probe readouts",
+        };
 
   return (
     <aside className="inspector" aria-label={t("systemSignals")}>
@@ -104,7 +118,11 @@ export function AppInspector({
         <a href="#inspector-operations">{sectionLabels.operations}</a>
         <a href="#inspector-probes">{sectionLabels.probes}</a>
       </nav>
-      <div id="inspector-overview" className="inspector-group">
+      <InspectorGroup
+        detail={sectionDetails.overview}
+        id="inspector-overview"
+        title={sectionLabels.overview}
+      >
         <Suspense fallback={<PanelSkeleton className="dashboard-panel" rows={3} />}>
           <DashboardPanel stats={dashboardStats} />
         </Suspense>
@@ -118,12 +136,20 @@ export function AppInspector({
               : undefined
           }
         />
-      </div>
-      <div id="inspector-evidence" className="inspector-group">
+      </InspectorGroup>
+      <InspectorGroup
+        detail={sectionDetails.evidence}
+        id="inspector-evidence"
+        title={sectionLabels.evidence}
+      >
         <SimulationCredibilityPanel report={simulationCredibility} />
         <TrajectoryReplayPanel recording={trajectoryRecording} />
-      </div>
-      <div id="inspector-operations" className="inspector-group">
+      </InspectorGroup>
+      <InspectorGroup
+        detail={sectionDetails.operations}
+        id="inspector-operations"
+        title={sectionLabels.operations}
+      >
         <CollaborationStatusPanel />
         <ProjectWorkspacePanel />
         <TemplateLibraryPanel />
@@ -136,9 +162,12 @@ export function AppInspector({
         <ImageGeometryPanel />
         <TilesBackdropPanel />
         <NeuralCorrectionPanel />
-      </div>
-      <div id="inspector-probes" className="inspector-group">
-        <h2>{t("systemSignals")}</h2>
+      </InspectorGroup>
+      <InspectorGroup
+        detail={sectionDetails.probes}
+        id="inspector-probes"
+        title={sectionLabels.probes}
+      >
         <dl>
           {signals.map((signal) => (
             <div key={signal.label}>
@@ -244,8 +273,32 @@ export function AppInspector({
               : t("noCurve")}
           </code>
         </section>
-      </div>
+      </InspectorGroup>
     </aside>
+  );
+}
+
+function InspectorGroup({
+  children,
+  detail,
+  id,
+  title,
+}: {
+  children: ReactNode;
+  detail: string;
+  id: string;
+  title: string;
+}) {
+  const titleId = `${id}-title`;
+
+  return (
+    <section id={id} className="inspector-group" aria-labelledby={titleId}>
+      <header className="inspector-group-header">
+        <span>{detail}</span>
+        <h2 id={titleId}>{title}</h2>
+      </header>
+      {children}
+    </section>
   );
 }
 
