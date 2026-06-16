@@ -312,6 +312,60 @@ button[aria-pressed="true"],
   background: #ffffff;
 }
 
+.inspector-nav {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #dce3ee;
+  border-radius: var(--product-radius);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 26px rgba(35, 48, 73, 0.08);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.inspector-nav a {
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: var(--product-radius-sm);
+  color: #536174;
+  font-size: 0.72rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-align: center;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+  white-space: nowrap;
+}
+
+.inspector-nav a:hover,
+.inspector-nav a:focus-visible {
+  background: #edf3ff;
+  color: #1f48ad;
+  outline: 0;
+}
+
+.inspector-nav a:active {
+  transform: translateY(1px);
+}
+
+.inspector-group {
+  display: grid;
+  gap: 16px;
+  scroll-margin-top: 64px;
+}
+
+.inspector-group + .inspector-group {
+  padding-top: 2px;
+}
+
 .eyebrow {
   margin-bottom: 6px;
   color: #6a7585;
