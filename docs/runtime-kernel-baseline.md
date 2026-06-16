@@ -163,3 +163,26 @@ Verification:
   into the current worker path.
 - The current UI exposes necessary runtime status, but the final productized UI
   redesign is intentionally deferred until the kernel paths are stable.
+
+## Phase 2 completion audit
+
+Source of truth:
+
+- `packages/app/src/simulationRuntimeConvergence.ts`
+- `packages/app/src/simulationRuntimeConvergence.test.ts`
+
+| Requirement                                                 | Evidence status | Completion | Blocks final UI |
+| ----------------------------------------------------------- | --------------- | ---------: | --------------- |
+| WebGPU movement optional main loop                          | Complete        |       100% | No              |
+| WASM decision tick owns live agent decisions                | Complete        |       100% | No              |
+| Worker simulation thread                                    | Complete        |       100% | No              |
+| SharedArrayBuffer metrics and agent SoA lanes               | Complete        |       100% | No              |
+| Benchmark, replay, and validation bound to runtime evidence | Complete        |       100% | No              |
+
+Audit result:
+
+- Kernel convergence completion: 5/5 items, 100%.
+- Remaining limitations are non-blocking runtime constraints, not missing phase 2
+  kernel work.
+- The project can now enter the deferred final productized UI redesign while
+  preserving the verified worker/WASM/SAB/WebGPU runtime paths.
