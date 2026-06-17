@@ -34,7 +34,10 @@ describe("bioCityRenderPlan", () => {
     const plan = createBioCityRenderPlan(bioCityDemoScene, 2100);
 
     expect(plan.weather.condition).toBe("heavyRain");
+    expect(plan.weather.fogOpacity).toBeGreaterThan(0);
     expect(plan.weather.precipitationIntensity).toBeGreaterThan(0.5);
+    expect(plan.weather.rainStreaks.length).toBeGreaterThan(12);
+    expect(plan.weather.windIndicators).toHaveLength(3);
     expect(
       Math.hypot(plan.weather.windVector.x, plan.weather.windVector.y),
     ).toBeGreaterThan(0);

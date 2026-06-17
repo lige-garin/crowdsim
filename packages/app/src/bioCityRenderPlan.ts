@@ -36,8 +36,18 @@ export type BioCityRenderPrimitive =
 export type BioCityWeatherVisualState = {
   condition: string;
   fogDensity: number;
+  fogOpacity: number;
   precipitationIntensity: number;
+  rainStreaks: BioCityWeatherLine[];
+  windIndicators: BioCityWeatherLine[];
   windVector: ScenePoint;
+};
+
+export type BioCityWeatherLine = {
+  end: ScenePoint;
+  id: string;
+  intensity: number;
+  start: ScenePoint;
 };
 
 export type BioCityRenderAssetPlacement = {
@@ -125,7 +135,10 @@ export function createBioCityRenderPlan(
     weather: {
       condition: weather.currentWeatherSample?.condition ?? "clear",
       fogDensity: fogDensity(weather.currentWeatherSample),
+      fogOpacity: fogOpacity(weather.currentWeatherSample),
       precipitationIntensity: precipitationIntensity(weather.currentWeatherSample),
+      rainStreaks: rainStreaks(scene, weather.currentWeatherSample),
+      windIndicators: windIndicators(scene, weather.currentWeatherSample),
       windVector: windVector(weather.currentWeatherSample),
     },
   };
@@ -160,6 +173,19 @@ function precipitationIntensity(
   return Math.min(1, sample.precipitationMmPerHour / 20);
 }
 
+function fogOpacity(
+  sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
+) {
+  if (!sample) return 0;
+
+  return Number(
+    Math.max(
+      fogDensity(sample),
+      Math.min(0.28, precipitationIntensity(sample) * 0.18),
+    ).toFixed(3),
+  );
+}
+
 function windVector(
   sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
 ): ScenePoint {
@@ -174,6 +200,72 @@ function windVector(
     x: Number((Math.cos(radians) * scale).toFixed(4)),
     y: Number((Math.sin(radians) * scale).toFixed(4)),
   };
+}
+
+function rainStreaks(
+  scene: CrowdSimScene,
+  sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
+): BioCityWeatherLine[] {
+  const intensity = precipitationIntensity(sample);
+
+  if (intensity <= 0) {
+    return [];
+  }
+
+  const wind = windVector(sample);
+  const count = Math.max(4, Math.round(8 + intensity * 18));
+  const length = 3.5 + intensity * 4;
+
+  return Array.from({ length: count }, (_, index) => {
+    const x = ((index * 37) % 100) / 100;
+    const y = ((index * 53 + 11) % 100) / 100;
+    const start = {
+      x: Number((x * scene.world.width).toFixed(3)),
+      y: Number((y * scene.world.height).toFixed(3)),
+    };
+    const end = {
+      x: Number((start.x + wind.x * length - 1.2 * intensity).toFixed(3)),
+      y: Number((start.y + length).toFixed(3)),
+    };
+
+    return {
+      end,
+      id: `rain-${index}`,
+      intensity: Number(intensity.toFixed(3)),
+      start,
+    };
+  });
+}
+
+function windIndicators(
+  scene: CrowdSimScene,
+  sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
+): BioCityWeatherLine[] {
+  const wind = windVector(sample);
+  const intensity = Math.hypot(wind.x, wind.y);
+
+  if (intensity <= 0.05) {
+    return [];
+  }
+
+  const length = 7 + intensity * 6;
+
+  return [0.25, 0.5, 0.75].map((y, index) => {
+    const start = {
+      x: Number((scene.world.width * 0.12).toFixed(3)),
+      y: Number((scene.world.height * y).toFixed(3)),
+    };
+
+    return {
+      end: {
+        x: Number((start.x + wind.x * length).toFixed(3)),
+        y: Number((start.y + wind.y * length).toFixed(3)),
+      },
+      id: `wind-${index}`,
+      intensity: Number(intensity.toFixed(3)),
+      start,
+    };
+  });
 }
 
 function copyPoint(point: ScenePoint): ScenePoint {

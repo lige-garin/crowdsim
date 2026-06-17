@@ -33,6 +33,7 @@ import {
   type BioCityRenderPlan,
   type BioCityRenderAssetPlacement,
   type BioCityRenderPrimitive,
+  type BioCityWeatherLine,
 } from "./bioCityRenderPlan";
 import { loadBioCityVisualAssetObject } from "./bioCityModelAssets";
 
@@ -506,6 +507,7 @@ function createBioCityObjects(
     ...plan.assets.map((asset) =>
       createBioCityAssetPlaceholder(asset, scene, viewMode),
     ),
+    ...createBioCityWeatherObjects(scene, viewMode, plan),
   ];
 }
 
@@ -591,6 +593,61 @@ function createBioCityPrimitiveMesh(
   );
 }
 
+function createBioCityWeatherObjects(
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+  plan: BioCityRenderPlan,
+) {
+  const rainObjects = plan.weather.rainStreaks.map((line) =>
+    createWeatherLineMesh(line, scene, "#2563eb", 0.22 + line.intensity * 0.38, 0.08),
+  );
+  const windObjects = plan.weather.windIndicators.map((line) =>
+    createWeatherLineMesh(line, scene, "#0f766e", 0.35 + line.intensity * 0.45, 0.18),
+  );
+
+  if (plan.weather.fogOpacity <= 0 || viewMode !== "3d") {
+    return [...rainObjects, ...windObjects];
+  }
+
+  const fog = new Mesh(
+    new PlaneGeometry(scene.world.width, scene.world.height),
+    new MeshBasicMaterial({
+      color: "#dbe4df",
+      opacity: Math.min(0.38, plan.weather.fogOpacity),
+      transparent: true,
+    }),
+  );
+
+  fog.name = "weather-fog-veil";
+  fog.position.set(0, 0, 2.2);
+
+  return [...rainObjects, ...windObjects, fog];
+}
+
+function createWeatherLineMesh(
+  line: BioCityWeatherLine,
+  scene: CrowdSimScene,
+  color: string,
+  opacity: number,
+  width: number,
+) {
+  const mesh = createLineLikeMesh(
+    toRenderX(line.start.x, scene),
+    toRenderY(line.start.y, scene),
+    toRenderX(line.end.x, scene),
+    toRenderY(line.end.y, scene),
+    width,
+    color,
+    0.06,
+    Math.min(0.92, opacity),
+  );
+
+  mesh.name = `weather-${line.id}`;
+  mesh.position.z = 2.6;
+
+  return mesh;
+}
+
 function createBioCityAssetPlaceholder(
   asset: BioCityRenderAssetPlacement,
   scene: CrowdSimScene,
@@ -627,10 +684,19 @@ function createLineLikeMesh(
   width: number,
   color: string,
   height: number,
+  opacity?: number,
 ) {
   const length = Math.hypot(x2 - x1, y2 - y1);
   const geometry = new BoxGeometry(length, Math.max(0.2, width), height);
-  const material = new MeshBasicMaterial({ color });
+  const material = new MeshBasicMaterial(
+    opacity === undefined
+      ? { color }
+      : {
+          color,
+          opacity,
+          transparent: true,
+        },
+  );
   const mesh = new Mesh(geometry, material);
 
   mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, height / 2);
