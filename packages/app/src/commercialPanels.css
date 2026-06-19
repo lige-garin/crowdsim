@@ -121,3 +121,51 @@
   background: #9aa9bf;
   opacity: 0.42;
 }
+
+.biocity-analytics-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.biocity-analytics-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e0e6ef;
+  border-radius: var(--product-radius-sm);
+  background: #f9fbfe;
+}
+
+.biocity-analytics-card > span,
+.biocity-meter-line > span {
+  color: #697586;
+  font-size: 0.66rem;
+  font-weight: 760;
+}
+
+.biocity-analytics-card code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  border-color: #e0e6ef;
+  border-radius: var(--product-radius-sm);
+  background: #ffffff;
+  color: #29384d;
+  font-size: 0.7rem;
+  font-weight: 720;
+}
+
+.biocity-meter-line {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(72px, 1.5fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.biocity-meter-line meter {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+}

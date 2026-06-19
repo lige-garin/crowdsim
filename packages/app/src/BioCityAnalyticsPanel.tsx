@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { createBioCityAnalyticsSummary } from "./bioCityAnalytics";
 import type { HeatmapCell } from "./heatmap";
 
@@ -52,14 +52,65 @@ export function BioCityAnalyticsPanel({
       <code className="dashboard-summary">
         corridors{" "}
         {summary.topCorridors
-          .map((corridor) => `${corridor.id}${corridor.risk ? ":risk" : ""}`)
+          .map((corridor) => `${corridor.label}${corridor.risk ? ":risk" : ""}`)
           .join(" | ") || "none"}
       </code>
-      {summary.insightLines.map((line) => (
-        <code key={line} className="dashboard-summary">
-          {line}
-        </code>
-      ))}
+      <section
+        className="biocity-analytics-grid"
+        aria-label="BioCity detailed analytics"
+      >
+        <MiniPanel title="Heatmap trend">
+          {summary.heatmapTrend.length > 0 ? (
+            summary.heatmapTrend.map((cell) => (
+              <MeterLine key={cell.id} label={cell.id} value={cell.intensityPercent} />
+            ))
+          ) : (
+            <code>No heatmap samples</code>
+          )}
+        </MiniPanel>
+        <MiniPanel title="Sales forecast">
+          {summary.salesForecastCards.map((shop) => (
+            <code key={shop.id}>
+              {shop.label} | conversion {shop.predictedConversionPercent}% | revenue{" "}
+              {shop.forecastRevenueIndex}
+            </code>
+          ))}
+        </MiniPanel>
+        <MiniPanel title="Main corridors">
+          {summary.topCorridors.map((corridor) => (
+            <code key={corridor.id}>
+              {corridor.label} | intensity {Math.round(corridor.intensity * 100)}% |{" "}
+              {corridor.transitOnly ? "transit" : "mixed"}
+              {corridor.risk ? " | risk" : ""}
+            </code>
+          ))}
+        </MiniPanel>
+        <MiniPanel title="Building attributes">
+          {summary.buildingPropertyCards.map((building) => (
+            <code key={building.id}>
+              {building.label} | {building.kind} | cap {building.capacity} | occupancy{" "}
+              {building.occupancySignalPercent}%
+            </code>
+          ))}
+        </MiniPanel>
+        <MiniPanel title="Transit queues">
+          {summary.transitStopCards.length > 0 ? (
+            summary.transitStopCards.map((stop) => (
+              <code key={stop.id}>
+                {stop.label} | wait {stop.waitMinutes}m | pressure{" "}
+                {stop.pressurePercent}%
+              </code>
+            ))
+          ) : (
+            <code>No active transit stops</code>
+          )}
+        </MiniPanel>
+        <MiniPanel title="Risk explanation">
+          {summary.riskExplanations.map((line) => (
+            <code key={line}>{line}</code>
+          ))}
+        </MiniPanel>
+      </section>
     </section>
   );
 }
@@ -70,5 +121,24 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  );
+}
+
+function MiniPanel({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <article className="biocity-analytics-card">
+      <span>{title}</span>
+      {children}
+    </article>
+  );
+}
+
+function MeterLine({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="biocity-meter-line">
+      <span>{label}</span>
+      <meter min="0" max="100" value={value} />
+      <code>{value}%</code>
+    </div>
   );
 }

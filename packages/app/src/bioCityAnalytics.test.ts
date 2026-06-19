@@ -37,11 +37,32 @@ describe("bioCityAnalytics", () => {
       id: "peak",
       intensity: 1,
     });
+    expect(summary.heatmapTrend[0]).toEqual({
+      id: "peak",
+      intensityPercent: 100,
+    });
     expect(summary.activeRiskCount).toBe(1);
     expect(summary.congestionIndexPercent).toBeGreaterThan(60);
     expect(summary.routeRiskIndexPercent).toBeGreaterThan(30);
     expect(summary.transitQueuePressurePercent).toBeGreaterThan(20);
     expect(summary.commercialConversionForecastPercent).toBeGreaterThan(40);
+    expect(summary.salesForecastCards[0]).toMatchObject({
+      id: "raincoat-pop-up",
+      label: "Raincoat Pop-up",
+    });
+    expect(summary.transitStopCards[0]).toMatchObject({
+      id: "rain-market-bus-stop",
+      label: "Rain Market Bus Stop",
+    });
+    expect(summary.buildingPropertyCards).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "glass-arcade",
+          kind: "retail",
+        }),
+      ]),
+    );
+    expect(summary.riskExplanations.join(" ")).toContain("Curbside Pooling");
     expect(summary.weatherImpact.activeFactorIds).toEqual(
       expect.arrayContaining(["hazard-curbside-pooling"]),
     );
@@ -73,5 +94,6 @@ describe("bioCityAnalytics", () => {
     });
     expect(summary.activeRiskCount).toBe(0);
     expect(summary.transitQueuePressurePercent).toBe(0);
+    expect(summary.transitStopCards).toEqual([]);
   });
 });
