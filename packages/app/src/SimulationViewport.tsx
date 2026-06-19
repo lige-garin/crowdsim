@@ -20,10 +20,10 @@ import { WebGPURenderer } from "three/webgpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useI18n, type TranslationKey } from "./i18n";
 import {
-  benchmarkAgentPosition,
   performanceAgentCount,
   performanceBenchmarkFrames,
 } from "./renderBenchmark";
+import { agentWorldPosition, visibleAgentCount } from "./agentInstanceField";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
@@ -75,6 +75,12 @@ export function SimulationViewport({
 }) {
   const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Latest snapshot, read each animation frame so the instanced crowd follows
+  // the live simulation without recreating the scene.
+  const snapshotRef = useRef(snapshot);
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [fps, setFps] = useState(0);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
@@ -237,15 +243,47 @@ export function SimulationViewport({
       renderer?.setSize(safeWidth, safeHeight, false);
     }
 
+    let renderedAgentCount = 0;
+
+    // Initial state: every instance hidden (scale 0). updateAgentInstances then
+    // reveals only the live agents each frame.
     function seedAgents() {
       for (let index = 0; index < performanceAgentCount; index++) {
-        const { x, y } = benchmarkAgentPosition(index);
-
-        dummy.position.set(x, y, viewMode === "3d" ? 0.23 : 0);
+        dummy.scale.setScalar(0);
+        dummy.position.set(0, 0, -1000);
         dummy.updateMatrix();
         agents.setMatrixAt(index, dummy.matrix);
       }
 
+      agents.instanceMatrix.needsUpdate = true;
+    }
+
+    // Drive the instanced mesh from the live simulation snapshot: position the
+    // first N instances at the real agents, hide any that were visible last
+    // frame but no longer are. This replaces the static benchmark grid.
+    function updateAgentInstances() {
+      const live = snapshotRef.current?.agents ?? [];
+      const visible = visibleAgentCount(live.length, performanceAgentCount);
+
+      for (let index = 0; index < visible; index++) {
+        const world = agentWorldPosition(
+          live[index],
+          { width: worldWidth, height: worldHeight },
+          viewMode,
+        );
+        dummy.position.set(world.x, world.y, world.z);
+        dummy.scale.setScalar(1);
+        dummy.updateMatrix();
+        agents.setMatrixAt(index, dummy.matrix);
+      }
+
+      for (let index = visible; index < renderedAgentCount; index++) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        agents.setMatrixAt(index, dummy.matrix);
+      }
+
+      renderedAgentCount = visible;
       agents.instanceMatrix.needsUpdate = true;
     }
 
@@ -257,7 +295,7 @@ export function SimulationViewport({
       const frameTime = Number.isFinite(time) ? time : performance.now();
 
       try {
-        agents.rotation.z = Math.sin(frameTime * 0.0002) * 0.025;
+        updateAgentInstances();
         renderer.render(scene, camera);
       } catch (error) {
         setStatus(
@@ -419,7 +457,7 @@ export function SimulationViewport({
       <div className="render-hud" aria-label={t("renderStatus")}>
         <span>{status.type === "localized" ? t(status.key) : status.message}</span>
         <strong>
-          {performanceAgentCount.toLocaleString()} {t("visualAgents")}
+          {(snapshot?.agentCount ?? 0).toLocaleString()} {t("visualAgents")}
         </strong>
         <span>{viewMode === "3d" ? t("view3d") : t("view2d")}</span>
         <span>{t("renderBenchmark")}</span>
