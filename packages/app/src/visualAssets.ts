@@ -3,12 +3,25 @@ import { redactSecret } from "./apiKeySafety";
 
 export type VisualAssetKind = "gltf-scene" | "gltf-prop" | "tileset";
 
+export type VisualAssetCalibration = {
+  origin: "base-center" | "scene-anchor" | "source-origin";
+  simulationProxy?: {
+    entityId: string;
+    kind: "area" | "building" | "obstacle" | "road" | "transitStop";
+    role: "alignment-only" | "footprint-source";
+  };
+  unitScaleMeters: number;
+  upAxis: "y-up" | "z-up";
+  verified: boolean;
+};
+
 export type VisualAssetManifestItem = {
   anchor: {
     x: number;
     y: number;
     z: number;
   };
+  calibration: VisualAssetCalibration;
   collisionMode: "none";
   id: string;
   kind: VisualAssetKind;
@@ -38,7 +51,16 @@ export function createVisualAssetManifest(
   }
 
   return {
-    assets: assets.map((asset) => ({ ...asset, anchor: { ...asset.anchor } })),
+    assets: assets.map((asset) => ({
+      ...asset,
+      anchor: { ...asset.anchor },
+      calibration: {
+        ...asset.calibration,
+        simulationProxy: asset.calibration.simulationProxy
+          ? { ...asset.calibration.simulationProxy }
+          : undefined,
+      },
+    })),
     collisionPolicy: "visual-only",
     renderer: "three-webgpu",
   };
@@ -52,6 +74,15 @@ export function createVisualAssetManifestFromScene(
       .filter((asset) => asset.visible)
       .map((asset) => ({
         anchor: { ...asset.anchor },
+        calibration: {
+          origin: asset.calibration.origin,
+          simulationProxy: asset.calibration.simulationProxy
+            ? { ...asset.calibration.simulationProxy }
+            : undefined,
+          unitScaleMeters: asset.calibration.unitScaleMeters,
+          upAxis: asset.calibration.upAxis,
+          verified: asset.calibration.verified,
+        },
         collisionMode: asset.collisionMode,
         id: asset.id,
         kind: asset.kind,
@@ -88,6 +119,7 @@ export function createSketchUpImportPlan(): SketchUpImportPlan {
 export const demoVisualAssetManifest = createVisualAssetManifest([
   {
     anchor: { x: 12, y: 8, z: 0 },
+    calibration: defaultVisualAssetCalibration(),
     collisionMode: "none",
     id: "wayfinding-kiosk",
     kind: "gltf-prop",
@@ -96,6 +128,7 @@ export const demoVisualAssetManifest = createVisualAssetManifest([
   },
   {
     anchor: { x: 40, y: 24, z: 0 },
+    calibration: defaultVisualAssetCalibration(),
     collisionMode: "none",
     id: "atrium-shell",
     kind: "gltf-scene",
@@ -104,6 +137,15 @@ export const demoVisualAssetManifest = createVisualAssetManifest([
   },
 ]);
 
+function defaultVisualAssetCalibration(): VisualAssetCalibration {
+  return {
+    origin: "scene-anchor",
+    unitScaleMeters: 1,
+    upAxis: "y-up",
+    verified: false,
+  };
+}
+
 function validateVisualAsset(asset: VisualAssetManifestItem) {
   if (!/^[a-z0-9_-]+$/i.test(asset.id)) {
     throw new Error("Visual asset id must be stable and URL-safe");
@@ -111,6 +153,10 @@ function validateVisualAsset(asset: VisualAssetManifestItem) {
 
   if (asset.collisionMode !== "none") {
     throw new Error("Imported 3D assets are visual-only and cannot drive collision");
+  }
+
+  if (asset.calibration.unitScaleMeters <= 0) {
+    throw new Error("Visual asset unit scale must be positive");
   }
 
   if (asset.scale <= 0 || !Number.isFinite(asset.scale)) {

@@ -19,6 +19,18 @@ describe("bioCityDemoScene", () => {
       "bus-stop-shelter",
     ]);
     expect(roundTripped.visualAssets[0]).toMatchObject({
+      calibration: {
+        accuracyMeters: 0.5,
+        origin: "scene-anchor",
+        simulationProxy: {
+          entityId: "downtown-walkable",
+          kind: "area",
+          role: "alignment-only",
+        },
+        unitScaleMeters: 1,
+        upAxis: "y-up",
+        verified: true,
+      },
       collisionMode: "none",
       originalSourceFormat: "sketchup",
       sourceUrl: "/assets/biocity/rain-market-streetscape.glb",

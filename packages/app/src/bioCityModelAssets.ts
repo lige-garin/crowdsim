@@ -17,6 +17,20 @@ export type BioCityAssetLoadingReport = {
   uniqueSourceCount: number;
 };
 
+export type BioCityAssetWorldTransform = {
+  position: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  rotation: {
+    x: number;
+    y: number;
+    z: number;
+  };
+  scale: number;
+};
+
 const gltfSceneCache = new Map<string, Promise<Object3D | undefined>>();
 
 export function createBioCityAssetLoadPlan(
@@ -48,6 +62,25 @@ export function summarizeBioCityAssetLoading(
   };
 }
 
+export function createBioCityAssetWorldTransform(
+  asset: BioCityRenderAssetPlacement,
+  scene: CrowdSimScene,
+): BioCityAssetWorldTransform {
+  return {
+    position: {
+      x: asset.anchor.x - scene.world.width / 2,
+      y: scene.world.height / 2 - asset.anchor.y,
+      z: asset.anchor.z,
+    },
+    rotation: {
+      x: asset.calibration.upAxis === "y-up" ? Math.PI / 2 : 0,
+      y: 0,
+      z: (asset.rotationDegrees * Math.PI) / 180,
+    },
+    scale: asset.scale * asset.calibration.unitScaleMeters,
+  };
+}
+
 export async function loadBioCityVisualAssetObject(
   asset: BioCityRenderAssetPlacement,
   scene: CrowdSimScene,
@@ -65,15 +98,12 @@ export async function loadBioCityVisualAssetObject(
   }
 
   const object = cachedScene.clone(true);
+  const transform = createBioCityAssetWorldTransform(asset, scene);
 
   object.name = `${asset.id}-model`;
-  object.position.set(
-    asset.anchor.x - scene.world.width / 2,
-    scene.world.height / 2 - asset.anchor.y,
-    asset.anchor.z,
-  );
-  object.rotation.z = (asset.rotationDegrees * Math.PI) / 180;
-  object.scale.setScalar(asset.scale);
+  object.position.set(transform.position.x, transform.position.y, transform.position.z);
+  object.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+  object.scale.setScalar(transform.scale);
 
   return object;
 }

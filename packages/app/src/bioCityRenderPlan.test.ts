@@ -18,6 +18,14 @@ describe("bioCityRenderPlan", () => {
     expect(plan.assets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
+          calibration: expect.objectContaining({
+            simulationProxy: expect.objectContaining({
+              entityId: "downtown-walkable",
+              kind: "area",
+            }),
+            unitScaleMeters: 1,
+            verified: true,
+          }),
           id: "asset-rain-market-streetscape",
           kind: "gltf-scene",
           sourceUrl: "/assets/biocity/rain-market-streetscape.glb",

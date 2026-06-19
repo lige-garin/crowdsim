@@ -135,6 +135,30 @@ const basemapSchema = z.object({
   heightMeters: z.number().positive().optional(),
 });
 
+const visualAssetCalibrationSchema = z
+  .object({
+    accuracyMeters: z.number().nonnegative().optional(),
+    origin: z
+      .enum(["base-center", "scene-anchor", "source-origin"])
+      .default("scene-anchor"),
+    simulationProxy: z
+      .object({
+        entityId: idSchema,
+        kind: z.enum(["area", "building", "obstacle", "road", "transitStop"]),
+        role: z.enum(["alignment-only", "footprint-source"]).default("alignment-only"),
+      })
+      .optional(),
+    unitScaleMeters: z.number().positive().default(1),
+    upAxis: z.enum(["y-up", "z-up"]).default("y-up"),
+    verified: z.boolean().default(false),
+  })
+  .default({
+    origin: "scene-anchor",
+    unitScaleMeters: 1,
+    upAxis: "y-up",
+    verified: false,
+  });
+
 const visualAssetSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
@@ -166,6 +190,7 @@ const visualAssetSchema = z.object({
   scale: z.number().positive().default(1),
   visible: z.boolean().default(true),
   collisionMode: z.literal("none").default("none"),
+  calibration: visualAssetCalibrationSchema,
   lod: z.enum(["high", "low", "medium"]).default("medium"),
   attribution: z.string().min(1).optional(),
   customParameters: customParametersSchema,

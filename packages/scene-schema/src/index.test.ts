@@ -283,6 +283,16 @@ describe("sceneSchema", () => {
           sourceUrl: "/assets/biocity/street-canyon.glb",
           originalSourceFormat: "sketchup",
           anchor: { x: 40, y: 24 },
+          calibration: {
+            accuracyMeters: 0.35,
+            simulationProxy: {
+              entityId: "walkable-floor",
+              kind: "area",
+            },
+            unitScaleMeters: 0.0254,
+            upAxis: "z-up",
+            verified: true,
+          },
           rotationDegrees: 12,
           scale: 0.8,
           attribution: "Converted from stakeholder SketchUp massing model",
@@ -299,11 +309,29 @@ describe("sceneSchema", () => {
     expect(scene.visualAssets[0]).toMatchObject({
       collisionMode: "none",
       id: "sketchup-street-canyon",
+      calibration: {
+        accuracyMeters: 0.35,
+        origin: "scene-anchor",
+        simulationProxy: {
+          entityId: "walkable-floor",
+          kind: "area",
+          role: "alignment-only",
+        },
+        unitScaleMeters: 0.0254,
+        upAxis: "z-up",
+        verified: true,
+      },
       lod: "medium",
       originalSourceFormat: "sketchup",
       visible: true,
     });
     expect(scene.visualAssets[0].anchor.z).toBe(0);
+    expect(scene.visualAssets[1].calibration).toMatchObject({
+      origin: "scene-anchor",
+      unitScaleMeters: 1,
+      upAxis: "y-up",
+      verified: false,
+    });
     expect(scene.visualAssets[1].scale).toBe(1);
   });
 

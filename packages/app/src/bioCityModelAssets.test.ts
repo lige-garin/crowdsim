@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import {
   createBioCityAssetLoadPlans,
+  createBioCityAssetWorldTransform,
   summarizeBioCityAssetLoading,
 } from "./bioCityModelAssets";
 import { createBioCityRenderPlan } from "./bioCityRenderPlan";
@@ -34,6 +35,12 @@ describe("bioCityModelAssets", () => {
         visualAssets: [
           {
             anchor: { x: 80, y: 48, z: 0 },
+            calibration: {
+              origin: "scene-anchor",
+              unitScaleMeters: 1,
+              upAxis: "y-up",
+              verified: false,
+            },
             collisionMode: "none",
             id: "city-tiles",
             kind: "tileset",
@@ -79,6 +86,34 @@ describe("bioCityModelAssets", () => {
       gltfCount: 3,
       tilesetCount: 0,
       uniqueSourceCount: 2,
+    });
+  });
+
+  it("applies visual asset calibration to world transforms", () => {
+    const renderPlan = createBioCityRenderPlan(
+      {
+        ...bioCityDemoScene,
+        visualAssets: [
+          {
+            ...bioCityDemoScene.visualAssets[0],
+            calibration: {
+              ...bioCityDemoScene.visualAssets[0].calibration,
+              unitScaleMeters: 0.5,
+              upAxis: "z-up",
+            },
+            scale: 2,
+          },
+        ],
+      },
+      0,
+    );
+
+    expect(
+      createBioCityAssetWorldTransform(renderPlan.assets[0], bioCityDemoScene),
+    ).toEqual({
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: 1,
     });
   });
 });

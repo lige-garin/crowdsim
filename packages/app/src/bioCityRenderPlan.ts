@@ -56,6 +56,13 @@ export type BioCityRenderAssetPlacement = {
     y: number;
     z: number;
   };
+  calibration: {
+    origin: CrowdSimScene["visualAssets"][number]["calibration"]["origin"];
+    simulationProxy?: CrowdSimScene["visualAssets"][number]["calibration"]["simulationProxy"];
+    unitScaleMeters: number;
+    upAxis: CrowdSimScene["visualAssets"][number]["calibration"]["upAxis"];
+    verified: boolean;
+  };
   id: string;
   kind: CrowdSimScene["visualAssets"][number]["kind"];
   rotationDegrees: number;
@@ -125,6 +132,15 @@ export function createBioCityRenderPlan(
       .filter((asset) => asset.visible)
       .map((asset) => ({
         anchor: { ...asset.anchor },
+        calibration: {
+          origin: asset.calibration.origin,
+          simulationProxy: asset.calibration.simulationProxy
+            ? { ...asset.calibration.simulationProxy }
+            : undefined,
+          unitScaleMeters: asset.calibration.unitScaleMeters,
+          upAxis: asset.calibration.upAxis,
+          verified: asset.calibration.verified,
+        },
         id: `asset-${asset.id}`,
         kind: asset.kind,
         rotationDegrees: asset.rotationDegrees,

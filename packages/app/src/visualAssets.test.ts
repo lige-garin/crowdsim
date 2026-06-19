@@ -29,6 +29,12 @@ describe("visual asset manifest", () => {
       "rain-market-streetscape",
       "bus-stop-shelter",
     ]);
+    expect(manifest.assets[0].calibration).toMatchObject({
+      origin: "scene-anchor",
+      unitScaleMeters: 1,
+      upAxis: "y-up",
+      verified: true,
+    });
     expect(manifest.assets.every((asset) => asset.collisionMode === "none")).toBe(true);
   });
 
@@ -46,6 +52,12 @@ describe("visual asset manifest", () => {
       createVisualAssetManifest([
         {
           anchor: { x: 0, y: 0, z: 0 },
+          calibration: {
+            origin: "scene-anchor",
+            unitScaleMeters: 1,
+            upAxis: "y-up",
+            verified: false,
+          },
           collisionMode: "none",
           id: "remote-asset",
           kind: "gltf-prop",
@@ -58,6 +70,12 @@ describe("visual asset manifest", () => {
       createVisualAssetManifest([
         {
           anchor: { x: 0, y: 0, z: 0 },
+          calibration: {
+            origin: "scene-anchor",
+            unitScaleMeters: 1,
+            upAxis: "y-up",
+            verified: false,
+          },
           collisionMode: "none",
           id: "secret-asset",
           kind: "gltf-prop",
