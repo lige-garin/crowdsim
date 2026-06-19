@@ -4,6 +4,7 @@ import { curvePointsToSvg } from "./appUi";
 import { AiWorkflowPanel } from "./AiWorkflowPanel";
 import { BioCityAnalyticsAcceptancePanel } from "./BioCityAnalyticsAcceptancePanel";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import { BioCityFinalUiAcceptancePanel } from "./BioCityFinalUiAcceptancePanel";
 import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
 import { BioCityWorkspaceAcceptancePanel } from "./BioCityWorkspaceAcceptancePanel";
 import { BioCityWorkspacePackagePanel } from "./BioCityWorkspacePackagePanel";
@@ -173,6 +174,7 @@ export function AppInspector({
           recording={trajectoryRecording}
           scene={scene}
         />
+        <BioCityFinalUiAcceptancePanel />
         <TrajectoryReplayPanel recording={trajectoryRecording} />
       </InspectorGroup>
       <InspectorGroup

@@ -23,6 +23,7 @@ import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
+import { bioCityStudioTitle, bioCityTopbarMetricLabels } from "./bioCityUiContract";
 
 export function App() {
   return (
@@ -362,7 +363,6 @@ function AppContent() {
   });
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
-  const bioCityTitle = "CrowdSim BioCity Studio";
   const satisfactionScore = Math.max(
     72,
     Math.min(98, 94 - densityPeak * 2 - (evacuation.active ? 8 : 0)),
@@ -370,6 +370,29 @@ function AppContent() {
   const commercialForecast = Math.round(
     96 + dashboardV2Stats.brandAttractionPercent * 0.8 + densityPeak * 1.7,
   );
+  const bioCityTopbarMetrics = [
+    {
+      label: bioCityTopbarMetricLabels[0],
+      state: simulation.snapshot.status,
+      value: runState,
+    },
+    {
+      label: bioCityTopbarMetricLabels[1],
+      value: `${Math.floor(simulation.snapshot.elapsedSeconds)}s`,
+    },
+    { label: bioCityTopbarMetricLabels[2], value: "Rain / wind" },
+    {
+      label: bioCityTopbarMetricLabels[3],
+      value: simulation.snapshot.agentCount.toLocaleString(),
+    },
+    {
+      label: bioCityTopbarMetricLabels[4],
+      value: simulation.snapshot.spawnedCount.toLocaleString(),
+    },
+    { label: bioCityTopbarMetricLabels[5], value: `CNY ${commercialForecast}k` },
+    { label: bioCityTopbarMetricLabels[6], value: `${satisfactionScore}%` },
+    { label: bioCityTopbarMetricLabels[7], value: "WASM + SAB" },
+  ] as const;
 
   function enterLab(nextViewMode: StageViewMode = viewMode) {
     setViewMode(nextViewMode);
@@ -400,10 +423,10 @@ function AppContent() {
         {language === "zh" ? "跳到主内容" : "Skip to main content"}
       </a>
       <main id="main-content" className="workspace">
-        <header className="command-bar biocity-topbar" aria-label={bioCityTitle}>
+        <header className="command-bar biocity-topbar" aria-label={bioCityStudioTitle}>
           <div className="command-brand">
             <span>BioCity</span>
-            <strong>{bioCityTitle}</strong>
+            <strong>{bioCityStudioTitle}</strong>
             <select className="biocity-project-select" aria-label="BioCity project">
               <option>{demoScene.name}</option>
             </select>
@@ -419,38 +442,14 @@ function AppContent() {
             className="command-status biocity-ops-status"
             aria-label="BioCity operating status"
           >
-            <article>
-              <span>Simulation</span>
-              <strong data-state={simulation.snapshot.status}>{runState}</strong>
-            </article>
-            <article>
-              <span>Time</span>
-              <strong>{Math.floor(simulation.snapshot.elapsedSeconds)}s</strong>
-            </article>
-            <article>
-              <span>Weather</span>
-              <strong>Rain / wind</strong>
-            </article>
-            <article>
-              <span>Footfall</span>
-              <strong>{simulation.snapshot.agentCount.toLocaleString()}</strong>
-            </article>
-            <article>
-              <span>Online</span>
-              <strong>{simulation.snapshot.spawnedCount.toLocaleString()}</strong>
-            </article>
-            <article>
-              <span>Sales</span>
-              <strong>CNY {commercialForecast}k</strong>
-            </article>
-            <article>
-              <span>Satisfaction</span>
-              <strong>{satisfactionScore}%</strong>
-            </article>
-            <article>
-              <span>Kernel</span>
-              <strong>WASM + SAB</strong>
-            </article>
+            {bioCityTopbarMetrics.map((metric) => (
+              <article key={metric.label}>
+                <span>{metric.label}</span>
+                <strong data-state={"state" in metric ? metric.state : undefined}>
+                  {metric.value}
+                </strong>
+              </article>
+            ))}
           </div>
           <div className="command-status" aria-label={t("systemSignals")}>
             <article>

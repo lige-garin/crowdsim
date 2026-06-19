@@ -2,6 +2,7 @@ import type { Language, TranslationKey } from "./i18n";
 import { heatmapWindows, milestones } from "./appUi";
 import type { ReactNode } from "react";
 import type { SimulationStatus } from "./simulationEngine";
+import { bioCityPlanningToolGroups } from "./bioCityUiContract";
 
 type AppSidebarProps = {
   agentCount: number;
@@ -21,45 +22,6 @@ type AppSidebarProps = {
   t: (key: TranslationKey) => string;
   timeScale: number;
 };
-
-const planningToolGroups = [
-  {
-    title: "Planning tools",
-    tools: [
-      ["Roads", "RD"],
-      ["Terrain", "TR"],
-      ["Districts", "DT"],
-      ["Buildings", "BL"],
-    ],
-  },
-  {
-    title: "People & transit",
-    tools: [
-      ["Agents", "AG"],
-      ["Flows", "FL"],
-      ["Transit", "BU"],
-      ["Parking", "PK"],
-    ],
-  },
-  {
-    title: "Analysis tools",
-    tools: [
-      ["Heatmap", "HM"],
-      ["Sight", "VI"],
-      ["Wind", "WD"],
-      ["Commerce", "$"],
-    ],
-  },
-  {
-    title: "Amenities",
-    tools: [
-      ["Facilities", "PO"],
-      ["Landscape", "LS"],
-      ["Lighting", "LG"],
-      ["Hazards", "R!"],
-    ],
-  },
-] as const;
 
 export function AppSidebar({
   agentCount,
@@ -117,7 +79,7 @@ export function AppSidebar({
         </div>
       </div>
       <section className="biocity-toolbox" aria-label="BioCity planning toolbox">
-        {planningToolGroups.map((group) => (
+        {bioCityPlanningToolGroups.map((group) => (
           <div className="biocity-tool-group" key={group.title}>
             <h2>{group.title}</h2>
             <div className="biocity-tool-grid">
