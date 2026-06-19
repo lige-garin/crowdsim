@@ -12,6 +12,9 @@ import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { AiWorkflowPanel } from "./AiWorkflowPanel";
+import { ImageGeometryPanel } from "./ImageGeometryPanel";
+import { TilesBackdropPanel } from "./TilesBackdropPanel";
+import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 
 export type PanelDockContext = {
   trajectoryRecording: TrajectoryRecording;
@@ -92,6 +95,24 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "AI 工作流",
     labelEn: "AI workflow",
     render: () => <AiWorkflowPanel />,
+  },
+  {
+    id: "image-geometry",
+    labelZh: "影像几何",
+    labelEn: "Image geometry",
+    render: () => <ImageGeometryPanel />,
+  },
+  {
+    id: "tiles-backdrop",
+    labelZh: "瓦片底图",
+    labelEn: "Tiles backdrop",
+    render: () => <TilesBackdropPanel />,
+  },
+  {
+    id: "trajectory-replay",
+    labelZh: "轨迹回放",
+    labelEn: "Trajectory replay",
+    render: (ctx) => <TrajectoryReplayPanel recording={ctx.trajectoryRecording} />,
   },
 ];
 
