@@ -27,7 +27,7 @@ describe("dashboard v2 stats", () => {
     expect(stats.crossSectionFlowPerMinute).toBe(24);
     expect(stats.trajectoryReplay.zh).toBe("1@10.3,4.5 | 2@12.0,8.8");
     expect(stats.trajectoryReplay.en).toBe("1@10.3,4.5 | 2@12.0,8.8");
-    expect(stats.summary.zh).toContain("进店率 50%");
-    expect(stats.summary.en).toContain("Shop entry 50%");
+    expect(stats.summary.zh).toContain("选店概率 50%");
+    expect(stats.summary.en).toContain("Store-choice 50%");
   });
 });

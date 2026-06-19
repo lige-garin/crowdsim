@@ -83,7 +83,7 @@ export function AppInspector({
           value={String(dashboardStats.densityPeak)}
         />
         <Metric
-          label={language === "zh" ? "进店率" : "Entry rate"}
+          label={language === "zh" ? "选店概率" : "Store-choice"}
           value={`${dashboardV2Stats.shopEntryRatePercent}%`}
         />
       </section>

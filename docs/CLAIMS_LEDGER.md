@@ -19,3 +19,9 @@ produced · FAKE-GREEN = self-referential test that cannot fail.
 | Fixed-step seeded determinism | REAL | mulberry32 seeded loop (simulationEngine.ts) | Keep |
 | ~72% panels reachable | FABRICATED (as "done") | ~8/29 mounted; rest orphaned | Tracked in PANEL_STATUS.md; made real in SP-5 |
 | uiProductizationAudit / *Acceptance "complete 100%" | FAKE-GREEN | Assert hardcoded 100%/no-blockers literals | Removed in Task 6 |
+
+## SP-5b honesty fixes (in progress)
+
+| Item | Was | Now |
+|---|---|---|
+| Inspector "进店率 / Entry rate" metric | The shop-decision probe's softmax store-choice probability mislabeled as a measured live entry rate (showed ~50% even at 0 agents) | Relabeled "选店概率 / Store-choice" in `AppInspector.tsx` + `dashboardV2Stats` summary; field comment clarifies it is a model probability, not a measured rate. The live loop has no shop-entry events to measure. |

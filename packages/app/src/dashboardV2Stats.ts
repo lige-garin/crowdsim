@@ -32,6 +32,9 @@ export function createDashboardV2Stats(options: {
       Math.round(sample.agentCount * 0.22 - options.queueThroughput * 0.02),
     ),
   }));
+  // NOTE (SP-5b honesty): this is the shop-decision model's softmax
+  // store-choice probability (from the probe), NOT a measured live entry rate —
+  // the live loop has no shop-entry events. Surfaced as "选店概率 / Store-choice".
   const shopEntryRatePercent = parseSoftmaxProbability(options.shopDecisionSummary);
   const crossSectionFlowPerMinute = calculateFlowPerMinute(options.samples);
   const trajectoryReplay = createTrajectoryReplay(options.heatmapSamples);
@@ -48,14 +51,14 @@ export function createDashboardV2Stats(options: {
     shopEntryRatePercent,
     summary: {
       zh: [
-        `进店率 ${shopEntryRatePercent}%`,
+        `选店概率 ${shopEntryRatePercent}%`,
         `队列峰值 ${queuePeak}`,
         `流量 ${crossSectionFlowPerMinute}/min`,
         `品牌 ${brandChoice} ${brandAttractionPercent}%`,
         `轨迹 ${trackCount}`,
       ].join(" | "),
       en: [
-        `Shop entry ${shopEntryRatePercent}%`,
+        `Store-choice ${shopEntryRatePercent}%`,
         `Queue peak ${queuePeak}`,
         `Flow ${crossSectionFlowPerMinute}/min`,
         `Brand ${brandChoice} ${brandAttractionPercent}%`,
