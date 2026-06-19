@@ -458,6 +458,8 @@ h3 {
 }
 
 .render-agent-overlay {
+  /* Legacy 2D dot layer — replaced by the real 3D instanced crowd (SP-2). */
+  display: none;
   position: absolute;
   inset: 0;
   pointer-events: none;

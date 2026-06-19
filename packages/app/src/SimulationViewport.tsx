@@ -1,14 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  AmbientLight,
   BoxGeometry,
   Color,
   CylinderGeometry,
+  DirectionalLight,
   DynamicDrawUsage,
   Group,
+  HemisphereLight,
   InstancedMesh,
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Object3D,
   OrthographicCamera,
   PlaneGeometry,
@@ -114,9 +118,14 @@ export function SimulationViewport({
       viewMode === "3d"
         ? new BoxGeometry(0.7, 0.7, 1.8)
         : new PlaneGeometry(1.4, 1.4);
-    const agentMaterial = new MeshBasicMaterial({
-      color: viewMode === "3d" ? "#14759f" : "#118672",
-    });
+    const agentMaterial =
+      viewMode === "3d"
+        ? new MeshStandardMaterial({
+            color: "#3aa6d6",
+            roughness: 0.55,
+            metalness: 0.05,
+          })
+        : new MeshBasicMaterial({ color: "#118672" });
     const agents = new InstancedMesh(
       agentGeometry,
       agentMaterial,
@@ -183,6 +192,17 @@ export function SimulationViewport({
     scene.add(agents);
     walls.forEach((wall) => scene.add(wall));
     bioCityObjects.forEach((object) => scene.add(object));
+
+    // Lighting so the 3d agents (MeshStandardMaterial) read as shaded figures
+    // with depth instead of flat blocks. Strong ambient/hemisphere keeps
+    // nothing from going black; the key light gives faces directionality.
+    if (viewMode === "3d") {
+      const hemisphereLight = new HemisphereLight("#cfe0ee", "#16242e", 1.1);
+      const keyLight = new DirectionalLight("#ffffff", 1.35);
+      keyLight.position.set(worldWidth * 0.3, -worldHeight * 0.35, worldHeight);
+      const fillLight = new AmbientLight("#ffffff", 0.4);
+      scene.add(hemisphereLight, keyLight, fillLight);
+    }
     if (bioCityPlan) {
       scene.background = new Color(
         bioCityPlan.weather.fogDensity > 0
