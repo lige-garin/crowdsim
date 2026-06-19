@@ -529,7 +529,16 @@ function AppContent() {
           trajectoryRecording={trajectoryRecording}
           webGpuProbe={probes.webGpuProbe}
         />
-        <PanelDock language={language} context={{ trajectoryRecording }} />
+        <PanelDock
+          language={language}
+          context={{
+            trajectoryRecording,
+            brandInsight:
+              probes.shopDecisionProbe.status === "ready"
+                ? probes.shopDecisionProbe.brandInsight
+                : undefined,
+          }}
+        />
       </main>
     </>
   );

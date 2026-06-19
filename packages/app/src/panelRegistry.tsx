@@ -1,14 +1,17 @@
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "./trajectoryRecording";
+import type { BrandDecisionInsight } from "./brandDecisionProbe";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
+import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
+import { NeuralCorrectionPanel } from "./NeuralCorrectionPanel";
+import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
 
 export type PanelDockContext = {
   trajectoryRecording: TrajectoryRecording;
-  // Refined to the real brand-insight type in SP-5a Task 3.
-  brandInsight?: unknown;
+  brandInsight?: BrandDecisionInsight;
 };
 
 export type PanelRegistryEntry = {
@@ -43,6 +46,24 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "校验报告",
     labelEn: "Validation report",
     render: () => <ValidationReportPanel />,
+  },
+  {
+    id: "brand-intelligence",
+    labelZh: "品牌智能",
+    labelEn: "Brand intelligence",
+    render: (ctx) => <BrandIntelligencePanel insight={ctx.brandInsight} />,
+  },
+  {
+    id: "neural-correction",
+    labelZh: "神经修正",
+    labelEn: "Neural correction",
+    render: () => <NeuralCorrectionPanel />,
+  },
+  {
+    id: "scale-readiness",
+    labelZh: "规模就绪",
+    labelEn: "Scale readiness",
+    render: () => <ScaleReadinessPanel />,
   },
 ];
 
