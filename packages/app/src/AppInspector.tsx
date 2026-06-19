@@ -2,6 +2,7 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { lazy, Suspense, type ReactNode } from "react";
 import { curvePointsToSvg } from "./appUi";
 import { AiWorkflowPanel } from "./AiWorkflowPanel";
+import { BioCityAnalyticsAcceptancePanel } from "./BioCityAnalyticsAcceptancePanel";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
 import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
@@ -159,6 +160,11 @@ export function AppInspector({
       >
         <SimulationCredibilityPanel report={simulationCredibility} />
         <BioCityVisualAcceptancePanel />
+        <BioCityAnalyticsAcceptancePanel
+          elapsedSeconds={elapsedSeconds}
+          heatmapCells={heatmapCells}
+          scene={scene}
+        />
         <TrajectoryReplayPanel recording={trajectoryRecording} />
       </InspectorGroup>
       <InspectorGroup
