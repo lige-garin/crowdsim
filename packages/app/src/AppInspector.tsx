@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { curvePointsToSvg } from "./appUi";
 import { AiWorkflowPanel } from "./AiWorkflowPanel";
+import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
 import type { DashboardStats } from "./dashboardStats";
@@ -143,6 +144,7 @@ export function AppInspector({
         title={sectionLabels.evidence}
       >
         <SimulationCredibilityPanel report={simulationCredibility} />
+        <BioCityVisualAcceptancePanel />
         <TrajectoryReplayPanel recording={trajectoryRecording} />
       </InspectorGroup>
       <InspectorGroup
