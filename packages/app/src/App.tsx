@@ -360,9 +360,16 @@ function AppContent() {
             status: "ready",
           },
   });
-  const labTitle = language === "zh" ? "商业客流运营台" : "Commercial crowd console";
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
+  const bioCityTitle = "CrowdSim BioCity Studio";
+  const satisfactionScore = Math.max(
+    72,
+    Math.min(98, 94 - densityPeak * 2 - (evacuation.active ? 8 : 0)),
+  );
+  const commercialForecast = Math.round(
+    96 + dashboardV2Stats.brandAttractionPercent * 0.8 + densityPeak * 1.7,
+  );
 
   function enterLab(nextViewMode: StageViewMode = viewMode) {
     setViewMode(nextViewMode);
@@ -393,10 +400,13 @@ function AppContent() {
         {language === "zh" ? "跳到主内容" : "Skip to main content"}
       </a>
       <main id="main-content" className="workspace">
-        <header className="command-bar" aria-label={labTitle}>
+        <header className="command-bar biocity-topbar" aria-label={bioCityTitle}>
           <div className="command-brand">
-            <span>CrowdSim</span>
-            <strong>{labTitle}</strong>
+            <span>BioCity</span>
+            <strong>{bioCityTitle}</strong>
+            <select className="biocity-project-select" aria-label="BioCity project">
+              <option>{demoScene.name}</option>
+            </select>
             <button
               type="button"
               className="command-home"
@@ -404,6 +414,43 @@ function AppContent() {
             >
               {language === "zh" ? "首页" : "Home"}
             </button>
+          </div>
+          <div
+            className="command-status biocity-ops-status"
+            aria-label="BioCity operating status"
+          >
+            <article>
+              <span>Simulation</span>
+              <strong data-state={simulation.snapshot.status}>{runState}</strong>
+            </article>
+            <article>
+              <span>Time</span>
+              <strong>{Math.floor(simulation.snapshot.elapsedSeconds)}s</strong>
+            </article>
+            <article>
+              <span>Weather</span>
+              <strong>Rain / wind</strong>
+            </article>
+            <article>
+              <span>Footfall</span>
+              <strong>{simulation.snapshot.agentCount.toLocaleString()}</strong>
+            </article>
+            <article>
+              <span>Online</span>
+              <strong>{simulation.snapshot.spawnedCount.toLocaleString()}</strong>
+            </article>
+            <article>
+              <span>Sales</span>
+              <strong>CNY {commercialForecast}k</strong>
+            </article>
+            <article>
+              <span>Satisfaction</span>
+              <strong>{satisfactionScore}%</strong>
+            </article>
+            <article>
+              <span>Kernel</span>
+              <strong>WASM + SAB</strong>
+            </article>
           </div>
           <div className="command-status" aria-label={t("systemSignals")}>
             <article>

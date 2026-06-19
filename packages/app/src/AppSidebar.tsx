@@ -22,6 +22,45 @@ type AppSidebarProps = {
   timeScale: number;
 };
 
+const planningToolGroups = [
+  {
+    title: "Planning tools",
+    tools: [
+      ["Roads", "RD"],
+      ["Terrain", "TR"],
+      ["Districts", "DT"],
+      ["Buildings", "BL"],
+    ],
+  },
+  {
+    title: "People & transit",
+    tools: [
+      ["Agents", "AG"],
+      ["Flows", "FL"],
+      ["Transit", "BU"],
+      ["Parking", "PK"],
+    ],
+  },
+  {
+    title: "Analysis tools",
+    tools: [
+      ["Heatmap", "HM"],
+      ["Sight", "VI"],
+      ["Wind", "WD"],
+      ["Commerce", "$"],
+    ],
+  },
+  {
+    title: "Amenities",
+    tools: [
+      ["Facilities", "PO"],
+      ["Landscape", "LS"],
+      ["Lighting", "LG"],
+      ["Hazards", "R!"],
+    ],
+  },
+] as const;
+
 export function AppSidebar({
   agentCount,
   exitedCount,
@@ -57,9 +96,9 @@ export function AppSidebar({
 
   return (
     <aside className="sidebar" aria-label={t("milestoneQueue")}>
-      <div>
-        <p className="eyebrow">{t("appName")}</p>
-        <h1>{t("controlRoom")}</h1>
+      <div className="biocity-sidebar-head">
+        <p className="eyebrow">City planning tools</p>
+        <h1>BioCity Studio</h1>
         <div className="language-toggle" aria-label={t("language")}>
           <button
             type="button"
@@ -77,6 +116,21 @@ export function AppSidebar({
           </button>
         </div>
       </div>
+      <section className="biocity-toolbox" aria-label="BioCity planning toolbox">
+        {planningToolGroups.map((group) => (
+          <div className="biocity-tool-group" key={group.title}>
+            <h2>{group.title}</h2>
+            <div className="biocity-tool-grid">
+              {group.tools.map(([label, icon]) => (
+                <button type="button" key={label} title={label}>
+                  <span>{icon}</span>
+                  <strong>{label}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </section>
       <section className="sidebar-summary" aria-label={t("systemSignals")}>
         <article>
           <span>{t("agents")}</span>

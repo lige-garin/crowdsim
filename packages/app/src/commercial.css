@@ -328,6 +328,39 @@ button[aria-pressed="true"],
   background: #f7f9fc;
 }
 
+.biocity-topbar {
+  gap: 14px;
+}
+
+.biocity-topbar > .command-status:not(.biocity-ops-status) {
+  display: none;
+}
+
+.biocity-project-select {
+  width: min(24vw, 260px);
+  min-width: 170px;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  color: #273346;
+  font-size: 0.72rem;
+}
+
+.biocity-ops-status {
+  flex: 1 1 auto;
+  grid-template-columns: repeat(8, minmax(72px, 1fr));
+  min-width: 0;
+}
+
+.biocity-ops-status article {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.biocity-ops-status article strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .sidebar {
   gap: 20px;
   padding: 22px 18px 24px;
@@ -443,6 +476,78 @@ h3 {
   color: #172033;
   font-size: 0.88rem;
   font-weight: 700;
+}
+
+.biocity-sidebar-head {
+  display: grid;
+  gap: 10px;
+}
+
+.biocity-sidebar-head h1 {
+  max-width: 11em;
+}
+
+.biocity-sidebar-head .language-toggle {
+  width: 100%;
+}
+
+.biocity-toolbox {
+  display: grid;
+  gap: 14px;
+}
+
+.biocity-tool-group {
+  display: grid;
+  gap: 8px;
+}
+
+.biocity-tool-group h2 {
+  color: #4c5b6f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.biocity-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.biocity-tool-grid button {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 8px;
+  text-align: left;
+}
+
+.biocity-tool-grid button span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #dbe3ef;
+  border-radius: 7px;
+  background: #f1f5fb;
+  color: #2557d6;
+  font-family: var(--lab-mono);
+  font-size: 0.64rem;
+  font-weight: 860;
+}
+
+.biocity-tool-grid button strong {
+  min-width: 0;
+  color: #273346;
+  font-size: 0.72rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .task-list {
@@ -664,6 +769,61 @@ h3 {
   inset: 12px;
   border-color: rgba(37, 87, 214, 0.08);
   border-radius: 10px;
+}
+
+.biocity-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.78fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid #d7dfeb;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 34px rgba(35, 48, 73, 0.08);
+}
+
+.biocity-layer-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.biocity-layer-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #d7dfeb;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #42526b;
+  font-size: 0.7rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.biocity-layer-toggles input {
+  accent-color: #2557d6;
+}
+
+.biocity-time-rail {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: #5d697b;
+  font-family: var(--lab-mono);
+  font-size: 0.68rem;
+  font-weight: 760;
+}
+
+.biocity-time-rail input {
+  width: 100%;
+  accent-color: #2557d6;
 }
 
 .render-hud {

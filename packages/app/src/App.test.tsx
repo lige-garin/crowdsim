@@ -168,7 +168,10 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 
-    expect(screen.getByRole("heading", { name: "控制台" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity planning toolbox")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
     expect(screen.getByText("T0.1")).toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
     expect(screen.getByText("中庭示例 有效")).toBeInTheDocument();
@@ -190,7 +193,7 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "EN" }));
 
-    expect(screen.getByRole("heading", { name: /control room/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
     expect(screen.getByLabelText(/simulation viewport/i)).toBeInTheDocument();
     const simulationControls = within(screen.getByLabelText("Simulation controls"));
     expect(simulationControls.getByText("Run controls")).toBeInTheDocument();

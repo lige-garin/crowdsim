@@ -109,6 +109,28 @@ export function AppStage({
                 viewMode={viewMode}
               />
             </Suspense>
+            <div className="biocity-timeline" aria-label="BioCity simulation timeline">
+              <div className="biocity-layer-toggles" aria-label="BioCity layers">
+                {["Heatmap", "Flow lines", "Wind", "POI", "Risk"].map((layer) => (
+                  <label key={layer}>
+                    <input type="checkbox" checked readOnly />
+                    <span>{layer}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="biocity-time-rail">
+                <span>05/20 06:00</span>
+                <input
+                  aria-label="Simulation timeline"
+                  max={3600}
+                  min={0}
+                  readOnly
+                  type="range"
+                  value={Math.min(3600, simulationSnapshot.elapsedSeconds)}
+                />
+                <span>{formatSimulationClock(simulationSnapshot.elapsedSeconds)}</span>
+              </div>
+            </div>
             <SceneEditor
               heatmapCells={heatmapCells}
               scene={scene}
