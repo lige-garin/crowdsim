@@ -25,3 +25,6 @@ produced · FAKE-GREEN = self-referential test that cannot fail.
 | Item | Was | Now |
 |---|---|---|
 | Inspector "进店率 / Entry rate" metric | The shop-decision probe's softmax store-choice probability mislabeled as a measured live entry rate (showed ~50% even at 0 agents) | Relabeled "选店概率 / Store-choice" in `AppInspector.tsx` + `dashboardV2Stats` summary; field comment clarifies it is a model probability, not a measured rate. The live loop has no shop-entry events to measure. |
+| Topbar "Sales / Satisfaction" KPIs | Heuristic formulas over constants (`App.tsx`) shown as confident business KPIs | Relabeled "Sales (est.) / Satisfaction (est.)" in `bioCityUiContract.ts`; code comment marks them as estimates (density/brand proxies), not measurements. |
+| ProjectWorkspacePanel | Static `createDemoProjectWorkspace()` shown as if a live product view | Now lists live projects via `backendClient` when one is provided; the no-client fallback is labeled "sample data · no live backend" (SP-5b T3). |
+| "品牌吸引 / Brand pull" % | Reviewed: only rendered in the mounted `BrandIntelligencePanel` (an explicitly analytics panel) and a derived forecast — honest context. The bare headline was in the unmounted (dead) `DashboardV2Panel`. | No change needed. |

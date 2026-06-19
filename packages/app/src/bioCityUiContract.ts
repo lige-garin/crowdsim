@@ -17,8 +17,8 @@ export const bioCityTopbarMetricText = [
   { en: "Weather", zh: "天气" },
   { en: "Footfall", zh: "客流" },
   { en: "Online", zh: "在线" },
-  { en: "Sales", zh: "销售" },
-  { en: "Satisfaction", zh: "满意度" },
+  { en: "Sales (est.)", zh: "销售·估" },
+  { en: "Satisfaction (est.)", zh: "满意度·估" },
   { en: "Kernel", zh: "内核" },
 ] as const;
 

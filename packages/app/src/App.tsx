@@ -364,6 +364,9 @@ function AppContent() {
   });
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
+  // Heuristic estimates, NOT measured (SP-5b honesty): satisfaction is a
+  // density/evacuation proxy; commercialForecast blends brand attraction +
+  // density. Surfaced as "Sales (est.) / Satisfaction (est.)" in the topbar.
   const satisfactionScore = Math.max(
     72,
     Math.min(98, 94 - densityPeak * 2 - (evacuation.active ? 8 : 0)),
