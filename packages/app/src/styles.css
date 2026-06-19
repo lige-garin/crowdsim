@@ -463,6 +463,10 @@ h3 {
   pointer-events: none;
 }
 
+.render-agent-overlay-3d {
+  perspective: 900px;
+}
+
 .render-agent-marker {
   position: absolute;
   display: grid;
@@ -483,6 +487,19 @@ h3 {
   box-shadow: 0 0 0 2px rgba(17, 134, 114, 0.14);
 }
 
+.render-agent-overlay-3d .render-agent-marker {
+  transform: translate(-50%, -72%) rotateX(13deg);
+}
+
+.render-agent-overlay-3d .render-agent-dot {
+  width: 6px;
+  height: 6px;
+  background: #0e7490;
+  box-shadow:
+    0 0 0 2px rgba(14, 116, 144, 0.14),
+    0 8px 14px rgba(4, 16, 28, 0.18);
+}
+
 .render-agent-intent {
   position: absolute;
   bottom: 8px;
@@ -501,6 +518,17 @@ h3 {
   line-height: 1;
   box-shadow: 0 7px 16px rgba(4, 16, 28, 0.2);
   transform: translateY(-2px);
+}
+
+.render-agent-overlay-3d .render-agent-intent {
+  bottom: 10px;
+  min-width: 17px;
+  height: 17px;
+  border-color: rgba(255, 255, 255, 0.92);
+  background: rgba(5, 18, 32, 0.82);
+  box-shadow:
+    0 9px 18px rgba(4, 16, 28, 0.28),
+    0 0 0 3px rgba(14, 165, 233, 0.08);
 }
 
 .render-hud {

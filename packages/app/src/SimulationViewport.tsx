@@ -25,7 +25,7 @@ import {
 } from "./renderBenchmark";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
-  selectAgentIntentOverlay,
+  selectViewportAgentAnnotations,
   selectViewportOverlayAgents,
   type ViewportAgentOverlayFrame,
 } from "./simulationViewportOverlay";
@@ -433,43 +433,52 @@ function ViewportLiveAgentOverlay({
   snapshot?: SimulationSnapshot;
   viewMode: ViewMode;
 }) {
-  const overlayAgents = selectViewportOverlayAgents(snapshot, sharedAgentOverlay);
+  const overlayAgents = scene
+    ? selectViewportAgentAnnotations({
+        scene,
+        sharedAgentOverlay,
+        snapshot,
+        viewMode,
+      })
+    : selectViewportOverlayAgents(snapshot, sharedAgentOverlay).map((agent) => ({
+        depth: 0,
+        icon: "i",
+        id: agent.id,
+        intent: "seekService" as const,
+        label: "Seeking service",
+        leftPercent: 0,
+        topPercent: 0,
+      }));
 
-  if (viewMode !== "2d" || !scene || overlayAgents.length === 0) {
+  if (!scene || overlayAgents.length === 0) {
     return null;
   }
 
   return (
-    <div className="render-agent-overlay" aria-hidden="true">
+    <div
+      className={`render-agent-overlay ${
+        viewMode === "3d" ? "render-agent-overlay-3d" : "render-agent-overlay-2d"
+      }`}
+      aria-hidden="true"
+    >
       {overlayAgents.map((agent) => (
         <span
           key={agent.id}
           className="render-agent-marker"
           style={{
-            left: `${toPercent(agent.x, scene.world.width)}%`,
-            top: `${toPercent(agent.y, scene.world.height)}%`,
+            left: `${agent.leftPercent}%`,
+            top: `${agent.topPercent}%`,
+            zIndex: Math.round(agent.depth * 1000),
           }}
         >
           <span className="render-agent-dot" />
-          <span className="render-agent-intent">
-            {
-              selectAgentIntentOverlay(agent, {
-                seed: scene.seed,
-              }).icon
-            }
+          <span className="render-agent-intent" title={agent.label}>
+            {agent.icon}
           </span>
         </span>
       ))}
     </div>
   );
-}
-
-function toPercent(value: number, max: number) {
-  if (!Number.isFinite(value) || max <= 0) {
-    return 0;
-  }
-
-  return Math.max(0, Math.min(100, (value / max) * 100));
 }
 
 function localizedStatus(key: TranslationKey): RenderStatus {
