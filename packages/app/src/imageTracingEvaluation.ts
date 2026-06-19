@@ -1,3 +1,6 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the "workload reduction %" here is a
+// PROJECTION from hardcoded per-entity minute constants, not a measurement.
+// Real before/after measurement is deferred to SP-5. Label any UI as "estimated".
 import { demoScene } from "./demoScene";
 import {
   calibrateImageScale,

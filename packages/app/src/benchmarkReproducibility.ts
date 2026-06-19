@@ -1,3 +1,7 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the "browser matrix" is a label
+// array and the hash is a browser-independent FNV of deterministic JS output.
+// Running it twice in one process cannot detect real cross-browser divergence.
+// A real Playwright Chromium/WebKit matrix is deferred to SP-5.
 import type { BenchmarkRunResult } from "./benchmarkTypes";
 
 export const reproducibilityBrowserMatrix = [

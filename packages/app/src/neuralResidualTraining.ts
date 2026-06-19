@@ -1,3 +1,8 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this is NOT MLP distillation.
+// Training targets are algebraic functions of the input features and only the
+// output layer is fit — effectively a small fixed-projection linear regression.
+// A genuine trajectory-trained model is deferred to SP-5. Do not describe this
+// as "distillation" or "trained from trajectory ground truth" in user-facing copy.
 import {
   createDefaultNeuralCorrectionModel,
   createNeuralCorrectionFeatures,
