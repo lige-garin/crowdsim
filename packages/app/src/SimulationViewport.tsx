@@ -36,7 +36,15 @@ import {
   type BioCityRenderPrimitive,
   type BioCityWeatherLine,
 } from "./bioCityRenderPlan";
+import {
+  createBioCityViewportOverlayPlan,
+  type BioCityViewportFlowOverlay,
+  type BioCityViewportHeatmapOverlay,
+  type BioCityViewportOverlayPlan,
+  type BioCityViewportRiskOverlay,
+} from "./bioCityViewportOverlayPlan";
 import { loadBioCityVisualAssetObject } from "./bioCityModelAssets";
+import type { HeatmapCell } from "./heatmap";
 
 export type ViewMode = "2d" | "3d";
 
@@ -51,11 +59,13 @@ type RenderStatus =
     };
 
 export function SimulationViewport({
+  heatmapCells = [],
   scene: crowdScene,
   sharedAgentOverlay,
   snapshot,
   viewMode = "2d",
 }: {
+  heatmapCells?: readonly HeatmapCell[];
   scene?: CrowdSimScene;
   sharedAgentOverlay?: ViewportAgentOverlayFrame;
   snapshot?: SimulationSnapshot;
@@ -112,9 +122,15 @@ export function SimulationViewport({
     const bioCityPlan = crowdScene
       ? createBioCityRenderPlan(crowdScene, bioCityVisualSecond)
       : undefined;
+    const bioCityOverlayPlan = crowdScene
+      ? createBioCityViewportOverlayPlan(crowdScene, {
+          elapsedSeconds: bioCityVisualSecond,
+          heatmapCells,
+        })
+      : undefined;
     const bioCityObjects =
       crowdScene && bioCityPlan
-        ? createBioCityObjects(crowdScene, viewMode, bioCityPlan)
+        ? createBioCityObjects(crowdScene, viewMode, bioCityPlan, bioCityOverlayPlan)
         : [];
 
     function createRenderer(device: GPUDevice) {
@@ -378,7 +394,7 @@ export function SimulationViewport({
       });
       loadedBioCityAssets.forEach(disposeRenderObject);
     };
-  }, [bioCityVisualSecond, crowdScene, viewMode]);
+  }, [bioCityVisualSecond, crowdScene, heatmapCells, viewMode]);
 
   return (
     <div
@@ -509,8 +525,10 @@ function createBioCityObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
   plan: BioCityRenderPlan,
+  overlayPlan?: BioCityViewportOverlayPlan,
 ) {
   return [
+    ...createBioCityOverlayObjects(scene, viewMode, overlayPlan),
     ...plan.primitives.map((primitive) =>
       createBioCityPrimitiveMesh(primitive, scene, viewMode),
     ),
@@ -518,6 +536,24 @@ function createBioCityObjects(
       createBioCityAssetPlaceholder(asset, scene, viewMode),
     ),
     ...createBioCityWeatherObjects(scene, viewMode, plan),
+  ];
+}
+
+function createBioCityOverlayObjects(
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+  overlayPlan?: BioCityViewportOverlayPlan,
+) {
+  if (!overlayPlan) {
+    return [];
+  }
+
+  return [
+    ...overlayPlan.heatmap.map((cell) =>
+      createHeatmapOverlayMesh(cell, scene, viewMode),
+    ),
+    ...overlayPlan.flows.map((flow) => createFlowOverlayMesh(flow, scene, viewMode)),
+    ...overlayPlan.risks.map((risk) => createRiskOverlayMesh(risk, scene, viewMode)),
   ];
 }
 
@@ -632,6 +668,76 @@ function createBioCityWeatherObjects(
   fog.position.set(0, 0, 2.2);
 
   return [...rainObjects, ...windObjects, fog];
+}
+
+function createHeatmapOverlayMesh(
+  cell: BioCityViewportHeatmapOverlay,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  const geometry = new PlaneGeometry(cell.width, cell.height);
+  const material = new MeshBasicMaterial({
+    color: cell.color,
+    opacity: viewMode === "3d" ? cell.opacity * 0.72 : cell.opacity,
+    transparent: true,
+  });
+  const mesh = new Mesh(geometry, material);
+
+  mesh.name = cell.id;
+  mesh.position.set(
+    toRenderX(cell.x + cell.width / 2, scene),
+    toRenderY(cell.y + cell.height / 2, scene),
+    viewMode === "3d" ? 0.13 : 0.03,
+  );
+
+  return mesh;
+}
+
+function createFlowOverlayMesh(
+  flow: BioCityViewportFlowOverlay,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  const mesh = createLineLikeMesh(
+    toRenderX(flow.start.x, scene),
+    toRenderY(flow.start.y, scene),
+    toRenderX(flow.end.x, scene),
+    toRenderY(flow.end.y, scene),
+    flow.widthMeters,
+    flow.color,
+    viewMode === "3d" ? 0.14 : 0.07,
+    flow.opacity,
+  );
+
+  mesh.name = flow.id;
+  mesh.position.z += viewMode === "3d" ? 0.15 : 0.03;
+
+  return mesh;
+}
+
+function createRiskOverlayMesh(
+  risk: BioCityViewportRiskOverlay,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  const height = viewMode === "3d" ? 0.16 : 0.06;
+  const mesh = new Mesh(
+    new CylinderGeometry(risk.radiusMeters, risk.radiusMeters, height, 32),
+    new MeshBasicMaterial({
+      color: risk.color,
+      opacity: risk.opacity,
+      transparent: true,
+    }),
+  );
+
+  mesh.name = risk.id;
+  mesh.position.set(
+    toRenderX(risk.position.x, scene),
+    toRenderY(risk.position.y, scene),
+    viewMode === "3d" ? 0.22 : 0.08,
+  );
+
+  return mesh;
 }
 
 function createWeatherLineMesh(

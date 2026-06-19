@@ -102,6 +102,7 @@ export function AppStage({
               }
             >
               <SimulationViewport
+                heatmapCells={heatmapCells}
                 scene={scene}
                 sharedAgentOverlay={sharedAgentOverlay}
                 snapshot={simulationSnapshot}
