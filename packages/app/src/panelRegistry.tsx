@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
+import type { BackendClient } from "./backendClient";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
@@ -19,6 +20,9 @@ import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 export type PanelDockContext = {
   trajectoryRecording: TrajectoryRecording;
   brandInsight?: BrandDecisionInsight;
+  // When provided, project-workspace lists live projects; otherwise it shows
+  // honestly-labeled sample data. Wired by the App once a backend is configured.
+  backendClient?: BackendClient;
 };
 
 export type PanelRegistryEntry = {
@@ -76,7 +80,7 @@ export const panelRegistry: PanelRegistryEntry[] = [
     id: "project-workspace",
     labelZh: "项目空间",
     labelEn: "Project workspace",
-    render: () => <ProjectWorkspacePanel />,
+    render: (ctx) => <ProjectWorkspacePanel client={ctx.backendClient} />,
   },
   {
     id: "collaboration-status",
