@@ -1,5 +1,10 @@
 # CrowdSim Web — 多智能体客流仿真引擎 项目规划书
 
+> **历史档（2026-06-19）**：本文档记录的是初版行人客流仿真方向。产品已转向
+> 都市天际线级城市仿真引擎。当前单一真相源为
+> `docs/superpowers/specs/2026-06-19-city-sim-engine-design.md` 与 `docs/adr/`。
+> §4 优先级与 §5 边界已被 ADR 0001/0003 取代。
+
 > 本文档供 Claude Code 作为开发依据。建议放在仓库根目录，并将「第9节 CLAUDE.md 模板」单独保存为 `CLAUDE.md`。
 
 -----

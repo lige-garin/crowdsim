@@ -1,5 +1,7 @@
 # Product Memory
 
+> 已纳入 `docs/superpowers/specs/2026-06-19-city-sim-engine-design.md`；以该 spec 与 `docs/adr/` 为准。
+
 This file records durable product direction and design intent that should guide
 future CrowdSim work. Treat it as project memory, not as a temporary note.
 

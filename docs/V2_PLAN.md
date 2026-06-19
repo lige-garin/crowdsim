@@ -1,5 +1,7 @@
 # CrowdSim Web — V2 阶段规划书（v1 完成后）
 
+> 已纳入 `docs/superpowers/specs/2026-06-19-city-sim-engine-design.md`；以该 spec 与 `docs/adr/` 为准。
+
 > 前提：PROJECT_PLAN.md 中 M0~M4 全部完成并测试合格。本文档接续其编号，从 M5 开始。
 > v2 的战略目标只有一句话：**从"技术 Demo"变成"别人愿意付费使用的可信工具"。**
 
