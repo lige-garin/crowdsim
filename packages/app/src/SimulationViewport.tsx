@@ -112,8 +112,8 @@ export function SimulationViewport({
 
     const agentGeometry =
       viewMode === "3d"
-        ? new BoxGeometry(0.12, 0.12, 0.45)
-        : new PlaneGeometry(0.18, 0.18);
+        ? new BoxGeometry(0.7, 0.7, 1.8)
+        : new PlaneGeometry(1.4, 1.4);
     const agentMaterial = new MeshBasicMaterial({
       color: viewMode === "3d" ? "#14759f" : "#118672",
     });

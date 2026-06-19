@@ -21,7 +21,9 @@ export function agentWorldPosition(
   return {
     x: agent.x - world.width / 2,
     y: world.height / 2 - agent.y,
-    z: viewMode === "3d" ? 0.23 : 0,
+    // z is the standing centre: half of the ~1.8m agent height so the figure
+    // sits on the z=0 ground plane in 3d; flat on the ground in 2d.
+    z: viewMode === "3d" ? 0.9 : 0,
   };
 }
 

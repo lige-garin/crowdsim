@@ -4,11 +4,11 @@ import { agentWorldPosition, visibleAgentCount } from "./agentInstanceField";
 const world = { width: 160, height: 96 };
 
 describe("agentWorldPosition", () => {
-  it("maps scene centre to world origin", () => {
+  it("maps scene centre to world origin and stands on the ground in 3d", () => {
     expect(agentWorldPosition({ x: 80, y: 48 }, world, "3d")).toEqual({
       x: 0,
       y: 0,
-      z: 0.23,
+      z: 0.9,
     });
   });
 
