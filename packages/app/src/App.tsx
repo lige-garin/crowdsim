@@ -3,6 +3,7 @@ import { AppHome } from "./AppHome";
 import { AppInspector } from "./AppInspector";
 import { AppSidebar } from "./AppSidebar";
 import { AppStage } from "./AppStage";
+import { PanelDock } from "./PanelDock";
 import type { EvacuationState, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
 import { createDashboardStats, type DashboardSample } from "./dashboardStats";
@@ -528,6 +529,7 @@ function AppContent() {
           trajectoryRecording={trajectoryRecording}
           webGpuProbe={probes.webGpuProbe}
         />
+        <PanelDock language={language} context={{ trajectoryRecording }} />
       </main>
     </>
   );
