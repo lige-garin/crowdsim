@@ -8,12 +8,20 @@ by nothing.
 SimulationViewport, ContactNetworkView, SceneEditor (+SceneEditorLayout/
 Controls/ParamPanel), BioCityAnalyticsPanel, AiImageOverlay.
 
-## Orphaned (mount + feed real data in SP-5)
+## Reachable via PanelDock (SP-5a — DONE, all 14 mounted)
+All previously-orphaned panels are now registered in `panelRegistry.tsx` and
+reachable through `PanelDock` (mounted in `App.tsx`), each with a render-smoke
+test (`panelRegistry.*.test.tsx`):
 BrandIntelligencePanel, ScaleReadinessPanel, ScenarioComparisonPanel,
 NeuralCorrectionPanel, ProjectWorkspacePanel, TemplateLibraryPanel,
 TilesBackdropPanel, AiWorkflowPanel, CollaborationStatusPanel,
 ValidationReportPanel, ExperimentSweepPanel, ExperimentSummaryPanel,
 ImageGeometryPanel, TrajectoryReplayPanel.
+
+SP-5a delivered REACHABILITY. Live brand insight + trajectory recording are
+wired through `PanelDockContext`; the other 12 panels are self-contained.
+Deeper real-data/backend/AI integration and turning the SP-0-flagged
+fabricated features into real implementations is SP-5b (not yet done).
 
 ## Dead (referenced by nothing)
 DashboardPanel, DashboardV2Panel, SimulationCredibilityPanel, and the

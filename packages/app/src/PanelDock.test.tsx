@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
+import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { I18nProvider } from "./i18n";
 import { PanelDock } from "./PanelDock";
 import { panelRegistry } from "./panelRegistry";
 import type { PanelDockContext } from "./panelRegistry";
@@ -14,16 +15,25 @@ const ctx = {
   },
 } as unknown as PanelDockContext;
 
+function renderDock() {
+  return render(
+    <I18nProvider>
+      <PanelDock language="en" context={ctx} />
+    </I18nProvider>,
+  );
+}
+
 describe("PanelDock", () => {
   it("renders a panels navigation region", () => {
-    render(<PanelDock language="en" context={ctx} />);
+    const { container } = renderDock();
     expect(
-      screen.getByRole("navigation", { name: /panels/i }),
+      within(container).getByRole("navigation", { name: /panels/i }),
     ).toBeInTheDocument();
   });
 
   it("renders exactly one nav button per registered panel", () => {
-    render(<PanelDock language="en" context={ctx} />);
-    expect(screen.queryAllByRole("button").length).toBe(panelRegistry.length);
+    const { container } = renderDock();
+    const nav = within(container).getByRole("navigation", { name: /panels/i });
+    expect(within(nav).getAllByRole("button").length).toBe(panelRegistry.length);
   });
 });
