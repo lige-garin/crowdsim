@@ -114,7 +114,7 @@ export function SimulationViewport({
       agentMaterial,
       performanceAgentCount,
     );
-    const floor = createFloor(viewMode);
+    const floor = createFloor(crowdScene, viewMode);
     const walls = [
       createWall(-13, 4, 5, 9, 0.32, viewMode),
       createWall(5, -8, 15, -2, 0.32, viewMode),
@@ -156,16 +156,19 @@ export function SimulationViewport({
       });
     }
 
+    const worldWidth = crowdScene?.world.width ?? 80;
+    const worldHeight = crowdScene?.world.height ?? 48;
+
     if (viewMode === "3d") {
       camera.up.set(0, 0, 1);
-      camera.position.set(23, -28, 22);
+      camera.position.set(worldWidth * 0.42, -worldHeight * 0.58, worldHeight * 0.42);
     } else {
       camera.up.set(0, 1, 0);
       camera.position.set(0, 0, 40);
     }
 
     camera.lookAt(0, 0, 0);
-    scene.background = new Color("#fdfbf4");
+    scene.background = new Color("#07131f");
 
     agents.instanceMatrix.setUsage(DynamicDrawUsage);
     scene.add(floor);
@@ -175,10 +178,10 @@ export function SimulationViewport({
     if (bioCityPlan) {
       scene.background = new Color(
         bioCityPlan.weather.fogDensity > 0
-          ? "#dbe4df"
+          ? "#182832"
           : bioCityPlan.weather.precipitationIntensity > 0
-            ? "#e8edf2"
-            : "#fdfbf4",
+            ? "#101f2c"
+            : "#07131f",
       );
     }
     if (crowdScene && bioCityPlan && viewMode === "3d") {
@@ -219,10 +222,11 @@ export function SimulationViewport({
       const aspect = safeWidth / safeHeight;
 
       if (camera instanceof OrthographicCamera) {
-        camera.left = -26 * aspect;
-        camera.right = 26 * aspect;
-        camera.top = 17;
-        camera.bottom = -17;
+        const verticalExtent = (crowdScene?.world.height ?? 48) * 0.62;
+        camera.left = -verticalExtent * aspect;
+        camera.right = verticalExtent * aspect;
+        camera.top = verticalExtent;
+        camera.bottom = -verticalExtent;
       } else {
         camera.aspect = aspect;
       }
@@ -495,10 +499,13 @@ function rawStatus(message: string): RenderStatus {
   };
 }
 
-function createFloor(viewMode: ViewMode) {
-  const geometry = new PlaneGeometry(62, 40);
+function createFloor(scene: CrowdSimScene | undefined, viewMode: ViewMode) {
+  const geometry = new PlaneGeometry(
+    (scene?.world.width ?? 80) * 1.08,
+    (scene?.world.height ?? 48) * 1.08,
+  );
   const material = new MeshBasicMaterial({
-    color: viewMode === "3d" ? "#ecf0e6" : "#fdfbf4",
+    color: viewMode === "3d" ? "#22323a" : "#102232",
   });
   const floor = new Mesh(geometry, material);
 

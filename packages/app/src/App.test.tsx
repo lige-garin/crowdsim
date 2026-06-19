@@ -140,13 +140,18 @@ afterEach(() => {
 });
 
 describe("App", () => {
-  it("starts from a white neural home screen", () => {
+  it("starts from the BioCity studio and can return home", () => {
     render(<App />);
+
+    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "首页" }));
 
     expect(
       screen.getByRole("heading", { name: "CrowdSim Operations" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "商业客流网络预览" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "EN" }));
     fireEvent.click(screen.getByRole("button", { name: "View network" }));
@@ -166,15 +171,13 @@ describe("App", () => {
   it("renders the bilingual control room shell", async () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
-
     expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity planning toolbox")).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
     expect(screen.getByText("T0.1")).toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
-    expect(screen.getByText("中庭示例 有效")).toBeInTheDocument();
+    expect(screen.getByText("BioCity Rainy High Street 有效")).toBeInTheDocument();
     expect(await screen.findByText("42")).toBeInTheDocument();
     expect(await screen.findByText("状态机已验证")).toBeInTheDocument();
     expect(await screen.findByText("DES 队列已验证")).toBeInTheDocument();
@@ -220,9 +223,9 @@ describe("App", () => {
     expect(screen.getByText("Simulation agent limit")).toBeInTheDocument();
     expect(screen.getByText("2,000")).toBeInTheDocument();
     expect(screen.getByText("Credibility loop")).toBeInTheDocument();
-    expect(screen.getByText(/scene=atrium-demo/)).toBeInTheDocument();
+    expect(screen.getByText(/scene=biocity-rainy-high-street/)).toBeInTheDocument();
     expect(screen.getByText(/packedReplay=v1 ready/)).toBeInTheDocument();
-    expect(screen.getByText("Atrium Demo valid")).toBeInTheDocument();
+    expect(screen.getByText("BioCity Rainy High Street valid")).toBeInTheDocument();
     expect(await screen.findByText("Agent state machine verified")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Network" }));
@@ -236,20 +239,18 @@ describe("App", () => {
   it("switches the viewport between 2D and 3D modes", () => {
     render(<App />);
 
-    fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
-
     const twoDimensionalButton = screen.getByRole("button", { name: "2D" });
     const threeDimensionalButton = screen.getByRole("button", { name: "3D" });
 
-    expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "true");
-    expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "false");
-
-    fireEvent.click(threeDimensionalButton);
-
     expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "false");
     expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(twoDimensionalButton);
+
+    expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "true");
+    expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "false");
     expect(
-      within(screen.getByLabelText("视图模式")).getByText("3D 透视"),
+      within(screen.getByLabelText("视图模式")).getByText("2D 平面"),
     ).toBeInTheDocument();
   });
 });

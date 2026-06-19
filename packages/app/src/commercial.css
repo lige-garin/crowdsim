@@ -924,3 +924,300 @@ dd {
     background-position: -120% 0;
   }
 }
+
+/* BioCity final game HUD pass */
+.workspace {
+  grid-template-columns: 214px minmax(760px, 1fr) minmax(300px, 360px);
+  grid-template-rows: 58px minmax(0, 1fr);
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(120, 198, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(120, 198, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(135deg, #06111c 0%, #0a1724 44%, #09131d 100%);
+  background-size:
+    42px 42px,
+    42px 42px,
+    auto;
+  color: #d8e7f6;
+}
+
+.workspace::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 48% 38%, rgba(54, 145, 188, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 22%);
+}
+
+.workspace > * {
+  position: relative;
+  z-index: 1;
+}
+
+.command-bar,
+.biocity-topbar {
+  border-bottom: 1px solid rgba(117, 171, 214, 0.18);
+  background: rgba(4, 14, 24, 0.86);
+  box-shadow: 0 18px 42px rgba(1, 8, 15, 0.34);
+}
+
+.command-brand strong,
+.biocity-sidebar-head h1,
+.stage-toolbar > span,
+.inspector-group h2,
+.probe-panel h3 {
+  color: #f3f8ff;
+}
+
+.command-brand span,
+.home-brand span {
+  color: #62d4ff;
+}
+
+.biocity-project-select,
+.command-home {
+  border-color: rgba(143, 190, 229, 0.22);
+  background: rgba(11, 28, 44, 0.76);
+  color: #e7f4ff;
+}
+
+.biocity-ops-status article,
+.sidebar-summary article,
+.stage-telemetry article,
+.probe-panel,
+.dashboard-panel,
+.dashboard-v2-panel,
+.biocity-analytics-card,
+.template-row,
+.comparison-card,
+.sim-controls,
+.inspector-nav,
+.biocity-timeline {
+  border-color: rgba(126, 176, 215, 0.16);
+  background:
+    linear-gradient(180deg, rgba(20, 39, 57, 0.82), rgba(9, 22, 36, 0.78)),
+    rgba(6, 17, 28, 0.82);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 42px rgba(1, 8, 15, 0.28);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.biocity-ops-status article span,
+.sidebar-summary span,
+.stage-telemetry span,
+.probe-panel p,
+.probe-panel dt,
+.biocity-layer-toggles label,
+.biocity-time-rail,
+.inspector-group-header p,
+.editor-filebar label span,
+.editor-filebar > span,
+.editor-status {
+  color: #9db2c8;
+}
+
+.biocity-ops-status article strong,
+.sidebar-summary strong,
+.stage-telemetry strong,
+.probe-panel code,
+.probe-panel dd,
+.dashboard-summary {
+  color: #f4f8ff;
+}
+
+.sidebar,
+.inspector {
+  overflow: auto;
+  border-color: rgba(117, 171, 214, 0.14);
+  background: rgba(5, 16, 27, 0.78);
+  box-shadow: 16px 0 36px rgba(1, 8, 15, 0.18);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+
+.inspector {
+  box-shadow: -16px 0 36px rgba(1, 8, 15, 0.18);
+}
+
+.biocity-tool-group h2 {
+  color: #8fb6d6;
+}
+
+.biocity-tool-grid button,
+.view-mode-toggle,
+.view-mode-toggle button,
+.control-group button,
+.editor-filebar button,
+.editor-toolbar button,
+.editor-draft-actions button {
+  border-color: rgba(126, 176, 215, 0.18);
+  background: rgba(14, 31, 48, 0.86);
+  color: #dcefff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.biocity-tool-grid button span {
+  border-color: rgba(98, 212, 255, 0.2);
+  background: rgba(54, 145, 188, 0.16);
+  color: #78dbff;
+}
+
+.biocity-tool-grid button strong,
+.task-list li,
+.task-list span,
+.control-group h3,
+.sim-controls-header h2,
+.sim-controls-header span {
+  color: #dcefff;
+}
+
+.task-list li {
+  min-height: 44px;
+  border-color: rgba(126, 176, 215, 0.14);
+  background: rgba(10, 25, 40, 0.72);
+}
+
+.task-list strong {
+  background: rgba(37, 99, 235, 0.18);
+  color: #9bd3ff;
+}
+
+.stage {
+  min-height: 0;
+  padding: 10px 12px 12px;
+}
+
+.stage-stack {
+  position: relative;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: calc(100dvh - 78px);
+  gap: 10px;
+}
+
+.stage-toolbar {
+  min-height: 32px;
+}
+
+.stage-telemetry {
+  position: absolute;
+  top: 58px;
+  left: 18px;
+  z-index: 4;
+  width: min(520px, calc(100% - 36px));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.stage-telemetry article {
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.render-viewport {
+  min-height: 0;
+  height: 100%;
+  aspect-ratio: auto;
+  border-color: rgba(103, 185, 224, 0.18);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(15, 35, 51, 0.34), rgba(7, 18, 29, 0.2)), #07131f;
+  box-shadow:
+    0 24px 70px rgba(1, 8, 15, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.render-viewport::before {
+  inset: 14px;
+  border-color: rgba(120, 219, 255, 0.16);
+}
+
+.render-hud {
+  top: 18px;
+  right: 18px;
+  bottom: auto;
+  left: auto;
+  border-color: rgba(120, 219, 255, 0.18);
+  background: rgba(5, 17, 28, 0.68);
+  color: #bfd5e8;
+  backdrop-filter: blur(14px);
+}
+
+.render-hud strong {
+  color: #78dbff;
+}
+
+.render-agent-dot {
+  background: #f7c948;
+  box-shadow:
+    0 0 0 2px rgba(247, 201, 72, 0.22),
+    0 0 18px rgba(247, 201, 72, 0.3);
+}
+
+.render-agent-intent {
+  border-color: rgba(8, 22, 34, 0.84);
+  background: rgba(250, 252, 255, 0.92);
+  color: #0b1724;
+}
+
+.biocity-timeline {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  z-index: 5;
+  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1fr);
+  border-radius: 14px;
+}
+
+.biocity-layer-toggles label {
+  border-color: rgba(126, 176, 215, 0.16);
+  background: rgba(12, 29, 46, 0.82);
+}
+
+.scene-editor {
+  position: absolute;
+  right: 18px;
+  bottom: 76px;
+  left: 18px;
+  z-index: 4;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(126, 176, 215, 0.16);
+  border-radius: 14px;
+  background: rgba(5, 17, 28, 0.62);
+  box-shadow: 0 18px 42px rgba(1, 8, 15, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.editor-canvas-wrap {
+  max-height: 118px;
+  border-color: rgba(126, 176, 215, 0.16);
+  background:
+    linear-gradient(rgba(120, 219, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 219, 255, 0.08) 1px, transparent 1px),
+    rgba(6, 17, 28, 0.78);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+}
+
+.editor-canvas {
+  max-height: 118px;
+}
+
+.editor-floor {
+  fill: rgba(4, 14, 24, 0.78);
+}
+
+.inspector-nav a {
+  color: #aabfd2;
+}
+
+.inspector-nav a:hover,
+.inspector-nav a:focus-visible {
+  background: rgba(54, 145, 188, 0.16);
+  color: #f4f8ff;
+}

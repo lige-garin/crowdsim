@@ -194,3 +194,96 @@
     border-radius: 10px;
   }
 }
+
+.inspector .dashboard-panel,
+.inspector .dashboard-v2-panel,
+.inspector .probe-panel,
+.inspector .biocity-analytics-card,
+.inspector .template-row,
+.inspector .comparison-card,
+.inspector .workspace-row,
+.inspector .dashboard-metric,
+.inspector .acceptance-row,
+.inspector .replay-frame-row {
+  border-color: rgba(126, 176, 215, 0.16);
+  background:
+    linear-gradient(180deg, rgba(20, 39, 57, 0.86), rgba(8, 21, 34, 0.82)),
+    rgba(6, 17, 28, 0.82);
+  color: #e7f4ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 18px 42px rgba(1, 8, 15, 0.22);
+}
+
+.inspector h2,
+.inspector h3,
+.inspector strong,
+.inspector code,
+.inspector dd {
+  color: #f4f8ff;
+}
+
+.inspector p,
+.inspector span,
+.inspector dt,
+.inspector li {
+  color: #9db2c8;
+}
+
+.inspector svg,
+.inspector canvas {
+  filter: saturate(0.88) brightness(0.86);
+}
+
+.scene-editor {
+  bottom: 76px;
+}
+
+.scene-editor .editor-canvas-wrap,
+.scene-editor .editor-param-panel {
+  display: none;
+}
+
+.scene-editor .editor-filebar,
+.scene-editor .editor-toolbar {
+  align-items: center;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.scene-editor .editor-status {
+  white-space: nowrap;
+}
+
+.inspector .dashboard-chart,
+.inspector .dashboard-v2-chart,
+.inspector .brand-field-map,
+.inspector .evacuation-panel svg,
+.inspector .dashboard-summary,
+.inspector .probe-panel code,
+.inspector .evacuation-panel code,
+.inspector .comparison-card code,
+.inspector .brand-reasons code {
+  border-color: rgba(126, 176, 215, 0.16);
+  background: rgba(7, 18, 30, 0.78);
+  color: #dcefff;
+}
+
+.inspector .dashboard-chart rect:first-child,
+.inspector .dashboard-v2-chart rect:first-child,
+.inspector .evacuation-panel svg rect:first-child {
+  fill: rgba(7, 18, 30, 0.78);
+}
+
+.inspector .dashboard-chart text,
+.inspector .dashboard-v2-chart text,
+.inspector .evacuation-panel svg text {
+  fill: #9db2c8;
+}
+
+.inspector .dashboard-chart line,
+.inspector .dashboard-v2-chart line,
+.inspector .evacuation-panel svg line {
+  stroke: rgba(126, 176, 215, 0.2);
+}

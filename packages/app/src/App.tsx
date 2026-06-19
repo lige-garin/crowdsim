@@ -7,7 +7,7 @@ import type { EvacuationState, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
 import { createDashboardStats, type DashboardSample } from "./dashboardStats";
 import { createDashboardV2Stats } from "./dashboardV2Stats";
-import { demoScene } from "./demoScene";
+import { bioCityDemoScene as demoScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
 import { I18nProvider, useI18n } from "./i18n";
@@ -90,8 +90,8 @@ function AppContent() {
     }),
   );
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
-  const [showHome, setShowHome] = useState(true);
-  const [viewMode, setViewMode] = useState<StageViewMode>("2d");
+  const [showHome, setShowHome] = useState(false);
+  const [viewMode, setViewMode] = useState<StageViewMode>("3d");
   const [evacuation, setEvacuation] = useState<EvacuationState>({
     active: false,
     baselineExited: 0,
