@@ -84,6 +84,14 @@ export function SimulationViewport({
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+  // The worker path (default without WebGPU) keeps snapshot.agents empty and
+  // streams live agent positions through the SharedArrayBuffer overlay instead.
+  // Read the freshest overlay each frame so the instanced crowd has real
+  // coordinates to render.
+  const sharedOverlayRef = useRef(sharedAgentOverlay);
+  useEffect(() => {
+    sharedOverlayRef.current = sharedAgentOverlay;
+  }, [sharedAgentOverlay]);
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [fps, setFps] = useState(0);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
@@ -280,7 +288,11 @@ export function SimulationViewport({
     // first N instances at the real agents, hide any that were visible last
     // frame but no longer are. This replaces the static benchmark grid.
     function updateAgentInstances() {
-      const live = snapshotRef.current?.agents ?? [];
+      const overlayAgents = sharedOverlayRef.current?.agents;
+      const live =
+        overlayAgents && overlayAgents.length > 0
+          ? overlayAgents
+          : (snapshotRef.current?.agents ?? []);
       const visible = visibleAgentCount(live.length, performanceAgentCount);
 
       for (let index = 0; index < visible; index++) {
