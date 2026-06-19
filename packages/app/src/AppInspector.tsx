@@ -5,6 +5,7 @@ import { AiWorkflowPanel } from "./AiWorkflowPanel";
 import { BioCityAnalyticsAcceptancePanel } from "./BioCityAnalyticsAcceptancePanel";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
 import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
+import { BioCityWorkspaceAcceptancePanel } from "./BioCityWorkspaceAcceptancePanel";
 import { BioCityWorkspacePackagePanel } from "./BioCityWorkspacePackagePanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
@@ -164,6 +165,12 @@ export function AppInspector({
         <BioCityAnalyticsAcceptancePanel
           elapsedSeconds={elapsedSeconds}
           heatmapCells={heatmapCells}
+          scene={scene}
+        />
+        <BioCityWorkspaceAcceptancePanel
+          elapsedSeconds={elapsedSeconds}
+          heatmapCells={heatmapCells}
+          recording={trajectoryRecording}
           scene={scene}
         />
         <TrajectoryReplayPanel recording={trajectoryRecording} />
