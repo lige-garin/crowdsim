@@ -45,7 +45,7 @@ export function formatStageViewMode(
   t: (key: TranslationKey) => string,
 ) {
   if (viewMode === "network") {
-    return language === "zh" ? "接触网络" : "Contact network";
+    return language === "zh" ? "关系网络" : "Contact network";
   }
 
   return viewMode === "3d" ? t("view3dPerspective") : t("view2dPlan");

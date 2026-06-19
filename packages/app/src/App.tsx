@@ -10,7 +10,7 @@ import { createDashboardV2Stats } from "./dashboardV2Stats";
 import { bioCityDemoScene as demoScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
-import { I18nProvider, useI18n } from "./i18n";
+import { formatSceneName, I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import {
@@ -23,7 +23,7 @@ import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
-import { bioCityStudioTitle, bioCityTopbarMetricLabels } from "./bioCityUiContract";
+import { bioCityStudioTitle, bioCityTopbarMetricText } from "./bioCityUiContract";
 
 export function App() {
   return (
@@ -370,28 +370,33 @@ function AppContent() {
   const commercialForecast = Math.round(
     96 + dashboardV2Stats.brandAttractionPercent * 0.8 + densityPeak * 1.7,
   );
+  const topbarLabels = bioCityTopbarMetricText.map((item) => item[language]);
   const bioCityTopbarMetrics = [
     {
-      label: bioCityTopbarMetricLabels[0],
+      label: topbarLabels[0],
       state: simulation.snapshot.status,
       value: runState,
     },
     {
-      label: bioCityTopbarMetricLabels[1],
+      label: topbarLabels[1],
       value: `${Math.floor(simulation.snapshot.elapsedSeconds)}s`,
     },
-    { label: bioCityTopbarMetricLabels[2], value: "Rain / wind" },
+    { label: topbarLabels[2], value: language === "zh" ? "雨 / 风" : "Rain / wind" },
     {
-      label: bioCityTopbarMetricLabels[3],
+      label: topbarLabels[3],
       value: simulation.snapshot.agentCount.toLocaleString(),
     },
     {
-      label: bioCityTopbarMetricLabels[4],
+      label: topbarLabels[4],
       value: simulation.snapshot.spawnedCount.toLocaleString(),
     },
-    { label: bioCityTopbarMetricLabels[5], value: `CNY ${commercialForecast}k` },
-    { label: bioCityTopbarMetricLabels[6], value: `${satisfactionScore}%` },
-    { label: bioCityTopbarMetricLabels[7], value: "WASM + SAB" },
+    {
+      label: topbarLabels[5],
+      value:
+        language === "zh" ? `¥${commercialForecast}千` : `CNY ${commercialForecast}k`,
+    },
+    { label: topbarLabels[6], value: `${satisfactionScore}%` },
+    { label: topbarLabels[7], value: "WASM + SAB" },
   ] as const;
 
   function enterLab(nextViewMode: StageViewMode = viewMode) {
@@ -428,7 +433,7 @@ function AppContent() {
             <span>BioCity</span>
             <strong>{bioCityStudioTitle}</strong>
             <select className="biocity-project-select" aria-label="BioCity project">
-              <option>{demoScene.name}</option>
+              <option>{formatSceneName(demoScene, language)}</option>
             </select>
             <button
               type="button"

@@ -13,7 +13,7 @@ import type { StageViewMode } from "./AppTypes";
 import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
-import { bioCityLayerNames } from "./bioCityUiContract";
+import { bioCityLayerText } from "./bioCityUiContract";
 
 const SimulationViewport = lazy(() =>
   import("./SimulationViewport").then((module) => ({
@@ -112,10 +112,10 @@ export function AppStage({
             </Suspense>
             <div className="biocity-timeline" aria-label="BioCity simulation timeline">
               <div className="biocity-layer-toggles" aria-label="BioCity layers">
-                {bioCityLayerNames.map((layer) => (
-                  <label key={layer}>
+                {bioCityLayerText.map((layer) => (
+                  <label key={layer.en}>
                     <input type="checkbox" checked readOnly />
-                    <span>{layer}</span>
+                    <span>{layer[language]}</span>
                   </label>
                 ))}
               </div>

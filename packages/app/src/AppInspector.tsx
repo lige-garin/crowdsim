@@ -14,7 +14,7 @@ import type { FlowFieldProbeResult } from "./flowFieldProbe";
 import type { GpuGridProbeResult } from "./gpuGridProbe";
 import type { HeatmapCell } from "./heatmap";
 import type { HeatmapProbeResult } from "./heatmapProbe";
-import { useI18n } from "./i18n";
+import { formatSceneName, useI18n } from "./i18n";
 import type { SimulationCredibilityReport } from "./simulationCredibility";
 import type { SocialForceProbeResult } from "./socialForceProbe";
 import type { TrajectoryRecording } from "./trajectoryRecording";
@@ -55,7 +55,7 @@ export function AppInspector({
   trajectoryRecording,
   webGpuProbe,
 }: AppInspectorProps) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const activeSignals = signals.slice(0, 4);
   const areaCount = scene.areas.length + scene.roads.length + scene.buildings.length;
 
@@ -65,18 +65,27 @@ export function AppInspector({
       aria-label={t("systemSignals")}
     >
       <header className="biocity-inspector-title">
-        <span>分析看板</span>
-        <strong>{scene.name}</strong>
+        <span>{language === "zh" ? "分析看板" : "Analytics panel"}</span>
+        <strong>{formatSceneName(scene, language)}</strong>
       </header>
 
       <section className="biocity-score-strip" aria-label="BioCity key metrics">
         <Metric
-          label="客流"
+          label={language === "zh" ? "客流" : "Footfall"}
           value={dashboardStats.currentAgentCount.toLocaleString()}
         />
-        <Metric label="离场" value={dashboardStats.exitedCount.toLocaleString()} />
-        <Metric label="密度峰值" value={String(dashboardStats.densityPeak)} />
-        <Metric label="进店率" value={`${dashboardV2Stats.shopEntryRatePercent}%`} />
+        <Metric
+          label={language === "zh" ? "离场" : "Exited"}
+          value={dashboardStats.exitedCount.toLocaleString()}
+        />
+        <Metric
+          label={language === "zh" ? "密度峰值" : "Density peak"}
+          value={String(dashboardStats.densityPeak)}
+        />
+        <Metric
+          label={language === "zh" ? "进店率" : "Entry rate"}
+          value={`${dashboardV2Stats.shopEntryRatePercent}%`}
+        />
       </section>
 
       <BioCityAnalyticsPanel
@@ -87,42 +96,76 @@ export function AppInspector({
 
       <section className="biocity-compact-panel" aria-label="BioCity scene objects">
         <header>
-          <span>场景对象</span>
+          <span>{language === "zh" ? "场景对象" : "Scene objects"}</span>
           <strong>{areaCount}</strong>
         </header>
         <div className="biocity-object-grid">
-          <Metric label="道路" value={String(scene.roads.length)} />
-          <Metric label="建筑" value={String(scene.buildings.length)} />
-          <Metric label="公交站" value={String(scene.transitStops.length)} />
-          <Metric label="风险" value={String(scene.hazards.length)} />
+          <Metric
+            label={language === "zh" ? "道路" : "Roads"}
+            value={String(scene.roads.length)}
+          />
+          <Metric
+            label={language === "zh" ? "建筑" : "Buildings"}
+            value={String(scene.buildings.length)}
+          />
+          <Metric
+            label={language === "zh" ? "公交站" : "Transit"}
+            value={String(scene.transitStops.length)}
+          />
+          <Metric
+            label={language === "zh" ? "风险" : "Risks"}
+            value={String(scene.hazards.length)}
+          />
         </div>
       </section>
 
       <section className="biocity-compact-panel" aria-label="BioCity system status">
         <header>
-          <span>系统状态</span>
-          <strong>{simulationCredibility.status}</strong>
+          <span>{language === "zh" ? "系统状态" : "System status"}</span>
+          <strong>{formatStatus(simulationCredibility.status, language)}</strong>
         </header>
         <div className="biocity-status-list">
-          <Row label="内核" value={webGpuProbe.status} />
           <Row
-            label="队列"
+            label={language === "zh" ? "内核" : "Kernel"}
+            value={formatStatus(webGpuProbe.status, language)}
+          />
+          <Row
+            label={language === "zh" ? "队列" : "Queue"}
             value={
               queueSystemProbe.status === "ready"
                 ? `${queueSystemProbe.throughput}/30s`
-                : queueSystemProbe.status
+                : formatStatus(queueSystemProbe.status, language)
             }
           />
           <Row
-            label="品牌"
+            label={language === "zh" ? "品牌" : "Brand"}
             value={
               shopDecisionProbe.status === "ready"
-                ? (shopDecisionProbe.brandInsight?.selectedBrandName ?? "ready")
-                : shopDecisionProbe.status
+                ? (shopDecisionProbe.brandInsight?.selectedBrandName ??
+                  formatStatus("ready", language))
+                : formatStatus(shopDecisionProbe.status, language)
             }
           />
-          <Row label="回放" value={`${trajectoryRecording.frames.length} frames`} />
-          <Row label="疏散" value={evacuation.active ? "active" : "standby"} />
+          <Row
+            label={language === "zh" ? "回放" : "Replay"}
+            value={
+              language === "zh"
+                ? `${trajectoryRecording.frames.length} 帧`
+                : `${trajectoryRecording.frames.length} frames`
+            }
+          />
+          <Row
+            label={language === "zh" ? "疏散" : "Evacuation"}
+            value={
+              evacuation.active
+                ? language === "zh"
+                  ? "已触发"
+                  : "active"
+                : language === "zh"
+                  ? "待命"
+                  : "standby"
+            }
+          />
         </div>
       </section>
 
@@ -131,8 +174,8 @@ export function AppInspector({
         aria-label="BioCity signal dock"
       >
         <header>
-          <span>工程状态</span>
-          <strong>收起</strong>
+          <span>{language === "zh" ? "工程状态" : "Engineering signals"}</span>
+          <strong>{language === "zh" ? "已收起" : "Collapsed"}</strong>
         </header>
         <div className="biocity-status-list">
           {activeSignals.map((signal) => (
@@ -160,4 +203,24 @@ function Row({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function formatStatus(status: string, language: "en" | "zh") {
+  if (language === "en") {
+    return status;
+  }
+
+  const labels: Record<string, string> = {
+    checking: "检查中",
+    error: "异常",
+    fallback: "兼容模式",
+    limited: "受限",
+    operational: "运行正常",
+    ready: "就绪",
+    standby: "待命",
+    unsupported: "不支持",
+    "warming-up": "预热中",
+  };
+
+  return labels[status] ?? status;
 }

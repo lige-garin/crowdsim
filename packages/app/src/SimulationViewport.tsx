@@ -4,6 +4,7 @@ import {
   Color,
   CylinderGeometry,
   DynamicDrawUsage,
+  Group,
   InstancedMesh,
   Matrix4,
   Mesh,
@@ -27,6 +28,7 @@ import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
   selectViewportOverlayAgents,
+  type ViewportAgentAnnotation,
   type ViewportAgentOverlayFrame,
 } from "./simulationViewportOverlay";
 import {
@@ -413,6 +415,7 @@ export function SimulationViewport({
         snapshot={snapshot}
         viewMode={viewMode}
       />
+      <ViewportCityLabelOverlay scene={crowdScene} viewMode={viewMode} />
       <div className="render-hud" aria-label={t("renderStatus")}>
         <span>{status.type === "localized" ? t(status.key) : status.message}</span>
         <strong>
@@ -453,8 +456,12 @@ function ViewportLiveAgentOverlay({
         leftPercent: 0,
         topPercent: 0,
       }));
+  const agents =
+    scene && overlayAgents.length === 0
+      ? createAmbientAgentAnnotations(scene, viewMode)
+      : overlayAgents;
 
-  if (!scene || overlayAgents.length === 0) {
+  if (!scene || agents.length === 0) {
     return null;
   }
 
@@ -465,7 +472,7 @@ function ViewportLiveAgentOverlay({
       }`}
       aria-hidden="true"
     >
-      {overlayAgents.map((agent) => (
+      {agents.map((agent) => (
         <span
           key={agent.id}
           className="render-agent-marker"
@@ -483,6 +490,186 @@ function ViewportLiveAgentOverlay({
       ))}
     </div>
   );
+}
+
+function ViewportCityLabelOverlay({
+  scene,
+  viewMode,
+}: {
+  scene?: CrowdSimScene;
+  viewMode: ViewMode;
+}) {
+  if (!scene) {
+    return null;
+  }
+
+  const labels = createCityLabels(scene, viewMode);
+
+  if (labels.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="render-city-label-overlay" aria-hidden="true">
+      {labels.map((label) => (
+        <span
+          key={label.id}
+          className={`render-city-label render-city-label-${label.kind}`}
+          style={{
+            left: `${label.leftPercent}%`,
+            top: `${label.topPercent}%`,
+            zIndex: label.zIndex,
+          }}
+        >
+          <strong>{label.title}</strong>
+          <span>{label.value}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function createAmbientAgentAnnotations(
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+): ViewportAgentAnnotation[] {
+  const seeds = scene.roads.flatMap((road) => road.geometry.points);
+  const fallbackSeeds = [
+    { x: scene.world.width * 0.25, y: scene.world.height * 0.55 },
+    { x: scene.world.width * 0.45, y: scene.world.height * 0.5 },
+    { x: scene.world.width * 0.65, y: scene.world.height * 0.58 },
+  ];
+  const points = seeds.length > 0 ? seeds : fallbackSeeds;
+  const intents = [
+    { icon: "$", intent: "browseFashion" as const, label: "Shopping" },
+    { icon: "C", intent: "buyCoffee" as const, label: "Coffee" },
+    { icon: "F", intent: "eatMeal" as const, label: "Dining" },
+    { icon: "Q", intent: "queue" as const, label: "Queueing" },
+    { icon: "M", intent: "meetCompanion" as const, label: "Meeting" },
+    { icon: ">", intent: "goToExit" as const, label: "Going to exit" },
+  ];
+
+  return Array.from({ length: viewMode === "3d" ? 42 : 64 }, (_, index) => {
+    const point = points[index % points.length];
+    const laneOffset = ((index % 7) - 3) * 1.8;
+    const waveOffset = Math.sin(index * 1.7 + scene.seed) * 3.4;
+    const position = projectScenePointToOverlay(
+      {
+        x: clampNumber(
+          point.x + waveOffset + (index % 3) * 5.2,
+          2,
+          scene.world.width - 2,
+        ),
+        y: clampNumber(point.y + laneOffset, 2, scene.world.height - 2),
+      },
+      scene,
+      viewMode,
+    );
+    const intent = intents[index % intents.length];
+
+    return {
+      depth: position.depth,
+      icon: intent.icon,
+      id: -index - 1,
+      intent: intent.intent,
+      label: intent.label,
+      leftPercent: position.leftPercent,
+      topPercent: position.topPercent,
+    };
+  }).sort((left, right) => left.depth - right.depth);
+}
+
+function createCityLabels(scene: CrowdSimScene, viewMode: ViewMode) {
+  const buildingLabels = scene.buildings.slice(0, 4).map((building) => {
+    const bounds = primitiveBounds(building.footprint.points);
+    const position = projectScenePointToOverlay(bounds.center, scene, viewMode);
+
+    return {
+      id: building.id,
+      kind: "building",
+      leftPercent: position.leftPercent,
+      title: building.name ?? building.id,
+      topPercent: position.topPercent - 4,
+      value: `${building.visitorCapacity ?? building.workerCapacity ?? 0}人`,
+      zIndex: 200 + Math.round(position.depth * 100),
+    };
+  });
+  const shopLabels = scene.shops.slice(0, 4).map((shop) => {
+    const position = projectScenePointToOverlay(shop.position, scene, viewMode);
+
+    return {
+      id: shop.id,
+      kind: "shop",
+      leftPercent: position.leftPercent,
+      title: shop.name,
+      topPercent: position.topPercent - 3,
+      value: `${Math.round(shop.attraction * 100)}% 吸引`,
+      zIndex: 240 + Math.round(position.depth * 100),
+    };
+  });
+  const transitLabels = scene.transitStops.slice(0, 3).map((stop) => {
+    const position = projectScenePointToOverlay(stop.position, scene, viewMode);
+
+    return {
+      id: stop.id,
+      kind: "transit",
+      leftPercent: position.leftPercent,
+      title: stop.name ?? stop.id,
+      topPercent: position.topPercent - 2,
+      value: `${stop.capacity}人容量`,
+      zIndex: 260 + Math.round(position.depth * 100),
+    };
+  });
+  const hazardLabels = scene.hazards.slice(0, 2).map((hazard) => {
+    const position = projectScenePointToOverlay(hazard.position, scene, viewMode);
+
+    return {
+      id: hazard.id,
+      kind: "hazard",
+      leftPercent: position.leftPercent,
+      title: hazard.name ?? hazard.id,
+      topPercent: position.topPercent,
+      value: `风险 ${Math.round(hazard.riskScore * 100)}%`,
+      zIndex: 280 + Math.round(position.depth * 100),
+    };
+  });
+
+  return [...buildingLabels, ...shopLabels, ...transitLabels, ...hazardLabels];
+}
+
+function projectScenePointToOverlay(
+  point: ScenePoint,
+  scene: CrowdSimScene,
+  viewMode: ViewMode,
+) {
+  if (viewMode === "2d") {
+    return {
+      depth: clampNumber(point.y / scene.world.height, 0, 1),
+      leftPercent: clampNumber((point.x / scene.world.width) * 100, 4, 96),
+      topPercent: clampNumber((point.y / scene.world.height) * 100, 4, 96),
+    };
+  }
+
+  const normalizedX = point.x / scene.world.width - 0.5;
+  const normalizedY = point.y / scene.world.height - 0.5;
+
+  return {
+    depth: clampNumber(
+      (point.y + point.x * 0.18) / (scene.world.height + scene.world.width * 0.18),
+      0,
+      1,
+    ),
+    leftPercent: clampNumber(50 + normalizedX * 58 + normalizedY * 18, 5, 95),
+    topPercent: clampNumber(54 + normalizedY * 32 - normalizedX * 10, 7, 92),
+  };
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+
+  return Math.max(min, Math.min(max, value));
 }
 
 function localizedStatus(key: TranslationKey): RenderStatus {
@@ -551,6 +738,7 @@ function createBioCityObjects(
     ...plan.assets.map((asset) =>
       createBioCityAssetPlaceholder(asset, scene, viewMode),
     ),
+    ...createBioCitySceneDressingObjects(scene, viewMode),
     ...createBioCityWeatherObjects(scene, viewMode, plan),
   ];
 }
@@ -595,34 +783,69 @@ function createBioCityPrimitiveMesh(
     const bounds = primitiveBounds(primitive.points);
     const height =
       viewMode === "3d" ? Math.max(1, primitive.heightMeters * 0.16) : 0.08;
-    const mesh = new Mesh(
+    const group = new Group();
+    const body = new Mesh(
       new BoxGeometry(bounds.width, bounds.height, height),
       new MeshBasicMaterial({ color: primitive.color }),
     );
-
-    mesh.position.set(
-      toRenderX(bounds.center.x, scene),
-      toRenderY(bounds.center.y, scene),
-      height / 2,
+    const roof = new Mesh(
+      new BoxGeometry(bounds.width * 1.04, bounds.height * 1.04, 0.16),
+      new MeshBasicMaterial({ color: "#d9e4ee" }),
+    );
+    const sign = new Mesh(
+      new BoxGeometry(bounds.width * 0.55, 0.42, 0.36),
+      new MeshBasicMaterial({ color: "#f59e0b" }),
     );
 
-    return mesh;
+    body.position.set(0, 0, height / 2);
+    roof.position.set(0, 0, height + 0.08);
+    sign.position.set(0, -bounds.height / 2 - 0.08, Math.max(0.8, height * 0.54));
+    group.add(body, roof, sign);
+
+    for (let index = 0; index < 4; index++) {
+      const strip = new Mesh(
+        new BoxGeometry(bounds.width * 0.74, 0.06, 0.08),
+        new MeshBasicMaterial({ color: "#a7f3ff" }),
+      );
+      strip.position.set(
+        0,
+        -bounds.height / 2 - 0.09,
+        Math.max(0.52, height * (0.22 + index * 0.16)),
+      );
+      group.add(strip);
+    }
+
+    group.position.set(
+      toRenderX(bounds.center.x, scene),
+      toRenderY(bounds.center.y, scene),
+      0,
+    );
+
+    return group;
   }
 
   if (primitive.kind === "transitStop") {
     const height = viewMode === "3d" ? 1.6 : 0.08;
-    const mesh = new Mesh(
+    const group = new Group();
+    const pole = new Mesh(
       new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, height, 16),
       new MeshBasicMaterial({ color: primitive.color }),
     );
-
-    mesh.position.set(
-      toRenderX(primitive.position.x, scene),
-      toRenderY(primitive.position.y, scene),
-      height / 2,
+    const shelter = new Mesh(
+      new BoxGeometry(primitive.radiusMeters * 2.4, 0.8, height * 0.74),
+      new MeshBasicMaterial({ color: "#22d3ee", opacity: 0.7, transparent: true }),
     );
 
-    return mesh;
+    pole.position.set(0, 0, height / 2);
+    shelter.position.set(0, primitive.radiusMeters * 1.08, height * 0.55);
+    group.add(pole, shelter);
+    group.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      0,
+    );
+
+    return group;
   }
 
   if (primitive.kind === "hazard") {
@@ -644,15 +867,127 @@ function createBioCityPrimitiveMesh(
     return mesh;
   }
 
+  const x1 = toRenderX(primitive.start.x, scene);
+  const y1 = toRenderY(primitive.start.y, scene);
+  const x2 = toRenderX(primitive.end.x, scene);
+  const y2 = toRenderY(primitive.end.y, scene);
+
+  if (primitive.kind === "road") {
+    const group = new Group();
+    group.add(
+      createLineLikeMesh(x1, y1, x2, y2, primitive.widthMeters, "#2d3b40", 0.09),
+    );
+    group.add(
+      createLineLikeMesh(
+        x1,
+        y1,
+        x2,
+        y2,
+        Math.max(0.22, primitive.widthMeters * 0.08),
+        primitive.color,
+        0.16,
+        0.88,
+      ),
+    );
+    group.add(
+      createLineLikeMesh(
+        x1,
+        y1,
+        x2,
+        y2,
+        Math.max(0.12, primitive.widthMeters * 0.04),
+        "#d9f99d",
+        0.18,
+        0.46,
+      ),
+    );
+    return group;
+  }
+
   return createLineLikeMesh(
-    toRenderX(primitive.start.x, scene),
-    toRenderY(primitive.start.y, scene),
-    toRenderX(primitive.end.x, scene),
-    toRenderY(primitive.end.y, scene),
+    x1,
+    y1,
+    x2,
+    y2,
     primitive.widthMeters,
     primitive.color,
-    primitive.kind === "road" && viewMode === "3d" ? 0.08 : 0.12,
+    0.12,
   );
+}
+
+function createBioCitySceneDressingObjects(scene: CrowdSimScene, viewMode: ViewMode) {
+  if (viewMode !== "3d") {
+    return [];
+  }
+
+  const objects: Object3D[] = [];
+  const roadPoints = scene.roads.flatMap((road) => road.geometry.points);
+
+  roadPoints.forEach((point, index) => {
+    if (index % 2 !== 0) {
+      return;
+    }
+
+    objects.push(
+      createTree(toRenderX(point.x + 4, scene), toRenderY(point.y + 5, scene)),
+    );
+    objects.push(
+      createStreetLight(toRenderX(point.x - 5, scene), toRenderY(point.y - 4, scene)),
+    );
+  });
+
+  scene.shops.slice(0, 6).forEach((shop, index) => {
+    const marker = new Mesh(
+      new BoxGeometry(shop.size.width * 0.82, 0.42, 0.72),
+      new MeshBasicMaterial({ color: index % 2 === 0 ? "#f97316" : "#22c55e" }),
+    );
+    marker.position.set(
+      toRenderX(shop.position.x, scene),
+      toRenderY(shop.position.y - shop.size.height / 2 - 0.35, scene),
+      1.24,
+    );
+    objects.push(marker);
+  });
+
+  return objects;
+}
+
+function createTree(x: number, y: number) {
+  const group = new Group();
+  const trunk = new Mesh(
+    new CylinderGeometry(0.18, 0.24, 1.2, 8),
+    new MeshBasicMaterial({ color: "#6b4f2a" }),
+  );
+  const crown = new Mesh(
+    new CylinderGeometry(1.05, 0.74, 1.25, 10),
+    new MeshBasicMaterial({ color: "#3f8f52" }),
+  );
+
+  trunk.position.set(0, 0, 0.6);
+  crown.position.set(0, 0, 1.52);
+  group.add(trunk, crown);
+  group.position.set(x, y, 0);
+
+  return group;
+}
+
+function createStreetLight(x: number, y: number) {
+  const group = new Group();
+  const pole = new Mesh(
+    new CylinderGeometry(0.08, 0.1, 2.4, 8),
+    new MeshBasicMaterial({ color: "#94a3b8" }),
+  );
+  const lamp = new Mesh(
+    new BoxGeometry(0.74, 0.28, 0.18),
+    new MeshBasicMaterial({ color: "#fde68a" }),
+  );
+
+  pole.position.set(0, 0, 1.2);
+  lamp.position.set(0.28, 0, 2.38);
+  group.add(pole, lamp);
+  group.position.set(x, y, 0);
+
+  return group;
 }
 
 function createBioCityWeatherObjects(

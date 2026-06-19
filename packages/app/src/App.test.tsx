@@ -177,7 +177,7 @@ describe("App", () => {
     expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
     expect(screen.getByText("T0.1")).toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
-    expect(screen.getAllByText("BioCity Rainy High Street").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("雨天商业街").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity analytics")).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity scene objects")).toBeInTheDocument();

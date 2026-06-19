@@ -1,8 +1,8 @@
 import type { Language, TranslationKey } from "./i18n";
 import { heatmapWindows, milestones } from "./appUi";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { SimulationStatus } from "./simulationEngine";
-import { bioCityPlanningToolGroups } from "./bioCityUiContract";
+import { bioCityPlanningToolGroupText } from "./bioCityUiContract";
 
 type AppSidebarProps = {
   agentCount: number;
@@ -41,6 +41,7 @@ export function AppSidebar({
   t,
   timeScale,
 }: AppSidebarProps) {
+  const [activePlanningTool, setActivePlanningTool] = useState("Roads");
   const controlLabels =
     language === "zh"
       ? {
@@ -59,7 +60,9 @@ export function AppSidebar({
   return (
     <aside className="sidebar" aria-label={t("milestoneQueue")}>
       <div className="biocity-sidebar-head">
-        <p className="eyebrow">City planning tools</p>
+        <p className="eyebrow">
+          {language === "zh" ? "城市规划工具" : "City planning tools"}
+        </p>
         <h1>BioCity Studio</h1>
         <div className="language-toggle" aria-label={t("language")}>
           <button
@@ -79,14 +82,20 @@ export function AppSidebar({
         </div>
       </div>
       <section className="biocity-toolbox" aria-label="BioCity planning toolbox">
-        {bioCityPlanningToolGroups.map((group) => (
-          <div className="biocity-tool-group" key={group.title}>
-            <h2>{group.title}</h2>
+        {bioCityPlanningToolGroupText.map((group) => (
+          <div className="biocity-tool-group" key={group.title.en}>
+            <h2>{group.title[language]}</h2>
             <div className="biocity-tool-grid">
-              {group.tools.map(([label, icon]) => (
-                <button type="button" key={label} title={label}>
-                  <span>{icon}</span>
-                  <strong>{label}</strong>
+              {group.tools.map((tool) => (
+                <button
+                  type="button"
+                  key={tool.label.en}
+                  aria-pressed={activePlanningTool === tool.label.en}
+                  onClick={() => setActivePlanningTool(tool.label.en)}
+                  title={tool.label[language]}
+                >
+                  <span>{tool.icon}</span>
+                  <strong>{tool.label[language]}</strong>
                 </button>
               ))}
             </div>

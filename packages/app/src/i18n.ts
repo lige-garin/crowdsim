@@ -378,7 +378,9 @@ export function formatEditorTool(tool: string, language: Language) {
 }
 
 function getMessage(language: Language, key: TranslationKey) {
-  return language === "zh" ? (zhOverrides[key] ?? messages[key].zh) : messages[key].en;
+  return language === "zh"
+    ? (cleanZhOverrides[key] ?? zhOverrides[key] ?? messages[key].zh)
+    : messages[key].en;
 }
 
 export function formatSceneName(
@@ -404,6 +406,7 @@ export function formatSceneName(
 
 const zhSceneNames: Record<string, string> = {
   "atrium-demo": "中庭示例",
+  "biocity-rainy-high-street": "雨天商业街",
   "mall-atrium": "商场中庭",
   "metro-station-hall": "地铁站厅",
   "performance-venue": "演出场馆疏散",
@@ -446,6 +449,60 @@ const probeMessageKeys: Record<string, TranslationKey> = {
   Unavailable: "unavailable",
   "WebGPU probe failed": "webgpuProbeFailed",
   "WebGPU unavailable": "webgpuUnavailable",
+};
+
+const cleanZhOverrides: Partial<Record<TranslationKey, string>> = {
+  active: "进行中",
+  agentState: "Agent 状态",
+  agents: "人数",
+  agentsUnit: "行人",
+  aiDraft: "AI 草稿",
+  appName: "CrowdSim Web",
+  benchmarking: "性能测试",
+  building: "建筑",
+  cells: "网格",
+  clear: "清除",
+  dashboard: "看板",
+  engine: "引擎",
+  evacuate: "疏散",
+  exited: "离开",
+  heatmap: "热力图",
+  heatmapTimeWindow: "热力图时间窗",
+  language: "语言",
+  milestoneQueue: "里程碑队列",
+  noSamples: "无样本",
+  none: "无",
+  pause: "暂停",
+  paused: "已暂停",
+  queued: "排队",
+  renderBenchmark: "渲染压测",
+  renderFailed: "渲染失败",
+  rendererFailed: "渲染器失败",
+  rendering: "渲染中",
+  renderStatus: "渲染状态",
+  requestingGpu: "请求 GPU",
+  reset: "重置",
+  running: "运行中",
+  scaffold: "脚手架",
+  sceneSchema: "场景 Schema",
+  shop: "商铺",
+  simulationControls: "仿真控制",
+  simulationSpeed: "仿真速度",
+  simulationViewport: "仿真视口",
+  spawned: "生成",
+  start: "开始",
+  starting: "启动中",
+  systemSignals: "系统信号",
+  valid: "有效",
+  view2d: "2D 视图",
+  view2dPlan: "2D 平面",
+  view3d: "3D 视图",
+  view3dPerspective: "3D 透视",
+  viewMode: "视图模式",
+  visualAgents: "可视行人",
+  wasmBridge: "WASM 桥接",
+  webgpuProbe: "WebGPU 探针",
+  webgpuUnavailable: "WebGPU 不可用",
 };
 
 const zhOverrides: Partial<Record<TranslationKey, string>> = {
@@ -583,6 +640,10 @@ const editorToolKeys: Record<string, TranslationKey> = {
 
 const sceneNames: Record<string, LocalizedText> = {
   "atrium-demo": { zh: "中庭示例", en: "Atrium Demo" },
+  "biocity-rainy-high-street": {
+    zh: "雨天商业街",
+    en: "BioCity Rainy High Street",
+  },
   "mall-atrium": { zh: "商场中庭", en: "Mall Atrium" },
   "metro-station-hall": { zh: "地铁站厅", en: "Metro Station Hall" },
   "performance-venue": {
