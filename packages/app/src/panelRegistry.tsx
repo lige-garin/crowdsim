@@ -8,6 +8,10 @@ import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { NeuralCorrectionPanel } from "./NeuralCorrectionPanel";
 import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
+import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
+import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
+import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
+import { AiWorkflowPanel } from "./AiWorkflowPanel";
 
 export type PanelDockContext = {
   trajectoryRecording: TrajectoryRecording;
@@ -64,6 +68,30 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "规模就绪",
     labelEn: "Scale readiness",
     render: () => <ScaleReadinessPanel />,
+  },
+  {
+    id: "project-workspace",
+    labelZh: "项目空间",
+    labelEn: "Project workspace",
+    render: () => <ProjectWorkspacePanel />,
+  },
+  {
+    id: "collaboration-status",
+    labelZh: "协作状态",
+    labelEn: "Collaboration",
+    render: () => <CollaborationStatusPanel />,
+  },
+  {
+    id: "template-library",
+    labelZh: "模板库",
+    labelEn: "Template library",
+    render: () => <TemplateLibraryPanel />,
+  },
+  {
+    id: "ai-workflow",
+    labelZh: "AI 工作流",
+    labelEn: "AI workflow",
+    render: () => <AiWorkflowPanel />,
   },
 ];
 
