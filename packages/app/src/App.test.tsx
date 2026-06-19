@@ -168,7 +168,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the bilingual control room shell", async () => {
+  it("renders the compact BioCity studio shell", () => {
     render(<App />);
 
     expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
@@ -177,17 +177,13 @@ describe("App", () => {
     expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
     expect(screen.getByText("T0.1")).toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
-    expect(screen.getByText("BioCity Rainy High Street 有效")).toBeInTheDocument();
-    expect(await screen.findByText("42")).toBeInTheDocument();
-    expect(await screen.findByText("状态机已验证")).toBeInTheDocument();
-    expect(await screen.findByText("DES 队列已验证")).toBeInTheDocument();
-    expect(await screen.findByText("商铺决策已验证")).toBeInTheDocument();
-    expect(await screen.findByText("队列系统已验证")).toBeInTheDocument();
-    expect(await screen.findByText("2, 4, 6, 8")).toBeInTheDocument();
-    expect(await screen.findByText(/sorted 0, 2, 1, 3/)).toBeInTheDocument();
-    expect(await screen.findByText("社会力已验证")).toBeInTheDocument();
-    expect(await screen.findByText("流场已验证")).toBeInTheDocument();
-    expect(await screen.findByText("热力图密度已验证")).toBeInTheDocument();
+    expect(screen.getAllByText("BioCity Rainy High Street").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity analytics")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity scene objects")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity system status")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity signal dock")).toBeInTheDocument();
+    expect(screen.queryByText("Credibility loop")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
 
@@ -209,24 +205,9 @@ describe("App", () => {
     expect(
       within(screen.getByLabelText("Live telemetry")).getByText("worker/fallback"),
     ).toBeInTheDocument();
-    expect(await screen.findByText("100,000 visual agents")).toBeInTheDocument();
-    expect(await screen.findByText("WebGPU render benchmark")).toBeInTheDocument();
-    expect(screen.getByText("Movement backend")).toBeInTheDocument();
-    expect(screen.getByText("cpu-compat active @ 60Hz")).toBeInTheDocument();
-    expect(screen.getByText("WebGPU movement")).toBeInTheDocument();
-    expect(screen.getByText("webgpu-ready verified")).toBeInTheDocument();
-    expect(screen.getByText("Decision backend")).toBeInTheDocument();
-    expect(await screen.findByText("wasm-ready @ 10Hz")).toBeInTheDocument();
-    expect(screen.getByText("Decision ticks")).toBeInTheDocument();
-    expect(screen.getByText("Shared memory")).toBeInTheDocument();
-    expect(screen.getByText("SAB ready | isolated | 16 bytes")).toBeInTheDocument();
-    expect(screen.getByText("Simulation agent limit")).toBeInTheDocument();
-    expect(screen.getByText("2,000")).toBeInTheDocument();
-    expect(screen.getByText("Credibility loop")).toBeInTheDocument();
-    expect(screen.getByText(/scene=biocity-rainy-high-street/)).toBeInTheDocument();
-    expect(screen.getByText(/packedReplay=v1 ready/)).toBeInTheDocument();
-    expect(screen.getByText("BioCity Rainy High Street valid")).toBeInTheDocument();
-    expect(await screen.findByText("Agent state machine verified")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
+    expect(screen.getByLabelText("BioCity analytics")).toBeInTheDocument();
+    expect(screen.queryByText("Movement backend")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Network" }));
 

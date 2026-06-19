@@ -1,22 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { lazy, Suspense, type ReactNode } from "react";
-import { curvePointsToSvg } from "./appUi";
-import { AiWorkflowPanel } from "./AiWorkflowPanel";
-import { BioCityAnalyticsAcceptancePanel } from "./BioCityAnalyticsAcceptancePanel";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
-import { BioCityFinalUiAcceptancePanel } from "./BioCityFinalUiAcceptancePanel";
-import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
-import { BioCityWorkspaceAcceptancePanel } from "./BioCityWorkspaceAcceptancePanel";
-import { BioCityWorkspacePackagePanel } from "./BioCityWorkspacePackagePanel";
-import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
-import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
-import type { DashboardStats } from "./dashboardStats";
-import type { DashboardV2Stats } from "./dashboardV2Stats";
-import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
-import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
-import { formatProbeMessage, useI18n } from "./i18n";
-import { ImageGeometryPanel } from "./ImageGeometryPanel";
-import { NeuralCorrectionPanel } from "./NeuralCorrectionPanel";
 import type {
   AgentStateProbeState,
   DiscreteEventProbeState,
@@ -25,33 +8,17 @@ import type {
   ShopDecisionProbeState,
   SystemSignal,
 } from "./AppTypes";
+import type { DashboardStats } from "./dashboardStats";
+import type { DashboardV2Stats } from "./dashboardV2Stats";
 import type { FlowFieldProbeResult } from "./flowFieldProbe";
 import type { GpuGridProbeResult } from "./gpuGridProbe";
 import type { HeatmapCell } from "./heatmap";
 import type { HeatmapProbeResult } from "./heatmapProbe";
-import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
-import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
-import { SimulationCredibilityPanel } from "./SimulationCredibilityPanel";
+import { useI18n } from "./i18n";
 import type { SimulationCredibilityReport } from "./simulationCredibility";
 import type { SocialForceProbeResult } from "./socialForceProbe";
-import { TilesBackdropPanel } from "./TilesBackdropPanel";
-import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
-import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
-import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 import type { TrajectoryRecording } from "./trajectoryRecording";
-import { ValidationReportPanel } from "./ValidationReportPanel";
 import type { WebGpuProbeResult } from "./webgpuProbe";
-
-const DashboardPanel = lazy(() =>
-  import("./DashboardPanel").then((module) => ({
-    default: module.DashboardPanel,
-  })),
-);
-const DashboardV2Panel = lazy(() =>
-  import("./DashboardV2Panel").then((module) => ({
-    default: module.DashboardV2Panel,
-  })),
-);
 
 type AppInspectorProps = {
   agentStateProbe: AgentStateProbeState;
@@ -75,294 +42,122 @@ type AppInspectorProps = {
 };
 
 export function AppInspector({
-  agentStateProbe,
   dashboardStats,
   dashboardV2Stats,
-  discreteEventProbe,
   elapsedSeconds,
   evacuation,
-  flowFieldProbe,
-  gridProbe,
   heatmapCells,
-  heatmapProbe,
   queueSystemProbe,
   scene,
   shopDecisionProbe,
   signals,
   simulationCredibility,
-  socialForceProbe,
   trajectoryRecording,
   webGpuProbe,
 }: AppInspectorProps) {
-  const { language, t, text } = useI18n();
-  const sectionLabels =
-    language === "zh"
-      ? {
-          evidence: "证据",
-          operations: "运营",
-          overview: "总览",
-          probes: "探针",
-        }
-      : {
-          evidence: "Evidence",
-          operations: "Operations",
-          overview: "Overview",
-          probes: "Probes",
-        };
-  const sectionDetails =
-    language === "zh"
-      ? {
-          evidence: "运行证据与回放",
-          operations: "协作、报告与实验",
-          overview: "现场经营摘要",
-          probes: "内核探针读数",
-        }
-      : {
-          evidence: "Runtime proof and replay",
-          operations: "Collaboration, reports, and experiments",
-          overview: "Live operating summary",
-          probes: "Kernel probe readouts",
-        };
+  const { t } = useI18n();
+  const activeSignals = signals.slice(0, 4);
+  const areaCount = scene.areas.length + scene.roads.length + scene.buildings.length;
 
   return (
-    <aside className="inspector" aria-label={t("systemSignals")}>
-      <nav className="inspector-nav" aria-label={t("systemSignals")}>
-        <a href="#inspector-overview">{sectionLabels.overview}</a>
-        <a href="#inspector-evidence">{sectionLabels.evidence}</a>
-        <a href="#inspector-operations">{sectionLabels.operations}</a>
-        <a href="#inspector-probes">{sectionLabels.probes}</a>
-      </nav>
-      <InspectorGroup
-        detail={sectionDetails.overview}
-        id="inspector-overview"
-        title={sectionLabels.overview}
+    <aside
+      className="inspector biocity-inspector-compact"
+      aria-label={t("systemSignals")}
+    >
+      <header className="biocity-inspector-title">
+        <span>分析看板</span>
+        <strong>{scene.name}</strong>
+      </header>
+
+      <section className="biocity-score-strip" aria-label="BioCity key metrics">
+        <Metric
+          label="客流"
+          value={dashboardStats.currentAgentCount.toLocaleString()}
+        />
+        <Metric label="离场" value={dashboardStats.exitedCount.toLocaleString()} />
+        <Metric label="密度峰值" value={String(dashboardStats.densityPeak)} />
+        <Metric label="进店率" value={`${dashboardV2Stats.shopEntryRatePercent}%`} />
+      </section>
+
+      <BioCityAnalyticsPanel
+        elapsedSeconds={elapsedSeconds}
+        heatmapCells={heatmapCells}
+        scene={scene}
+      />
+
+      <section className="biocity-compact-panel" aria-label="BioCity scene objects">
+        <header>
+          <span>场景对象</span>
+          <strong>{areaCount}</strong>
+        </header>
+        <div className="biocity-object-grid">
+          <Metric label="道路" value={String(scene.roads.length)} />
+          <Metric label="建筑" value={String(scene.buildings.length)} />
+          <Metric label="公交站" value={String(scene.transitStops.length)} />
+          <Metric label="风险" value={String(scene.hazards.length)} />
+        </div>
+      </section>
+
+      <section className="biocity-compact-panel" aria-label="BioCity system status">
+        <header>
+          <span>系统状态</span>
+          <strong>{simulationCredibility.status}</strong>
+        </header>
+        <div className="biocity-status-list">
+          <Row label="内核" value={webGpuProbe.status} />
+          <Row
+            label="队列"
+            value={
+              queueSystemProbe.status === "ready"
+                ? `${queueSystemProbe.throughput}/30s`
+                : queueSystemProbe.status
+            }
+          />
+          <Row
+            label="品牌"
+            value={
+              shopDecisionProbe.status === "ready"
+                ? (shopDecisionProbe.brandInsight?.selectedBrandName ?? "ready")
+                : shopDecisionProbe.status
+            }
+          />
+          <Row label="回放" value={`${trajectoryRecording.frames.length} frames`} />
+          <Row label="疏散" value={evacuation.active ? "active" : "standby"} />
+        </div>
+      </section>
+
+      <section
+        className="biocity-compact-panel biocity-signal-dock"
+        aria-label="BioCity signal dock"
       >
-        <Suspense fallback={<PanelSkeleton className="dashboard-panel" rows={3} />}>
-          <DashboardPanel stats={dashboardStats} />
-        </Suspense>
-        <Suspense fallback={<PanelSkeleton className="dashboard-v2-panel" rows={2} />}>
-          <DashboardV2Panel stats={dashboardV2Stats} />
-        </Suspense>
-        <BioCityAnalyticsPanel
-          elapsedSeconds={elapsedSeconds}
-          heatmapCells={heatmapCells}
-          scene={scene}
-        />
-        <BrandIntelligencePanel
-          insight={
-            shopDecisionProbe.status === "ready"
-              ? shopDecisionProbe.brandInsight
-              : undefined
-          }
-        />
-      </InspectorGroup>
-      <InspectorGroup
-        detail={sectionDetails.evidence}
-        id="inspector-evidence"
-        title={sectionLabels.evidence}
-      >
-        <SimulationCredibilityPanel report={simulationCredibility} />
-        <BioCityVisualAcceptancePanel />
-        <BioCityAnalyticsAcceptancePanel
-          elapsedSeconds={elapsedSeconds}
-          heatmapCells={heatmapCells}
-          scene={scene}
-        />
-        <BioCityWorkspaceAcceptancePanel
-          elapsedSeconds={elapsedSeconds}
-          heatmapCells={heatmapCells}
-          recording={trajectoryRecording}
-          scene={scene}
-        />
-        <BioCityFinalUiAcceptancePanel />
-        <TrajectoryReplayPanel recording={trajectoryRecording} />
-      </InspectorGroup>
-      <InspectorGroup
-        detail={sectionDetails.operations}
-        id="inspector-operations"
-        title={sectionLabels.operations}
-      >
-        <CollaborationStatusPanel />
-        <ProjectWorkspacePanel />
-        <TemplateLibraryPanel />
-        <BioCityWorkspacePackagePanel
-          elapsedSeconds={elapsedSeconds}
-          heatmapCells={heatmapCells}
-          recording={trajectoryRecording}
-          scene={scene}
-        />
-        <AiWorkflowPanel />
-        <ValidationReportPanel />
-        <ExperimentSummaryPanel />
-        <ScenarioComparisonPanel />
-        <ExperimentSweepPanel />
-        <ScaleReadinessPanel />
-        <ImageGeometryPanel />
-        <TilesBackdropPanel />
-        <NeuralCorrectionPanel />
-      </InspectorGroup>
-      <InspectorGroup
-        detail={sectionDetails.probes}
-        id="inspector-probes"
-        title={sectionLabels.probes}
-      >
-        <dl>
-          {signals.map((signal) => (
-            <div key={signal.label}>
-              <dt>{signal.label}</dt>
-              <dd>{signal.value}</dd>
-            </div>
+        <header>
+          <span>工程状态</span>
+          <strong>收起</strong>
+        </header>
+        <div className="biocity-status-list">
+          {activeSignals.map((signal) => (
+            <Row key={signal.label} label={signal.label} value={signal.value} />
           ))}
-        </dl>
-        <ProbePanel title={t("computeProbe")} ariaLabel={t("computeProbe")}>
-          <p>{formatProbeMessage(webGpuProbe.message, language)}</p>
-          <code>
-            {webGpuProbe.output.length > 0
-              ? webGpuProbe.output.join(", ")
-              : t("noReadback")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("desQueue")} ariaLabel={t("desQueue")}>
-          <p>{formatProbeMessage(discreteEventProbe.message, language)}</p>
-          <code>
-            {discreteEventProbe.labels.length > 0
-              ? `${discreteEventProbe.labels.join(" | ")} @ ${discreteEventProbe.now.toFixed(2)}s`
-              : t("noEvents")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("agentState")} ariaLabel={t("agentState")}>
-          <p>{formatProbeMessage(agentStateProbe.message, language)}</p>
-          <code>
-            {agentStateProbe.labels.length > 0
-              ? `${agentStateProbe.labels.join(" -> ")} | SAB ${agentStateProbe.sabStateLabels.join(", ")}`
-              : t("noStates")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("shopDecision")} ariaLabel={t("shopDecision")}>
-          <p>{formatProbeMessage(shopDecisionProbe.message, language)}</p>
-          <code>
-            {shopDecisionProbe.status === "ready"
-              ? `${shopDecisionProbe.profileLabels.join(", ")} | goal ${shopDecisionProbe.goalChoice} | commuter ${shopDecisionProbe.commuterChoice} | ${shopDecisionProbe.browserSummary}`
-              : t("noDecision")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("queueSystem")} ariaLabel={t("queueSystem")}>
-          <p>{formatProbeMessage(queueSystemProbe.message, language)}</p>
-          <code>
-            {queueSystemProbe.status === "ready"
-              ? `layout ${queueSystemProbe.layout} | fifo ${queueSystemProbe.dequeued.join(", ")} | service ${queueSystemProbe.serviceTimes.join(", ")}s | throughput ${queueSystemProbe.throughput}/30s`
-              : t("noQueue")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("hashGrid")} ariaLabel={t("hashGrid")}>
-          <p>{formatProbeMessage(gridProbe.message, language)}</p>
-          <code>
-            {gridProbe.sortedAgentIds.length > 0
-              ? `ids ${gridProbe.cellIds.join(", ")} | sorted ${gridProbe.sortedAgentIds.join(", ")}`
-              : t("noReadback")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("socialForce")} ariaLabel={t("socialForce")}>
-          <p>{formatProbeMessage(socialForceProbe.message, language)}</p>
-          <code>
-            {socialForceProbe.positions.length > 0
-              ? socialForceProbe.positions.map((value) => value.toFixed(3)).join(", ")
-              : t("noReadback")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("flowField")} ariaLabel={t("flowField")}>
-          <p>{formatProbeMessage(flowFieldProbe.message, language)}</p>
-          <code>
-            {flowFieldProbe.directions.length > 0
-              ? flowFieldProbe.directions.join(", ")
-              : t("noReadback")}
-          </code>
-        </ProbePanel>
-        <ProbePanel title={t("heatmap")} ariaLabel={t("densityHeatmap")}>
-          <p>{formatProbeMessage(heatmapProbe.message, language)}</p>
-          <code>
-            {heatmapProbe.cellCounts.length > 0
-              ? `counts ${heatmapProbe.cellCounts.join(", ")} | max ${heatmapProbe.maxCount}`
-              : t("noReadback")}
-          </code>
-        </ProbePanel>
-        <section className="evacuation-panel" aria-label={t("evacuationCurve")}>
-          <h3>{t("evacuation")}</h3>
-          <p>
-            {evacuation.flowPlan
-              ? `${text(evacuation.flowPlan.message)} 路 ${evacuation.flowPlan.reachableCells} ${t("cells")}`
-              : t("noEvacuationActive")}
-          </p>
-          <svg
-            viewBox="0 0 120 48"
-            role="img"
-            aria-label={t("evacuationRemainingCurve")}
-          >
-            <polyline points={curvePointsToSvg(evacuation.curve)} />
-          </svg>
-          <code>
-            {evacuation.curve.length > 0
-              ? evacuation.curve
-                  .map(
-                    (point) =>
-                      `${Math.round(point.elapsedSeconds)}s:${point.remaining}`,
-                  )
-                  .join(" | ")
-              : t("noCurve")}
-          </code>
-        </section>
-      </InspectorGroup>
+        </div>
+      </section>
     </aside>
   );
 }
 
-function InspectorGroup({
-  children,
-  detail,
-  id,
-  title,
-}: {
-  children: ReactNode;
-  detail: string;
-  id: string;
-  title: string;
-}) {
-  const titleId = `${id}-title`;
-
+function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <section id={id} className="inspector-group" aria-labelledby={titleId}>
-      <header className="inspector-group-header">
-        <span>{detail}</span>
-        <h2 id={titleId}>{title}</h2>
-      </header>
-      {children}
-    </section>
+    <article>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
   );
 }
 
-function PanelSkeleton({ className, rows }: { className: string; rows: number }) {
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <section className={`${className} panel-skeleton`} aria-hidden="true">
-      {Array.from({ length: rows }, (_, index) => (
-        <span key={index} />
-      ))}
-    </section>
-  );
-}
-
-function ProbePanel({
-  ariaLabel,
-  children,
-  title,
-}: {
-  ariaLabel: string;
-  children: ReactNode;
-  title: string;
-}) {
-  return (
-    <section className="probe-panel" aria-label={ariaLabel}>
-      <h3>{title}</h3>
-      {children}
-    </section>
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
