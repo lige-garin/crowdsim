@@ -21,6 +21,7 @@
     "zustand": "latest"
   },
   "devDependencies": {
+    "@crowdsim/backend": "workspace:*",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@types/node": "latest",

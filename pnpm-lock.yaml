@@ -60,6 +60,9 @@ importers:
         specifier: latest
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
     devDependencies:
+      '@crowdsim/backend':
+        specifier: workspace:*
+        version: link:../backend
       '@testing-library/jest-dom':
         specifier: latest
         version: 6.9.1
