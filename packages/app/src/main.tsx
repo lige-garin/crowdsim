@@ -5,6 +5,7 @@ import "./appHome.css";
 import "./contactNetwork.css";
 import "./sceneEditor.css";
 import "./panels.css";
+import "./panelDock.css";
 import "./responsive.css";
 import "./commercial.css";
 import "./commercialPanels.css";

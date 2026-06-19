@@ -1,0 +1,37 @@
+/* PanelDock: full-width strip below the main 3-pane workspace row.
+   grid-column: 1 / -1 keeps it from disturbing the named-area grid. */
+.panel-dock {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid rgba(219, 228, 238, 0.82);
+  background: var(--lab-surface, #ffffff);
+}
+
+.panel-dock-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.panel-dock-nav button {
+  padding: 5px 10px;
+  font-size: 0.74rem;
+  border: 1px solid rgba(219, 228, 238, 0.9);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--lab-muted, #5b6b7c);
+  cursor: pointer;
+}
+
+.panel-dock-nav button[aria-pressed="true"] {
+  font-weight: 700;
+  color: var(--lab-ink, #12202e);
+  border-color: var(--lab-ink, #12202e);
+}
+
+.panel-dock-body {
+  max-height: 320px;
+  overflow: auto;
+}
