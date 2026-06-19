@@ -25,6 +25,7 @@ import {
 } from "./renderBenchmark";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
+  selectAgentIntentOverlay,
   selectViewportOverlayAgents,
   type ViewportAgentOverlayFrame,
 } from "./simulationViewportOverlay";
@@ -427,12 +428,21 @@ function ViewportLiveAgentOverlay({
       {overlayAgents.map((agent) => (
         <span
           key={agent.id}
-          className="render-agent-dot"
+          className="render-agent-marker"
           style={{
             left: `${toPercent(agent.x, scene.world.width)}%`,
             top: `${toPercent(agent.y, scene.world.height)}%`,
           }}
-        />
+        >
+          <span className="render-agent-dot" />
+          <span className="render-agent-intent">
+            {
+              selectAgentIntentOverlay(agent, {
+                seed: scene.seed,
+              }).icon
+            }
+          </span>
+        </span>
       ))}
     </div>
   );

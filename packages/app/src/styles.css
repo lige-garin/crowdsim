@@ -463,6 +463,16 @@ h3 {
   pointer-events: none;
 }
 
+.render-agent-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  transition:
+    left 90ms linear,
+    top 90ms linear;
+}
+
 .render-agent-dot {
   position: absolute;
   width: 7px;
@@ -471,10 +481,26 @@ h3 {
   border-radius: 999px;
   background: #118672;
   box-shadow: 0 0 0 2px rgba(17, 134, 114, 0.14);
-  transform: translate(-50%, -50%);
-  transition:
-    left 90ms linear,
-    top 90ms linear;
+}
+
+.render-agent-intent {
+  position: absolute;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 999px;
+  background: rgba(6, 23, 40, 0.78);
+  color: #f8fbff;
+  font-family: var(--lab-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 7px 16px rgba(4, 16, 28, 0.2);
+  transform: translateY(-2px);
 }
 
 .render-hud {
