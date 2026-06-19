@@ -28,6 +28,10 @@ describe("bioCityRenderPlan", () => {
           }),
           id: "asset-rain-market-streetscape",
           kind: "gltf-scene",
+          lod: "medium",
+          lodSources: expect.objectContaining({
+            low: "/assets/biocity/rain-market-streetscape.low.glb",
+          }),
           sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
         }),
         expect.objectContaining({

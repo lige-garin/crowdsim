@@ -32,6 +32,11 @@ describe("bioCityDemoScene", () => {
         verified: true,
       },
       collisionMode: "none",
+      lodSources: {
+        high: "/assets/biocity/rain-market-streetscape.high.glb",
+        low: "/assets/biocity/rain-market-streetscape.low.glb",
+        medium: "/assets/biocity/rain-market-streetscape.glb",
+      },
       originalSourceFormat: "sketchup",
       sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
     });

@@ -25,6 +25,7 @@ export type VisualAssetManifestItem = {
   collisionMode: "none";
   id: string;
   kind: VisualAssetKind;
+  lodSources: Partial<Record<"high" | "low" | "medium", string>>;
   scale: number;
   sourceUrl: string;
 };
@@ -86,6 +87,7 @@ export function createVisualAssetManifestFromScene(
         collisionMode: asset.collisionMode,
         id: asset.id,
         kind: asset.kind,
+        lodSources: { ...asset.lodSources },
         scale: asset.scale,
         sourceUrl: asset.sourceUrl,
       })),
@@ -123,6 +125,7 @@ export const demoVisualAssetManifest = createVisualAssetManifest([
     collisionMode: "none",
     id: "wayfinding-kiosk",
     kind: "gltf-prop",
+    lodSources: {},
     scale: 1,
     sourceUrl: "/assets/showcase/wayfinding-kiosk.glb",
   },
@@ -132,6 +135,7 @@ export const demoVisualAssetManifest = createVisualAssetManifest([
     collisionMode: "none",
     id: "atrium-shell",
     kind: "gltf-scene",
+    lodSources: {},
     scale: 1,
     sourceUrl: "/assets/showcase/atrium-shell.gltf",
   },
@@ -159,6 +163,14 @@ function validateVisualAsset(asset: VisualAssetManifestItem) {
     throw new Error("Visual asset unit scale must be positive");
   }
 
+  for (const sourceUrl of Object.values(asset.lodSources)) {
+    if (sourceUrl === undefined) {
+      continue;
+    }
+
+    validateVisualAssetUrl(sourceUrl);
+  }
+
   if (asset.scale <= 0 || !Number.isFinite(asset.scale)) {
     throw new Error("Visual asset scale must be positive");
   }
@@ -172,6 +184,20 @@ function validateVisualAsset(asset: VisualAssetManifestItem) {
   }
 
   if (asset.sourceUrl !== redactSecret(asset.sourceUrl)) {
+    throw new Error("Visual asset URL must not expose secrets");
+  }
+}
+
+function validateVisualAssetUrl(sourceUrl: string) {
+  if (!sourceUrl.startsWith("/")) {
+    throw new Error("Visual asset URL must be a relative application route");
+  }
+
+  if (!/\.(gltf|glb|json)$/i.test(sourceUrl)) {
+    throw new Error("Visual asset URL must reference glTF, GLB, or tileset JSON");
+  }
+
+  if (sourceUrl !== redactSecret(sourceUrl)) {
     throw new Error("Visual asset URL must not expose secrets");
   }
 }

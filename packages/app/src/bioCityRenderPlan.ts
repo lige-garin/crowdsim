@@ -65,6 +65,8 @@ export type BioCityRenderAssetPlacement = {
   };
   id: string;
   kind: CrowdSimScene["visualAssets"][number]["kind"];
+  lod: CrowdSimScene["visualAssets"][number]["lod"];
+  lodSources: CrowdSimScene["visualAssets"][number]["lodSources"];
   rotationDegrees: number;
   scale: number;
   sourceUrl: string;
@@ -143,6 +145,8 @@ export function createBioCityRenderPlan(
         },
         id: `asset-${asset.id}`,
         kind: asset.kind,
+        lod: asset.lod,
+        lodSources: { ...asset.lodSources },
         rotationDegrees: asset.rotationDegrees,
         scale: asset.scale,
         sourceUrl: asset.sourceUrl,

@@ -35,6 +35,9 @@ describe("visual asset manifest", () => {
       upAxis: "y-up",
       verified: true,
     });
+    expect(manifest.assets[0].lodSources.low).toBe(
+      "/assets/biocity/rain-market-streetscape.low.glb",
+    );
     expect(manifest.assets.every((asset) => asset.collisionMode === "none")).toBe(true);
   });
 
@@ -61,6 +64,7 @@ describe("visual asset manifest", () => {
           collisionMode: "none",
           id: "remote-asset",
           kind: "gltf-prop",
+          lodSources: {},
           scale: 1,
           sourceUrl: "https://example.com/asset.glb",
         },
@@ -79,6 +83,7 @@ describe("visual asset manifest", () => {
           collisionMode: "none",
           id: "secret-asset",
           kind: "gltf-prop",
+          lodSources: {},
           scale: 1,
           sourceUrl: "/assets/asset-key-sk-secret_1234567890.glb",
         },

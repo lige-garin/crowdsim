@@ -159,25 +159,34 @@ const visualAssetCalibrationSchema = z
     verified: false,
   });
 
+const visualAssetSourceUrlSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (sourceUrl) => sourceUrl.startsWith("/"),
+    "visual asset URL must be a relative application route",
+  )
+  .refine(
+    (sourceUrl) => /\.(gltf|glb|json)$/i.test(sourceUrl),
+    "visual asset URL must reference glTF, GLB, or tileset JSON",
+  )
+  .refine(
+    (sourceUrl) => !/sk-[a-z0-9_-]{12,}/i.test(sourceUrl),
+    "visual asset URL must not expose secrets",
+  );
+
 const visualAssetSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
   kind: z.enum(["gltf-prop", "gltf-scene", "tileset"]),
-  sourceUrl: z
-    .string()
-    .min(1)
-    .refine(
-      (sourceUrl) => sourceUrl.startsWith("/"),
-      "visual asset URL must be a relative application route",
-    )
-    .refine(
-      (sourceUrl) => /\.(gltf|glb|json)$/i.test(sourceUrl),
-      "visual asset URL must reference glTF, GLB, or tileset JSON",
-    )
-    .refine(
-      (sourceUrl) => !/sk-[a-z0-9_-]{12,}/i.test(sourceUrl),
-      "visual asset URL must not expose secrets",
-    ),
+  sourceUrl: visualAssetSourceUrlSchema,
+  lodSources: z
+    .object({
+      high: visualAssetSourceUrlSchema.optional(),
+      low: visualAssetSourceUrlSchema.optional(),
+      medium: visualAssetSourceUrlSchema.optional(),
+    })
+    .default({}),
   originalSourceFormat: z
     .enum(["collada", "fbx", "glb", "gltf", "ifc", "obj", "revit", "sketchup"])
     .optional(),

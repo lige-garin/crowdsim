@@ -60,6 +60,12 @@ export function TilesBackdropPanel() {
         {summary.bioCityAssetLoading.uniqueSourceCount} | fallback{" "}
         {summary.bioCityAssetLoading.fallbackCount} placeholders
       </code>
+      <code>
+        LOD low/medium/high {summary.bioCityAssetLoading.lowLodCount}/
+        {summary.bioCityAssetLoading.mediumLodCount}/
+        {summary.bioCityAssetLoading.highLodCount} | budget{" "}
+        {summary.bioCityAssetLoading.estimatedTriangles.toLocaleString()} tris
+      </code>
     </section>
   );
 }

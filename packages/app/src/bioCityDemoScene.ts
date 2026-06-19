@@ -15,6 +15,11 @@ export const bioCityDemoScene = parseScene({
       name: "Rain Market Streetscape",
       kind: "gltf-scene",
       sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+      lodSources: {
+        high: "/assets/biocity/rain-market-streetscape.high.glb",
+        low: "/assets/biocity/rain-market-streetscape.low.glb",
+        medium: "/assets/biocity/rain-market-streetscape.glb",
+      },
       originalSourceFormat: "sketchup",
       anchor: { x: 80, y: 48, z: 0 },
       calibration: {
@@ -36,6 +41,9 @@ export const bioCityDemoScene = parseScene({
       name: "Bus Stop Shelter",
       kind: "gltf-prop",
       sourceUrl: "/assets/biocity/bus-stop-shelter.glb",
+      lodSources: {
+        low: "/assets/biocity/bus-stop-shelter.low.glb",
+      },
       originalSourceFormat: "glb",
       anchor: { x: 122, y: 72, z: 0 },
       calibration: {

@@ -28,5 +28,7 @@ describe("TilesBackdropPanel", () => {
     expect(screen.getByText(/GLB assets 2/)).toBeInTheDocument();
     expect(screen.getByText(/unique URLs 2/)).toBeInTheDocument();
     expect(screen.getByText(/fallback 2 placeholders/)).toBeInTheDocument();
+    expect(screen.getByText(/LOD low\/medium\/high 0\/2\/0/)).toBeInTheDocument();
+    expect(screen.getByText(/budget 127,500 tris/)).toBeInTheDocument();
   });
 });

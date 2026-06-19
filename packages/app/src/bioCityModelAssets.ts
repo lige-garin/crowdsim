@@ -2,17 +2,27 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { Object3D } from "three";
 import type { BioCityRenderAssetPlacement } from "./bioCityRenderPlan";
 
+export type BioCityAssetLod = "high" | "low" | "medium";
+
 export type BioCityAssetLoadPlan = {
+  estimatedTriangles: number;
   fallback: "placeholder";
   id: string;
   loader: "gltf-loader" | "tileset-renderer";
+  requestedLod: BioCityAssetLod;
+  selectedLod: BioCityAssetLod;
   sourceUrl: string;
 };
 
 export type BioCityAssetLoadingReport = {
   assetCount: number;
+  deferredCount: number;
+  estimatedTriangles: number;
   fallbackCount: number;
   gltfCount: number;
+  highLodCount: number;
+  lowLodCount: number;
+  mediumLodCount: number;
   tilesetCount: number;
   uniqueSourceCount: number;
 };
@@ -33,21 +43,57 @@ export type BioCityAssetWorldTransform = {
 
 const gltfSceneCache = new Map<string, Promise<Object3D | undefined>>();
 
+export type BioCityAssetLoadOptions = {
+  maxUniqueSources?: number;
+  quality?: BioCityAssetLod;
+};
+
 export function createBioCityAssetLoadPlan(
   asset: BioCityRenderAssetPlacement,
+  options: BioCityAssetLoadOptions = {},
 ): BioCityAssetLoadPlan {
+  const requestedLod = options.quality ?? "medium";
+  const selectedLod = selectAssetLod(asset.lod, requestedLod);
+
   return {
+    estimatedTriangles: estimateAssetTriangles(asset.kind, selectedLod),
     fallback: "placeholder",
     id: asset.id,
     loader: asset.kind === "tileset" ? "tileset-renderer" : "gltf-loader",
-    sourceUrl: asset.sourceUrl,
+    requestedLod,
+    selectedLod,
+    sourceUrl: asset.lodSources[selectedLod] ?? asset.sourceUrl,
   };
 }
 
 export function createBioCityAssetLoadPlans(
   assets: readonly BioCityRenderAssetPlacement[],
+  options: BioCityAssetLoadOptions = {},
 ) {
-  return assets.map(createBioCityAssetLoadPlan);
+  const seenSources = new Set<string>();
+
+  return assets.map((asset) => {
+    const plan = createBioCityAssetLoadPlan(asset, options);
+
+    if (
+      options.maxUniqueSources !== undefined &&
+      !seenSources.has(plan.sourceUrl) &&
+      seenSources.size >= options.maxUniqueSources
+    ) {
+      return {
+        ...plan,
+        estimatedTriangles: 0,
+        loader: "gltf-loader" as const,
+        sourceUrl: "",
+      };
+    }
+
+    if (plan.sourceUrl) {
+      seenSources.add(plan.sourceUrl);
+    }
+
+    return plan;
+  });
 }
 
 export function summarizeBioCityAssetLoading(
@@ -55,10 +101,19 @@ export function summarizeBioCityAssetLoading(
 ): BioCityAssetLoadingReport {
   return {
     assetCount: plans.length,
+    deferredCount: plans.filter((plan) => plan.sourceUrl === "").length,
+    estimatedTriangles: plans.reduce(
+      (total, plan) => total + plan.estimatedTriangles,
+      0,
+    ),
     fallbackCount: plans.filter((plan) => plan.fallback === "placeholder").length,
     gltfCount: plans.filter((plan) => plan.loader === "gltf-loader").length,
+    highLodCount: plans.filter((plan) => plan.selectedLod === "high").length,
+    lowLodCount: plans.filter((plan) => plan.selectedLod === "low").length,
+    mediumLodCount: plans.filter((plan) => plan.selectedLod === "medium").length,
     tilesetCount: plans.filter((plan) => plan.loader === "tileset-renderer").length,
-    uniqueSourceCount: new Set(plans.map((plan) => plan.sourceUrl)).size,
+    uniqueSourceCount: new Set(plans.map((plan) => plan.sourceUrl).filter(Boolean))
+      .size,
   };
 }
 
@@ -87,11 +142,11 @@ export async function loadBioCityVisualAssetObject(
 ): Promise<Object3D | undefined> {
   const plan = createBioCityAssetLoadPlan(asset);
 
-  if (plan.loader !== "gltf-loader") {
+  if (plan.loader !== "gltf-loader" || plan.sourceUrl === "") {
     return undefined;
   }
 
-  const cachedScene = await loadCachedGltfScene(asset.sourceUrl);
+  const cachedScene = await loadCachedGltfScene(plan.sourceUrl);
 
   if (!cachedScene) {
     return undefined;
@@ -106,6 +161,36 @@ export async function loadBioCityVisualAssetObject(
   object.scale.setScalar(transform.scale);
 
   return object;
+}
+
+function selectAssetLod(
+  assetLod: BioCityAssetLod,
+  requestedLod: BioCityAssetLod,
+): BioCityAssetLod {
+  const rank: Record<BioCityAssetLod, number> = {
+    high: 3,
+    low: 1,
+    medium: 2,
+  };
+
+  return rank[assetLod] < rank[requestedLod] ? assetLod : requestedLod;
+}
+
+function estimateAssetTriangles(
+  kind: BioCityRenderAssetPlacement["kind"],
+  lod: BioCityAssetLod,
+) {
+  if (kind === "tileset") return 0;
+  if (kind === "gltf-prop") {
+    if (lod === "high") return 18_000;
+    if (lod === "medium") return 7_500;
+    return 2_400;
+  }
+
+  if (lod === "high") return 450_000;
+  if (lod === "medium") return 120_000;
+
+  return 28_000;
 }
 
 async function loadCachedGltfScene(sourceUrl: string) {

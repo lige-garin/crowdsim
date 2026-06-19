@@ -281,6 +281,11 @@ describe("sceneSchema", () => {
           id: "sketchup-street-canyon",
           kind: "gltf-scene",
           sourceUrl: "/assets/biocity/street-canyon.glb",
+          lodSources: {
+            high: "/assets/biocity/street-canyon.high.glb",
+            low: "/assets/biocity/street-canyon.low.glb",
+            medium: "/assets/biocity/street-canyon.medium.glb",
+          },
           originalSourceFormat: "sketchup",
           anchor: { x: 40, y: 24 },
           calibration: {
@@ -322,6 +327,11 @@ describe("sceneSchema", () => {
         verified: true,
       },
       lod: "medium",
+      lodSources: {
+        high: "/assets/biocity/street-canyon.high.glb",
+        low: "/assets/biocity/street-canyon.low.glb",
+        medium: "/assets/biocity/street-canyon.medium.glb",
+      },
       originalSourceFormat: "sketchup",
       visible: true,
     });
@@ -332,6 +342,7 @@ describe("sceneSchema", () => {
       upAxis: "y-up",
       verified: false,
     });
+    expect(scene.visualAssets[1].lodSources).toEqual({});
     expect(scene.visualAssets[1].scale).toBe(1);
   });
 
@@ -574,6 +585,25 @@ describe("sceneSchema", () => {
           id: "remote-model",
           kind: "gltf-prop",
           sourceUrl: "https://example.com/model.glb",
+          anchor: { x: 10, y: 10 },
+        },
+      ],
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects unsafe visual asset LOD source imports", () => {
+    const result = safeParseScene({
+      ...validScene,
+      visualAssets: [
+        {
+          id: "bad-lod-model",
+          kind: "gltf-prop",
+          sourceUrl: "/assets/biocity/model.glb",
+          lodSources: {
+            low: "https://example.com/model.low.glb",
+          },
           anchor: { x: 10, y: 10 },
         },
       ],
