@@ -462,11 +462,14 @@ function AppContent() {
           dashboardStats={dashboardStats}
           dashboardV2Stats={dashboardV2Stats}
           discreteEventProbe={probes.discreteEventProbe}
+          elapsedSeconds={simulation.snapshot.elapsedSeconds}
           evacuation={evacuation}
           flowFieldProbe={probes.flowFieldProbe}
           gridProbe={probes.gridProbe}
+          heatmapCells={heatmapCells}
           heatmapProbe={probes.heatmapProbe}
           queueSystemProbe={probes.queueSystemProbe}
+          scene={demoScene}
           shopDecisionProbe={probes.shopDecisionProbe}
           signals={signals}
           simulationCredibility={simulationCredibility}

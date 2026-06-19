@@ -1,6 +1,8 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { lazy, Suspense, type ReactNode } from "react";
 import { curvePointsToSvg } from "./appUi";
 import { AiWorkflowPanel } from "./AiWorkflowPanel";
+import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
 import { BioCityVisualAcceptancePanel } from "./BioCityVisualAcceptancePanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
@@ -21,6 +23,7 @@ import type {
 } from "./AppTypes";
 import type { FlowFieldProbeResult } from "./flowFieldProbe";
 import type { GpuGridProbeResult } from "./gpuGridProbe";
+import type { HeatmapCell } from "./heatmap";
 import type { HeatmapProbeResult } from "./heatmapProbe";
 import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
@@ -51,11 +54,14 @@ type AppInspectorProps = {
   dashboardStats: DashboardStats;
   dashboardV2Stats: DashboardV2Stats;
   discreteEventProbe: DiscreteEventProbeState;
+  elapsedSeconds: number;
   evacuation: EvacuationState;
   flowFieldProbe: FlowFieldProbeResult;
   gridProbe: GpuGridProbeResult;
+  heatmapCells: readonly HeatmapCell[];
   heatmapProbe: HeatmapProbeResult;
   queueSystemProbe: QueueSystemProbeState;
+  scene: CrowdSimScene;
   shopDecisionProbe: ShopDecisionProbeState;
   signals: readonly SystemSignal[];
   simulationCredibility: SimulationCredibilityReport;
@@ -69,11 +75,14 @@ export function AppInspector({
   dashboardStats,
   dashboardV2Stats,
   discreteEventProbe,
+  elapsedSeconds,
   evacuation,
   flowFieldProbe,
   gridProbe,
+  heatmapCells,
   heatmapProbe,
   queueSystemProbe,
+  scene,
   shopDecisionProbe,
   signals,
   simulationCredibility,
@@ -130,6 +139,11 @@ export function AppInspector({
         <Suspense fallback={<PanelSkeleton className="dashboard-v2-panel" rows={2} />}>
           <DashboardV2Panel stats={dashboardV2Stats} />
         </Suspense>
+        <BioCityAnalyticsPanel
+          elapsedSeconds={elapsedSeconds}
+          heatmapCells={heatmapCells}
+          scene={scene}
+        />
         <BrandIntelligencePanel
           insight={
             shopDecisionProbe.status === "ready"
