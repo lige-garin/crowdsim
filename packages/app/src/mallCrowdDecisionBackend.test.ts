@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
-import type { SimulationShop } from "./simulationDecisionBackend";
+import type {
+  SimulationServicePoint,
+  SimulationShop,
+} from "./simulationDecisionBackend";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import type { BrandStoreCandidate } from "./brandAttraction";
 
 const shops: SimulationShop[] = [
-  { id: "a", position: { x: 10, y: 10 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 10, y: 14 } },
-  { id: "b", position: { x: 50, y: 50 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 50, y: 54 } },
+  { id: "a", position: { x: 10, y: 10 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 10, y: 14 }, conversionRate: 1 },
+  { id: "b", position: { x: 50, y: 50 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 50, y: 54 }, conversionRate: 1 },
 ];
 const sinks: SimulationSink[] = [{ id: "exit", position: { x: 0, y: 0 }, radius: 2 }];
+const servicePoints: SimulationServicePoint[] = [
+  { id: "checkout1", position: { x: 5, y: 5 }, radius: 2, serviceSeconds: 3 },
+];
 
 function agent(overrides: Partial<SimulationAgent>): SimulationAgent {
   return { id: 1, x: 5, y: 5, vx: 0, vy: 0, targetX: 0, targetY: 0, ...overrides };
@@ -118,6 +124,38 @@ describe("createMallCrowdDecisionBackend", () => {
     const decided = decide(agents, 1).find((x) => x.agentId === 2);
     expect(decided?.nextState).toBe("browse");
     expect(decided?.browseUntilSeconds).toBe(6); // elapsed 1 + dwell 5
+  });
+
+  it("sends a buyer to checkout after browsing (when service points exist)", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const buyer = agent({ lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 5, x: 10, y: 10 });
+    const d = backend.decideAgents({ agents: [buyer], decisionTick: 0, elapsedSeconds: 6, sinks, shops, servicePoints });
+    expect(d[0].nextState).toBe("checkout");
+    expect(d[0].target).toEqual({ x: 5, y: 5 });
+  });
+
+  it("starts the checkout service when the buyer reaches the counter", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const atCounter = agent({ lifecycleState: "checkout", x: 5, y: 5 });
+    const d = backend.decideAgents({ agents: [atCounter], decisionTick: 0, elapsedSeconds: 0, sinks, shops, servicePoints });
+    expect(d[0].nextState).toBe("enterStore");
+    expect(d[0].browseUntilSeconds).toBe(3); // 0 + serviceSeconds 3
+  });
+
+  it("leaves after the checkout service completes", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const serving = agent({ lifecycleState: "enterStore", browseUntilSeconds: 3, x: 5, y: 5 });
+    const d = backend.decideAgents({ agents: [serving], decisionTick: 0, elapsedSeconds: 4, sinks, shops, servicePoints });
+    expect(d[0].nextState).toBe("leave");
+    expect(d[0].targetSinkId).toBe("exit");
+  });
+
+  it("a non-buyer leaves straight after browsing", () => {
+    const noBuyShops = shops.map((s) => ({ ...s, conversionRate: 0 }));
+    const backend = createMallCrowdDecisionBackend({ shops: noBuyShops, seed: 1 });
+    const browser = agent({ lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 5, x: 10, y: 10 });
+    const d = backend.decideAgents({ agents: [browser], decisionTick: 0, elapsedSeconds: 6, sinks, shops: noBuyShops, servicePoints });
+    expect(d[0].nextState).toBe("leave");
   });
 
   it("evacuates everyone to the nearest exit when evacuation is active", () => {

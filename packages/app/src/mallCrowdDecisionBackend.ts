@@ -2,6 +2,7 @@ import type { ScenePoint } from "@crowdsim/scene-schema";
 import type {
   SimulationAgentDecision,
   SimulationDecisionBackend,
+  SimulationServicePoint,
   SimulationShop,
 } from "./simulationDecisionBackend";
 import type { SimulationSink } from "./simulationEngine";
@@ -56,6 +57,24 @@ function nearestSink(
   return best;
 }
 
+function nearestServicePoint(
+  point: ScenePoint,
+  servicePoints: readonly SimulationServicePoint[],
+): SimulationServicePoint {
+  let best = servicePoints[0];
+  let bestSq = Number.POSITIVE_INFINITY;
+  for (const servicePoint of servicePoints) {
+    const dx = servicePoint.position.x - point.x;
+    const dy = servicePoint.position.y - point.y;
+    const sq = dx * dx + dy * dy;
+    if (sq < bestSq) {
+      best = servicePoint;
+      bestSq = sq;
+    }
+  }
+  return best;
+}
+
 /**
  * Rule-based mall-crowd behaviour: a shopper enters, walks to a shop chosen by
  * attraction, browses it for the shop's dwell time, then leaves toward the
@@ -75,8 +94,9 @@ export function createMallCrowdDecisionBackend(options: {
   return {
     id: "rule-ts",
     decisionHz: options.decisionHz ?? 10,
-    decideAgents({ agents, elapsedSeconds, sinks, shops, evacuationActive }) {
+    decideAgents({ agents, elapsedSeconds, sinks, shops, servicePoints, evacuationActive }) {
       const activeShops = shops ?? options.shops;
+      const activeServicePoints = servicePoints ?? [];
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
 
@@ -147,13 +167,69 @@ export function createMallCrowdDecisionBackend(options: {
             agent.browseUntilSeconds != null &&
             elapsedSeconds >= agent.browseUntilSeconds
           ) {
+            const shop = agent.selectedStoreId
+              ? shopById.get(agent.selectedStoreId)
+              : undefined;
+            // A buyer (per the shop's conversion rate) heads to a checkout;
+            // a non-buyer (or a mall with no checkouts) leaves directly.
+            const buys =
+              activeServicePoints.length > 0 &&
+              shop !== undefined &&
+              random() < shop.conversionRate;
+            if (buys) {
+              const counter = nearestServicePoint(agent, activeServicePoints);
+              decisions.push({
+                agentId: agent.id,
+                nextState: "checkout",
+                target: counter.position,
+                selectedStoreId: undefined,
+                browseUntilSeconds: null,
+              });
+            } else {
+              const sink = nearestSink(agent, sinks);
+              decisions.push({
+                agentId: agent.id,
+                nextState: "leave",
+                target: sink.position,
+                targetSinkId: sink.id,
+                selectedStoreId: undefined,
+                browseUntilSeconds: null,
+              });
+            }
+          }
+          continue;
+        }
+
+        // Walking to a checkout: start the service once at the counter.
+        if (state === "checkout") {
+          if (activeServicePoints.length > 0) {
+            const counter = nearestServicePoint(agent, activeServicePoints);
+            const dx = counter.position.x - agent.x;
+            const dy = counter.position.y - agent.y;
+            if (Math.hypot(dx, dy) <= counter.radius) {
+              decisions.push({
+                agentId: agent.id,
+                nextState: "enterStore",
+                target: counter.position,
+                browseUntilSeconds: elapsedSeconds + counter.serviceSeconds,
+              });
+            }
+          }
+          continue;
+        }
+
+        // Being served at a checkout: leave when the service completes.
+        if (state === "enterStore") {
+          if (
+            agent.browseUntilSeconds != null &&
+            elapsedSeconds >= agent.browseUntilSeconds
+          ) {
             const sink = nearestSink(agent, sinks);
             decisions.push({
               agentId: agent.id,
               nextState: "leave",
               target: sink.position,
               targetSinkId: sink.id,
-              selectedStoreId: undefined,
               browseUntilSeconds: null,
             });
           }

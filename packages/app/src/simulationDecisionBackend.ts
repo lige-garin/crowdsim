@@ -5,6 +5,7 @@ export type SimulationDecisionBackendId = "rule-ts" | "wasm-ready";
 
 export type SimulationAgentDecisionState =
   | "browse"
+  | "checkout"
   | "enterStore"
   | "evacuate"
   | "leave"
@@ -24,6 +25,17 @@ export type SimulationShop = {
   capacity: number;
   /** Where queued shoppers wait for a free slot. */
   queuePosition: ScenePoint;
+  /** Probability a browser buys (and so heads to checkout) after browsing. */
+  conversionRate: number;
+};
+
+export type SimulationServicePoint = {
+  id: string;
+  position: ScenePoint;
+  /** Arrival radius: the agent counts as "at the checkout" within this distance. */
+  radius: number;
+  /** How long a checkout takes once served, in seconds. */
+  serviceSeconds: number;
 };
 
 export type SimulationAgentDecision = {
@@ -42,6 +54,7 @@ export type SimulationDecisionTickInput = {
   elapsedSeconds: number;
   sinks: readonly SimulationSink[];
   shops?: readonly SimulationShop[];
+  servicePoints?: readonly SimulationServicePoint[];
   /** When true, all agents abandon shopping and head for the nearest exit. */
   evacuationActive?: boolean;
 };

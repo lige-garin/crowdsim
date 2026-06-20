@@ -21,6 +21,7 @@ import {
   shouldRunDecisionTick,
   type SimulationAgentDecisionState,
   type SimulationDecisionBackend,
+  type SimulationServicePoint,
   type SimulationShop,
 } from "./simulationDecisionBackend";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
@@ -67,6 +68,7 @@ export type SimulationEngineConfig = {
   seed?: number;
   speedMetersPerSecond?: number;
   shops?: readonly SimulationShop[];
+  servicePoints?: readonly SimulationServicePoint[];
   sources: SimulationSource[];
   sinks: SimulationSink[];
   walls?: WallSegment[];
@@ -151,7 +153,16 @@ export function createSimulationEngineFromScene(
     dwellSeconds: shop.dwellMeanSeconds * weather.dwellMultiplier,
     capacity: shop.capacity,
     queuePosition: shop.queueAnchor ?? shop.entrancePosition ?? shop.position,
+    conversionRate: shop.conversionRate,
   }));
+  const servicePoints: SimulationServicePoint[] = scene.servicePoints.map(
+    (servicePoint) => ({
+      id: servicePoint.id,
+      position: servicePoint.position,
+      radius: Math.max(2, servicePoint.width / 2),
+      serviceSeconds: servicePoint.serviceMeanSeconds,
+    }),
+  );
   // Default to the rule-based mall-crowd behaviour (enter -> shop -> browse ->
   // leave) so the crowd moves with a reason; callers may override.
   const decisionBackend =
@@ -172,6 +183,7 @@ export function createSimulationEngineFromScene(
     world: scene.world,
     ...overrides,
     shops,
+    servicePoints,
     decisionBackend,
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
   });
@@ -188,6 +200,7 @@ export function createSimulationEngine(
   const sources = config.sources;
   const sinks = config.sinks;
   const shops = config.shops ?? [];
+  const servicePoints = config.servicePoints ?? [];
   const movementBackend = config.movementBackend;
   const seed = config.seed ?? 1;
   const walls = config.walls ?? [];
@@ -331,6 +344,7 @@ export function createSimulationEngine(
         elapsedSeconds,
         sinks,
         shops,
+        servicePoints,
         evacuationActive,
       }),
       decisionTick,
@@ -351,8 +365,11 @@ export function createSimulationEngine(
     const nextAgents: SimulationAgent[] = [];
 
     for (const agent of agents) {
-      // Browsing shoppers dwell in place until their decision flips to "leave".
-      if (agent.lifecycleState === "browse") {
+      // Browsing shoppers and shoppers being served at a checkout dwell in place.
+      if (
+        agent.lifecycleState === "browse" ||
+        agent.lifecycleState === "enterStore"
+      ) {
         nextAgents.push({ ...agent, vx: 0, vy: 0 });
         continue;
       }
@@ -364,7 +381,9 @@ export function createSimulationEngine(
       // Exit on reaching the sink, unless heading to a shop or queuing for one.
       // Agents with no decision backend head straight to the sink and still exit.
       const headingToShop =
-        agent.lifecycleState === "walk" || agent.lifecycleState === "queue";
+        agent.lifecycleState === "walk" ||
+        agent.lifecycleState === "queue" ||
+        agent.lifecycleState === "checkout";
       if (!headingToShop && distance <= nearestSink(agent).radius) {
         exitedCount++;
         continue;

@@ -96,6 +96,16 @@ export const bioCityDemoScene = parseScene({
       width: 10,
     },
   ],
+  servicePoints: [
+    {
+      id: "east-checkout",
+      name: "East Checkout",
+      kind: "counter",
+      position: { x: 132, y: 52 },
+      width: 6,
+      serviceMeanSeconds: 6,
+    },
+  ],
   roads: [
     {
       id: "rain-market-avenue",
