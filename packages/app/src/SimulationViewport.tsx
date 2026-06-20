@@ -165,6 +165,9 @@ export function SimulationViewport({
             emissive: agentLook.emissive,
             emissiveIntensity: agentLook.emissiveIntensity,
             roughness: 0.5,
+            // Always-visible crowd: draw agents over the buildings so the live
+            // flow is never hidden behind tall (glTF) towers.
+            depthTest: false,
           })
         : new MeshBasicMaterial({ color: agentLook.color });
     const agents = new InstancedMesh(
@@ -176,6 +179,9 @@ export function SimulationViewport({
     // the scene each frame while the geometry bounding sphere stays at the
     // origin, so culling would wrongly hide the whole mesh.
     agents.frustumCulled = false;
+    // Draw the crowd last so the always-on-top (depthTest:false) agents render
+    // above the buildings — the street-level flow stays visible in the 3d city.
+    agents.renderOrder = 10;
     const floor = createFloor(crowdScene, viewMode);
     const walls = [
       createWall(-13, 4, 5, 9, 0.32, viewMode),
