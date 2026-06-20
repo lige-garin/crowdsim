@@ -44,6 +44,7 @@ import {
   type OrbitState,
 } from "./orbitCamera";
 import { isClick, screenToNdc } from "./agentPicking";
+import { facadeWindows } from "./buildingFacade";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectAgentIntentOverlay,
@@ -1011,16 +1012,23 @@ function createBioCityPrimitiveMesh(
 ) {
   if (primitive.kind === "building") {
     const bounds = primitiveBounds(primitive.points);
-    const height =
-      viewMode === "3d" ? Math.max(1, primitive.heightMeters * 0.16) : 0.08;
+    const is3d = viewMode === "3d";
+    // Taller, lit volumes so buildings read as buildings (not flat tiles).
+    const height = is3d ? Math.max(2.5, primitive.heightMeters * 0.34) : 0.08;
     const group = new Group();
+    // 3d uses lit materials so the day/night light gives shaded, solid facades;
+    // 2d (top-down) has no scene lighting, so it keeps flat unlit colours.
+    const litMaterial = (color: string) =>
+      is3d
+        ? new MeshStandardMaterial({ color, roughness: 0.82 })
+        : new MeshBasicMaterial({ color });
     const body = new Mesh(
       new BoxGeometry(bounds.width, bounds.height, height),
-      new MeshBasicMaterial({ color: primitive.color }),
+      litMaterial(primitive.color),
     );
     const roof = new Mesh(
-      new BoxGeometry(bounds.width * 1.04, bounds.height * 1.04, 0.16),
-      new MeshBasicMaterial({ color: "#d9e4ee" }),
+      new BoxGeometry(bounds.width * 1.04, bounds.height * 1.04, is3d ? 0.4 : 0.16),
+      litMaterial(is3d ? "#2f3a48" : "#d9e4ee"),
     );
     const sign = new Mesh(
       new BoxGeometry(bounds.width * 0.55, 0.42, 0.36),
@@ -1028,21 +1036,51 @@ function createBioCityPrimitiveMesh(
     );
 
     body.position.set(0, 0, height / 2);
-    roof.position.set(0, 0, height + 0.08);
+    roof.position.set(0, 0, height + (is3d ? 0.2 : 0.08));
     sign.position.set(0, -bounds.height / 2 - 0.08, Math.max(0.8, height * 0.54));
     group.add(body, roof, sign);
 
-    for (let index = 0; index < 4; index++) {
-      const strip = new Mesh(
-        new BoxGeometry(bounds.width * 0.74, 0.06, 0.08),
-        new MeshBasicMaterial({ color: "#a7f3ff" }),
-      );
-      strip.position.set(
-        0,
-        -bounds.height / 2 - 0.09,
-        Math.max(0.52, height * (0.22 + index * 0.16)),
-      );
-      group.add(strip);
+    if (is3d) {
+      // Emissive window grid on every facade: shaded panes by day, lit at night.
+      const windowMaterial = new MeshStandardMaterial({
+        color: "#dbeafe",
+        emissive: "#ffd23a",
+        emissiveIntensity: 0.5,
+        roughness: 0.4,
+      });
+      for (const win of facadeWindows(bounds.width, height)) {
+        for (const face of [-1, 1]) {
+          const pane = new Mesh(
+            new BoxGeometry(win.width, 0.06, win.height),
+            windowMaterial,
+          );
+          pane.position.set(win.offset, face * (bounds.height / 2 + 0.03), win.vertical);
+          group.add(pane);
+        }
+      }
+      for (const win of facadeWindows(bounds.height, height)) {
+        for (const face of [-1, 1]) {
+          const pane = new Mesh(
+            new BoxGeometry(0.06, win.width, win.height),
+            windowMaterial,
+          );
+          pane.position.set(face * (bounds.width / 2 + 0.03), win.offset, win.vertical);
+          group.add(pane);
+        }
+      }
+    } else {
+      for (let index = 0; index < 4; index++) {
+        const strip = new Mesh(
+          new BoxGeometry(bounds.width * 0.74, 0.06, 0.08),
+          new MeshBasicMaterial({ color: "#a7f3ff" }),
+        );
+        strip.position.set(
+          0,
+          -bounds.height / 2 - 0.09,
+          Math.max(0.52, height * (0.22 + index * 0.16)),
+        );
+        group.add(strip);
+      }
     }
 
     group.position.set(
