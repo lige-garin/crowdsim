@@ -33,6 +33,7 @@ import {
   visibleAgentCount,
 } from "./agentInstanceField";
 import { agentAppearance } from "./agentAppearance";
+import { dayNightLighting } from "./dayNightCycle";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
@@ -215,14 +216,20 @@ export function SimulationViewport({
     walls.forEach((wall) => scene.add(wall));
     bioCityObjects.forEach((object) => scene.add(object));
 
-    // Lighting so the 3d agents (MeshStandardMaterial) read as shaded figures
-    // with depth instead of flat blocks. Strong ambient/hemisphere keeps
-    // nothing from going black; the key light gives faces directionality.
+    // Lighting follows the simulation clock (day -> night -> day) so the 3d
+    // city reads as living. Only the lights change; the scene background stays
+    // owned by the weather layer. Agents self-illuminate (emissive), so they
+    // stay visible even at night.
     if (viewMode === "3d") {
-      const hemisphereLight = new HemisphereLight("#cfe0ee", "#16242e", 1.1);
-      const keyLight = new DirectionalLight("#ffffff", 1.35);
+      const lighting = dayNightLighting(bioCityVisualSecond);
+      const hemisphereLight = new HemisphereLight(
+        lighting.hemiSky,
+        lighting.hemiGround,
+        lighting.hemiIntensity,
+      );
+      const keyLight = new DirectionalLight(lighting.keyColor, lighting.keyIntensity);
       keyLight.position.set(worldWidth * 0.3, -worldHeight * 0.35, worldHeight);
-      const fillLight = new AmbientLight("#ffffff", 0.4);
+      const fillLight = new AmbientLight("#ffffff", lighting.ambientIntensity);
       scene.add(hemisphereLight, keyLight, fillLight);
     }
     if (bioCityPlan) {
