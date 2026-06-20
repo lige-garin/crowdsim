@@ -24,6 +24,7 @@ import {
   type SimulationShop,
 } from "./simulationDecisionBackend";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
+import { weatherCrowdImpact } from "./weatherCrowdImpact";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 
 export type SimulationStatus = "paused" | "running";
@@ -136,6 +137,8 @@ export function createSimulationEngineFromScene(
       radius: Math.max(1, entrance.width / 2),
     }));
 
+  // Bad weather makes shoppers shelter longer (dwell stretches with riskScore).
+  const weather = weatherCrowdImpact(environmentImpact);
   const shops: SimulationShop[] = scene.shops.map((shop) => ({
     id: shop.id,
     // Prefer the shop entrance (reachable, at the building edge) over the centre,
@@ -143,7 +146,7 @@ export function createSimulationEngineFromScene(
     position: shop.entrancePosition ?? shop.position,
     radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
     attraction: shop.attraction,
-    dwellSeconds: shop.dwellMeanSeconds,
+    dwellSeconds: shop.dwellMeanSeconds * weather.dwellMultiplier,
     capacity: shop.capacity,
     queuePosition: shop.queueAnchor ?? shop.entrancePosition ?? shop.position,
   }));

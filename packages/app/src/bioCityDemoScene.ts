@@ -9,6 +9,14 @@ export const bioCityDemoScene = parseScene({
     width: 160,
     height: 96,
   },
+  environmentFactors: [
+    {
+      id: "high-street-rain",
+      name: "Rain over the high street",
+      kind: "rain",
+      severity: 0.8,
+    },
+  ],
   visualAssets: [
     {
       id: "rain-market-streetscape",
