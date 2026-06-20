@@ -22,6 +22,7 @@ import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
+import { usesWorkerSimulationPath } from "./simulationThread";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
 import { bioCityStudioTitle, bioCityTopbarMetricText } from "./bioCityUiContract";
@@ -63,7 +64,11 @@ function AppContent() {
   const forceMainSim =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("mainsim");
-  const usesWorkerSimulation = !forceMainSim && !webGpuMovementBackend.backend;
+  // Pick the simulation path from the stable ?mainsim flag only — never from the
+  // async WebGPU probe. Gating on webGpuMovementBackend.backend flipped the path
+  // worker -> main the moment the probe resolved, abandoning the running worker
+  // sim for a never-started main engine: the "empty city" bug on WebGPU machines.
+  const usesWorkerSimulation = usesWorkerSimulationPath({ forceMainSim });
   const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
   const currentRuntime = useMemo(
     () =>
