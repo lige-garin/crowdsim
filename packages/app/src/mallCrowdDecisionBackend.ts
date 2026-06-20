@@ -75,7 +75,7 @@ export function createMallCrowdDecisionBackend(options: {
   return {
     id: "rule-ts",
     decisionHz: options.decisionHz ?? 10,
-    decideAgents({ agents, elapsedSeconds, sinks, shops }) {
+    decideAgents({ agents, elapsedSeconds, sinks, shops, evacuationActive }) {
       const activeShops = shops ?? options.shops;
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
@@ -110,6 +110,22 @@ export function createMallCrowdDecisionBackend(options: {
 
       for (const agent of agents) {
         const state = agent.lifecycleState;
+
+        // Evacuation overrides shopping: abandon the shop, head for the exit.
+        if (evacuationActive) {
+          if (state !== "evacuate") {
+            const sink = nearestSink(agent, sinks);
+            decisions.push({
+              agentId: agent.id,
+              nextState: "evacuate",
+              target: sink.position,
+              targetSinkId: sink.id,
+              selectedStoreId: undefined,
+              browseUntilSeconds: null,
+            });
+          }
+          continue;
+        }
 
         if (state === "leave") {
           continue;

@@ -61,6 +61,12 @@ export type SimulationWorkerSetTimeScaleRequest = {
   type: "set-time-scale";
 };
 
+export type SimulationWorkerSetEvacuationRequest = {
+  active: boolean;
+  id: number;
+  type: "set-evacuation";
+};
+
 export type SimulationWorkerTickRequest = {
   id: number;
   realDeltaSeconds: number;
@@ -70,6 +76,7 @@ export type SimulationWorkerTickRequest = {
 export type SimulationWorkerRequest =
   | SimulationWorkerCommandRequest
   | SimulationWorkerInitRequest
+  | SimulationWorkerSetEvacuationRequest
   | SimulationWorkerSetTimeScaleRequest
   | SimulationWorkerTickRequest;
 
@@ -88,6 +95,7 @@ export type SimulationWorkerResponse =
 type SimulationWorkerRequestPayload =
   | Omit<SimulationWorkerCommandRequest, "id">
   | Omit<SimulationWorkerInitRequest, "id">
+  | Omit<SimulationWorkerSetEvacuationRequest, "id">
   | Omit<SimulationWorkerSetTimeScaleRequest, "id">
   | Omit<SimulationWorkerTickRequest, "id">;
 
@@ -110,6 +118,7 @@ export type SimulationWorkerClient = {
   ) => Promise<SimulationSnapshot>;
   pause: () => Promise<SimulationSnapshot>;
   reset: () => Promise<SimulationSnapshot>;
+  setEvacuation: (active: boolean) => Promise<SimulationSnapshot>;
   setTimeScale: (timeScale: number) => Promise<SimulationSnapshot>;
   snapshot: () => Promise<SimulationSnapshot>;
   start: () => Promise<SimulationSnapshot>;
@@ -432,6 +441,7 @@ export function createSimulationWorkerClient(
       }),
     pause: () => send({ type: "pause" }),
     reset: () => send({ type: "reset" }),
+    setEvacuation: (active) => send({ active, type: "set-evacuation" }),
     setTimeScale: (timeScale) => send({ timeScale, type: "set-time-scale" }),
     snapshot: () => send({ type: "snapshot" }),
     start: () => send({ type: "start" }),
@@ -474,6 +484,7 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
     },
     pause: () => publish(requireEngine().pause()),
     reset: () => publish(requireEngine().reset()),
+    setEvacuation: (active) => publish(requireEngine().setEvacuation(active)),
     setTimeScale: (timeScale) => publish(requireEngine().setTimeScale(timeScale)),
     snapshot: () => publish(requireEngine().snapshot()),
     start: () => publish(requireEngine().start()),

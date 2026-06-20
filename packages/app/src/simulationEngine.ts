@@ -87,6 +87,7 @@ export type SimulationSnapshot = {
 export type SimulationEngine = {
   pause: () => SimulationSnapshot;
   reset: () => SimulationSnapshot;
+  setEvacuation: (active: boolean) => SimulationSnapshot;
   setTimeScale: (timeScale: number) => SimulationSnapshot;
   snapshot: () => SimulationSnapshot;
   start: () => SimulationSnapshot;
@@ -203,6 +204,7 @@ export function createSimulationEngine(
   let spawnedCount = 0;
   let exitedCount = 0;
   let agents: SimulationAgent[] = [];
+  let evacuationActive = false;
 
   function makeSnapshot(): SimulationSnapshot {
     return {
@@ -329,6 +331,7 @@ export function createSimulationEngine(
         elapsedSeconds,
         sinks,
         shops,
+        evacuationActive,
       }),
       decisionTick,
     );
@@ -395,9 +398,9 @@ export function createSimulationEngine(
     dy: number,
     distance: number,
   ) {
-    // The flow field only knows routes to sinks, so use it only when leaving;
-    // a shopper walking to a shop steers straight at the shop.
-    if (agent.lifecycleState === "leave") {
+    // The flow field only knows routes to sinks, so use it when heading for an
+    // exit (leaving or evacuating); a shopper walking to a shop steers straight.
+    if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
       const fieldDirection = sampleNavigationDirection(agent);
 
       if (fieldDirection) {
@@ -454,6 +457,11 @@ export function createSimulationEngine(
       spawnedCount = 0;
       exitedCount = 0;
       agents = [];
+      evacuationActive = false;
+      return makeSnapshot();
+    },
+    setEvacuation(active: boolean) {
+      evacuationActive = active;
       return makeSnapshot();
     },
     setTimeScale(nextTimeScale: number) {

@@ -26,6 +26,7 @@ export type SimulationOrchestratorSnapshot = SimulationSnapshot & {
 export type SimulationOrchestrator = {
   pause: () => SimulationOrchestratorSnapshot;
   reset: () => SimulationOrchestratorSnapshot;
+  setEvacuation: (active: boolean) => SimulationOrchestratorSnapshot;
   setTimeScale: (timeScale: number) => SimulationOrchestratorSnapshot;
   snapshot: () => SimulationOrchestratorSnapshot;
   start: () => SimulationOrchestratorSnapshot;
@@ -67,6 +68,7 @@ export function createSimulationOrchestrator(
       decisionTickCount = 0;
       return wrap(engine.reset());
     },
+    setEvacuation: (active: boolean) => wrap(engine.setEvacuation(active)),
     setTimeScale: (timeScale: number) => wrap(engine.setTimeScale(timeScale)),
     snapshot: () => wrap(engine.snapshot()),
     start: () => wrap(engine.start()),

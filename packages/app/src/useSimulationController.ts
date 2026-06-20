@@ -10,6 +10,7 @@ import type { MovementBackend } from "./movementBackend";
 export type SimulationController = {
   pause: () => void;
   reset: () => void;
+  setEvacuation: (active: boolean) => void;
   setTimeScale: (timeScale: number) => void;
   snapshot: SimulationSnapshot;
   start: () => void;
@@ -127,9 +128,17 @@ export function useSimulationController(
     [engine],
   );
 
+  const setEvacuation = useCallback(
+    (active: boolean) => {
+      setSnapshot(engine.setEvacuation(active));
+    },
+    [engine],
+  );
+
   return {
     pause,
     reset,
+    setEvacuation,
     setTimeScale,
     snapshot,
     start,

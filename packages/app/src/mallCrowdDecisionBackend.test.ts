@@ -120,6 +120,42 @@ describe("createMallCrowdDecisionBackend", () => {
     expect(decided?.browseUntilSeconds).toBe(6); // elapsed 1 + dwell 5
   });
 
+  it("evacuates everyone to the nearest exit when evacuation is active", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const agents = [
+      agent({ id: 1, lifecycleState: "browse", selectedStoreId: "a", x: 10, y: 10 }),
+      agent({ id: 2, lifecycleState: "walk", selectedStoreId: "b", x: 30, y: 30 }),
+      agent({ id: 3, lifecycleState: "queue", selectedStoreId: "a", x: 12, y: 12 }),
+    ];
+    const decisions = backend.decideAgents({
+      agents,
+      decisionTick: 0,
+      elapsedSeconds: 0,
+      sinks,
+      shops,
+      evacuationActive: true,
+    });
+    expect(decisions).toHaveLength(3);
+    for (const d of decisions) {
+      expect(d.nextState).toBe("evacuate");
+      expect(d.targetSinkId).toBe("exit");
+      expect(d.target).toEqual({ x: 0, y: 0 });
+    }
+  });
+
+  it("does not re-issue evacuation for an already-evacuating agent", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const decisions = backend.decideAgents({
+      agents: [agent({ id: 1, lifecycleState: "evacuate", x: 5, y: 5 })],
+      decisionTick: 0,
+      elapsedSeconds: 0,
+      sinks,
+      shops,
+      evacuationActive: true,
+    });
+    expect(decisions).toHaveLength(0);
+  });
+
   it("uses persona/brand store-choice when brand stores are provided", () => {
     const brand = (id: string, category: BrandStoreCandidate["brand"]["category"]) => ({
       id,

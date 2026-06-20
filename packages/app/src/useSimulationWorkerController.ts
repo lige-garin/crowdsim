@@ -193,9 +193,17 @@ export function useSimulationWorkerController(
     [publish],
   );
 
+  const setEvacuation = useCallback(
+    (active: boolean) => {
+      void clientRef.current?.setEvacuation(active).then(publish);
+    },
+    [publish],
+  );
+
   return {
     pause,
     reset,
+    setEvacuation,
     setTimeScale,
     snapshot,
     start,

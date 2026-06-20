@@ -42,6 +42,8 @@ export type SimulationDecisionTickInput = {
   elapsedSeconds: number;
   sinks: readonly SimulationSink[];
   shops?: readonly SimulationShop[];
+  /** When true, all agents abandon shopping and head for the nearest exit. */
+  evacuationActive?: boolean;
 };
 
 export type SimulationDecisionBackend = {

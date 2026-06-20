@@ -70,6 +70,11 @@ async function handleMessage(message: SimulationWorkerRequest) {
       return;
     }
 
+    if (message.type === "set-evacuation") {
+      postSnapshot(message.id, engine.setEvacuation(message.active));
+      return;
+    }
+
     if (message.type === "tick") {
       postSnapshot(message.id, engine.tick(message.realDeltaSeconds));
       return;

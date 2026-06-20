@@ -307,6 +307,7 @@ function AppContent() {
     const snapshot = simulation.snapshot;
     const flowPlan = createEvacuationFlowPlan(demoScene, snapshot.agents);
 
+    simulation.setEvacuation(true);
     simulation.start();
     setEvacuation({
       active: behaviorMode.active,
@@ -327,6 +328,7 @@ function AppContent() {
   async function clearEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.reset();
 
+    simulation.setEvacuation(false);
     setEvacuation({
       active: behaviorMode.active,
       baselineExited: simulation.snapshot.exitedCount,
