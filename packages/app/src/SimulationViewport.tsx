@@ -48,6 +48,7 @@ import { facadeWindows } from "./buildingFacade";
 import { streetDressingPlacements } from "./streetDressing";
 import { shadowCameraFrustum } from "./shadowConfig";
 import type { SimulationSnapshot } from "./simulationEngine";
+import { deconflictLabels } from "./simulationViewportLabels";
 import {
   selectAgentIntentOverlay,
   selectViewportAgentAnnotations,
@@ -771,7 +772,7 @@ function ViewportCityLabelOverlay({
     return null;
   }
 
-  const labels = createCityLabels(scene, viewMode);
+  const labels = deconflictLabels(createCityLabels(scene, viewMode));
 
   if (labels.length === 0) {
     return null;

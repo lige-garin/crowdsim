@@ -177,6 +177,24 @@ function AppContent() {
     simulationSnapshotRef.current = simulation.snapshot;
   }, [simulation.snapshot]);
 
+  // Auto-start the demo so opening the workbench shows a live crowd instead of
+  // an empty city. Retries until the worker is ready, runs once, and never
+  // fights a manual pause.
+  const autoStartedRef = useRef(false);
+  const startSimulation = simulation.start;
+  const simulationStatus = simulation.snapshot.status;
+  useEffect(() => {
+    if (autoStartedRef.current) {
+      return;
+    }
+    if (simulationStatus === "running") {
+      autoStartedRef.current = true;
+      return;
+    }
+    const intervalId = window.setInterval(() => startSimulation(), 400);
+    return () => window.clearInterval(intervalId);
+  }, [simulationStatus, startSimulation]);
+
   useEffect(() => {
     if (!evacuation.active) {
       return;
