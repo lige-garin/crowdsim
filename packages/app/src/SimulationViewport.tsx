@@ -45,6 +45,7 @@ import {
 } from "./orbitCamera";
 import { isClick, screenToNdc } from "./agentPicking";
 import { facadeWindows } from "./buildingFacade";
+import { streetDressingPlacements } from "./streetDressing";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectAgentIntentOverlay,
@@ -922,9 +923,12 @@ function createFloor(scene: CrowdSimScene | undefined, viewMode: ViewMode) {
     (scene?.world.width ?? 80) * 1.08,
     (scene?.world.height ?? 48) * 1.08,
   );
-  const material = new MeshBasicMaterial({
-    color: viewMode === "3d" ? "#22323a" : "#102232",
-  });
+  // 3d ground takes the scene light so it darkens at night with everything
+  // else; 2d (top-down, unlit) keeps a flat colour.
+  const material =
+    viewMode === "3d"
+      ? new MeshStandardMaterial({ color: "#2a3a42", roughness: 0.96 })
+      : new MeshBasicMaterial({ color: "#102232" });
   const floor = new Mesh(geometry, material);
 
   floor.position.set(0, 0, -0.02);
@@ -1190,17 +1194,14 @@ function createBioCitySceneDressingObjects(scene: CrowdSimScene, viewMode: ViewM
 
   const objects: Object3D[] = [];
   const roadPoints = scene.roads.flatMap((road) => road.geometry.points);
+  const dressing = streetDressingPlacements(roadPoints);
 
-  roadPoints.forEach((point, index) => {
-    if (index % 2 !== 0) {
-      return;
-    }
-
+  dressing.trees.forEach((tree) => {
+    objects.push(createTree(toRenderX(tree.x, scene), toRenderY(tree.y, scene)));
+  });
+  dressing.lights.forEach((light) => {
     objects.push(
-      createTree(toRenderX(point.x + 4, scene), toRenderY(point.y + 5, scene)),
-    );
-    objects.push(
-      createStreetLight(toRenderX(point.x - 5, scene), toRenderY(point.y - 4, scene)),
+      createStreetLight(toRenderX(light.x, scene), toRenderY(light.y, scene)),
     );
   });
 
@@ -1222,17 +1223,20 @@ function createBioCitySceneDressingObjects(scene: CrowdSimScene, viewMode: ViewM
 
 function createTree(x: number, y: number) {
   const group = new Group();
+  // Cylinders are Y-axis by default; rotate to stand upright in the z-up scene.
   const trunk = new Mesh(
     new CylinderGeometry(0.18, 0.24, 1.2, 8),
-    new MeshBasicMaterial({ color: "#6b4f2a" }),
+    new MeshStandardMaterial({ color: "#6b4f2a", roughness: 0.9 }),
   );
+  trunk.rotation.x = Math.PI / 2;
   const crown = new Mesh(
-    new CylinderGeometry(1.05, 0.74, 1.25, 10),
-    new MeshBasicMaterial({ color: "#3f8f52" }),
+    new CylinderGeometry(0.2, 1.1, 1.6, 10),
+    new MeshStandardMaterial({ color: "#3f8f52", roughness: 0.85 }),
   );
+  crown.rotation.x = Math.PI / 2;
 
   trunk.position.set(0, 0, 0.6);
-  crown.position.set(0, 0, 1.52);
+  crown.position.set(0, 0, 1.9);
   group.add(trunk, crown);
   group.position.set(x, y, 0);
 
@@ -1243,11 +1247,17 @@ function createStreetLight(x: number, y: number) {
   const group = new Group();
   const pole = new Mesh(
     new CylinderGeometry(0.08, 0.1, 2.4, 8),
-    new MeshBasicMaterial({ color: "#94a3b8" }),
+    new MeshStandardMaterial({ color: "#94a3b8", roughness: 0.5, metalness: 0.3 }),
   );
+  pole.rotation.x = Math.PI / 2;
+  // Emissive lamp head reads as a lit lamp, glowing against the night scene.
   const lamp = new Mesh(
     new BoxGeometry(0.74, 0.28, 0.18),
-    new MeshBasicMaterial({ color: "#fde68a" }),
+    new MeshStandardMaterial({
+      color: "#fde68a",
+      emissive: "#ffd23a",
+      emissiveIntensity: 0.7,
+    }),
   );
 
   pole.position.set(0, 0, 1.2);
