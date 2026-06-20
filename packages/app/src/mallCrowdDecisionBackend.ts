@@ -74,6 +74,35 @@ export function createMallCrowdDecisionBackend(options: {
     decideAgents({ agents, elapsedSeconds, sinks, shops }) {
       const activeShops = shops ?? options.shops;
       const decisions: SimulationAgentDecision[] = [];
+      const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
+
+      // Live occupancy (current browsers) per shop; enter() reserves a slot so
+      // concurrent arrivals in one tick cannot overfill a shop.
+      const occupancy = new Map<string, number>();
+      for (const agent of agents) {
+        if (agent.lifecycleState === "browse" && agent.selectedStoreId) {
+          occupancy.set(
+            agent.selectedStoreId,
+            (occupancy.get(agent.selectedStoreId) ?? 0) + 1,
+          );
+        }
+      }
+      const hasRoom = (shopId: string) => {
+        const shop = shopById.get(shopId);
+        return shop ? (occupancy.get(shopId) ?? 0) < shop.capacity : false;
+      };
+      const enter = (shopId: string) =>
+        occupancy.set(shopId, (occupancy.get(shopId) ?? 0) + 1);
+      const browseDecision = (
+        agentId: number,
+        shop: SimulationShop,
+      ): SimulationAgentDecision => ({
+        agentId,
+        nextState: "browse",
+        selectedStoreId: shop.id,
+        target: shop.position,
+        browseUntilSeconds: elapsedSeconds + shop.dwellSeconds,
+      });
 
       for (const agent of agents) {
         const state = agent.lifecycleState;
@@ -111,19 +140,34 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
+        // Queued: enter as soon as a slot frees, otherwise keep waiting.
+        if (state === "queue" && agent.selectedStoreId) {
+          const shop = shopById.get(agent.selectedStoreId);
+          if (shop && hasRoom(shop.id)) {
+            enter(shop.id);
+            decisions.push(browseDecision(agent.id, shop));
+          }
+          continue;
+        }
+
+        // Walking and arrived: browse if there is room, else join the queue.
         if (state === "walk" && agent.selectedStoreId) {
-          const shop = activeShops.find((s) => s.id === agent.selectedStoreId);
+          const shop = shopById.get(agent.selectedStoreId);
           if (shop) {
             const dx = shop.position.x - agent.x;
             const dy = shop.position.y - agent.y;
             if (Math.hypot(dx, dy) <= shop.radius) {
-              decisions.push({
-                agentId: agent.id,
-                nextState: "browse",
-                selectedStoreId: shop.id,
-                target: shop.position,
-                browseUntilSeconds: elapsedSeconds + shop.dwellSeconds,
-              });
+              if (hasRoom(shop.id)) {
+                enter(shop.id);
+                decisions.push(browseDecision(agent.id, shop));
+              } else {
+                decisions.push({
+                  agentId: agent.id,
+                  nextState: "queue",
+                  selectedStoreId: shop.id,
+                  target: shop.queuePosition,
+                });
+              }
             }
           }
           continue;

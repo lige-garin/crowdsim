@@ -20,6 +20,10 @@ export type SimulationShop = {
   attraction: number;
   /** How long the agent dwells (browses) once it arrives, in seconds. */
   dwellSeconds: number;
+  /** Max simultaneous browsers; arrivals beyond this queue instead of entering. */
+  capacity: number;
+  /** Where queued shoppers wait for a free slot. */
+  queuePosition: ScenePoint;
 };
 
 export type SimulationAgentDecision = {

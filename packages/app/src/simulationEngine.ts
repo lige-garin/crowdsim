@@ -144,6 +144,8 @@ export function createSimulationEngineFromScene(
     radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
     attraction: shop.attraction,
     dwellSeconds: shop.dwellMeanSeconds,
+    capacity: shop.capacity,
+    queuePosition: shop.queueAnchor ?? shop.entrancePosition ?? shop.position,
   }));
   // Default to the rule-based mall-crowd behaviour (enter -> shop -> browse ->
   // leave) so the crowd moves with a reason; callers may override.
@@ -346,9 +348,10 @@ export function createSimulationEngine(
       const dy = agent.targetY - agent.y;
       const distance = Math.hypot(dx, dy);
 
-      // Exit on reaching the sink, unless currently heading to a shop. Agents
-      // with no decision backend head straight to the sink and still exit.
-      const headingToShop = agent.lifecycleState === "walk";
+      // Exit on reaching the sink, unless heading to a shop or queuing for one.
+      // Agents with no decision backend head straight to the sink and still exit.
+      const headingToShop =
+        agent.lifecycleState === "walk" || agent.lifecycleState === "queue";
       if (!headingToShop && distance <= nearestSink(agent).radius) {
         exitedCount++;
         continue;

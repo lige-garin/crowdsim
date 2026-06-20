@@ -4,8 +4,8 @@ import type { SimulationShop } from "./simulationDecisionBackend";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 
 const shops: SimulationShop[] = [
-  { id: "a", position: { x: 10, y: 10 }, radius: 2, attraction: 1, dwellSeconds: 5 },
-  { id: "b", position: { x: 50, y: 50 }, radius: 2, attraction: 1, dwellSeconds: 5 },
+  { id: "a", position: { x: 10, y: 10 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 10, y: 14 } },
+  { id: "b", position: { x: 50, y: 50 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 50, y: 54 } },
 ];
 const sinks: SimulationSink[] = [{ id: "exit", position: { x: 0, y: 0 }, radius: 2 }];
 
@@ -95,5 +95,27 @@ describe("createMallCrowdDecisionBackend", () => {
         .map((d) => d.selectedStoreId),
     );
     expect(chosen.size).toBeGreaterThan(1);
+  });
+
+  it("queues an arriving shopper when the shop is at capacity", () => {
+    const browsers = [
+      agent({ id: 1, lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 10, x: 10, y: 10 }),
+      agent({ id: 2, lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 10, x: 10, y: 10 }),
+    ];
+    const arriving = agent({ id: 3, lifecycleState: "walk", selectedStoreId: "a", x: 10, y: 10 });
+    const d = decide([...browsers, arriving], 1);
+    const decided = d.find((x) => x.agentId === 3);
+    expect(decided?.nextState).toBe("queue");
+    expect(decided?.target).toEqual({ x: 10, y: 14 });
+  });
+
+  it("admits a queued shopper once a slot frees up", () => {
+    const agents = [
+      agent({ id: 1, lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 10, x: 10, y: 10 }),
+      agent({ id: 2, lifecycleState: "queue", selectedStoreId: "a", x: 10, y: 14 }),
+    ];
+    const decided = decide(agents, 1).find((x) => x.agentId === 2);
+    expect(decided?.nextState).toBe("browse");
+    expect(decided?.browseUntilSeconds).toBe(6); // elapsed 1 + dwell 5
   });
 });
