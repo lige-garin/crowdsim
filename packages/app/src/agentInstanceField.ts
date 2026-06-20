@@ -34,3 +34,22 @@ export function visibleAgentCount(agentCount: number, capacity: number): number 
   }
   return Math.max(0, Math.min(Math.floor(agentCount), capacity));
 }
+
+/**
+ * Which agent list the crowd renderer should draw. The worker simulation path
+ * (default without WebGPU) keeps snapshot.agents empty and streams live
+ * positions through the SharedArrayBuffer overlay, so the overlay wins when it
+ * has data; otherwise fall back to the main-thread snapshot agents.
+ *
+ * Regression guard for the bug where the InstancedMesh read the always-empty
+ * snapshot.agents and rendered nothing in the worker path.
+ */
+export function selectCrowdAgents(
+  snapshotAgents: readonly Pick<SimulationAgent, "x" | "y">[] | undefined,
+  overlayAgents: readonly Pick<SimulationAgent, "x" | "y">[] | undefined,
+): readonly Pick<SimulationAgent, "x" | "y">[] {
+  if (overlayAgents && overlayAgents.length > 0) {
+    return overlayAgents;
+  }
+  return snapshotAgents ?? [];
+}

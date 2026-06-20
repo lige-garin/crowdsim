@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { agentWorldPosition, visibleAgentCount } from "./agentInstanceField";
+import {
+  agentWorldPosition,
+  selectCrowdAgents,
+  visibleAgentCount,
+} from "./agentInstanceField";
 
 const world = { width: 160, height: 96 };
 
@@ -35,6 +39,27 @@ describe("agentWorldPosition", () => {
       y: world.height / 2 - 20,
       z: 0,
     });
+  });
+});
+
+describe("selectCrowdAgents", () => {
+  const snap = [{ x: 1, y: 2 }];
+  const overlay = [
+    { x: 3, y: 4 },
+    { x: 5, y: 6 },
+  ];
+
+  it("prefers the SharedArrayBuffer overlay when it has agents (worker path)", () => {
+    expect(selectCrowdAgents(snap, overlay)).toBe(overlay);
+  });
+
+  it("falls back to snapshot agents when the overlay is empty or undefined", () => {
+    expect(selectCrowdAgents(snap, [])).toBe(snap);
+    expect(selectCrowdAgents(snap, undefined)).toBe(snap);
+  });
+
+  it("returns an empty list when both sources are empty", () => {
+    expect(selectCrowdAgents(undefined, undefined)).toEqual([]);
   });
 });
 

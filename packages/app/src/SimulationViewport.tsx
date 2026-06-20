@@ -27,7 +27,11 @@ import {
   performanceAgentCount,
   performanceBenchmarkFrames,
 } from "./renderBenchmark";
-import { agentWorldPosition, visibleAgentCount } from "./agentInstanceField";
+import {
+  agentWorldPosition,
+  selectCrowdAgents,
+  visibleAgentCount,
+} from "./agentInstanceField";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
@@ -292,11 +296,10 @@ export function SimulationViewport({
     // first N instances at the real agents, hide any that were visible last
     // frame but no longer are. This replaces the static benchmark grid.
     function updateAgentInstances() {
-      const overlayAgents = sharedOverlayRef.current?.agents;
-      const live =
-        overlayAgents && overlayAgents.length > 0
-          ? overlayAgents
-          : (snapshotRef.current?.agents ?? []);
+      const live = selectCrowdAgents(
+        snapshotRef.current?.agents,
+        sharedOverlayRef.current?.agents,
+      );
       const visible = visibleAgentCount(live.length, performanceAgentCount);
 
       for (let index = 0; index < visible; index++) {
