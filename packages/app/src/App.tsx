@@ -57,7 +57,13 @@ function AppContent() {
     movementBackend: webGpuMovementBackend.backend,
   });
   const workerSimulation = useSimulationWorkerController(demoScene);
-  const usesWorkerSimulation = !webGpuMovementBackend.backend;
+  // `?mainsim` forces the main-thread CPU simulation. It is the working path
+  // when there is no WebGPU (otherwise the app falls back to the worker path)
+  // and is also what headless visual testing uses to render a live crowd.
+  const forceMainSim =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("mainsim");
+  const usesWorkerSimulation = !forceMainSim && !webGpuMovementBackend.backend;
   const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
   const currentRuntime = useMemo(
     () =>
