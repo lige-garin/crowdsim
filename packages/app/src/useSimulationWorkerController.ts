@@ -28,9 +28,8 @@ export type SimulationWorkerController = SimulationController & {
 export function useSimulationWorkerController(
   scene: CrowdSimScene,
 ): SimulationWorkerController {
-  const client = useMemo(() => createSimulationWorkerClient(), []);
   const sharedMemory = useMemo(() => createSimulationSharedMemory(), []);
-  const clientRef = useRef<SimulationWorkerClient>(client);
+  const clientRef = useRef<SimulationWorkerClient | undefined>(undefined);
   const sharedMemoryRef = useRef<SimulationWorkerSharedMemory | undefined>(
     sharedMemory,
   );
@@ -59,7 +58,13 @@ export function useSimulationWorkerController(
 
   useEffect(() => {
     let cancelled = false;
-    const currentClient = clientRef.current;
+    // Create the worker client INSIDE the effect. React StrictMode runs effects
+    // setup -> cleanup -> setup; the cleanup terminates the worker, so a single
+    // reused client would be left with a dead worker and every request (start /
+    // tick) would hang forever — the simulation never ran. A fresh client per
+    // setup always has a live worker.
+    const currentClient = createSimulationWorkerClient();
+    clientRef.current = currentClient;
 
     currentClient
       .init(scene, {
@@ -118,9 +123,14 @@ export function useSimulationWorkerController(
       const lastFrameAt = lastFrameAtRef.current ?? frameTime;
       const deltaSeconds = (frameTime - lastFrameAt) / 1000;
 
+      const client = clientRef.current;
+      if (!client) {
+        return;
+      }
+
       lastFrameAtRef.current = frameTime;
       tickInFlightRef.current = true;
-      void clientRef.current
+      void client
         .tick(deltaSeconds)
         .then((nextSnapshot) => {
           if (!cancelled) {
@@ -161,21 +171,21 @@ export function useSimulationWorkerController(
 
   const start = useCallback(() => {
     lastFrameAtRef.current = null;
-    void clientRef.current.start().then(publish);
+    void clientRef.current?.start().then(publish);
   }, [publish]);
 
   const pause = useCallback(() => {
-    void clientRef.current.pause().then(publish);
+    void clientRef.current?.pause().then(publish);
   }, [publish]);
 
   const reset = useCallback(() => {
     lastFrameAtRef.current = null;
-    void clientRef.current.reset().then(publish);
+    void clientRef.current?.reset().then(publish);
   }, [publish]);
 
   const setTimeScale = useCallback(
     (timeScale: number) => {
-      void clientRef.current.setTimeScale(timeScale).then(publish);
+      void clientRef.current?.setTimeScale(timeScale).then(publish);
     },
     [publish],
   );
