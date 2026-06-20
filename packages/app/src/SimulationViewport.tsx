@@ -383,10 +383,24 @@ export function SimulationViewport({
           }
 
           scene.getObjectByName(asset.id)?.removeFromParent();
+          object.traverse((child) => {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          });
           scene.add(object);
 
           return [object];
         });
+
+        // A real model loaded: hide the programmatic inline buildings it stands
+        // in for (roads / trees / lamps / overlays stay).
+        if (loadedBioCityAssets.length > 0) {
+          scene.children
+            .filter((child) => child.name === "inline-building")
+            .forEach((child) => {
+              child.visible = false;
+            });
+        }
       });
     }
 
@@ -1037,6 +1051,7 @@ function createBioCityPrimitiveMesh(
     // Taller, lit volumes so buildings read as buildings (not flat tiles).
     const height = is3d ? Math.max(2.5, primitive.heightMeters * 0.34) : 0.08;
     const group = new Group();
+    group.name = "inline-building";
     // 3d uses lit materials so the day/night light gives shaded, solid facades;
     // 2d (top-down) has no scene lighting, so it keeps flat unlit colours.
     const litMaterial = (color: string) =>
