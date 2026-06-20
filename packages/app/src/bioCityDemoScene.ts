@@ -343,6 +343,15 @@ export const bioCityDemoScene = parseScene({
       attraction: 1.1,
       dwellMeanSeconds: 9,
       capacity: 14,
+      brand: {
+        profileId: "glass-arcade-store",
+        category: "fastFashion",
+        brandPower: 0.62,
+        personaAffinity: {
+          browser: 0.85,
+          commuter: 0.3,
+        },
+      },
     },
     {
       id: "food-hall-eatery",
@@ -354,6 +363,16 @@ export const bioCityDemoScene = parseScene({
       attraction: 1.25,
       dwellMeanSeconds: 12,
       capacity: 16,
+      brand: {
+        profileId: "food-hall-eatery",
+        category: "dining",
+        brandPower: 0.72,
+        personaAffinity: {
+          browser: 0.5,
+          commuter: 0.55,
+          serviceSeeker: 0.4,
+        },
+      },
     },
     {
       id: "avenue-newsstand",
@@ -365,6 +384,15 @@ export const bioCityDemoScene = parseScene({
       attraction: 0.85,
       dwellMeanSeconds: 5,
       capacity: 8,
+      brand: {
+        profileId: "avenue-newsstand",
+        category: "grocery",
+        brandPower: 0.42,
+        personaAffinity: {
+          commuter: 0.78,
+          serviceSeeker: 0.3,
+        },
+      },
     },
   ],
   visual: {

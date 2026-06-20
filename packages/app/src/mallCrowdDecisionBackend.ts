@@ -5,6 +5,8 @@ import type {
   SimulationShop,
 } from "./simulationDecisionBackend";
 import type { SimulationSink } from "./simulationEngine";
+import { chooseBrandStore, type BrandStoreCandidate } from "./brandAttraction";
+import { createAgentMindset } from "./agentPersona";
 
 /** Deterministic PRNG so shop choice is reproducible for a given seed. */
 function mulberry32(seed: number): () => number {
@@ -65,8 +67,10 @@ export function createMallCrowdDecisionBackend(options: {
   shops: readonly SimulationShop[];
   seed?: number;
   decisionHz?: number;
+  brandStores?: readonly BrandStoreCandidate[];
 }): SimulationDecisionBackend {
   const random = mulberry32(options.seed ?? 1);
+  const mindsetSeed = options.seed ?? 1;
 
   return {
     id: "rule-ts",
@@ -173,13 +177,26 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
-        // Fresh shopper: pick a shop by attraction and walk to it.
-        const shop = pickShopByAttraction(activeShops, random());
+        // Fresh shopper: choose a shop. With brand data, use the persona/brand
+        // store-choice model so different personas favour different shops;
+        // otherwise fall back to attraction-weighted choice.
+        let chosen: SimulationShop | undefined;
+        if (options.brandStores && options.brandStores.length > 0) {
+          const mindset = createAgentMindset({ agentId: agent.id, seed: mindsetSeed });
+          const choice = chooseBrandStore(mindset, options.brandStores, {
+            agentPosition: { x: agent.x, y: agent.y },
+            randomUnit: random(),
+          });
+          chosen = choice ? shopById.get(choice.store.id) : undefined;
+        }
+        if (!chosen) {
+          chosen = pickShopByAttraction(activeShops, random());
+        }
         decisions.push({
           agentId: agent.id,
           nextState: "walk",
-          selectedStoreId: shop.id,
-          target: shop.position,
+          selectedStoreId: chosen.id,
+          target: chosen.position,
         });
       }
 

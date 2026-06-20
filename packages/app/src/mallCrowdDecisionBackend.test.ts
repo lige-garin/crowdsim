@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
 import type { SimulationShop } from "./simulationDecisionBackend";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
+import type { BrandStoreCandidate } from "./brandAttraction";
 
 const shops: SimulationShop[] = [
   { id: "a", position: { x: 10, y: 10 }, radius: 2, attraction: 1, dwellSeconds: 5, capacity: 2, queuePosition: { x: 10, y: 14 } },
@@ -117,5 +118,40 @@ describe("createMallCrowdDecisionBackend", () => {
     const decided = decide(agents, 1).find((x) => x.agentId === 2);
     expect(decided?.nextState).toBe("browse");
     expect(decided?.browseUntilSeconds).toBe(6); // elapsed 1 + dwell 5
+  });
+
+  it("uses persona/brand store-choice when brand stores are provided", () => {
+    const brand = (id: string, category: BrandStoreCandidate["brand"]["category"]) => ({
+      id,
+      name: id,
+      category,
+      brandPower: 0.6,
+      capacity: 2,
+      dwellMeanSeconds: 5,
+      novelty: 0.3,
+      priceTier: 3,
+      promotion: 0,
+      visibility: 0.5,
+      queueToleranceImpact: 0.4,
+      personaAffinity: {},
+    });
+    const brandStores: BrandStoreCandidate[] = [
+      { id: "a", position: { x: 10, y: 10 }, crowdLevel: 0.2, queueLength: 0, brand: brand("ba", "fastFashion") },
+      { id: "b", position: { x: 50, y: 50 }, crowdLevel: 0.2, queueLength: 0, brand: brand("bb", "coffee") },
+    ];
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1, brandStores });
+    const fresh = Array.from({ length: 20 }, (_, i) => agent({ id: i + 1 }));
+    const decisions = backend.decideAgents({
+      agents: fresh,
+      decisionTick: 0,
+      elapsedSeconds: 0,
+      sinks,
+      shops,
+    });
+    expect(decisions.length).toBeGreaterThan(0);
+    for (const d of decisions) {
+      expect(d.nextState).toBe("walk");
+      expect(["a", "b"]).toContain(d.selectedStoreId);
+    }
   });
 });

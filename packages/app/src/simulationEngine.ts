@@ -25,6 +25,7 @@ import {
 } from "./simulationDecisionBackend";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
 import { weatherCrowdImpact } from "./weatherCrowdImpact";
+import { createBrandStoresFromScene } from "./brandAttraction";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 
 export type SimulationStatus = "paused" | "running";
@@ -154,7 +155,13 @@ export function createSimulationEngineFromScene(
   // leave) so the crowd moves with a reason; callers may override.
   const decisionBackend =
     overrides.decisionBackend ??
-    createMallCrowdDecisionBackend({ shops, seed: scene.seed });
+    createMallCrowdDecisionBackend({
+      shops,
+      seed: scene.seed,
+      // Persona/brand-driven store choice: different shoppers favour different
+      // shops (commuters -> coffee/grocery, browsers -> fashion).
+      brandStores: createBrandStoresFromScene(scene),
+    });
 
   return createSimulationEngine({
     seed: scene.seed,
