@@ -12,6 +12,7 @@ import {
   Matrix4,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Object3D,
   OrthographicCamera,
   PlaneGeometry,
@@ -123,19 +124,22 @@ export function SimulationViewport({
 
     const agentGeometry =
       viewMode === "3d"
-        ? new BoxGeometry(2, 2, 1.8)
-        : new PlaneGeometry(2.5, 2.5);
-    // DIAGNOSTIC: unlit bright material (independent of lighting) to rule out a
-    // WebGPU MeshStandardMaterial render issue while we confirm agents show.
-    const agentMaterial = new MeshBasicMaterial({ color: "#ff5a3c" });
+        ? new BoxGeometry(0.7, 0.7, 1.8)
+        : new PlaneGeometry(1, 1);
+    // Lit material so 3d agents read as shaded figures with depth; flat unlit
+    // for the top-down 2d view.
+    const agentMaterial =
+      viewMode === "3d"
+        ? new MeshStandardMaterial({ color: "#d7dee8", roughness: 0.65 })
+        : new MeshBasicMaterial({ color: "#2f6f63" });
     const agents = new InstancedMesh(
       agentGeometry,
       agentMaterial,
       performanceAgentCount,
     );
-    // DIAGNOSTIC: never frustum-cull the crowd. InstancedMesh keeps the
-    // geometry's tiny origin bounding sphere, so once instances move across the
-    // scene the whole mesh can be culled and vanish. This rules that out.
+    // Dynamic instanced crowd: never frustum-cull. Instance matrices move across
+    // the scene each frame while the geometry bounding sphere stays at the
+    // origin, so culling would wrongly hide the whole mesh.
     agents.frustumCulled = false;
     const floor = createFloor(crowdScene, viewMode);
     const walls = [
