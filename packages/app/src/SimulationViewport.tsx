@@ -34,6 +34,13 @@ import {
 } from "./agentInstanceField";
 import { agentAppearance } from "./agentAppearance";
 import { dayNightLighting } from "./dayNightCycle";
+import {
+  orbitByDrag,
+  zoomByWheel,
+  orbitToPosition,
+  positionToOrbit,
+  type OrbitState,
+} from "./orbitCamera";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
@@ -99,6 +106,13 @@ export function SimulationViewport({
   useEffect(() => {
     sharedOverlayRef.current = sharedAgentOverlay;
   }, [sharedAgentOverlay]);
+  // 2.5D orbit-camera state, kept across the 5s scene rebuilds so dragging the
+  // city does not snap back. Seeded from the default framing on first 3d mount.
+  const orbitRef = useRef<OrbitState | null>(null);
+  // Active-drag state also lives in a ref so an in-flight drag survives the 5s
+  // scene rebuild — otherwise the rebuilt effect resets a local `dragging` flag
+  // and the gesture dies mid-drag (the rebuild re-binds the pointer handlers).
+  const dragRef = useRef({ active: false, x: 0, y: 0 });
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [fps, setFps] = useState(0);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
@@ -199,15 +213,67 @@ export function SimulationViewport({
     const worldWidth = crowdScene?.world.width ?? 80;
     const worldHeight = crowdScene?.world.height ?? 48;
 
+    function applyOrbit() {
+      if (!orbitRef.current) {
+        return;
+      }
+      const p = orbitToPosition(orbitRef.current);
+      camera.position.set(p.x, p.y, p.z);
+      camera.lookAt(0, 0, 0);
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      dragRef.current = { active: true, x: event.clientX, y: event.clientY };
+      canvasElement.setPointerCapture(event.pointerId);
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (!dragRef.current.active || !orbitRef.current) {
+        return;
+      }
+      orbitRef.current = orbitByDrag(
+        orbitRef.current,
+        event.clientX - dragRef.current.x,
+        event.clientY - dragRef.current.y,
+      );
+      dragRef.current.x = event.clientX;
+      dragRef.current.y = event.clientY;
+      applyOrbit();
+    }
+
+    function onPointerUp(event: PointerEvent) {
+      dragRef.current.active = false;
+      canvasElement.releasePointerCapture(event.pointerId);
+    }
+
+    function onWheel(event: WheelEvent) {
+      if (!orbitRef.current) {
+        return;
+      }
+      event.preventDefault();
+      orbitRef.current = zoomByWheel(orbitRef.current, event.deltaY);
+      applyOrbit();
+    }
+
     if (viewMode === "3d") {
       camera.up.set(0, 0, 1);
-      camera.position.set(worldWidth * 0.42, -worldHeight * 0.58, worldHeight * 0.42);
+      if (!orbitRef.current) {
+        orbitRef.current = positionToOrbit({
+          x: worldWidth * 0.42,
+          y: -worldHeight * 0.58,
+          z: worldHeight * 0.42,
+        });
+      }
+      applyOrbit();
+      canvasElement.addEventListener("pointerdown", onPointerDown);
+      canvasElement.addEventListener("pointermove", onPointerMove);
+      canvasElement.addEventListener("pointerup", onPointerUp);
+      canvasElement.addEventListener("wheel", onWheel, { passive: false });
     } else {
       camera.up.set(0, 1, 0);
       camera.position.set(0, 0, 40);
+      camera.lookAt(0, 0, 0);
     }
-
-    camera.lookAt(0, 0, 0);
     scene.background = new Color("#07131f");
 
     agents.instanceMatrix.setUsage(DynamicDrawUsage);
@@ -473,6 +539,10 @@ export function SimulationViewport({
 
     return () => {
       disposed = true;
+      canvasElement.removeEventListener("pointerdown", onPointerDown);
+      canvasElement.removeEventListener("pointermove", onPointerMove);
+      canvasElement.removeEventListener("pointerup", onPointerUp);
+      canvasElement.removeEventListener("wheel", onWheel);
       window.cancelAnimationFrame(animationFrameId);
       window.clearInterval(watchdogTimerId);
       resizeObserver?.disconnect();
