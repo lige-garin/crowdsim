@@ -44,10 +44,12 @@ export function visibleAgentCount(agentCount: number, capacity: number): number 
  * Regression guard for the bug where the InstancedMesh read the always-empty
  * snapshot.agents and rendered nothing in the worker path.
  */
+export type CrowdAgent = Pick<SimulationAgent, "id" | "x" | "y">;
+
 export function selectCrowdAgents(
-  snapshotAgents: readonly Pick<SimulationAgent, "x" | "y">[] | undefined,
-  overlayAgents: readonly Pick<SimulationAgent, "x" | "y">[] | undefined,
-): readonly Pick<SimulationAgent, "x" | "y">[] {
+  snapshotAgents: readonly CrowdAgent[] | undefined,
+  overlayAgents: readonly CrowdAgent[] | undefined,
+): readonly CrowdAgent[] {
   if (overlayAgents && overlayAgents.length > 0) {
     return overlayAgents;
   }

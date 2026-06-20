@@ -43,10 +43,10 @@ describe("agentWorldPosition", () => {
 });
 
 describe("selectCrowdAgents", () => {
-  const snap = [{ x: 1, y: 2 }];
+  const snap = [{ id: 7, x: 1, y: 2 }];
   const overlay = [
-    { x: 3, y: 4 },
-    { x: 5, y: 6 },
+    { id: 1, x: 3, y: 4 },
+    { id: 2, x: 5, y: 6 },
   ];
 
   it("prefers the SharedArrayBuffer overlay when it has agents (worker path)", () => {
@@ -60,6 +60,10 @@ describe("selectCrowdAgents", () => {
 
   it("returns an empty list when both sources are empty", () => {
     expect(selectCrowdAgents(undefined, undefined)).toEqual([]);
+  });
+
+  it("keeps agent ids so a picked instance can be identified", () => {
+    expect(selectCrowdAgents(snap, overlay)[0].id).toBe(1);
   });
 });
 

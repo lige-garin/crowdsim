@@ -17,7 +17,9 @@ import {
   OrthographicCamera,
   PlaneGeometry,
   PerspectiveCamera,
+  Raycaster,
   Scene,
+  Vector2,
   WebGLRenderer,
 } from "three";
 import { WebGPURenderer } from "three/webgpu";
@@ -41,8 +43,10 @@ import {
   positionToOrbit,
   type OrbitState,
 } from "./orbitCamera";
+import { isClick, screenToNdc } from "./agentPicking";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
+  selectAgentIntentOverlay,
   selectViewportAgentAnnotations,
   selectViewportOverlayAgents,
   type ViewportAgentAnnotation,
@@ -112,9 +116,10 @@ export function SimulationViewport({
   // Active-drag state also lives in a ref so an in-flight drag survives the 5s
   // scene rebuild — otherwise the rebuilt effect resets a local `dragging` flag
   // and the gesture dies mid-drag (the rebuild re-binds the pointer handlers).
-  const dragRef = useRef({ active: false, x: 0, y: 0 });
+  const dragRef = useRef({ active: false, x: 0, y: 0, downX: 0, downY: 0 });
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [fps, setFps] = useState(0);
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
 
   useEffect(() => {
@@ -222,8 +227,36 @@ export function SimulationViewport({
       camera.lookAt(0, 0, 0);
     }
 
+    const raycaster = new Raycaster();
+
+    function pickAgentAt(clientX: number, clientY: number) {
+      const rect = canvasElement.getBoundingClientRect();
+      const ndc = screenToNdc(clientX, clientY, rect);
+      raycaster.setFromCamera(new Vector2(ndc.x, ndc.y), camera);
+      // Instances move every frame; refresh the cull sphere or raycast's coarse
+      // bounding-sphere test uses the stale seed-time sphere and never hits.
+      agents.computeBoundingSphere();
+      const hit = raycaster.intersectObject(agents)[0];
+      if (hit?.instanceId == null) {
+        setSelectedAgentId(null);
+        return;
+      }
+      const live = selectCrowdAgents(
+        snapshotRef.current?.agents,
+        sharedOverlayRef.current?.agents,
+      );
+      const picked = live[hit.instanceId];
+      setSelectedAgentId(picked ? picked.id : null);
+    }
+
     function onPointerDown(event: PointerEvent) {
-      dragRef.current = { active: true, x: event.clientX, y: event.clientY };
+      dragRef.current = {
+        active: true,
+        x: event.clientX,
+        y: event.clientY,
+        downX: event.clientX,
+        downY: event.clientY,
+      };
       canvasElement.setPointerCapture(event.pointerId);
     }
 
@@ -242,8 +275,15 @@ export function SimulationViewport({
     }
 
     function onPointerUp(event: PointerEvent) {
+      const wasClick = isClick(
+        event.clientX - dragRef.current.downX,
+        event.clientY - dragRef.current.downY,
+      );
       dragRef.current.active = false;
       canvasElement.releasePointerCapture(event.pointerId);
+      if (wasClick) {
+        pickAgentAt(event.clientX, event.clientY);
+      }
     }
 
     function onWheel(event: WheelEvent) {
@@ -562,6 +602,23 @@ export function SimulationViewport({
     };
   }, [bioCityVisualSecond, crowdScene, heatmapCells, viewMode]);
 
+  const pickedAgent =
+    selectedAgentId == null
+      ? undefined
+      : selectCrowdAgents(snapshot?.agents, sharedAgentOverlay?.agents).find(
+          (agent) => agent.id === selectedAgentId,
+        );
+  const pickedFull =
+    selectedAgentId == null
+      ? undefined
+      : snapshot?.agents.find((agent) => agent.id === selectedAgentId);
+  const pickedIntent =
+    pickedAgent && crowdScene
+      ? selectAgentIntentOverlay(pickedFull ?? { id: pickedAgent.id }, {
+          seed: crowdScene.seed,
+        })
+      : undefined;
+
   return (
     <div
       className={`render-viewport ${
@@ -585,6 +642,19 @@ export function SimulationViewport({
         <span>{t("renderBenchmark")}</span>
         <span>{fps > 0 ? `${fps} fps` : "..."}</span>
       </div>
+      {viewMode === "3d" && pickedAgent && (
+        <div className="render-selected-agent" aria-live="polite">
+          <strong>Agent #{pickedAgent.id}</strong>
+          {pickedIntent && (
+            <span>
+              {pickedIntent.icon} {pickedIntent.label}
+            </span>
+          )}
+          <span>
+            x {pickedAgent.x.toFixed(1)} · y {pickedAgent.y.toFixed(1)}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

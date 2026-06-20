@@ -554,3 +554,24 @@ h3 {
 .render-hud strong {
   color: var(--lab-blue);
 }
+
+.render-selected-agent {
+  position: absolute;
+  right: 14px;
+  top: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 122, 20, 0.4);
+  border-radius: 7px;
+  background: rgba(18, 26, 36, 0.82);
+  color: #ffd8b0;
+  font-family: var(--lab-mono);
+  font-size: 0.74rem;
+  backdrop-filter: blur(14px);
+}
+
+.render-selected-agent strong {
+  color: #ffb43c;
+}
