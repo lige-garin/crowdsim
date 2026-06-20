@@ -23,6 +23,7 @@ import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { usesWorkerSimulationPath } from "./simulationThread";
+import { crowdFlowAnalytics } from "./crowdFlowAnalytics";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import { bioCityStudioTitle, bioCityTopbarMetricText } from "./bioCityUiContract";
 
@@ -374,15 +375,23 @@ function AppContent() {
   });
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
-  // Heuristic estimates, NOT measured (SP-5b honesty): satisfaction is a
-  // density/evacuation proxy; commercialForecast blends brand attraction +
-  // density. Surfaced as "Sales (est.) / Satisfaction (est.)" in the topbar.
+  // Heuristic estimates, NOT measured (SP-5b honesty), but grounded in the real
+  // crowd: satisfaction drops with congestion (live queueing + density);
+  // commercial forecast rises with shoppers actually browsing stores. Surfaced
+  // as "Sales (est.) / Satisfaction (est.)" in the topbar.
+  const crowdFlow = crowdFlowAnalytics(simulation.snapshot.agents, demoScene.shops);
   const satisfactionScore = Math.max(
-    72,
-    Math.min(98, 94 - densityPeak * 2 - (evacuation.active ? 8 : 0)),
+    60,
+    Math.min(
+      98,
+      94 - densityPeak * 2 - crowdFlow.totalQueuing * 0.5 - (evacuation.active ? 8 : 0),
+    ),
   );
   const commercialForecast = Math.round(
-    96 + dashboardV2Stats.brandAttractionPercent * 0.8 + densityPeak * 1.7,
+    80 +
+      crowdFlow.totalShopping * 1.5 +
+      dashboardV2Stats.brandAttractionPercent * 0.5 +
+      densityPeak * 1.1,
   );
   const topbarLabels = bioCityTopbarMetricText.map((item) => item[language]);
   const bioCityTopbarMetrics = [
