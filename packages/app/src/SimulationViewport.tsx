@@ -46,6 +46,7 @@ import {
 import { isClick, screenToNdc } from "./agentPicking";
 import { facadeWindows } from "./buildingFacade";
 import { streetDressingPlacements } from "./streetDressing";
+import { shadowCameraFrustum } from "./shadowConfig";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectAgentIntentOverlay,
@@ -195,26 +196,28 @@ export function SimulationViewport({
         : [];
 
     function createRenderer(device: GPUDevice) {
-      return new WebGPURenderer({
+      const gpuRenderer = new WebGPURenderer({
         alpha: true,
         antialias: false,
         canvas: canvasElement,
-        depth: false,
         device,
         powerPreference: "high-performance",
         stencil: false,
       });
+      gpuRenderer.shadowMap.enabled = true;
+      return gpuRenderer;
     }
 
     function createFallbackRenderer() {
-      return new WebGLRenderer({
+      const glRenderer = new WebGLRenderer({
         alpha: true,
         antialias: false,
         canvas: canvasElement,
-        depth: false,
         powerPreference: "high-performance",
         stencil: false,
       });
+      glRenderer.shadowMap.enabled = true;
+      return glRenderer;
     }
 
     const worldWidth = crowdScene?.world.width ?? 80;
@@ -337,6 +340,19 @@ export function SimulationViewport({
       );
       const keyLight = new DirectionalLight(lighting.keyColor, lighting.keyIntensity);
       keyLight.position.set(worldWidth * 0.3, -worldHeight * 0.35, worldHeight);
+      // Cast real sun shadows so buildings/trees ground themselves instead of
+      // floating; the ortho shadow camera covers the whole world footprint.
+      keyLight.castShadow = true;
+      const shadow = shadowCameraFrustum(worldWidth, worldHeight);
+      keyLight.shadow.camera.left = shadow.left;
+      keyLight.shadow.camera.right = shadow.right;
+      keyLight.shadow.camera.top = shadow.top;
+      keyLight.shadow.camera.bottom = shadow.bottom;
+      keyLight.shadow.camera.near = shadow.near;
+      keyLight.shadow.camera.far = shadow.far;
+      keyLight.shadow.camera.updateProjectionMatrix();
+      keyLight.shadow.mapSize.set(shadow.mapSize, shadow.mapSize);
+      keyLight.shadow.bias = -0.0005;
       const fillLight = new AmbientLight("#ffffff", lighting.ambientIntensity);
       scene.add(hemisphereLight, keyLight, fillLight);
     }
@@ -931,6 +947,7 @@ function createFloor(scene: CrowdSimScene | undefined, viewMode: ViewMode) {
       : new MeshBasicMaterial({ color: "#102232" });
   const floor = new Mesh(geometry, material);
 
+  floor.receiveShadow = viewMode === "3d";
   floor.position.set(0, 0, -0.02);
 
   return floor;
@@ -1042,6 +1059,11 @@ function createBioCityPrimitiveMesh(
     body.position.set(0, 0, height / 2);
     roof.position.set(0, 0, height + (is3d ? 0.2 : 0.08));
     sign.position.set(0, -bounds.height / 2 - 0.08, Math.max(0.8, height * 0.54));
+    if (is3d) {
+      body.castShadow = true;
+      body.receiveShadow = true;
+      roof.castShadow = true;
+    }
     group.add(body, roof, sign);
 
     if (is3d) {
@@ -1235,6 +1257,8 @@ function createTree(x: number, y: number) {
   );
   crown.rotation.x = Math.PI / 2;
 
+  trunk.castShadow = true;
+  crown.castShadow = true;
   trunk.position.set(0, 0, 0.6);
   crown.position.set(0, 0, 1.9);
   group.add(trunk, crown);
@@ -1260,6 +1284,7 @@ function createStreetLight(x: number, y: number) {
     }),
   );
 
+  pole.castShadow = true;
   pole.position.set(0, 0, 1.2);
   lamp.position.set(0.28, 0, 2.38);
   group.add(pole, lamp);
