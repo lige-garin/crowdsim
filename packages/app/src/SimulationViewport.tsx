@@ -32,6 +32,7 @@ import {
   selectCrowdAgents,
   visibleAgentCount,
 } from "./agentInstanceField";
+import { agentAppearance } from "./agentAppearance";
 import type { SimulationSnapshot } from "./simulationEngine";
 import {
   selectViewportAgentAnnotations,
@@ -126,16 +127,23 @@ export function SimulationViewport({
     let lastFpsUpdate = performance.now();
     let lastFrameAt = lastFpsUpdate;
 
+    const agentLook = agentAppearance(viewMode);
     const agentGeometry =
       viewMode === "3d"
-        ? new BoxGeometry(0.7, 0.7, 1.8)
-        : new PlaneGeometry(1, 1);
-    // Lit material so 3d agents read as shaded figures with depth; flat unlit
-    // for the top-down 2d view.
+        ? new BoxGeometry(agentLook.size.x, agentLook.size.y, agentLook.size.z)
+        : new PlaneGeometry(agentLook.size.x, agentLook.size.y);
+    // Lit + self-illuminated so the 3d crowd reads as warm figures that stand
+    // out from the cool, pale scene; flat unlit for the top-down 2d view. See
+    // agentAppearance for why 3d figures are widened past human scale.
     const agentMaterial =
       viewMode === "3d"
-        ? new MeshStandardMaterial({ color: "#d7dee8", roughness: 0.65 })
-        : new MeshBasicMaterial({ color: "#2f6f63" });
+        ? new MeshStandardMaterial({
+            color: agentLook.color,
+            emissive: agentLook.emissive,
+            emissiveIntensity: agentLook.emissiveIntensity,
+            roughness: 0.5,
+          })
+        : new MeshBasicMaterial({ color: agentLook.color });
     const agents = new InstancedMesh(
       agentGeometry,
       agentMaterial,
