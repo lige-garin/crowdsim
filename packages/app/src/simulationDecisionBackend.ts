@@ -11,10 +11,23 @@ export type SimulationAgentDecisionState =
   | "queue"
   | "walk";
 
+export type SimulationShop = {
+  id: string;
+  position: ScenePoint;
+  /** Arrival radius: the agent counts as "at the shop" within this distance. */
+  radius: number;
+  /** Relative draw used to weight which shop an agent picks. */
+  attraction: number;
+  /** How long the agent dwells (browses) once it arrives, in seconds. */
+  dwellSeconds: number;
+};
+
 export type SimulationAgentDecision = {
   agentId: number;
   nextState: SimulationAgentDecisionState;
   selectedStoreId?: string;
+  /** Clears the field when explicitly null (e.g. on leaving a shop). */
+  browseUntilSeconds?: number | null;
   target?: ScenePoint;
   targetSinkId?: string;
 };
@@ -24,6 +37,7 @@ export type SimulationDecisionTickInput = {
   decisionTick: number;
   elapsedSeconds: number;
   sinks: readonly SimulationSink[];
+  shops?: readonly SimulationShop[];
 };
 
 export type SimulationDecisionBackend = {
@@ -91,6 +105,10 @@ export function applySimulationAgentDecisions(
       decisionTick,
       lifecycleState: decision.nextState,
       selectedStoreId: decision.selectedStoreId,
+      browseUntilSeconds:
+        decision.browseUntilSeconds === null
+          ? undefined
+          : (decision.browseUntilSeconds ?? agent.browseUntilSeconds),
       targetSinkId: decision.targetSinkId ?? agent.targetSinkId,
       targetX: target.x,
       targetY: target.y,

@@ -21,7 +21,9 @@ import {
   shouldRunDecisionTick,
   type SimulationAgentDecisionState,
   type SimulationDecisionBackend,
+  type SimulationShop,
 } from "./simulationDecisionBackend";
+import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 
 export type SimulationStatus = "paused" | "running";
@@ -31,6 +33,8 @@ export type SimulationAgent = {
   id: number;
   lifecycleState?: SimulationAgentDecisionState;
   selectedStoreId?: string;
+  /** When browsing a shop, the sim time at which the dwell ends and the agent leaves. */
+  browseUntilSeconds?: number;
   x: number;
   y: number;
   vx: number;
@@ -60,6 +64,7 @@ export type SimulationEngineConfig = {
   movementBackend?: MovementBackend;
   seed?: number;
   speedMetersPerSecond?: number;
+  shops?: readonly SimulationShop[];
   sources: SimulationSource[];
   sinks: SimulationSink[];
   walls?: WallSegment[];
@@ -131,6 +136,21 @@ export function createSimulationEngineFromScene(
       radius: Math.max(1, entrance.width / 2),
     }));
 
+  const shops: SimulationShop[] = scene.shops.map((shop) => ({
+    id: shop.id,
+    // Prefer the shop entrance (reachable, at the building edge) over the centre,
+    // which can sit inside a wall.
+    position: shop.entrancePosition ?? shop.position,
+    radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
+    attraction: shop.attraction,
+    dwellSeconds: shop.dwellMeanSeconds,
+  }));
+  // Default to the rule-based mall-crowd behaviour (enter -> shop -> browse ->
+  // leave) so the crowd moves with a reason; callers may override.
+  const decisionBackend =
+    overrides.decisionBackend ??
+    createMallCrowdDecisionBackend({ shops, seed: scene.seed });
+
   return createSimulationEngine({
     seed: scene.seed,
     sources,
@@ -138,6 +158,8 @@ export function createSimulationEngineFromScene(
     walls: wallSegmentsFromScene(scene),
     world: scene.world,
     ...overrides,
+    shops,
+    decisionBackend,
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
   });
 }
@@ -152,6 +174,7 @@ export function createSimulationEngine(
     config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
   const sources = config.sources;
   const sinks = config.sinks;
+  const shops = config.shops ?? [];
   const movementBackend = config.movementBackend;
   const seed = config.seed ?? 1;
   const walls = config.walls ?? [];
@@ -293,6 +316,7 @@ export function createSimulationEngine(
         decisionTick,
         elapsedSeconds,
         sinks,
+        shops,
       }),
       decisionTick,
     );
@@ -312,12 +336,20 @@ export function createSimulationEngine(
     const nextAgents: SimulationAgent[] = [];
 
     for (const agent of agents) {
+      // Browsing shoppers dwell in place until their decision flips to "leave".
+      if (agent.lifecycleState === "browse") {
+        nextAgents.push({ ...agent, vx: 0, vy: 0 });
+        continue;
+      }
+
       const dx = agent.targetX - agent.x;
       const dy = agent.targetY - agent.y;
       const distance = Math.hypot(dx, dy);
-      const sinkRadius = nearestSink(agent).radius;
 
-      if (distance <= sinkRadius) {
+      // Exit on reaching the sink, unless currently heading to a shop. Agents
+      // with no decision backend head straight to the sink and still exit.
+      const headingToShop = agent.lifecycleState === "walk";
+      if (!headingToShop && distance <= nearestSink(agent).radius) {
         exitedCount++;
         continue;
       }
@@ -350,10 +382,14 @@ export function createSimulationEngine(
     dy: number,
     distance: number,
   ) {
-    const fieldDirection = sampleNavigationDirection(agent);
+    // The flow field only knows routes to sinks, so use it only when leaving;
+    // a shopper walking to a shop steers straight at the shop.
+    if (agent.lifecycleState === "leave") {
+      const fieldDirection = sampleNavigationDirection(agent);
 
-    if (fieldDirection) {
-      return fieldDirection;
+      if (fieldDirection) {
+        return fieldDirection;
+      }
     }
 
     const invDistance = distance > 0 ? 1 / distance : 0;

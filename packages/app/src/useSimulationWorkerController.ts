@@ -68,7 +68,10 @@ export function useSimulationWorkerController(
 
     currentClient
       .init(scene, {
-        runtime: { wasmDecisionBackend: true },
+        // Use the engine's default mall-crowd decision backend (enter -> shop ->
+        // browse -> leave) instead of the generic wasm DES, so the crowd has a
+        // reason to move.
+        runtime: { wasmDecisionBackend: false },
         sharedMemory: sharedMemoryRef.current,
       })
       .then((nextSnapshot) => {

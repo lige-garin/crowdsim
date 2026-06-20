@@ -294,6 +294,7 @@ export const bioCityDemoScene = parseScene({
       queueAnchor: { x: 38, y: 45 },
       size: { width: 12, height: 8 },
       attraction: 1.32,
+      dwellMeanSeconds: 10,
       brand: {
         profileId: "brew-under-canopy",
         category: "coffee",
@@ -312,6 +313,7 @@ export const bioCityDemoScene = parseScene({
       entrancePosition: { x: 86, y: 42 },
       size: { width: 10, height: 7 },
       attraction: 1.48,
+      dwellMeanSeconds: 8,
       brand: {
         profileId: "raincoat-pop-up",
         category: "service",

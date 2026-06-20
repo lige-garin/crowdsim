@@ -24,7 +24,6 @@ import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { usesWorkerSimulationPath } from "./simulationThread";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
-import { useWasmSimulationDecisionBackend } from "./useWasmSimulationDecisionBackend";
 import { bioCityStudioTitle, bioCityTopbarMetricText } from "./bioCityUiContract";
 
 export function App() {
@@ -51,10 +50,10 @@ function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
   const probes = useAppProbes();
-  const wasmSimulationDecisionBackend = useWasmSimulationDecisionBackend(demoScene);
   const webGpuMovementBackend = useWebGpuMovementBackend();
   const mainThreadSimulation = useSimulationController(demoScene, {
-    decisionBackend: wasmSimulationDecisionBackend.backend,
+    // Default to the engine's mall-crowd decision backend so agents shop with a
+    // reason; the wasm DES backend stays available for other scenarios.
     movementBackend: webGpuMovementBackend.backend,
   });
   const workerSimulation = useSimulationWorkerController(demoScene);
