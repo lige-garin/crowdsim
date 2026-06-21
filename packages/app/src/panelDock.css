@@ -9,10 +9,22 @@
   background: var(--lab-surface, #ffffff);
 }
 
+.panel-dock-collapsed {
+  padding-bottom: 8px;
+}
+
 .panel-dock-nav {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
+}
+
+.panel-dock-hint {
+  margin-right: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--lab-muted, #5b6b7c);
 }
 
 .panel-dock-nav button {
