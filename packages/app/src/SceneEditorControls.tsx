@@ -9,6 +9,24 @@ import {
 } from "./i18n";
 import type { EditorTool } from "./sceneEditorState";
 
+const TOOL_GLYPH: Record<EditorTool, string> = {
+  select: "⬚",
+  road: "🛣️",
+  zone: "▦",
+  wall: "🧱",
+  building: "🏢",
+  source: "🟢",
+  sink: "🔴",
+  target: "🎯",
+  shop: "🏪",
+  transitStop: "🚌",
+  counter: "🧾",
+  gate: "🚪",
+  obstacle: "⛔",
+  hazard: "⚠️",
+  countLine: "📊",
+};
+
 type DocumentCounts = {
   buildings: number;
   countLines: number;
@@ -161,30 +179,75 @@ export function SceneEditorControls({
           <button
             type="button"
             key={toolId}
+            className="editor-tool"
             aria-pressed={tool === toolId}
             onClick={() => onToolChange(toolId)}
           >
-            {formatEditorTool(toolId, language)}
+            <span className="editor-tool-glyph" aria-hidden="true">
+              {TOOL_GLYPH[toolId]}
+            </span>
+            <span className="editor-tool-text">
+              {formatEditorTool(toolId, language)}
+            </span>
           </button>
         ))}
-        <button type="button" aria-pressed={snapEnabled} onClick={onToggleSnap}>
-          {t("snap")}
+        <span className="editor-toolbar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="editor-tool"
+          aria-pressed={snapEnabled}
+          onClick={onToggleSnap}
+        >
+          <span className="editor-tool-glyph" aria-hidden="true">
+            🧲
+          </span>
+          <span className="editor-tool-text">{t("snap")}</span>
         </button>
         <button
           type="button"
+          className="editor-tool"
           aria-pressed={viewMode === "isometric"}
           onClick={onToggleEditorViewMode}
         >
-          {viewMode === "isometric" ? t("view2d5") : t("view2dPlan")}
+          <span className="editor-tool-glyph" aria-hidden="true">
+            {viewMode === "isometric" ? "🧊" : "🗺️"}
+          </span>
+          <span className="editor-tool-text">
+            {viewMode === "isometric" ? t("view2d5") : t("view2dPlan")}
+          </span>
         </button>
-        <button type="button" onClick={onUndo} disabled={!canUndo}>
-          {t("undo")}
+        <button
+          type="button"
+          className="editor-tool"
+          onClick={onUndo}
+          disabled={!canUndo}
+        >
+          <span className="editor-tool-glyph" aria-hidden="true">
+            ↩️
+          </span>
+          <span className="editor-tool-text">{t("undo")}</span>
         </button>
-        <button type="button" onClick={onRedo} disabled={!canRedo}>
-          {t("redo")}
+        <button
+          type="button"
+          className="editor-tool"
+          onClick={onRedo}
+          disabled={!canRedo}
+        >
+          <span className="editor-tool-glyph" aria-hidden="true">
+            ↪️
+          </span>
+          <span className="editor-tool-text">{t("redo")}</span>
         </button>
-        <button type="button" onClick={onDeleteSelected} disabled={!canDelete}>
-          {t("delete")}
+        <button
+          type="button"
+          className="editor-tool"
+          onClick={onDeleteSelected}
+          disabled={!canDelete}
+        >
+          <span className="editor-tool-glyph" aria-hidden="true">
+            🗑️
+          </span>
+          <span className="editor-tool-text">{t("delete")}</span>
         </button>
       </div>
       <div className="editor-status" aria-label={t("editorStatus")}>

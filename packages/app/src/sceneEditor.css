@@ -31,9 +31,41 @@
   font-weight: 800;
 }
 
-.editor-toolbar button {
-  min-width: 64px;
-  padding: 0 10px;
+.editor-toolbar {
+  align-items: stretch;
+}
+
+.editor-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 54px;
+  min-height: 48px;
+  padding: 4px 8px;
+  line-height: 1.05;
+}
+
+.editor-tool-glyph {
+  font-size: 1.05rem;
+}
+
+.editor-tool-text {
+  font-size: 0.63rem;
+  font-weight: 700;
+  color: var(--lab-muted);
+}
+
+.editor-tool[aria-pressed="true"] .editor-tool-text {
+  color: #ffffff;
+}
+
+.editor-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--lab-line);
 }
 
 .editor-filebar button:disabled,
