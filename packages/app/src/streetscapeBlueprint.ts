@@ -8,7 +8,20 @@ export type BlueprintBuilding = {
   color: string;
 };
 
-const PALETTE = ["#c9d4e3", "#b8c2d0", "#d8cdbf", "#a9b8c4", "#cdbfae", "#bcc7b8"];
+// Night-city facade tones (cool glass + warm concrete) that read well against
+// the dark viewport, with lit windows added at render time.
+const PALETTE = [
+  "#3c4d68",
+  "#47597b",
+  "#56677f",
+  "#6b5f53",
+  "#5f6e57",
+  "#7c8694",
+  "#34536e",
+  "#8a7c6a",
+  "#455b6e",
+  "#6c7589",
+];
 
 /** Deterministic PRNG so the same seed always yields the same block. */
 function mulberry32(seed: number): () => number {
@@ -32,8 +45,8 @@ export function streetscapeBlueprint(
   seed: number,
 ): BlueprintBuilding[] {
   const rng = mulberry32(seed);
-  const margin = 8;
-  const lot = 26;
+  const margin = 6;
+  const lot = 15;
   const cols = Math.max(1, Math.floor((world.width - margin * 2) / lot));
   const rows = Math.max(1, Math.floor((world.height - margin * 2) / lot));
   const offsetX = margin + (world.width - margin * 2 - cols * lot) / 2;
@@ -46,9 +59,10 @@ export function streetscapeBlueprint(
       continue; // central avenue
     }
     for (let c = 0; c < cols; c++) {
-      const width = 12 + rng() * 6;
-      const depth = 12 + rng() * 6;
-      const height = 6 + rng() * 26;
+      const width = 9 + rng() * 4.5;
+      const depth = 9 + rng() * 4.5;
+      // Skewed toward mid-rise with the occasional tower (rng*rng biases low).
+      const height = 9 + rng() * rng() * 56;
       const color = PALETTE[Math.floor(rng() * PALETTE.length)] ?? PALETTE[0];
       buildings.push({
         x: offsetX + (c + 0.5) * lot,

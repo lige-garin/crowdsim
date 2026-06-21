@@ -144,7 +144,7 @@ export function SimulationViewport({
     const scene = new Scene();
     const camera =
       viewMode === "3d"
-        ? new PerspectiveCamera(48, 16 / 10, 0.1, 140)
+        ? new PerspectiveCamera(46, 16 / 10, 0.1, 320)
         : new OrthographicCamera(-26, 26, 17, -17, 0.1, 100);
     const dummy = new Object3D();
     let frameCount = 0;
@@ -310,10 +310,12 @@ export function SimulationViewport({
     if (viewMode === "3d") {
       camera.up.set(0, 0, 1);
       if (!orbitRef.current) {
+        // City-overview framing: pulled back and tilted so the whole dense
+        // skyline reads at once (like a city-builder overview).
         orbitRef.current = positionToOrbit({
-          x: worldWidth * 0.42,
-          y: -worldHeight * 0.58,
-          z: worldHeight * 0.42,
+          x: worldWidth * 0.5,
+          y: -worldHeight * 0.92,
+          z: worldHeight * 0.8,
         });
       }
       applyOrbit();

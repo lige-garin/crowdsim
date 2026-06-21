@@ -1,5 +1,6 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { createBioCityWeatherRuntimeState } from "./bioCityWeatherSystem";
+import { streetscapeBlueprint } from "./streetscapeBlueprint";
 
 export type BioCityRenderPrimitive =
   | {
@@ -95,6 +96,20 @@ export function createBioCityRenderPlan(
         widthMeters: road.widthMeters,
       })),
     ),
+    // Procedural filler blocks so the city reads as a dense skyline instead of
+    // a few isolated boxes; the named scene buildings layer on top.
+    ...streetscapeBlueprint(scene.world, scene.seed).map((b, index) => ({
+      color: b.color,
+      heightMeters: b.height,
+      id: `filler-${index}`,
+      kind: "building" as const,
+      points: [
+        { x: b.x - b.width / 2, y: b.y - b.depth / 2 },
+        { x: b.x + b.width / 2, y: b.y - b.depth / 2 },
+        { x: b.x + b.width / 2, y: b.y + b.depth / 2 },
+        { x: b.x - b.width / 2, y: b.y + b.depth / 2 },
+      ],
+    })),
     ...scene.buildings.map((building) => ({
       color: buildingColor(building.kind),
       heightMeters: building.heightMeters,
