@@ -1,18 +1,18 @@
 :root {
-  --lab-bg: #f6f8fb;
-  --lab-surface: #ffffff;
-  --lab-surface-2: #f9fbfe;
-  --lab-ink: #111827;
-  --lab-muted: #667085;
-  --lab-faint: #98a2b3;
-  --lab-line: #dbe4ee;
-  --lab-line-strong: #b9c7d6;
-  --lab-blue: #005bff;
-  --lab-cyan: #00b7ff;
+  --lab-bg: #080e1c;
+  --lab-surface: #111c31;
+  --lab-surface-2: #17233c;
+  --lab-ink: #e9eef8;
+  --lab-muted: #93a3bd;
+  --lab-faint: #65779a;
+  --lab-line: #243449;
+  --lab-line-strong: #35475f;
+  --lab-blue: #4d8cff;
+  --lab-cyan: #2fd0ff;
   --lab-acid: #c8ff2d;
-  --lab-green: #16a36a;
-  --lab-red: #ff4d3d;
-  --lab-shadow: 0 22px 70px rgba(29, 55, 89, 0.11);
+  --lab-green: #2ecf8c;
+  --lab-red: #ff6b5d;
+  --lab-shadow: 0 22px 70px rgba(0, 0, 0, 0.5);
   --lab-mono: "SFMono-Regular", "Cascadia Code", Consolas, "Liberation Mono", monospace;
   color: var(--lab-ink);
   background: var(--lab-bg);
@@ -35,9 +35,9 @@ body {
   min-height: 100dvh;
   margin: 0;
   background:
-    linear-gradient(rgba(12, 34, 61, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(12, 34, 61, 0.035) 1px, transparent 1px),
-    linear-gradient(135deg, #fbfcff 0%, #f4f8fc 52%, #eef5fb 100%);
+    linear-gradient(rgba(120, 160, 220, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 220, 0.04) 1px, transparent 1px),
+    linear-gradient(135deg, #080e1c 0%, #0a1326 52%, #081020 100%);
   background-size:
     26px 26px,
     26px 26px,
@@ -55,7 +55,7 @@ button {
   min-height: 34px;
   border: 1px solid var(--lab-line);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--lab-ink);
   cursor: pointer;
   font-weight: 700;
@@ -70,7 +70,7 @@ button {
 
 button:hover {
   border-color: rgba(0, 91, 255, 0.46);
-  background: #ffffff;
+  background: var(--lab-surface-2);
   box-shadow: 0 8px 24px rgba(0, 91, 255, 0.1);
 }
 
@@ -97,7 +97,7 @@ select {
   min-width: 160px;
   border: 1px solid var(--lab-line);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--lab-surface-2);
   color: var(--lab-ink);
   font-weight: 700;
 }
@@ -135,8 +135,8 @@ select {
   gap: 20px;
   min-width: 0;
   padding: 0 22px;
-  border-bottom: 1px solid rgba(185, 199, 214, 0.72);
-  background: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid var(--lab-line);
+  background: rgba(13, 22, 40, 0.82);
   backdrop-filter: blur(22px) saturate(1.4);
 }
 
@@ -164,8 +164,8 @@ select {
   min-height: 28px;
   padding: 0 10px;
   border-color: rgba(0, 183, 255, 0.3);
-  background: rgba(255, 255, 255, 0.68);
-  color: #0f365c;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--lab-ink);
   font-size: 0.76rem;
 }
 
@@ -180,10 +180,10 @@ select {
 .command-status span {
   min-height: 26px;
   padding: 5px 9px;
-  border: 1px solid rgba(0, 91, 255, 0.18);
+  border: 1px solid rgba(77, 140, 255, 0.24);
   border-radius: 7px;
-  background: rgba(246, 250, 255, 0.78);
-  color: #24415f;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: 0.7rem;
   font-weight: 800;
@@ -192,7 +192,7 @@ select {
 .command-status span[data-state="running"] {
   border-color: rgba(22, 163, 106, 0.34);
   background: rgba(22, 163, 106, 0.08);
-  color: #087449;
+  color: var(--lab-green);
 }
 
 .command-status span[data-state="paused"] {
@@ -215,8 +215,8 @@ select {
   flex-direction: column;
   gap: 22px;
   padding: 20px 16px 24px;
-  border-right: 1px solid rgba(185, 199, 214, 0.68);
-  background: rgba(255, 255, 255, 0.56);
+  border-right: 1px solid var(--lab-line);
+  background: rgba(14, 23, 41, 0.58);
 }
 
 .inspector {
@@ -225,8 +225,8 @@ select {
   flex-direction: column;
   gap: 14px;
   padding: 18px 16px 24px;
-  border-left: 1px solid rgba(185, 199, 214, 0.68);
-  background: rgba(248, 251, 255, 0.72);
+  border-left: 1px solid var(--lab-line);
+  background: rgba(14, 23, 41, 0.62);
 }
 
 .eyebrow {
@@ -291,10 +291,10 @@ h3 {
   min-height: 50px;
   padding: 10px;
   overflow: hidden;
-  border: 1px solid rgba(219, 228, 238, 0.92);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #243044;
+  background: var(--lab-surface-2);
+  color: var(--lab-ink);
   font-size: 0.82rem;
 }
 
@@ -329,7 +329,7 @@ h3 {
   display: grid;
   gap: 12px;
   padding-top: 12px;
-  border-top: 1px solid rgba(185, 199, 214, 0.7);
+  border-top: 1px solid var(--lab-line);
 }
 
 .control-row,
@@ -390,7 +390,7 @@ h3 {
 .stage-toolbar > span {
   position: relative;
   padding-left: 18px;
-  color: #36506d;
+  color: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: 0.75rem;
   font-weight: 850;
@@ -418,12 +418,12 @@ h3 {
   width: 100%;
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border: 1px solid rgba(185, 199, 214, 0.86);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
   background:
-    linear-gradient(rgba(0, 91, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 91, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(135deg, #ffffff 0%, #fafdff 54%, #eef8ff 100%);
+    linear-gradient(rgba(77, 140, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 140, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(135deg, #0a1424 0%, #0c1830 54%, #0a1626 100%);
   background-size:
     28px 28px,
     28px 28px,
@@ -444,7 +444,7 @@ h3 {
   background:
     linear-gradient(rgba(0, 91, 255, 0.06) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 183, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(135deg, #ffffff 0%, #f4f9ff 100%);
+    linear-gradient(135deg, #0a1424 0%, #0c1830 100%);
   background-size:
     32px 32px,
     32px 32px,
@@ -544,8 +544,8 @@ h3 {
   padding: 7px 10px;
   border: 1px solid rgba(0, 91, 255, 0.16);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
-  color: #32445c;
+  background: rgba(13, 22, 40, 0.78);
+  color: var(--lab-muted);
   font-family: var(--lab-mono);
   font-size: 0.76rem;
   backdrop-filter: blur(14px);

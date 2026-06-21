@@ -40,7 +40,7 @@
   }
 
   .inspector {
-    border-top: 1px solid #dde4ee;
+    border-top: 1px solid var(--lab-line);
     border-left: 0;
   }
 
@@ -140,8 +140,8 @@
   }
 
   .sidebar {
-    border-top: 1px solid #dde4ee;
-    border-bottom: 1px solid #dde4ee;
+    border-top: 1px solid var(--lab-line);
+    border-bottom: 1px solid var(--lab-line);
   }
 
   .stage-toolbar {

@@ -45,12 +45,13 @@
 
 .editor-canvas-wrap {
   overflow: hidden;
-  border: 1px solid rgba(185, 199, 214, 0.88);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
   background:
-    linear-gradient(rgba(0, 91, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 91, 255, 0.045) 1px, transparent 1px), #ffffff;
-  box-shadow: 0 18px 46px rgba(29, 55, 89, 0.08);
+    linear-gradient(rgba(77, 140, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 140, 255, 0.06) 1px, transparent 1px),
+    var(--lab-surface);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.35);
 }
 
 .editor-canvas {
@@ -61,7 +62,7 @@
 }
 
 .editor-floor {
-  fill: #ffffff;
+  fill: var(--lab-surface);
 }
 
 .editor-basemap {
@@ -150,11 +151,11 @@
 }
 
 .ai-image-label {
-  fill: #064f7c;
+  fill: var(--lab-ink);
   font-size: 1.1px;
   font-weight: 900;
   paint-order: stroke;
-  stroke: rgba(255, 255, 255, 0.92);
+  stroke: rgba(8, 14, 28, 0.92);
   stroke-width: 0.3;
   text-anchor: middle;
 }
@@ -194,7 +195,7 @@
 .editor-road {
   fill: none;
   pointer-events: none;
-  stroke: rgba(32, 51, 73, 0.46);
+  stroke: rgba(147, 163, 189, 0.5);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -204,12 +205,12 @@
 .editor-obstacle text,
 .editor-transit-stop text,
 .editor-hazard text {
-  fill: #132033;
+  fill: var(--lab-ink);
   font-size: 1.15px;
   font-weight: 900;
   paint-order: stroke;
   pointer-events: none;
-  stroke: rgba(255, 255, 255, 0.86);
+  stroke: rgba(8, 14, 28, 0.86);
   stroke-width: 0.24;
   text-anchor: middle;
 }
@@ -225,7 +226,7 @@
 .editor-obstacle polyline {
   fill: rgba(100, 116, 139, 0.18);
   pointer-events: all;
-  stroke: rgba(51, 65, 85, 0.74);
+  stroke: rgba(148, 163, 184, 0.74);
   stroke-dasharray: 0.75 0.38;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -254,7 +255,7 @@
 .editor-zone polygon {
   fill: rgba(0, 183, 255, 0.12);
   pointer-events: all;
-  stroke: rgba(5, 76, 120, 0.45);
+  stroke: rgba(47, 208, 255, 0.45);
   stroke-width: 0.2;
 }
 
@@ -278,7 +279,7 @@
 }
 
 .editor-zone text {
-  fill: #12324a;
+  fill: var(--lab-ink);
   font-size: 1.25px;
   font-weight: 900;
   pointer-events: none;
@@ -290,8 +291,8 @@
 }
 
 .editor-store-lots polygon {
-  fill: rgba(255, 255, 255, 0.16);
-  stroke: rgba(32, 51, 73, 0.52);
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: rgba(147, 163, 189, 0.52);
   stroke-dasharray: 0.6 0.35;
   stroke-width: 0.18;
 }
@@ -305,7 +306,7 @@
 }
 
 .editor-wall {
-  stroke: #203349;
+  stroke: rgba(147, 163, 189, 0.9);
   stroke-width: 0.4;
 }
 
@@ -484,9 +485,9 @@
   display: grid;
   gap: 8px;
   padding: 10px;
-  border: 1px solid rgba(219, 228, 238, 0.92);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--lab-surface-2);
   color: var(--lab-muted);
   font-size: 0.78rem;
 }
@@ -510,7 +511,7 @@
   min-height: 32px;
   border: 1px solid var(--lab-line);
   border-radius: 7px;
-  background: #ffffff;
+  background: var(--lab-surface);
   color: var(--lab-ink);
   font-family: var(--lab-mono);
   font-weight: 800;

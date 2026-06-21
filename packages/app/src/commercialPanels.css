@@ -5,10 +5,10 @@
 .evacuation-panel {
   gap: 11px;
   padding: 14px;
-  border: 1px solid #dce3ee;
+  border: 1px solid var(--lab-line);
   border-radius: var(--product-radius);
-  background: #ffffff;
-  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.03);
+  background: var(--lab-surface);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
 }
 
 .dashboard-panel::before,
@@ -30,9 +30,9 @@
 .comparison-card,
 .workspace-row,
 .template-row {
-  border-color: #e0e6ef;
+  border-color: var(--lab-line);
   border-radius: var(--product-radius-sm);
-  background: #f9fbfe;
+  background: var(--lab-surface-2);
 }
 
 .dashboard-metric {
@@ -47,7 +47,7 @@
 .comparison-card span,
 .workspace-row span,
 .template-row span {
-  color: #697586;
+  color: var(--lab-muted);
   font-size: 0.66rem;
   font-weight: 760;
 }
@@ -59,7 +59,7 @@
 .comparison-card strong,
 .workspace-row strong,
 .template-row strong {
-  color: #172033;
+  color: var(--lab-ink);
   font-weight: 760;
 }
 
@@ -67,9 +67,9 @@
 .dashboard-v2-chart,
 .brand-field-map,
 .evacuation-panel svg {
-  border-color: #e0e6ef;
+  border-color: var(--lab-line);
   border-radius: var(--product-radius-sm);
-  background: #ffffff;
+  background: var(--lab-surface);
 }
 
 .dashboard-v2-chart polyline {
@@ -79,7 +79,7 @@
 
 .probe-panel p,
 .evacuation-panel p {
-  color: #667085;
+  color: var(--lab-muted);
 }
 
 .probe-panel code,
@@ -87,17 +87,17 @@
 .dashboard-summary,
 .comparison-card code,
 .brand-reasons code {
-  border-color: #e0e6ef;
+  border-color: var(--lab-line);
   border-radius: var(--product-radius-sm);
-  background: #f7f9fc;
-  color: #29384d;
+  background: var(--lab-surface-2);
+  color: var(--lab-ink);
   font-size: 0.72rem;
   font-weight: 760;
 }
 
 .brand-choice-card {
-  border-color: #cfd9ea;
-  background: linear-gradient(180deg, #f9fbff 0%, #ffffff 100%);
+  border-color: var(--lab-line);
+  background: linear-gradient(180deg, var(--lab-surface-2) 0%, var(--lab-surface) 100%);
 }
 
 .brand-field-halo {
@@ -118,7 +118,7 @@
 .comparison-card::before,
 .workspace-row::before,
 .template-row::before {
-  background: #9aa9bf;
+  background: var(--lab-line-strong);
   opacity: 0.42;
 }
 
@@ -133,14 +133,14 @@
   gap: 7px;
   min-width: 0;
   padding: 10px;
-  border: 1px solid #e0e6ef;
+  border: 1px solid var(--lab-line);
   border-radius: var(--product-radius-sm);
-  background: #f9fbfe;
+  background: var(--lab-surface-2);
 }
 
 .biocity-analytics-card > span,
 .biocity-meter-line > span {
-  color: #697586;
+  color: var(--lab-muted);
   font-size: 0.66rem;
   font-weight: 760;
 }
@@ -148,10 +148,10 @@
 .biocity-analytics-card code {
   min-width: 0;
   overflow-wrap: anywhere;
-  border-color: #e0e6ef;
+  border-color: var(--lab-line);
   border-radius: var(--product-radius-sm);
-  background: #ffffff;
-  color: #29384d;
+  background: var(--lab-surface);
+  color: var(--lab-ink);
   font-size: 0.7rem;
   font-weight: 720;
 }

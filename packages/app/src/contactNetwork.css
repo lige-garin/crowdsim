@@ -4,12 +4,12 @@
   width: 100%;
   padding: 18px;
   overflow: hidden;
-  border: 1px solid rgba(185, 199, 214, 0.88);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
   background:
-    linear-gradient(rgba(0, 91, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 91, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(135deg, #ffffff 0%, #f7fbff 58%, #eef7ff 100%);
+    linear-gradient(rgba(77, 140, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(77, 140, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(135deg, var(--lab-surface) 0%, var(--lab-surface-2) 58%, var(--lab-surface) 100%);
   background-size:
     28px 28px,
     28px 28px,
@@ -49,9 +49,9 @@
   gap: 4px;
   min-height: 62px;
   padding: 9px 10px;
-  border: 1px solid rgba(219, 228, 238, 0.92);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--lab-surface-2);
 }
 
 .contact-network-stats span {
@@ -99,13 +99,13 @@
 }
 
 .contact-edge-label {
-  fill: #24506f;
+  fill: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: 1.45px;
   font-weight: 850;
   paint-order: stroke;
   pointer-events: none;
-  stroke: rgba(255, 255, 255, 0.92);
+  stroke: rgba(8, 14, 28, 0.92);
   stroke-width: 0.45px;
   text-anchor: middle;
 }
@@ -146,13 +146,13 @@
 }
 
 .contact-node text {
-  fill: #10253d;
+  fill: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: 1.78px;
   font-weight: 900;
   paint-order: stroke;
   pointer-events: none;
-  stroke: rgba(255, 255, 255, 0.94);
+  stroke: rgba(8, 14, 28, 0.94);
   stroke-width: 0.55px;
   text-anchor: middle;
 }
@@ -161,7 +161,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  color: #36506d;
+  color: var(--lab-muted);
   font-size: 0.82rem;
   font-weight: 800;
 }
