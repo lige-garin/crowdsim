@@ -157,7 +157,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "View network" }));
 
     expect(
-      screen.getByRole("heading", { name: "Contact Network" }),
+      screen.getByRole("heading", { name: "Crowd Contact Network" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
 
@@ -212,9 +212,8 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Network" }));
 
     expect(
-      screen.getByRole("heading", { name: "Contact Network" }),
+      screen.getByRole("heading", { name: "Crowd Contact Network" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Dr. Chen")).toBeInTheDocument();
   });
 
   it("switches the viewport between 2D and 3D modes", () => {

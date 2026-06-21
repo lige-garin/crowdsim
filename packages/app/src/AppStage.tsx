@@ -1,6 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { lazy, Suspense } from "react";
 import { ContactNetworkView } from "./ContactNetworkView";
+import { buildCrowdContactNetwork } from "./crowdContactNetwork";
 import {
   formatSimulationClock,
   formatStageViewButton,
@@ -90,7 +91,12 @@ export function AppStage({
           ))}
         </div>
         {viewMode === "network" ? (
-          <ContactNetworkView />
+          <ContactNetworkView
+            network={buildCrowdContactNetwork(simulationSnapshot.agents, {
+              worldWidth: scene.world.width,
+              worldHeight: scene.world.height,
+            })}
+          />
         ) : (
           <>
             <Suspense
