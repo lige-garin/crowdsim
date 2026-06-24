@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { createArnisIntegrationPlan } from "./arnisIntegration";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import {
   createBioCityAssetLoadPlans,
@@ -30,6 +31,16 @@ export function TilesBackdropPanel() {
     );
 
     return {
+      arnisPlan: createArnisIntegrationPlan({
+        bbox: {
+          east: 121.476,
+          north: 31.232,
+          south: 31.228,
+          west: 121.47,
+        },
+        outputDirectory: "E:/crowdsim-data/arnis/rainy-high-street",
+        scene: bioCityDemoScene,
+      }),
       assets: summarizeVisualAssetManifest(demoVisualAssetManifest),
       bioCityAssetLoading,
       rendererPlan: createTilesRendererIntegrationPlan(tilesConfig),
@@ -46,7 +57,7 @@ export function TilesBackdropPanel() {
         {summary.tilesConfig.provider} | {summary.tilesConfig.proxyUrl}
       </code>
       <code>
-        {summary.rendererPlan.moduleName} → {summary.rendererPlan.renderer} |{" "}
+        {summary.rendererPlan.moduleName} {"->"} {summary.rendererPlan.renderer} |{" "}
         {summary.rendererPlan.rootTilesetUrl}
       </code>
       <code>
@@ -65,6 +76,12 @@ export function TilesBackdropPanel() {
         {summary.bioCityAssetLoading.mediumLodCount}/
         {summary.bioCityAssetLoading.highLodCount} | budget{" "}
         {summary.bioCityAssetLoading.estimatedTriangles.toLocaleString()} tris
+      </code>
+      <code>Arnis external generator | {summary.arnisPlan.command.join(" ")}</code>
+      <code>
+        Arnis output {summary.arnisPlan.outputExpectation} | asset{" "}
+        {summary.arnisPlan.sceneAsset.sourceUrl} | collision{" "}
+        {summary.arnisPlan.sceneAsset.collisionMode}
       </code>
     </section>
   );
