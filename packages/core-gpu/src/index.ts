@@ -22,6 +22,12 @@ export {
   sampleFlowFieldAtlasCpu,
 } from "./flowFieldAtlas";
 export { sampleFlowFieldGpu, stepSocialForceGpu } from "./motionGpu";
+export { createGpuSimCore } from "./gpuSimCore";
+export type {
+  AgentSpawn,
+  GpuSimCore,
+  GpuSimCoreOptions,
+} from "./gpuSimCore";
 export {
   createNeuralResidualFeatureBufferData,
   createNeuralResidualWeightBufferData,
