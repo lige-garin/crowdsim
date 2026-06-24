@@ -24,8 +24,9 @@ Deeper real-data/backend/AI integration and turning the SP-0-flagged
 fabricated features into real implementations is SP-5b (not yet done).
 
 ## Dead (referenced by nothing)
-DashboardPanel, DashboardV2Panel, SimulationCredibilityPanel, and the
-BioCity*Acceptance/Package panels (the acceptance ones are removed in Task 6).
+None. DashboardPanel, DashboardV2Panel, SimulationCredibilityPanel, and
+BioCityWorkspacePackagePanel were deleted in P0 T1 (2026-06-24); the
+BioCity*Acceptance panels were removed earlier.
 
 > NOTE: re-run the reachability grep before SP-5 to refresh this list; the
 > numbers above are the 2026-06-19 snapshot.
