@@ -36,7 +36,7 @@ export function BioCityAnalyticsPanel({
         <Metric label="风险" value={`${summary.routeRiskIndexPercent}%`} />
         <Metric label="排队" value={`${summary.transitQueuePressurePercent}%`} />
         <Metric
-          label="转化"
+          label="转化(预测)"
           value={`${summary.commercialConversionForecastPercent}%`}
         />
       </div>
