@@ -18,7 +18,7 @@ describe("validation report", () => {
     expect(report.neuralCorrectionValidation.correctedMeanError).toBeLessThan(
       report.neuralCorrectionValidation.baselineMeanError,
     );
-    expect(report.neuralCorrectionValidation.modelSource).toBe("trained-dataset");
+    expect(report.neuralCorrectionValidation.modelSource).toBe("fitted-projection");
     expect(report.speedDensityPoints).toHaveLength(4);
     expect(report.pedestrianPresetSummaries).toHaveLength(12);
     expect(report.referenceLinks.map((link) => link.label)).toEqual([
@@ -39,7 +39,7 @@ describe("validation report", () => {
     expect(html).toContain("RiMEA straight corridor");
     expect(html).toContain("Weidmann");
     expect(html).toContain("神经修正验证");
-    expect(html).toContain("Physics + MLP error");
+    expect(html).toContain("Physics + residual error");
     expect(html).toContain("MSC.1/Circ.1533");
   });
 

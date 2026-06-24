@@ -38,7 +38,7 @@ describe("social force calibration", () => {
     const result = runBenchmarkScenario(rimeaCoreScenarios[0]);
     const report = createNeuralCorrectionValidationReport(result, createTarget());
 
-    expect(report.modelSource).toBe("trained-dataset");
+    expect(report.modelSource).toBe("fitted-projection");
     expect(report.baselineMeanError).toBeGreaterThan(report.correctedMeanError);
     expect(report.improvementRatio).toBeGreaterThan(0);
     expect(report.targetThroughputPerMinute).toBe(60);

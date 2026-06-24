@@ -220,7 +220,7 @@ export function renderValidationReportHtml(
         <th>Target speed</th>
         <th>Target throughput</th>
         <th>Pure physics error</th>
-        <th>Physics + MLP error</th>
+        <th>Physics + residual error</th>
         <th>Improvement</th>
         <th>Model</th>
       </tr>

@@ -7,7 +7,6 @@ import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
-import { NeuralCorrectionPanel } from "./NeuralCorrectionPanel";
 import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
 import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
@@ -63,12 +62,6 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "品牌智能",
     labelEn: "Brand intelligence",
     render: (ctx) => <BrandIntelligencePanel insight={ctx.brandInsight} />,
-  },
-  {
-    id: "neural-correction",
-    labelZh: "神经修正",
-    labelEn: "Neural correction",
-    render: () => <NeuralCorrectionPanel />,
   },
   {
     id: "scale-readiness",

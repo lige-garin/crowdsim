@@ -7,7 +7,6 @@ const EXPECTED = [
   "experiment-summary",
   "validation-report",
   "brand-intelligence",
-  "neural-correction",
   "scale-readiness",
   "project-workspace",
   "collaboration-status",
@@ -19,7 +18,7 @@ const EXPECTED = [
 ];
 
 describe("panel reachability", () => {
-  it("registers all 14 previously-orphaned panels exactly once", () => {
+  it("registers all 13 previously-orphaned panels exactly once", () => {
     const ids = panelRegistry.map((panel) => panel.id);
     for (const id of EXPECTED) {
       expect(ids.filter((value) => value === id).length, id).toBe(1);

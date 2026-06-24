@@ -1,43 +1,12 @@
-// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the "browser matrix" is a label
-// array and the hash is a browser-independent FNV of deterministic JS output.
-// Running it twice in one process cannot detect real cross-browser divergence.
-// A real Playwright Chromium/WebKit matrix is deferred to SP-5.
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this hash is a SAME-BUILD determinism
+// check only -- an FNV of deterministic JS output that is stable across repeated
+// runs of the same build/seed. It is browser-independent and CANNOT detect
+// cross-browser divergence. The fabricated "Chrome/Edge/Safari reproducibility
+// matrix" (label array + identical in-process runs) was removed in P0 T2; a real
+// Playwright Chromium/WebKit matrix is deferred to SP-5.
 import type { BenchmarkRunResult } from "./benchmarkTypes";
 
-export const reproducibilityBrowserMatrix = [
-  { engine: "chromium", name: "Chrome" },
-  { engine: "chromium", name: "Edge" },
-  { engine: "webkit", name: "Safari" },
-] as const;
-
-export type ReproducibilityBrowser = (typeof reproducibilityBrowserMatrix)[number];
-
-export const reproducibilityCiMatrix = [
-  {
-    channel: "chrome",
-    engine: "chromium",
-    id: "chrome",
-    name: "Chrome",
-  },
-  {
-    channel: "msedge",
-    engine: "chromium",
-    id: "edge",
-    name: "Edge",
-  },
-  {
-    channel: "webkit-safari-compat",
-    engine: "webkit",
-    id: "safari",
-    name: "Safari",
-  },
-] as const;
-
-export type ReproducibilityCiTarget = (typeof reproducibilityCiMatrix)[number];
-
 export type BenchmarkReproducibilityContract = {
-  browserMatrix: readonly ReproducibilityBrowser[];
-  ciMatrix: readonly ReproducibilityCiTarget[];
   metricTolerance: {
     densityPeak: number;
     meanSpeedMetersPerSecond: number;
@@ -51,8 +20,6 @@ export function createBenchmarkReproducibilityContract(
   results: readonly BenchmarkRunResult[],
 ): BenchmarkReproducibilityContract {
   return {
-    browserMatrix: reproducibilityBrowserMatrix,
-    ciMatrix: reproducibilityCiMatrix,
     metricTolerance: {
       densityPeak: 0.0001,
       meanSpeedMetersPerSecond: 0.0001,

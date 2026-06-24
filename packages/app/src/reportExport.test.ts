@@ -11,15 +11,10 @@ describe("validation report export bundle", () => {
 
     expect(bundle.filename).toBe("crowdsim-v2-calibration-zh-2026-06-12.html");
     expect(bundle.pdfReady).toBe(true);
-    expect(bundle.browserMatrix.map((browser) => browser.name)).toEqual([
-      "Chrome",
-      "Edge",
-      "Safari",
-    ]);
     expect(bundle.reproducibilityMatch).toBe(true);
     expect(bundle.contentDigest).toMatch(/^[0-9a-f]{16}$/);
     expect(bundle.html).toContain("CrowdSim V2 校准报告");
-    expect(bundle.html).toContain("Physics + MLP error");
+    expect(bundle.html).toContain("Physics + residual error");
   });
 
   it("wraps printable report HTML in a text/html blob", async () => {

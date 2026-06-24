@@ -18,7 +18,6 @@ describe("ImageGeometryPanel", () => {
 
     expect(screen.getByRole("heading", { name: "AI 描图" })).toBeInTheDocument();
     expect(screen.getByText(/fixtures 3/)).toBeInTheDocument();
-    expect(screen.getByText(/reduction/)).toBeInTheDocument();
-    expect(screen.getByText(/70% pass/)).toBeInTheDocument();
+    expect(screen.getByText(/low-confidence review/)).toBeInTheDocument();
   });
 });

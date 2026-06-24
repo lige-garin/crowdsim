@@ -19,7 +19,6 @@ describe("ValidationReportPanel", () => {
     expect(screen.getByRole("heading", { name: "校准报告" })).toBeInTheDocument();
     expect(screen.getByText(/4\/4\s+通过/)).toBeInTheDocument();
     expect(screen.getByText(/PDF-ready yes/)).toBeInTheDocument();
-    expect(screen.getByText(/Chrome\/Edge\/Safari/)).toBeInTheDocument();
     expect(screen.getByText(/physics error/)).toBeInTheDocument();
     expect(screen.getByText(/AI 校准摘要/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "打印 / 导出 PDF" })).toBeInTheDocument();

@@ -1,8 +1,10 @@
-// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this is NOT MLP distillation.
-// Training targets are algebraic functions of the input features and only the
-// output layer is fit — effectively a small fixed-projection linear regression.
-// A genuine trajectory-trained model is deferred to SP-5. Do not describe this
-// as "distillation" or "trained from trajectory ground truth" in user-facing copy.
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this is NOT MLP distillation and NOT a
+// model trained from trajectory ground truth. The fit targets are algebraic
+// functions of the input features and only the output projection is fit by gradient
+// descent over a fixed hidden layer -- a small fixed-projection residual. It is
+// experimental and default-off. A genuine trajectory-trained model is deferred to
+// SP-5. P0 T2 renamed the "train/trained-dataset/MLP" API to honest projection-fit
+// terms; do not reintroduce "distillation" or "trained from ground truth" copy.
 import {
   createDefaultNeuralCorrectionModel,
   createNeuralCorrectionFeatures,
@@ -13,24 +15,24 @@ import {
 } from "./neuralCorrection";
 import type { BenchmarkRunResult } from "./benchmarkTypes";
 
-export type NeuralResidualTrainingSample = {
+export type ResidualProjectionSample = {
   features: NeuralCorrectionFeatures;
   targetSpeedResidual: number;
   targetThroughputResidual: number;
 };
 
-export type NeuralResidualTrainingReport = {
-  epochs: number;
+export type ResidualProjectionFitReport = {
+  iterations: number;
   finalLoss: number;
   initialLoss: number;
   model: NeuralCorrectionModel;
   sampleCount: number;
 };
 
-export function createResidualTrainingSamples(
+export function createResidualProjectionSamples(
   result: BenchmarkRunResult,
   target: NeuralCorrectionInput,
-): NeuralResidualTrainingSample[] {
+): ResidualProjectionSample[] {
   const base = createNeuralCorrectionFeatures(result, target);
   const variants: NeuralCorrectionFeatures[] = [
     base,
@@ -75,27 +77,27 @@ export function createResidualTrainingSamples(
   }));
 }
 
-export function trainNeuralResidualModel(
-  samples: readonly NeuralResidualTrainingSample[],
+export function fitResidualProjection(
+  samples: readonly ResidualProjectionSample[],
   options: {
-    epochs?: number;
+    iterations?: number;
     learningRate?: number;
     seedModel?: NeuralCorrectionModel;
   } = {},
-): NeuralResidualTrainingReport {
+): ResidualProjectionFitReport {
   if (samples.length === 0) {
-    throw new Error("Neural residual training requires at least one sample");
+    throw new Error("Residual projection fit requires at least one sample");
   }
 
   const seedModel = options.seedModel ?? createDefaultNeuralCorrectionModel();
   const model = cloneModel(seedModel, false);
-  const epochs = options.epochs ?? 160;
+  const iterations = options.iterations ?? 160;
   const learningRate = options.learningRate ?? 0.08;
   const initialLoss = calculateResidualLoss(samples, model);
   const outputWeights = model.outputWeights.map((weights) => [...weights]);
   const outputBias = [...model.outputBias];
 
-  for (let epoch = 0; epoch < epochs; epoch++) {
+  for (let iteration = 0; iteration < iterations; iteration++) {
     for (const sample of samples) {
       const hidden = hiddenActivations(model, sample.features);
       const targets = [sample.targetSpeedResidual, sample.targetThroughputResidual];
@@ -115,25 +117,25 @@ export function trainNeuralResidualModel(
     }
   }
 
-  const trainedModel: NeuralCorrectionModel = {
+  const fittedModel: NeuralCorrectionModel = {
     ...model,
     enabled: true,
     outputBias: outputBias.map(round),
     outputWeights: outputWeights.map((weights) => weights.map(round)),
-    source: "trained-dataset",
+    source: "fitted-projection",
   };
 
   return {
-    epochs,
-    finalLoss: calculateResidualLoss(samples, trainedModel),
+    iterations,
+    finalLoss: calculateResidualLoss(samples, fittedModel),
     initialLoss,
-    model: trainedModel,
+    model: fittedModel,
     sampleCount: samples.length,
   };
 }
 
 export function calculateResidualLoss(
-  samples: readonly NeuralResidualTrainingSample[],
+  samples: readonly ResidualProjectionSample[],
   model: NeuralCorrectionModel,
 ) {
   const total = samples.reduce((sum, sample) => {

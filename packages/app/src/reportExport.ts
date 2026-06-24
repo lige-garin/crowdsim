@@ -10,7 +10,6 @@ import {
 } from "./validationReport";
 
 export type ValidationReportExportBundle = {
-  browserMatrix: BenchmarkReproducibilityContract["browserMatrix"];
   filename: string;
   html: string;
   mimeType: "text/html";
@@ -37,7 +36,6 @@ export function createValidationReportExportBundle(
   ].join("|");
 
   return {
-    browserMatrix: reproducibility.browserMatrix,
     filename: createReportFilename(report.generatedAtIso, language),
     html,
     mimeType: "text/html",

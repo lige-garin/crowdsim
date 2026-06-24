@@ -22,7 +22,7 @@ describe("neural correction", () => {
     expect(recommendation.throughputMultiplier).toBeCloseTo(0.9);
     expect(recommendation.confidence).toBeGreaterThan(0.8);
     expect(recommendation.modelApplied).toBe(false);
-    expect(recommendation.notes[0]).toContain("Audit MLP");
+    expect(recommendation.notes[0]).toContain("Heuristic residual inference path");
   });
 
   it("applies recommendations without mutating the benchmark result", () => {
@@ -37,7 +37,7 @@ describe("neural correction", () => {
     expect(applyNeuralCorrectionToSpeed(1.2, recommendation)).toBe(1.8);
   });
 
-  it("runs a bounded audit MLP residual path when explicitly enabled", () => {
+  it("runs a bounded auditable residual path when explicitly enabled", () => {
     const result = runBenchmarkScenario(rimeaCoreScenarios[0]);
     const target = {
       targetMeanSpeedMetersPerSecond: result.meanSpeedMetersPerSecond * 1.05,
@@ -55,6 +55,6 @@ describe("neural correction", () => {
     expect(Math.abs(residual.speedResidual)).toBeLessThanOrEqual(0.12);
     expect(Math.abs(residual.throughputResidual)).toBeLessThanOrEqual(0.12);
     expect(recommendation.modelApplied).toBe(true);
-    expect(recommendation.notes[0]).toContain("MLP residual applied");
+    expect(recommendation.notes[0]).toContain("Heuristic residual correction applied");
   });
 });

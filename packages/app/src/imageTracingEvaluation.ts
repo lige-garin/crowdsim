@@ -1,6 +1,8 @@
-// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the "workload reduction %" here is a
-// PROJECTION from hardcoded per-entity minute constants, not a measurement.
-// Real before/after measurement is deferred to SP-5. Label any UI as "estimated".
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the fabricated "workload reduction %"
+// (projected from hardcoded per-entity minute constants, never measured) was
+// removed in P0 T2. This module now only exercises the real image->geometry
+// pipeline (in aiImageGeometry.ts) over demo fixtures and reports what it actually
+// produced: generated entities, low-confidence count, and the resulting scene id.
 import { demoScene } from "./demoScene";
 import {
   calibrateImageScale,
@@ -20,19 +22,14 @@ export type ImageTracingFixture = {
 };
 
 export type ImageTracingFixtureResult = {
-  assistedMinutes: number;
   generatedEntities: number;
   id: string;
   lowConfidenceCount: number;
-  manualMinutes: number;
-  reductionRatio: number;
   sceneId: string;
 };
 
 export type ImageTracingEvaluation = {
-  averageReductionRatio: number;
   fixtureCount: number;
-  passedSeventyPercentTarget: boolean;
   results: readonly ImageTracingFixtureResult[];
 };
 
@@ -96,15 +93,9 @@ export function evaluateImageTracingFixtures(
   fixtures: readonly ImageTracingFixture[] = imageTracingFixtures,
 ): ImageTracingEvaluation {
   const results = fixtures.map(evaluateFixture);
-  const averageReductionRatio = round(
-    results.reduce((sum, result) => sum + result.reductionRatio, 0) /
-      Math.max(1, results.length),
-  );
 
   return {
-    averageReductionRatio,
     fixtureCount: results.length,
-    passedSeventyPercentTarget: averageReductionRatio >= 0.7,
     results,
   };
 }
@@ -123,16 +114,11 @@ function evaluateFixture(fixture: ImageTracingFixture): ImageTracingFixtureResul
   const lowConfidenceCount = findLowConfidenceGeometry(cleanedDraft).length;
   const generatedEntities =
     cleanedDraft.lines.length + (cleanedDraft.entrances?.length ?? 0);
-  const manualMinutes = generatedEntities * 6;
-  const assistedMinutes = round(generatedEntities * 0.8 + lowConfidenceCount * 3);
 
   return {
-    assistedMinutes,
     generatedEntities,
     id: fixture.id,
     lowConfidenceCount,
-    manualMinutes,
-    reductionRatio: round(1 - assistedMinutes / manualMinutes),
     sceneId: scene.id,
   };
 }
@@ -172,8 +158,4 @@ function line(
       { x: x2, y: y2 },
     ],
   };
-}
-
-function round(value: number) {
-  return Number(value.toFixed(4));
 }

@@ -6,8 +6,8 @@ import {
   inferNeuralResidualCorrection,
 } from "./neuralCorrection";
 import {
-  createResidualTrainingSamples,
-  trainNeuralResidualModel,
+  createResidualProjectionSamples,
+  fitResidualProjection,
 } from "./neuralResidualTraining";
 import {
   demoTrajectoryCsv,
@@ -26,7 +26,7 @@ function createTrainingFixture() {
 
   return {
     result,
-    samples: createResidualTrainingSamples(result, {
+    samples: createResidualProjectionSamples(result, {
       targetMeanSpeedMetersPerSecond: target.targetMeanSpeedMetersPerSecond,
       targetThroughputPerMinute: target.targetThroughputPerMinute,
     }),
@@ -34,23 +34,23 @@ function createTrainingFixture() {
   };
 }
 
-describe("neural residual training", () => {
-  it("distills trajectory calibration samples into a bounded trained model", () => {
+describe("residual projection fit", () => {
+  it("fits algebraic residual samples into a bounded fixed-projection model", () => {
     const { samples } = createTrainingFixture();
-    const report = trainNeuralResidualModel(samples);
+    const report = fitResidualProjection(samples);
     const prediction = inferNeuralResidualCorrection(samples[0].features, report.model);
 
     expect(report.sampleCount).toBe(6);
-    expect(report.epochs).toBe(160);
-    expect(report.model.source).toBe("trained-dataset");
+    expect(report.iterations).toBe(160);
+    expect(report.model.source).toBe("fitted-projection");
     expect(report.finalLoss).toBeLessThan(report.initialLoss);
     expect(Math.abs(prediction.speedResidual)).toBeLessThanOrEqual(0.12);
     expect(Math.abs(prediction.throughputResidual)).toBeLessThanOrEqual(0.12);
   });
 
-  it("can drive the auditable recommendation path with the trained model", () => {
+  it("can drive the auditable recommendation path with the fitted model", () => {
     const { result, samples, target } = createTrainingFixture();
-    const report = trainNeuralResidualModel(samples);
+    const report = fitResidualProjection(samples);
     const recommendation = createNeuralCorrectionRecommendation(
       result,
       {
@@ -61,6 +61,6 @@ describe("neural residual training", () => {
     );
 
     expect(recommendation.modelApplied).toBe(true);
-    expect(recommendation.notes[0]).toContain("trained-dataset");
+    expect(recommendation.notes[0]).toContain("fitted-projection");
   });
 });

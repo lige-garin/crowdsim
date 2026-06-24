@@ -20,9 +20,7 @@ export function ImageGeometryPanel() {
           : "Scale calibration, geometry cleanup, low-confidence review, and three-fixture validation are connected."}
       </p>
       <code>
-        fixtures {evaluation.fixtureCount} | review {totalReviewCount} | reduction{" "}
-        {Math.round(evaluation.averageReductionRatio * 100)}% |{" "}
-        {evaluation.passedSeventyPercentTarget ? "70% pass" : "needs review"}
+        fixtures {evaluation.fixtureCount} | low-confidence review {totalReviewCount}
       </code>
     </section>
   );

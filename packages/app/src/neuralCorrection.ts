@@ -27,7 +27,7 @@ export type NeuralCorrectionModel = {
   hiddenWeights: readonly (readonly number[])[];
   outputBias: readonly number[];
   outputWeights: readonly (readonly number[])[];
-  source: "calibration-fixture" | "trained-dataset" | "untrained";
+  source: "calibration-fixture" | "fitted-projection" | "untrained";
 };
 
 export type NeuralResidualOutput = {
@@ -183,9 +183,11 @@ function createCorrectionNotes(
   residual: NeuralResidualOutput | undefined,
 ) {
   const notes = residual
-    ? [`MLP residual applied from ${residual.modelSource}; keep toggle auditable.`]
+    ? [
+        `Heuristic residual correction applied from ${residual.modelSource}; experimental, default off.`,
+      ]
     : [
-        "Audit MLP inference path available; disabled until trained-data validation passes.",
+        "Heuristic residual inference path available; experimental, default off until calibrated.",
       ];
 
   if (speedError > 0.2) {

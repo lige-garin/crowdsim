@@ -8,18 +8,22 @@ by nothing.
 SimulationViewport, ContactNetworkView, SceneEditor (+SceneEditorLayout/
 Controls/ParamPanel), BioCityAnalyticsPanel, AiImageOverlay.
 
-## Reachable via PanelDock (SP-5a — DONE, all 14 mounted)
+## Reachable via PanelDock (SP-5a — DONE, 13 mounted)
 All previously-orphaned panels are now registered in `panelRegistry.tsx` and
 reachable through `PanelDock` (mounted in `App.tsx`), each with a render-smoke
 test (`panelRegistry.*.test.tsx`):
 BrandIntelligencePanel, ScaleReadinessPanel, ScenarioComparisonPanel,
-NeuralCorrectionPanel, ProjectWorkspacePanel, TemplateLibraryPanel,
+ProjectWorkspacePanel, TemplateLibraryPanel,
 TilesBackdropPanel, AiWorkflowPanel, CollaborationStatusPanel,
 ValidationReportPanel, ExperimentSweepPanel, ExperimentSummaryPanel,
 ImageGeometryPanel, TrajectoryReplayPanel.
 
+NeuralCorrectionPanel was de-registered and deleted in P0 T2 (it exposed the
+fabricated "trained MLP / trained-dataset" framing to users); the underlying
+`socialForceCalibration` path is retained.
+
 SP-5a delivered REACHABILITY. Live brand insight + trajectory recording are
-wired through `PanelDockContext`; the other 12 panels are self-contained.
+wired through `PanelDockContext`; the other 11 panels are self-contained.
 Deeper real-data/backend/AI integration and turning the SP-0-flagged
 fabricated features into real implementations is SP-5b (not yet done).
 

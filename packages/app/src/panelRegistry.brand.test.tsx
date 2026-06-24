@@ -15,7 +15,7 @@ const ctx = {
 } as unknown as PanelDockContext;
 
 describe("brand + calibration panels are registered and render", () => {
-  for (const id of ["brand-intelligence", "neural-correction", "scale-readiness"]) {
+  for (const id of ["brand-intelligence", "scale-readiness"]) {
     it(`renders ${id}`, () => {
       const entry = panelRegistry.find((panel) => panel.id === id);
       expect(entry, `panel ${id} must be registered`).toBeDefined();

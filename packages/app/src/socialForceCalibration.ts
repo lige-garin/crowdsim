@@ -5,8 +5,8 @@ import {
   type NeuralCorrectionModel,
 } from "./neuralCorrection";
 import {
-  createResidualTrainingSamples,
-  trainNeuralResidualModel,
+  createResidualProjectionSamples,
+  fitResidualProjection,
 } from "./neuralResidualTraining";
 import type { TrajectoryCalibrationTarget } from "./trajectoryDataset";
 
@@ -73,8 +73,8 @@ export function calibrateSocialForceParameters(
 export function createNeuralCorrectionValidationReport(
   result: BenchmarkRunResult,
   target: TrajectoryCalibrationTarget,
-  model = trainNeuralResidualModel(
-    createResidualTrainingSamples(result, {
+  model = fitResidualProjection(
+    createResidualProjectionSamples(result, {
       targetMeanSpeedMetersPerSecond: target.targetMeanSpeedMetersPerSecond,
       targetThroughputPerMinute: target.targetThroughputPerMinute,
     }),

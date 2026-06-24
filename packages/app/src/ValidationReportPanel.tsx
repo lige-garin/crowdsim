@@ -43,12 +43,10 @@ export function ValidationReportPanel() {
         {passLabel} | {report.benchmarkSummary.failCount} {failLabel}
       </code>
       <code>
-        PDF-ready {exportBundle.pdfReady ? "yes" : "no"} |{" "}
-        {exportBundle.browserMatrix.map((browser) => browser.name).join("/")} |{" "}
-        {exportBundle.filename}
+        PDF-ready {exportBundle.pdfReady ? "yes" : "no"} | {exportBundle.filename}
       </code>
       <code>
-        physics error {report.neuralCorrectionValidation.baselineMeanError} | mlp{" "}
+        physics error {report.neuralCorrectionValidation.baselineMeanError} | +residual{" "}
         {report.neuralCorrectionValidation.correctedMeanError} | improve{" "}
         {Math.round(report.neuralCorrectionValidation.improvementRatio * 100)}%
       </code>
