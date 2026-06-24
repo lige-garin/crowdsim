@@ -8,6 +8,7 @@ import type {
 import type { SimulationSink } from "./simulationEngine";
 import { chooseBrandStore, type BrandStoreCandidate } from "./brandAttraction";
 import { createAgentMindset } from "./agentPersona";
+import { gravityWeight } from "./odEntryModel";
 
 /** Deterministic PRNG so shop choice is reproducible for a given seed. */
 function mulberry32(seed: number): () => number {
@@ -34,6 +35,37 @@ function pickShopByAttraction(
     remaining -= Math.max(0, shop.attraction);
     if (remaining <= 0) {
       return shop;
+    }
+  }
+  return shops[shops.length - 1];
+}
+
+/**
+ * Gravity store choice: weight each shop by attraction attenuated by distance
+ * from the shopper (P2 retail behaviour layer). decay = 0 reduces to
+ * pickShopByAttraction; higher decay favours nearer shops.
+ */
+function pickShopByGravity(
+  shops: readonly SimulationShop[],
+  origin: ScenePoint,
+  random01: number,
+  distanceDecay: number,
+): SimulationShop {
+  const weights = shops.map((shop) => {
+    const dx = shop.position.x - origin.x;
+    const dy = shop.position.y - origin.y;
+    return gravityWeight(shop.attraction, Math.hypot(dx, dy), distanceDecay);
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  if (total <= 0) {
+    return shops[Math.min(shops.length - 1, Math.floor(random01 * shops.length))];
+  }
+
+  let remaining = random01 * total;
+  for (let i = 0; i < shops.length; i++) {
+    remaining -= weights[i];
+    if (remaining <= 0) {
+      return shops[i];
     }
   }
   return shops[shops.length - 1];
@@ -87,6 +119,11 @@ export function createMallCrowdDecisionBackend(options: {
   seed?: number;
   decisionHz?: number;
   brandStores?: readonly BrandStoreCandidate[];
+  /**
+   * Gravity distance-decay for store choice (P2). When > 0, fresh shoppers favour
+   * nearer shops via pickShopByGravity; 0/undefined keeps attraction-only choice.
+   */
+  distanceDecay?: number;
 }): SimulationDecisionBackend {
   const random = mulberry32(options.seed ?? 1);
   const mindsetSeed = options.seed ?? 1;
@@ -282,7 +319,15 @@ export function createMallCrowdDecisionBackend(options: {
           chosen = choice ? shopById.get(choice.store.id) : undefined;
         }
         if (!chosen) {
-          chosen = pickShopByAttraction(activeShops, random());
+          chosen =
+            options.distanceDecay && options.distanceDecay > 0
+              ? pickShopByGravity(
+                  activeShops,
+                  { x: agent.x, y: agent.y },
+                  random(),
+                  options.distanceDecay,
+                )
+              : pickShopByAttraction(activeShops, random());
         }
         decisions.push({
           agentId: agent.id,

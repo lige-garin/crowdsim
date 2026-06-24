@@ -104,6 +104,21 @@ describe("createMallCrowdDecisionBackend", () => {
     expect(chosen.size).toBeGreaterThan(1);
   });
 
+  it("favours nearer shops under gravity distance decay", () => {
+    // shops a(10,10) and b(50,50) have equal attraction; agents sit next to a.
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 7, distanceDecay: 0.3 });
+    const many = Array.from({ length: 40 }, (_, i) => agent({ id: i + 1, x: 8, y: 8 }));
+    const decisions = backend.decideAgents({
+      agents: many,
+      decisionTick: 0,
+      elapsedSeconds: 0,
+      sinks,
+      shops,
+    });
+    const nearCount = decisions.filter((d) => d.selectedStoreId === "a").length;
+    expect(nearCount).toBeGreaterThan(decisions.length * 0.7);
+  });
+
   it("queues an arriving shopper when the shop is at capacity", () => {
     const browsers = [
       agent({ id: 1, lifecycleState: "browse", selectedStoreId: "a", browseUntilSeconds: 10, x: 10, y: 10 }),

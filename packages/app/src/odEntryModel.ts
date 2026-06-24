@@ -46,6 +46,17 @@ export type ODAllocation = {
   totalInflow: number;
 };
 
+// Shared gravity draw: attraction attenuated by exponential distance decay. Used
+// by the OD allocation and by per-agent store choice (mallCrowdDecisionBackend).
+// decay = 0 returns the bare (non-negative) attraction.
+export function gravityWeight(
+  attraction: number,
+  effectiveDistance: number,
+  distanceDecay: number,
+): number {
+  return Math.max(0, attraction) * Math.exp(-distanceDecay * effectiveDistance);
+}
+
 export function buildGravityOdAllocation(
   entrances: readonly ODEntrance[],
   destinations: readonly ODDestination[],
@@ -70,7 +81,7 @@ export function buildGravityOdAllocation(
       const floorDelta = Math.abs((destination.floor ?? 0) - (entrance.floor ?? 0));
       const effectiveDistance =
         Math.hypot(dx, dy) + floorChangePenalty * floorDelta;
-      return Math.max(0, destination.attraction) * Math.exp(-distanceDecay * effectiveDistance);
+      return gravityWeight(destination.attraction, effectiveDistance, distanceDecay);
     });
 
     let weightSum = weights.reduce((sum, weight) => sum + weight, 0);
