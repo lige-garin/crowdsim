@@ -26,6 +26,10 @@ import { WebGPURenderer } from "three/webgpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useI18n, type TranslationKey } from "./i18n";
 import {
+  describeViewportRenderMode,
+  type ViewportRenderMode,
+} from "./viewportRenderMode";
+import {
   performanceAgentCount,
   performanceBenchmarkFrames,
 } from "./renderBenchmark";
@@ -98,7 +102,7 @@ export function SimulationViewport({
   snapshot?: SimulationSnapshot;
   viewMode?: ViewMode;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   // Latest snapshot, read each animation frame so the instanced crowd follows
   // the live simulation without recreating the scene.
@@ -122,6 +126,7 @@ export function SimulationViewport({
   // and the gesture dies mid-drag (the rebuild re-binds the pointer handlers).
   const dragRef = useRef({ active: false, x: 0, y: 0, downX: 0, downY: 0 });
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
+  const [renderMode, setRenderMode] = useState<ViewportRenderMode>("detecting");
   const [fps, setFps] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
@@ -541,10 +546,12 @@ export function SimulationViewport({
       try {
         if (!("gpu" in navigator) || !navigator.gpu) {
           if (navigator.userAgent.includes("jsdom")) {
+            setRenderMode("unsupported");
             setStatus(localizedStatus("webgpuUnavailable"));
             return;
           }
 
+          setRenderMode("compat");
           renderer = createFallbackRenderer();
           resize();
           seedAgents();
@@ -565,6 +572,7 @@ export function SimulationViewport({
         });
 
         if (!adapter) {
+          setRenderMode("unsupported");
           setStatus(localizedStatus("noWebGpuAdapter"));
           return;
         }
@@ -576,6 +584,7 @@ export function SimulationViewport({
           return;
         }
 
+        setRenderMode("full-gpu");
         setStatus(localizedStatus("initializing"));
         renderer = createRenderer(device);
         await renderer.init();
@@ -676,6 +685,14 @@ export function SimulationViewport({
       <ViewportCityLabelOverlay scene={crowdScene} viewMode={viewMode} />
       <div className="render-hud" aria-label={t("renderStatus")}>
         <span>{status.type === "localized" ? t(status.key) : status.message}</span>
+        {(() => {
+          const mode = describeViewportRenderMode(renderMode, language);
+          return mode ? (
+            <span className="render-mode-badge" title={mode.caveat}>
+              {mode.label}
+            </span>
+          ) : null;
+        })()}
         <strong>
           {(snapshot?.agentCount ?? 0).toLocaleString()} {t("visualAgents")}
         </strong>

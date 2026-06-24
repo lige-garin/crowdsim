@@ -1,6 +1,11 @@
 # ADR 0004: WebGPU-only — remove the WebGL fallback
 
-- Status: Accepted (2026-06-19)
+- Status: Superseded by ADR-0006 (2026-06-24)
+
+> Superseded: the WebGPU-only / remove-WebGL stance below was never implemented
+> (the SP-2 viewport kept a WebGL fallback). ADR-0006 reconciles docs with code:
+> WebGPU for compute + a labeled, scale-limited WebGL/CPU compatibility mode,
+> with no silent degradation. The original decision is kept here for history.
 
 ## Context
 projectplan.md §2/§5 mandate WebGPU-only with an explicit unsupported notice,
