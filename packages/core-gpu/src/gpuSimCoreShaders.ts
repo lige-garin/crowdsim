@@ -87,3 +87,114 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
   offsets[i] = offsets[i] + acc;
   if (i == n - 1u) { offsets[n] = offsets[i] + counts[i]; }
 }`;
+
+// Fused movement step. Ports stepSocialForceCpu (socialForceCpu.ts) exactly:
+// desired-velocity relaxation + linear-falloff agent repulsion over the sorted
+// 3x3 neighborhood (valid because agentRepulsionRange <= cellSize, asserted on
+// the host) + wall repulsion + maxSpeed clamp + integrate. Reads positionsIn/
+// velocitiesIn, writes positionsOut/velocitiesOut (ping-pong).
+export const FUSED_MOVE_WORKGROUP = 64;
+export const fusedMoveShader = /* wgsl */ `
+struct MoveParams {
+  count: u32,
+  columns: u32,
+  rows: u32,
+  cellCount: u32,
+  cellSize: f32,
+  dt: f32,
+  desiredSpeed: f32,
+  relaxationTime: f32,
+  agentRepulsionStrength: f32,
+  agentRepulsionRange: f32,
+  wallRepulsionStrength: f32,
+  wallRepulsionRange: f32,
+  maxSpeed: f32,
+  wallCount: u32,
+};
+@group(0) @binding(0) var<storage, read> params: MoveParams;
+@group(0) @binding(1) var<storage, read> positionsIn: array<vec2<f32>>;
+@group(0) @binding(2) var<storage, read> velocitiesIn: array<vec2<f32>>;
+@group(0) @binding(3) var<storage, read> targets: array<vec2<f32>>;
+@group(0) @binding(4) var<storage, read> speed: array<f32>;
+@group(0) @binding(5) var<storage, read> cellOffsets: array<u32>;
+@group(0) @binding(6) var<storage, read> sortedAgentIds: array<u32>;
+@group(0) @binding(7) var<storage, read> walls: array<vec4<f32>>;
+@group(0) @binding(8) var<storage, read_write> positionsOut: array<vec2<f32>>;
+@group(0) @binding(9) var<storage, read_write> velocitiesOut: array<vec2<f32>>;
+
+fn cellOf(p: vec2<f32>) -> u32 {
+  let c = min(u32(max(floor(p.x / params.cellSize), 0.0)), params.columns - 1u);
+  let r = min(u32(max(floor(p.y / params.cellSize), 0.0)), params.rows - 1u);
+  return r * params.columns + c;
+}
+fn closestOnSegment(p: vec2<f32>, w: vec4<f32>) -> vec2<f32> {
+  let a = w.xy;
+  let ab = w.zw - w.xy;
+  let denom = max(dot(ab, ab), 0.0001);
+  let t = clamp(dot(p - a, ab) / denom, 0.0, 1.0);
+  return a + ab * t;
+}
+
+@compute @workgroup_size(64)
+fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
+  let i = id.x;
+  if (i >= params.count) { return; }
+
+  let p = positionsIn[i];
+  let v = velocitiesIn[i];
+  let ds = select(params.desiredSpeed, speed[i], speed[i] > 0.0);
+
+  let toTarget = targets[i] - p;
+  let tlen = length(toTarget);
+  var desired = vec2<f32>(0.0, 0.0);
+  if (tlen > 0.0001) { desired = toTarget / tlen; }
+  var force = (desired * ds - v) / params.relaxationTime;
+
+  // agent repulsion over the sorted 3x3 neighborhood
+  let cell = cellOf(p);
+  let cu = i32(cell % params.columns);
+  let ru = i32(cell / params.columns);
+  for (var dr = -1; dr <= 1; dr = dr + 1) {
+    let nr = ru + dr;
+    if (nr < 0 || nr >= i32(params.rows)) { continue; }
+    for (var dc = -1; dc <= 1; dc = dc + 1) {
+      let nc = cu + dc;
+      if (nc < 0 || nc >= i32(params.columns)) { continue; }
+      let ncell = u32(nr) * params.columns + u32(nc);
+      let start = cellOffsets[ncell];
+      let end = cellOffsets[ncell + 1u];
+      for (var slot = start; slot < end; slot = slot + 1u) {
+        let other = sortedAgentIds[slot];
+        if (other == i) { continue; }
+        let d = p - positionsIn[other];
+        let dist = max(length(d), 0.0001);
+        if (dist < params.agentRepulsionRange) {
+          let strength = params.agentRepulsionStrength *
+            ((params.agentRepulsionRange - dist) / params.agentRepulsionRange);
+          force = force + (d / dist) * strength;
+        }
+      }
+    }
+  }
+
+  // wall repulsion
+  for (var w = 0u; w < params.wallCount; w = w + 1u) {
+    let closest = closestOnSegment(p, walls[w]);
+    let d = p - closest;
+    let dist = max(length(d), 0.0001);
+    if (dist < params.wallRepulsionRange) {
+      let strength = params.wallRepulsionStrength *
+        ((params.wallRepulsionRange - dist) / params.wallRepulsionRange);
+      force = force + (d / dist) * strength;
+    }
+  }
+
+  // integrate + clamp to maxSpeed
+  let uv = v + force * params.dt;
+  let len = length(uv);
+  var cv = uv;
+  if (len > params.maxSpeed && len > 0.0001) { cv = (uv / len) * params.maxSpeed; }
+  velocitiesOut[i] = cv;
+  positionsOut[i] = p + cv * params.dt;
+}`;
+
