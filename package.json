@@ -15,6 +15,7 @@
     "format:check": "prettier . --check",
     "test": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/backend build && pnpm build:wasm && pnpm test:rust && pnpm -r test",
     "test:rust": "cargo test --manifest-path packages/core-behavior/Cargo.toml",
+    "test:webgpu": "pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/core-gpu test:webgpu",
     "typecheck": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/backend build && pnpm build:wasm && pnpm -r typecheck"
   },
   "devDependencies": {

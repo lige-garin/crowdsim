@@ -14,6 +14,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:webgpu": "vitest run -c vitest.webgpu.config.ts",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "devDependencies": {
