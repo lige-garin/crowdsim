@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { rimeaCoreScenarios } from "./benchmarkScenarios";
 import { runBenchmarkScenario } from "./benchmarkRunner";
+import type { NeuralCorrectionModel } from "./neuralCorrection";
 import {
   calibrateSocialForceParameters,
-  createNeuralCorrectionValidationReport,
+  createResidualProjectionValidationReport,
 } from "./socialForceCalibration";
 import {
   demoTrajectoryCsv,
@@ -34,13 +35,56 @@ describe("social force calibration", () => {
     expect(preset.notes[0]).toContain("trajectory target");
   });
 
-  it("reports pure physics versus physics plus neural correction error", () => {
+  it("reports pure physics versus physics plus residual projection error", () => {
     const result = runBenchmarkScenario(rimeaCoreScenarios[0]);
-    const report = createNeuralCorrectionValidationReport(result, createTarget());
+    const report = createResidualProjectionValidationReport(result, createTarget());
 
     expect(report.modelSource).toBe("fitted-projection");
-    expect(report.baselineMeanError).toBeGreaterThan(report.correctedMeanError);
-    expect(report.improvementRatio).toBeGreaterThan(0);
+    expect(report.improved).toBe(true);
     expect(report.targetThroughputPerMinute).toBe(60);
   });
+
+  // The default multiplier is target/actual, so "corrected" can only ever look
+  // better. This drives the residual the wrong way on a run that already sits
+  // on target, which is the only way the report can say it made things worse.
+  it("reports improved=false when the residual moves the run off target", () => {
+    const onTarget = {
+      ...runBenchmarkScenario(rimeaCoreScenarios[0]),
+      meanSpeedMetersPerSecond: 0.99,
+      throughputPerMinute: 60,
+    };
+    const target = {
+      densityEstimatePerSquareMeter: 1,
+      durationSeconds: 60,
+      targetMeanSpeedMetersPerSecond: 1,
+      targetThroughputPerMinute: 60,
+      trackCount: 10,
+    };
+    const report = createResidualProjectionValidationReport(
+      onTarget,
+      target,
+      overshootingModel,
+    );
+
+    expect(report.baselineMeanError).toBeLessThan(0.01);
+    expect(report.correctedMeanError).toBeGreaterThan(report.baselineMeanError);
+    expect(report.improved).toBe(false);
+    expect(report.improvementRatio).toBeLessThan(0);
+  });
 });
+
+const overshootingModel: NeuralCorrectionModel = {
+  enabled: true,
+  hiddenBias: [4, 4, 4],
+  hiddenWeights: [
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+  ],
+  outputBias: [4, 4],
+  outputWeights: [
+    [4, 4, 4],
+    [4, 4, 4],
+  ],
+  source: "fitted-projection",
+};

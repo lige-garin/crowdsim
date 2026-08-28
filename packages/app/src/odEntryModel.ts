@@ -79,8 +79,7 @@ export function buildGravityOdAllocation(
       const dx = destination.position.x - entrance.position.x;
       const dy = destination.position.y - entrance.position.y;
       const floorDelta = Math.abs((destination.floor ?? 0) - (entrance.floor ?? 0));
-      const effectiveDistance =
-        Math.hypot(dx, dy) + floorChangePenalty * floorDelta;
+      const effectiveDistance = Math.hypot(dx, dy) + floorChangePenalty * floorDelta;
       return gravityWeight(destination.attraction, effectiveDistance, distanceDecay);
     });
 

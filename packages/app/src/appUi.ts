@@ -1,17 +1,6 @@
 import type { TranslationKey } from "./i18n";
 import type { EvacuationCurvePoint, StageViewMode } from "./AppTypes";
 
-export const milestones: readonly {
-  id: string;
-  labelKey: TranslationKey;
-  statusKey: TranslationKey;
-}[] = [
-  { id: "T0.1", labelKey: "scaffold", statusKey: "active" },
-  { id: "T0.2", labelKey: "wasmBridge", statusKey: "queued" },
-  { id: "T0.3", labelKey: "webgpuProbe", statusKey: "queued" },
-  { id: "T1.1", labelKey: "sceneSchema", statusKey: "queued" },
-];
-
 export const heatmapWindows = [10, 30, 60] as const;
 
 export function curvePointsToSvg(points: EvacuationCurvePoint[]) {

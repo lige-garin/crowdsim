@@ -38,12 +38,23 @@ export type SimulationServicePoint = {
   serviceSeconds: number;
 };
 
+export type SimulationAgentWalkProgress = {
+  /** Smallest distance to the walk target reached so far. */
+  distance: number;
+  /** Decision tick at which `distance` was last improved. */
+  tick: number;
+};
+
 export type SimulationAgentDecision = {
   agentId: number;
   nextState: SimulationAgentDecisionState;
   selectedStoreId?: string;
   /** Clears the field when explicitly null (e.g. on leaving a shop). */
   browseUntilSeconds?: number | null;
+  /** Clears the field when explicitly null (e.g. on leaving a queue). */
+  queueUntilSeconds?: number | null;
+  /** Clears the field when explicitly null (e.g. when the target changes). */
+  walkProgress?: SimulationAgentWalkProgress | null;
   target?: ScenePoint;
   targetSinkId?: string;
 };
@@ -128,6 +139,14 @@ export function applySimulationAgentDecisions(
         decision.browseUntilSeconds === null
           ? undefined
           : (decision.browseUntilSeconds ?? agent.browseUntilSeconds),
+      queueUntilSeconds:
+        decision.queueUntilSeconds === null
+          ? undefined
+          : (decision.queueUntilSeconds ?? agent.queueUntilSeconds),
+      walkProgress:
+        decision.walkProgress === null
+          ? undefined
+          : (decision.walkProgress ?? agent.walkProgress),
       targetSinkId: decision.targetSinkId ?? agent.targetSinkId,
       targetX: target.x,
       targetY: target.y,

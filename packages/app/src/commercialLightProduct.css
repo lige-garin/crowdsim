@@ -1,0 +1,447 @@
+:root {
+  --lab-bg: #f6f9fc;
+  --lab-surface: #ffffff;
+  --lab-surface-2: #f0f5f9;
+  --lab-ink: #0d1b2a;
+  --lab-muted: #526173;
+  --lab-faint: #8796a7;
+  --lab-line: #d9e4ee;
+  --lab-line-strong: #aebfce;
+  --lab-blue: #0b63e5;
+  --lab-blue-strong: #074fb9;
+  --lab-cyan: #00a3c7;
+  --lab-acid: #178a4f;
+  --lab-green: #0b8b61;
+  --lab-red: #d74436;
+  --lab-shadow: 0 24px 70px rgba(32, 58, 83, 0.12);
+  --product-radius: 8px;
+  --product-radius-sm: 6px;
+  --product-sidebar: #ffffff;
+  --product-topbar: rgba(255, 255, 255, 0.88);
+  color: var(--lab-ink);
+  font-family:
+    "Aptos Display", "Segoe UI Variable Display", "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: var(--lab-bg);
+  color: var(--lab-ink);
+}
+
+body {
+  background:
+    linear-gradient(90deg, rgba(13, 91, 150, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(13, 91, 150, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 72%, #eef4f8 100%);
+  background-size:
+    56px 56px,
+    56px 56px,
+    auto;
+}
+
+button,
+select,
+input,
+textarea {
+  color: var(--lab-ink);
+  font-family: inherit;
+}
+
+button,
+select {
+  border-color: var(--lab-line);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+button:hover {
+  border-color: var(--lab-line-strong);
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(34, 73, 112, 0.12);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid rgba(11, 99, 229, 0.26);
+  outline-offset: 2px;
+}
+
+button[aria-pressed="true"],
+.home-primary,
+.sim-primary {
+  border-color: var(--lab-blue-strong);
+  background: var(--lab-blue-strong);
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(7, 79, 185, 0.18);
+}
+
+.skip-link {
+  background: #ffffff;
+  color: var(--lab-ink);
+  box-shadow: var(--lab-shadow);
+}
+
+.home-shell {
+  overflow: auto;
+  background:
+    linear-gradient(90deg, rgba(11, 99, 229, 0.045) 1px, transparent 1px),
+    linear-gradient(rgba(11, 99, 229, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, #ffffff 0%, #f7fafc 62%, #eef4f8 100%);
+  background-size:
+    48px 48px,
+    48px 48px,
+    auto;
+}
+
+.home-topbar,
+.command-bar {
+  border-bottom-color: rgba(195, 211, 225, 0.9);
+  background: var(--product-topbar);
+  box-shadow: 0 12px 38px rgba(36, 66, 96, 0.08);
+  backdrop-filter: blur(20px) saturate(1.2);
+}
+
+.home-brand span,
+.command-brand span,
+.home-kicker {
+  color: var(--lab-blue);
+}
+
+.home-brand strong,
+.command-brand strong,
+.home-copy h1 {
+  color: var(--lab-ink);
+}
+
+.home-topbar {
+  min-height: 64px;
+  padding-inline: clamp(20px, 4vw, 48px);
+}
+
+.home-brand strong {
+  font-size: 0.92rem;
+}
+
+.home-language button {
+  min-height: 32px;
+}
+
+.home-hero {
+  position: relative;
+  display: block;
+  width: min(1420px, calc(100vw - 48px));
+  min-height: calc(100dvh - 64px);
+  padding: 34px 0 42px;
+  isolation: isolate;
+}
+
+.home-copy {
+  position: absolute;
+  z-index: 4;
+  top: clamp(72px, 15vh, 132px);
+  left: clamp(6px, 3.6vw, 58px);
+  max-width: 470px;
+}
+
+.home-copy h1 {
+  max-width: 7.4em;
+  font-size: clamp(3.2rem, 6vw, 6.8rem);
+  font-weight: 820;
+  line-height: 0.94;
+}
+
+.home-copy p:not(.home-kicker) {
+  max-width: 430px;
+  color: #4f6072;
+  font-size: 1.02rem;
+  font-weight: 560;
+}
+
+.home-actions {
+  gap: 10px;
+}
+
+.home-actions button {
+  min-height: 42px;
+  padding-inline: 17px;
+  border-radius: var(--product-radius-sm);
+}
+
+.home-secondary,
+.command-home {
+  border-color: rgba(11, 99, 229, 0.18);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--lab-blue-strong);
+}
+
+.home-visual-panel {
+  position: absolute;
+  inset: 34px 0 30px min(34vw, 470px);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.home-visual-panel::before {
+  display: none;
+}
+
+.home-visual-top {
+  position: absolute;
+  z-index: 3;
+  top: 18px;
+  right: 24px;
+  left: 24px;
+  color: #6c7c8e;
+}
+
+.home-network,
+.contact-network-view {
+  border-color: rgba(178, 198, 216, 0.92);
+  background:
+    linear-gradient(rgba(11, 99, 229, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 99, 229, 0.055) 1px, transparent 1px),
+    linear-gradient(135deg, #ffffff 0%, #f7fbfd 50%, #eef5f9 100%);
+  background-size:
+    30px 30px,
+    30px 30px,
+    auto;
+  box-shadow: 0 30px 82px rgba(42, 69, 98, 0.14);
+}
+
+.home-network {
+  height: 100%;
+  min-height: 560px;
+  border-radius: var(--product-radius);
+}
+
+.home-grid-lines line {
+  stroke: rgba(76, 111, 145, 0.16);
+}
+
+.home-link {
+  animation: homePulse 4.4s ease-in-out infinite;
+}
+
+.home-link-care {
+  stroke: #0b63e5;
+}
+
+.home-link-group {
+  stroke: #178a4f;
+}
+
+.home-link-proximity {
+  stroke: #00a3c7;
+}
+
+.home-link-evidence {
+  stroke: #7c5c00;
+}
+
+.home-node circle:first-child {
+  fill: rgba(11, 99, 229, 0.08);
+  stroke: rgba(11, 99, 229, 0.18);
+}
+
+.home-node circle:nth-child(2) {
+  fill: #ffffff;
+  filter: drop-shadow(0 10px 18px rgba(26, 63, 101, 0.14));
+}
+
+.home-node text,
+.contact-node text,
+.contact-edge-label {
+  fill: var(--lab-ink);
+  stroke: rgba(255, 255, 255, 0.92);
+}
+
+.home-rail {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  width: min(720px, calc(100% - 36px));
+}
+
+.home-rail article,
+.command-status article,
+.stage-telemetry article,
+.dashboard-metric,
+.biocity-score-card,
+.biocity-compact-panel,
+.probe-panel,
+.dashboard-v2-panel,
+.sidebar-summary,
+.sim-controls,
+.control-group,
+.brand-choice-card,
+.workspace-row,
+.template-row,
+.comparison-card {
+  border-color: rgba(206, 220, 232, 0.92);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 32px rgba(34, 66, 98, 0.07);
+}
+
+.home-rail span,
+.command-status article span,
+.stage-telemetry span,
+.eyebrow,
+dt,
+.panel-dock-hint {
+  color: var(--lab-muted);
+}
+
+.home-rail strong,
+.command-status article strong,
+.stage-telemetry strong,
+dd {
+  color: var(--lab-ink);
+}
+
+.workspace {
+  background:
+    linear-gradient(90deg, rgba(11, 99, 229, 0.032) 1px, transparent 1px),
+    linear-gradient(rgba(11, 99, 229, 0.032) 1px, transparent 1px), var(--lab-bg);
+  background-size:
+    44px 44px,
+    44px 44px,
+    auto;
+}
+
+.biocity-project-name {
+  color: #5f7185;
+}
+
+.command-status article strong[data-state="running"],
+.command-status article:has(strong[data-state="running"]) strong {
+  color: var(--lab-green);
+}
+
+.command-status article:has(strong[data-state="running"]) {
+  border-color: rgba(11, 139, 97, 0.24);
+  background: rgba(11, 139, 97, 0.08);
+}
+
+.workspace .command-status article,
+.workspace .biocity-ops-status article {
+  border-color: rgba(199, 216, 231, 0.96) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--lab-muted) !important;
+  box-shadow: 0 10px 26px rgba(34, 66, 98, 0.08) !important;
+}
+
+.workspace .command-status article span {
+  color: var(--lab-muted) !important;
+}
+
+.workspace .command-status article strong {
+  color: var(--lab-ink) !important;
+}
+
+.workspace .command-status article strong[data-state="running"] {
+  color: var(--lab-green) !important;
+}
+
+.sidebar,
+.inspector {
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.sidebar {
+  border-right-color: rgba(205, 220, 232, 0.92);
+  box-shadow: 12px 0 36px rgba(36, 66, 96, 0.06);
+}
+
+.inspector {
+  border-left-color: rgba(205, 220, 232, 0.92);
+  box-shadow: -12px 0 36px rgba(36, 66, 96, 0.05);
+}
+
+.inspector-nav,
+.view-mode-toggle,
+.biocity-timeline,
+.panel-dock {
+  border-color: rgba(204, 219, 232, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 14px 36px rgba(34, 66, 98, 0.08);
+}
+
+.inspector-nav a:hover,
+.inspector-nav a:focus-visible,
+.view-mode-toggle button[aria-pressed="true"] {
+  background: rgba(11, 99, 229, 0.1);
+  color: var(--lab-blue-strong);
+}
+
+.stage {
+  background: transparent;
+}
+
+.stage-toolbar > span,
+h1,
+h2,
+h3 {
+  color: var(--lab-ink);
+}
+
+.sidebar .biocity-tool-grid button,
+.sidebar .sim-controls,
+.sidebar .control-group,
+.inspector .dashboard-metric,
+.inspector .dashboard-v2-panel,
+.inspector .biocity-compact-panel,
+.inspector .biocity-score-card,
+.inspector .probe-panel {
+  border-color: rgba(203, 219, 232, 0.96) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--lab-ink) !important;
+  box-shadow: 0 12px 30px rgba(34, 66, 98, 0.08) !important;
+}
+
+.sidebar .biocity-tool-grid button {
+  min-height: 42px;
+}
+
+.sidebar .biocity-tool-grid button span:first-child,
+.editor-tool-glyph {
+  border-color: rgba(11, 99, 229, 0.16) !important;
+  background: rgba(11, 99, 229, 0.08) !important;
+  color: var(--lab-blue-strong) !important;
+  font-family: var(--lab-mono);
+  font-size: 0.66rem;
+  font-weight: 850;
+}
+
+.sidebar .biocity-tool-grid button[aria-pressed="true"],
+.sidebar .biocity-tool-grid button:hover {
+  border-color: rgba(11, 99, 229, 0.34) !important;
+  background: rgba(11, 99, 229, 0.1) !important;
+  color: var(--lab-blue-strong) !important;
+}
+
+.inspector strong,
+.inspector h2,
+.inspector h3,
+.dashboard-metric strong {
+  color: var(--lab-ink) !important;
+}
+
+.inspector span,
+.inspector p,
+.dashboard-metric span {
+  color: var(--lab-muted);
+}

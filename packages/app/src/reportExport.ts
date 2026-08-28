@@ -2,6 +2,7 @@ import {
   compareReproducibilityContracts,
   createBenchmarkReproducibilityContract,
   type BenchmarkReproducibilityContract,
+  type ReproducibilityMismatch,
 } from "./benchmarkReproducibility";
 import {
   renderValidationReportHtml,
@@ -9,19 +10,39 @@ import {
   type ValidationReportLanguage,
 } from "./validationReport";
 
+// A contract compared against itself always matches, so the old boolean
+// `reproducibilityMatch: true` carried no information about reproducibility.
+// Only a baseline captured from a different run/build can say anything, so the
+// bundle now reports "nothing was compared" when the caller has no baseline.
+export type ReproducibilityComparison =
+  | {
+      status: "not-compared";
+    }
+  | {
+      match: boolean;
+      mismatches: readonly ReproducibilityMismatch[];
+      status: "compared";
+    };
+
 export type ValidationReportExportBundle = {
   filename: string;
   html: string;
   mimeType: "text/html";
   pdfReady: boolean;
   reproducibility: BenchmarkReproducibilityContract;
-  reproducibilityMatch: boolean;
+  reproducibilityComparison: ReproducibilityComparison;
   contentDigest: string;
+};
+
+export type ValidationReportExportOptions = {
+  /** Contract from an earlier run/build; without it nothing can be compared. */
+  baselineReproducibility?: BenchmarkReproducibilityContract;
 };
 
 export function createValidationReportExportBundle(
   report: ValidationReport,
   language: ValidationReportLanguage,
+  options: ValidationReportExportOptions = {},
 ): ValidationReportExportBundle {
   const html = renderValidationReportHtml(report, language);
   const reproducibility = createBenchmarkReproducibilityContract(
@@ -41,11 +62,28 @@ export function createValidationReportExportBundle(
     mimeType: "text/html",
     pdfReady: html.includes("@media print") && html.includes("<table"),
     reproducibility,
-    reproducibilityMatch: compareReproducibilityContracts(
+    reproducibilityComparison: compareAgainstBaseline(
       reproducibility,
-      reproducibility,
-    ).match,
+      options.baselineReproducibility,
+    ),
     contentDigest: fnv1a64(digestPayload),
+  };
+}
+
+function compareAgainstBaseline(
+  candidate: BenchmarkReproducibilityContract,
+  baseline: BenchmarkReproducibilityContract | undefined,
+): ReproducibilityComparison {
+  if (!baseline) {
+    return { status: "not-compared" };
+  }
+
+  const comparison = compareReproducibilityContracts(baseline, candidate);
+
+  return {
+    match: comparison.match,
+    mismatches: comparison.mismatches,
+    status: "compared",
   };
 }
 

@@ -16,14 +16,18 @@ describe("ScaleReadinessPanel", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "规模就绪" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "规模投影" })).toBeInTheDocument();
     expect(screen.getByText(/2 楼层/)).toBeInTheDocument();
+    expect(screen.getByText(/未在任何设备上实测/)).toBeInTheDocument();
     expect(screen.getByText(/webgpu-indirect/)).toBeInTheDocument();
+    expect(screen.getByText(/500k within-budget \(not-measured\)/)).toBeInTheDocument();
     expect(screen.getByText(/demo 6 steps/)).toBeInTheDocument();
     expect(screen.getByText(/assets 2/)).toBeInTheDocument();
     expect(screen.getByText(/flow atlas 2 fields/)).toBeInTheDocument();
     expect(screen.getByText(/targetField routed/)).toBeInTheDocument();
-    expect(screen.getByText(/indirect drawIndirect/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/indirect planned-drawIndirect \(no renderer wired\)/),
+    ).toBeInTheDocument();
     expect(screen.getByText(/batches 8/)).toBeInTheDocument();
   });
 });

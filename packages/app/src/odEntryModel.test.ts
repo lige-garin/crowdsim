@@ -5,13 +5,25 @@ import {
   type ODEntrance,
 } from "./odEntryModel";
 
-const entrance = (id: string, x: number, y: number, inflow: number, floor = 0): ODEntrance => ({
+const entrance = (
+  id: string,
+  x: number,
+  y: number,
+  inflow: number,
+  floor = 0,
+): ODEntrance => ({
   id,
   position: { x, y },
   inflow,
   floor,
 });
-const dest = (id: string, x: number, y: number, attraction: number, floor = 0): ODDestination => ({
+const dest = (
+  id: string,
+  x: number,
+  y: number,
+  attraction: number,
+  floor = 0,
+): ODDestination => ({
   id,
   position: { x, y },
   attraction,
@@ -86,7 +98,10 @@ describe("buildGravityOdAllocation", () => {
     expect(e1Flow).toBeCloseTo(60, 6);
     expect(e2Flow).toBeCloseTo(40, 6);
     expect(result.totalInflow).toBe(100);
-    const arrivals = Object.values(result.destinationArrivals).reduce((s, v) => s + v, 0);
+    const arrivals = Object.values(result.destinationArrivals).reduce(
+      (s, v) => s + v,
+      0,
+    );
     expect(arrivals).toBeCloseTo(100, 6);
   });
 

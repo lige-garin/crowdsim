@@ -1,0 +1,246 @@
+﻿.stage {
+  padding: 20px;
+}
+
+.stage-stack {
+  gap: 16px;
+}
+
+.stage-toolbar {
+  min-height: 44px;
+  padding: 0 2px;
+}
+
+.stage-toolbar > span {
+  padding-left: 0;
+  color: var(--lab-ink);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 720;
+}
+
+.stage-toolbar > span::before {
+  display: none;
+}
+
+.stage-telemetry {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.stage-telemetry article {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface-2);
+}
+
+.stage-telemetry span {
+  color: var(--lab-muted);
+  font-size: 0.68rem;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.stage-telemetry strong {
+  min-width: 0;
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-mode-toggle {
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
+  padding: 3px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius);
+  background: var(--lab-surface);
+}
+
+.view-mode-toggle button {
+  min-height: 32px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.render-viewport {
+  border-color: var(--lab-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--lab-surface) 0%, var(--lab-surface-2) 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.render-viewport::before {
+  inset: 12px;
+  border-color: rgba(77, 140, 255, 0.12);
+  border-radius: 10px;
+}
+
+.biocity-timeline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.78fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: 12px;
+  background: var(--lab-surface);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
+}
+
+.biocity-layer-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.biocity-layer-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--lab-line);
+  border-radius: 999px;
+  background: var(--lab-surface-2);
+  color: var(--lab-muted);
+  font-size: 0.7rem;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.biocity-layer-toggles input {
+  accent-color: #2557d6;
+}
+
+.biocity-time-rail {
+  display: grid;
+  grid-template-columns: auto minmax(110px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  color: var(--lab-muted);
+  font-family: var(--lab-mono);
+  font-size: 0.68rem;
+  font-weight: 760;
+}
+
+.biocity-time-rail input {
+  width: 100%;
+  accent-color: #2557d6;
+}
+
+.render-hud {
+  border-color: var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface);
+  color: var(--lab-muted);
+}
+
+.render-hud strong {
+  color: var(--lab-blue);
+}
+
+.render-viewport-skeleton {
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  padding: 18px;
+}
+
+.render-viewport-skeleton span,
+.panel-skeleton span {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--product-radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--lab-surface) 0%,
+    var(--lab-surface-2) 42%,
+    var(--lab-surface) 100%
+  );
+  background-size: 220% 100%;
+  animation: skeletonSweep 1.4s ease-in-out infinite;
+}
+
+.render-viewport-skeleton span {
+  width: min(420px, 72%);
+  height: 16px;
+}
+
+.render-viewport-skeleton span:nth-child(2) {
+  width: min(320px, 56%);
+}
+
+.render-viewport-skeleton span:nth-child(3) {
+  width: min(220px, 42%);
+}
+
+.panel-skeleton {
+  min-height: 96px;
+}
+
+.panel-skeleton span {
+  height: 14px;
+}
+
+.panel-skeleton span:nth-child(1) {
+  width: 52%;
+}
+
+.panel-skeleton span:nth-child(2) {
+  width: 86%;
+}
+
+.panel-skeleton span:nth-child(3) {
+  width: 68%;
+}
+
+dl div {
+  min-height: 38px;
+  padding: 8px 0;
+  border-bottom-color: var(--lab-line);
+}
+
+dt {
+  color: var(--lab-muted);
+  font-size: 0.78rem;
+}
+
+dd {
+  color: var(--lab-ink);
+  font-size: 0.74rem;
+  font-weight: 760;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes skeletonSweep {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}

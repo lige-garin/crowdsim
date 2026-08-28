@@ -67,7 +67,11 @@ export const backendBlueprints: readonly BackendBlueprint[] = [
 ];
 
 export function createDemoProjectWorkspace(): ProjectWorkspaceSummary {
-  const store = new InMemoryProjectStore();
+  // Fixed demo token: the store now mints share tokens itself, and this
+  // walkthrough needs a stable URL to display.
+  const store = new InMemoryProjectStore({
+    createShareToken: () => "demo-read-only",
+  });
   const project = store.createProject({
     id: "workspace-demo",
     name: "Atrium evacuation review",
@@ -86,7 +90,6 @@ export function createDemoProjectWorkspace(): ProjectWorkspaceSummary {
     actorId: "planner",
     projectId: project.id,
     timestampIso: "2026-06-12T00:06:00.000Z",
-    token: "demo-read-only",
   });
 
   store.recordUsage(project.ownerId, "experiment-runs", 18);

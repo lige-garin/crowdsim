@@ -58,7 +58,10 @@ export function orbitToPosition(
 }
 
 /** Inverse of orbitToPosition — seeds orbit state from the initial camera position. */
-export function positionToOrbit(pos: Vec3, target: Vec3 = { x: 0, y: 0, z: 0 }): OrbitState {
+export function positionToOrbit(
+  pos: Vec3,
+  target: Vec3 = { x: 0, y: 0, z: 0 },
+): OrbitState {
   const dx = pos.x - target.x;
   const dy = pos.y - target.y;
   const dz = pos.z - target.z;

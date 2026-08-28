@@ -1,17 +1,16 @@
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+﻿import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
 import {
   createSimulationEngineFromScene,
+  type SimulationEngine,
   type SimulationEngineConfig,
   type SimulationAgent,
   type SimulationSnapshot,
 } from "./simulationEngine";
-
 const sharedHeaderIntCount = 8;
 const sharedIntLaneCount = 3;
 const sharedFloatLaneCount = 6;
 const sharedVersion = 1;
-
 const headerStatusIndex = 0;
 const headerStepCountIndex = 1;
 const headerAgentCountIndex = 2;
@@ -20,13 +19,11 @@ const headerExitedCountIndex = 4;
 const headerElapsedMillisecondsIndex = 5;
 const headerCapacityIndex = 6;
 const headerVersionIndex = 7;
-
 export type SimulationWorkerSharedMemory = {
   buffer: SharedArrayBuffer;
   capacity: number;
   view: Int32Array;
 };
-
 export type SimulationSharedAgentFrame = {
   agents: Array<
     Pick<SimulationAgent, "id" | "targetX" | "targetY" | "vx" | "vy" | "x" | "y"> & {
@@ -36,11 +33,9 @@ export type SimulationSharedAgentFrame = {
   >;
   capacity: number;
 };
-
 export type SimulationWorkerRuntimeOptions = {
   wasmDecisionBackend?: boolean;
 };
-
 export type SimulationWorkerInitRequest = {
   id: number;
   runtime?: SimulationWorkerRuntimeOptions;
@@ -49,37 +44,31 @@ export type SimulationWorkerInitRequest = {
   simulation?: Partial<SimulationEngineConfig>;
   type: "init";
 };
-
 export type SimulationWorkerCommandRequest = {
   id: number;
   type: "pause" | "reset" | "snapshot" | "start";
 };
-
 export type SimulationWorkerSetTimeScaleRequest = {
   id: number;
   timeScale: number;
   type: "set-time-scale";
 };
-
 export type SimulationWorkerSetEvacuationRequest = {
   active: boolean;
   id: number;
   type: "set-evacuation";
 };
-
 export type SimulationWorkerTickRequest = {
   id: number;
   realDeltaSeconds: number;
   type: "tick";
 };
-
 export type SimulationWorkerRequest =
   | SimulationWorkerCommandRequest
   | SimulationWorkerInitRequest
   | SimulationWorkerSetEvacuationRequest
   | SimulationWorkerSetTimeScaleRequest
   | SimulationWorkerTickRequest;
-
 export type SimulationWorkerResponse =
   | {
       id: number;
@@ -91,21 +80,18 @@ export type SimulationWorkerResponse =
       message: string;
       type: "error";
     };
-
 type SimulationWorkerRequestPayload =
   | Omit<SimulationWorkerCommandRequest, "id">
   | Omit<SimulationWorkerInitRequest, "id">
   | Omit<SimulationWorkerSetEvacuationRequest, "id">
   | Omit<SimulationWorkerSetTimeScaleRequest, "id">
   | Omit<SimulationWorkerTickRequest, "id">;
-
 export type SimulationWorkerLike = {
   onerror: ((event: ErrorEvent) => void) | null;
   onmessage: ((event: MessageEvent<SimulationWorkerResponse>) => void) | null;
   postMessage: (message: SimulationWorkerRequest) => void;
   terminate: () => void;
 };
-
 export type SimulationWorkerClient = {
   dispose: () => void;
   init: (
@@ -124,14 +110,14 @@ export type SimulationWorkerClient = {
   start: () => Promise<SimulationSnapshot>;
   tick: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
 };
-
+/** Rejection reason for requests cut short by `dispose()`. */
+export const simulationWorkerDisposedMessage = "Simulation worker disposed";
 export function createSimulationWorker(): SimulationWorkerLike {
   return new Worker(new URL("./simulation.worker.ts", import.meta.url), {
     name: "crowdsim-live-simulation-worker",
     type: "module",
   });
 }
-
 export function createSimulationSharedMemory(
   runtime: typeof globalThis = globalThis,
   capacity = 2_000,
@@ -143,7 +129,6 @@ export function createSimulationSharedMemory(
   ) {
     return undefined;
   }
-
   const safeCapacity = Math.max(1, Math.floor(capacity));
   const buffer = new runtime.SharedArrayBuffer(
     Int32Array.BYTES_PER_ELEMENT *
@@ -151,10 +136,8 @@ export function createSimulationSharedMemory(
         safeCapacity * sharedIntLaneCount +
         safeCapacity * sharedFloatLaneCount),
   );
-
   return createSimulationSharedMemoryView(buffer);
 }
-
 export function createSimulationSharedMemoryView(
   buffer: SharedArrayBuffer,
 ): SimulationWorkerSharedMemory {
@@ -164,17 +147,14 @@ export function createSimulationSharedMemoryView(
     Math.floor((intLength - sharedHeaderIntCount) / lanesPerAgent()),
   );
   const view = new Int32Array(buffer);
-
   Atomics.store(view, headerCapacityIndex, capacity);
   Atomics.store(view, headerVersionIndex, sharedVersion);
-
   return {
     buffer,
     capacity,
     view,
   };
 }
-
 export function writeSimulationSharedMemory(
   sharedMemory: SimulationWorkerSharedMemory | undefined,
   snapshot: SimulationSnapshot,
@@ -182,7 +162,6 @@ export function writeSimulationSharedMemory(
   if (!sharedMemory || typeof Atomics !== "object") {
     return;
   }
-
   Atomics.store(
     sharedMemory.view,
     headerStatusIndex,
@@ -199,10 +178,8 @@ export function writeSimulationSharedMemory(
   );
   Atomics.store(sharedMemory.view, headerCapacityIndex, sharedMemory.capacity);
   Atomics.store(sharedMemory.view, headerVersionIndex, sharedVersion);
-
   writeSimulationSharedAgents(sharedMemory, snapshot.agents);
 }
-
 export function readSimulationSharedMemory(sharedMemory: SimulationWorkerSharedMemory) {
   return {
     agentCount: Atomics.load(sharedMemory.view, headerAgentCountIndex),
@@ -219,7 +196,6 @@ export function readSimulationSharedMemory(sharedMemory: SimulationWorkerSharedM
     version: Atomics.load(sharedMemory.view, headerVersionIndex),
   };
 }
-
 export function readSimulationSharedAgents(
   sharedMemory: SimulationWorkerSharedMemory,
   limit = sharedMemory.capacity,
@@ -231,17 +207,14 @@ export function readSimulationSharedAgents(
   );
   const floatView = new Float32Array(sharedMemory.buffer);
   const agents: SimulationSharedAgentFrame["agents"] = [];
-
   for (let index = 0; index < count; index++) {
     const flags = Atomics.load(
       sharedMemory.view,
       intLaneOffset("flags", index, sharedMemory.capacity),
     );
-
     if ((flags & 1) === 0) {
       continue;
     }
-
     agents.push({
       behaviorState: Atomics.load(
         sharedMemory.view,
@@ -260,20 +233,17 @@ export function readSimulationSharedAgents(
       y: floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)],
     });
   }
-
   return {
     agents,
     capacity: sharedMemory.capacity,
   };
 }
-
 function writeSimulationSharedAgents(
   sharedMemory: SimulationWorkerSharedMemory,
   agents: readonly SimulationAgent[],
 ) {
   const floatView = new Float32Array(sharedMemory.buffer);
   const count = Math.min(agents.length, sharedMemory.capacity);
-
   for (let index = 0; index < sharedMemory.capacity; index++) {
     if (index >= count) {
       Atomics.store(
@@ -283,9 +253,7 @@ function writeSimulationSharedAgents(
       );
       continue;
     }
-
     const agent = agents[index];
-
     Atomics.store(
       sharedMemory.view,
       intLaneOffset("agentId", index, sharedMemory.capacity),
@@ -309,7 +277,6 @@ function writeSimulationSharedAgents(
     floatView[floatLaneOffset("targetY", index, sharedMemory.capacity)] = agent.targetY;
   }
 }
-
 type IntLane = "agentId" | "behaviorState" | "flags";
 type FloatLane =
   | "positionX"
@@ -318,17 +285,14 @@ type FloatLane =
   | "targetY"
   | "velocityX"
   | "velocityY";
-
 function intLaneOffset(lane: IntLane, agentIndex: number, capacity: number) {
   const laneIndex: Record<IntLane, number> = {
     agentId: 0,
     behaviorState: 1,
     flags: 2,
   };
-
   return sharedHeaderIntCount + laneIndex[lane] * capacity + agentIndex;
 }
-
 function floatLaneOffset(lane: FloatLane, agentIndex: number, capacity: number) {
   const laneIndex: Record<FloatLane, number> = {
     positionX: 0,
@@ -345,11 +309,9 @@ function floatLaneOffset(lane: FloatLane, agentIndex: number, capacity: number) 
     agentIndex
   );
 }
-
 function lanesPerAgent() {
   return sharedIntLaneCount + sharedFloatLaneCount;
 }
-
 function lifecycleStateCode(state: SimulationAgent["lifecycleState"]) {
   switch (state) {
     case "walk":
@@ -368,7 +330,6 @@ function lifecycleStateCode(state: SimulationAgent["lifecycleState"]) {
       return 0;
   }
 }
-
 export function createSimulationWorkerClient(
   options: {
     workerFactory?: (() => SimulationWorkerLike) | null;
@@ -380,9 +341,9 @@ export function createSimulationWorkerClient(
   ) {
     return createInlineSimulationWorkerClient();
   }
-
   const worker = options.workerFactory?.() ?? createSimulationWorker();
   let nextId = 1;
+  let disposed = false;
   const pending = new Map<
     number,
     {
@@ -390,17 +351,13 @@ export function createSimulationWorkerClient(
       resolve: (snapshot: SimulationSnapshot) => void;
     }
   >();
-
   worker.onmessage = (event) => {
     const message = event.data;
     const request = pending.get(message.id);
-
     if (!request) {
       return;
     }
-
     pending.delete(message.id);
-
     if (message.type === "error") {
       request.reject(new Error(message.message));
     } else {
@@ -409,26 +366,29 @@ export function createSimulationWorkerClient(
   };
   worker.onerror = (event) => {
     const error = new Error(event.message || "Simulation worker failed");
-
     for (const request of pending.values()) {
       request.reject(error);
     }
-
     pending.clear();
   };
-
   function send(message: SimulationWorkerRequestPayload) {
+    if (disposed) {
+      return Promise.reject(new Error(simulationWorkerDisposedMessage));
+    }
     const id = nextId++;
-
     return new Promise<SimulationSnapshot>((resolve, reject) => {
       pending.set(id, { reject, resolve });
       worker.postMessage({ ...message, id } as SimulationWorkerRequest);
     });
   }
-
   return {
     dispose() {
+      disposed = true;
       worker.terminate();
+      const error = new Error(simulationWorkerDisposedMessage);
+      for (const request of pending.values()) {
+        request.reject(error);
+      }
       pending.clear();
     },
     init: (scene, options) =>
@@ -448,24 +408,28 @@ export function createSimulationWorkerClient(
     tick: (realDeltaSeconds) => send({ realDeltaSeconds, type: "tick" }),
   };
 }
-
 function createInlineSimulationWorkerClient(): SimulationWorkerClient {
-  let engine: ReturnType<typeof createSimulationEngineFromScene> | undefined;
+  let engine: SimulationEngine | undefined;
   let sharedMemory: SimulationWorkerSharedMemory | undefined;
-
   function requireEngine() {
     if (!engine) {
       throw new Error("Simulation worker is not initialized");
     }
-
     return engine;
   }
-
   function publish(snapshot: SimulationSnapshot) {
     writeSimulationSharedMemory(sharedMemory, snapshot);
     return Promise.resolve(snapshot);
   }
-
+  function run(command: (current: SimulationEngine) => SimulationSnapshot) {
+    try {
+      return publish(command(requireEngine()));
+    } catch (error) {
+      return Promise.reject(
+        error instanceof Error ? error : new Error("Simulation worker failed"),
+      );
+    }
+  }
   return {
     dispose() {
       engine = undefined;
@@ -482,12 +446,12 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
       });
       return publish(engine.snapshot());
     },
-    pause: () => publish(requireEngine().pause()),
-    reset: () => publish(requireEngine().reset()),
-    setEvacuation: (active) => publish(requireEngine().setEvacuation(active)),
-    setTimeScale: (timeScale) => publish(requireEngine().setTimeScale(timeScale)),
-    snapshot: () => publish(requireEngine().snapshot()),
-    start: () => publish(requireEngine().start()),
-    tick: (realDeltaSeconds) => publish(requireEngine().tick(realDeltaSeconds)),
+    pause: () => run((current) => current.pause()),
+    reset: () => run((current) => current.reset()),
+    setEvacuation: (active) => run((current) => current.setEvacuation(active)),
+    setTimeScale: (timeScale) => run((current) => current.setTimeScale(timeScale)),
+    snapshot: () => run((current) => current.snapshot()),
+    start: () => run((current) => current.start()),
+    tick: (realDeltaSeconds) => run((current) => current.tick(realDeltaSeconds)),
   };
 }

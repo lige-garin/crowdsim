@@ -1,0 +1,279 @@
+.render-viewport {
+  height: clamp(360px, 48vh, 560px) !important;
+  min-height: 360px !important;
+  border-color: rgba(173, 196, 216, 0.95);
+  background:
+    linear-gradient(rgba(11, 99, 229, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 99, 229, 0.05) 1px, transparent 1px),
+    linear-gradient(180deg, #ffffff 0%, #f4f8fb 100%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  box-shadow: 0 26px 72px rgba(32, 58, 83, 0.14);
+}
+
+.stage-stack {
+  grid-template-rows: auto auto auto auto auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+.stage-telemetry,
+.biocity-timeline,
+.scene-editor {
+  position: relative !important;
+  inset: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: auto !important;
+  width: auto !important;
+}
+
+.stage-telemetry {
+  margin: 0 !important;
+}
+
+.biocity-timeline {
+  margin: 0 !important;
+  border-radius: var(--product-radius) !important;
+}
+
+.render-viewport::before {
+  border-color: rgba(11, 99, 229, 0.11);
+}
+
+.render-hud,
+.render-agent-marker,
+.render-selected-agent,
+.render-city-label,
+.render-unsupported-card {
+  border-color: rgba(190, 209, 224, 0.88);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--lab-ink);
+  box-shadow: 0 14px 34px rgba(32, 58, 83, 0.12);
+}
+
+.render-hud strong,
+.render-mode-badge {
+  color: var(--lab-blue-strong);
+}
+
+.render-agent-intent,
+.render-city-label span,
+.render-unsupported-muted {
+  color: var(--lab-muted);
+}
+
+.render-agent-dot {
+  background: var(--lab-blue);
+  box-shadow: 0 0 0 4px rgba(11, 99, 229, 0.12);
+}
+
+.biocity-layer-toggles label,
+.heatmap-window button,
+.speed-group button,
+.editor-tool {
+  border-color: rgba(201, 218, 231, 0.95);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--lab-muted);
+}
+
+.biocity-layer-toggles label:has(input:checked),
+.speed-group button[aria-pressed="true"],
+.heatmap-window button[aria-pressed="true"],
+.editor-tool[aria-pressed="true"] {
+  border-color: rgba(11, 99, 229, 0.34);
+  background: rgba(11, 99, 229, 0.1);
+  color: var(--lab-blue-strong);
+}
+
+.biocity-time-progress {
+  background: linear-gradient(90deg, #0b63e5, #00a3c7);
+}
+
+.panel-dock {
+  border-top-color: rgba(204, 219, 232, 0.95);
+}
+
+.panel-dock button,
+.panel-dock-nav button {
+  background: transparent;
+}
+
+.contact-network-view {
+  color: var(--lab-ink);
+}
+
+.contact-network-stats article {
+  border-color: rgba(204, 219, 232, 0.92);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.contact-edge-care {
+  stroke: var(--lab-blue);
+}
+
+.contact-edge-group {
+  stroke: var(--lab-green);
+}
+
+.contact-edge-proximity {
+  stroke: var(--lab-cyan);
+}
+
+.contact-node-core {
+  stroke: rgba(255, 255, 255, 0.98);
+}
+
+.contact-network-legend {
+  color: var(--lab-muted);
+}
+
+.scene-editor,
+.editor-canvas-wrap,
+.editor-param-panel,
+.editor-filebar,
+.editor-toolbar,
+.editor-status {
+  border-color: rgba(204, 219, 232, 0.95);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--lab-ink);
+  box-shadow: 0 14px 34px rgba(34, 66, 98, 0.08);
+}
+
+.editor-filebar,
+.editor-toolbar,
+.editor-status,
+.editor-param-panel {
+  color: var(--lab-ink) !important;
+}
+
+.editor-filebar button,
+.editor-toolbar button,
+.editor-status span,
+.editor-param-panel input,
+.editor-param-panel select {
+  border-color: rgba(203, 219, 232, 0.96) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--lab-ink) !important;
+}
+
+.editor-tool[aria-pressed="true"],
+.editor-toolbar button[aria-pressed="true"] {
+  border-color: rgba(11, 99, 229, 0.36) !important;
+  background: rgba(11, 99, 229, 0.1) !important;
+  color: var(--lab-blue-strong) !important;
+}
+
+.scene-editor {
+  padding: 12px !important;
+  backdrop-filter: none !important;
+}
+
+.scene-editor .editor-canvas-wrap,
+.scene-editor .editor-param-panel {
+  max-height: none !important;
+}
+
+.sidebar-summary article,
+.biocity-score-strip article,
+.biocity-compact-list article,
+.biocity-object-grid article,
+.biocity-status-list > div {
+  border-color: rgba(203, 219, 232, 0.96) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: var(--lab-ink) !important;
+  box-shadow: 0 10px 26px rgba(34, 66, 98, 0.07) !important;
+}
+
+.sidebar-summary article span,
+.biocity-score-strip article span,
+.biocity-compact-list article span,
+.biocity-object-grid article span,
+.biocity-status-list > div span {
+  color: var(--lab-muted) !important;
+}
+
+.sidebar-summary article strong,
+.biocity-score-strip article strong,
+.biocity-compact-list article strong,
+.biocity-object-grid article strong,
+.biocity-status-list > div strong {
+  color: var(--lab-ink) !important;
+}
+
+.sim-controls button,
+.control-row button,
+.view-mode-toggle button {
+  border-color: rgba(203, 219, 232, 0.96) !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: var(--lab-ink) !important;
+  box-shadow: 0 8px 20px rgba(34, 66, 98, 0.07) !important;
+}
+
+.sim-controls .sim-primary,
+.view-mode-toggle button[aria-pressed="true"] {
+  border-color: var(--lab-blue-strong) !important;
+  background: var(--lab-blue-strong) !important;
+  color: #ffffff !important;
+}
+
+.render-agent-intent {
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: var(--lab-ink) !important;
+}
+
+.editor-canvas {
+  background: #f8fbfd;
+}
+
+.editor-floor {
+  fill: #f8fbfd;
+}
+
+.editor-grid line,
+.editor-basemap line {
+  stroke: rgba(84, 119, 151, 0.18);
+}
+
+.render-viewport-skeleton span,
+.panel-skeleton span {
+  background: linear-gradient(90deg, #eef4f8 0%, #ffffff 42%, #eef4f8 100%);
+  background-size: 220% 100%;
+}
+
+.render-unsupported {
+  background: rgba(246, 249, 252, 0.74);
+}
+
+@media (max-width: 980px) {
+  .home-hero {
+    display: grid;
+    gap: 18px;
+    width: min(100% - 28px, 720px);
+    padding: 24px 0 32px;
+  }
+
+  .home-copy,
+  .home-visual-panel {
+    position: relative;
+    inset: auto;
+  }
+
+  .home-copy {
+    max-width: 100%;
+  }
+
+  .home-network {
+    min-height: 420px;
+  }
+
+  .home-rail {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    width: 100%;
+  }
+}

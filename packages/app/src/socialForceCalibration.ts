@@ -21,11 +21,16 @@ export type SocialForceParameterPreset = {
   throughputMultiplier: number;
 };
 
-export type NeuralCorrectionValidationReport = {
+// "Neural correction" was the fabricated 4-3-2 MLP distillation claim (see
+// docs/CLAIMS_LEDGER.md); the surviving mechanism is a bounded residual applied
+// on top of a target/actual multiplier, so the report is named after that.
+export type ResidualProjectionValidationReport = {
   baselineMeanError: number;
   correctedMeanError: number;
   correctedMeanSpeedMetersPerSecond: number;
   correctedThroughputPerMinute: number;
+  /** False when the residual pushed the run further from the target. */
+  improved: boolean;
   improvementRatio: number;
   modelSource: NeuralCorrectionModel["source"];
   targetMeanSpeedMetersPerSecond: number;
@@ -70,7 +75,7 @@ export function calibrateSocialForceParameters(
   };
 }
 
-export function createNeuralCorrectionValidationReport(
+export function createResidualProjectionValidationReport(
   result: BenchmarkRunResult,
   target: TrajectoryCalibrationTarget,
   model = fitResidualProjection(
@@ -80,7 +85,7 @@ export function createNeuralCorrectionValidationReport(
     }),
     { seedModel: createDefaultNeuralCorrectionModel() },
   ).model,
-): NeuralCorrectionValidationReport {
+): ResidualProjectionValidationReport {
   const recommendation = createNeuralCorrectionRecommendation(
     result,
     {
@@ -111,6 +116,7 @@ export function createNeuralCorrectionValidationReport(
     correctedMeanError,
     correctedMeanSpeedMetersPerSecond,
     correctedThroughputPerMinute,
+    improved: correctedMeanError < baselineMeanError,
     improvementRatio:
       baselineMeanError > 0
         ? round((baselineMeanError - correctedMeanError) / baselineMeanError)

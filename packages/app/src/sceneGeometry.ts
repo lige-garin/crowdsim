@@ -13,6 +13,7 @@ export type MovementConstraintResult = {
 };
 
 const intersectionEpsilon = 1e-6;
+const contactEpsilonMeters = 1e-6;
 
 export function wallSegmentsFromScene(scene: CrowdSimScene): WallSegment[] {
   return scene.walls.flatMap((wall) => {
@@ -126,8 +127,15 @@ function segmentIntersectionParameter(
   const offsetY = wall.y1 - start.y;
   const t = cross(offsetX, offsetY, wallX, wallY) / denominator;
   const u = cross(offsetX, offsetY, rayX, rayY) / denominator;
+  // Ignore a wall the agent is already standing on (so it can always step away
+  // from it), measured as a distance rather than as a fraction of the step. The
+  // fraction (2% of a step) let an agent that had crept to within ~3 mm walk
+  // straight through a solid wall, which is how shoppers ended up in rooms they
+  // could never leave.
+  const rayLength = Math.hypot(rayX, rayY);
+  const minT = rayLength > 0 ? contactEpsilonMeters / rayLength : 0;
 
-  if (t > 0.02 && t <= 1 && u >= 0 && u <= 1) {
+  if (t > minT && t <= 1 && u >= 0 && u <= 1) {
     return t;
   }
 

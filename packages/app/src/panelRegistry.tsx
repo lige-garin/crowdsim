@@ -24,7 +24,20 @@ export type PanelDockContext = {
   backendClient?: BackendClient;
 };
 
+/**
+ * Where a panel's numbers come from.
+ *
+ * `live` reads the running simulation or a configured backend. `fixture` builds
+ * its own hardcoded scenario in a useMemo and is unrelated to whatever the user
+ * currently has open -- ScaleReadiness, for instance, reports on `demoScene`
+ * (an atrium) while the app runs the rainy high street. Only ProjectWorkspace
+ * used to say so; the dock now labels every fixture panel, because a panel that
+ * looks authoritative and describes someone else's scene is worse than no panel.
+ */
+export type PanelDataSource = "live" | "fixture";
+
 export type PanelRegistryEntry = {
+  dataSource: PanelDataSource;
   id: string;
   labelZh: string;
   labelEn: string;
@@ -34,82 +47,94 @@ export type PanelRegistryEntry = {
 // Panels are registered in SP-5a Tasks 2-5.
 export const panelRegistry: PanelRegistryEntry[] = [
   {
+    dataSource: "fixture",
     id: "scenario-comparison",
     labelZh: "情景对比",
     labelEn: "Scenario comparison",
     render: () => <ScenarioComparisonPanel />,
   },
   {
+    dataSource: "fixture",
     id: "experiment-sweep",
     labelZh: "参数扫描",
     labelEn: "Experiment sweep",
     render: () => <ExperimentSweepPanel />,
   },
   {
+    dataSource: "fixture",
     id: "experiment-summary",
     labelZh: "实验汇总",
     labelEn: "Experiment summary",
     render: () => <ExperimentSummaryPanel />,
   },
   {
+    dataSource: "fixture",
     id: "validation-report",
     labelZh: "校验报告",
     labelEn: "Validation report",
     render: () => <ValidationReportPanel />,
   },
   {
+    dataSource: "live",
     id: "brand-intelligence",
     labelZh: "品牌智能",
     labelEn: "Brand intelligence",
     render: (ctx) => <BrandIntelligencePanel insight={ctx.brandInsight} />,
   },
   {
+    dataSource: "fixture",
     id: "scale-readiness",
-    labelZh: "规模就绪",
-    labelEn: "Scale readiness",
+    labelZh: "规模投影",
+    labelEn: "Scale projection",
     render: () => <ScaleReadinessPanel />,
   },
   {
+    dataSource: "live",
     id: "project-workspace",
     labelZh: "项目空间",
     labelEn: "Project workspace",
     render: (ctx) => <ProjectWorkspacePanel client={ctx.backendClient} />,
   },
   {
+    dataSource: "fixture",
     id: "collaboration-status",
     labelZh: "协作状态",
     labelEn: "Collaboration",
     render: () => <CollaborationStatusPanel />,
   },
   {
+    dataSource: "fixture",
     id: "template-library",
     labelZh: "模板库",
     labelEn: "Template library",
     render: () => <TemplateLibraryPanel />,
   },
   {
+    dataSource: "fixture",
     id: "ai-workflow",
     labelZh: "AI 工作流",
     labelEn: "AI workflow",
     render: () => <AiWorkflowPanel />,
   },
   {
+    dataSource: "fixture",
     id: "image-geometry",
     labelZh: "影像几何",
     labelEn: "Image geometry",
     render: () => <ImageGeometryPanel />,
   },
   {
+    dataSource: "fixture",
     id: "tiles-backdrop",
     labelZh: "瓦片底图",
     labelEn: "Tiles backdrop",
     render: () => <TilesBackdropPanel />,
   },
   {
+    dataSource: "live",
     id: "trajectory-replay",
     labelZh: "轨迹回放",
     labelEn: "Trajectory replay",
     render: (ctx) => <TrajectoryReplayPanel recording={ctx.trajectoryRecording} />,
   },
 ];
-

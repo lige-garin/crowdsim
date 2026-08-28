@@ -1,0 +1,436 @@
+﻿.workspace {
+  grid-template-columns: 276px minmax(0, 1fr) minmax(360px, 410px);
+  grid-template-rows: 64px minmax(0, 1fr);
+  background: var(--lab-bg);
+}
+
+.command-bar {
+  min-height: 64px;
+  padding: 0 24px;
+}
+
+.command-brand {
+  align-items: center;
+  gap: 12px;
+}
+
+.command-brand strong {
+  padding-right: 4px;
+}
+
+.command-home {
+  min-height: 30px;
+  padding: 0 11px;
+  font-size: 0.74rem;
+}
+
+.command-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(88px, auto));
+  gap: 7px;
+}
+
+.command-status article {
+  display: grid;
+  grid-template-columns: auto;
+  gap: 2px;
+  min-width: 88px;
+  min-height: 34px;
+  padding: 6px 10px;
+  min-height: 28px;
+  border-color: var(--lab-line);
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface-2);
+  color: var(--lab-muted);
+}
+
+.command-status article span {
+  color: var(--lab-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.command-status article strong {
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-size: 0.72rem;
+  font-weight: 820;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.command-status article strong[data-state="running"] {
+  color: var(--lab-green);
+}
+
+.command-status article:has(strong[data-state="running"]) {
+  border-color: rgba(40, 122, 84, 0.25);
+  background: rgba(40, 122, 84, 0.08);
+}
+
+.command-status article:has(strong[data-state="paused"]) {
+  border-color: var(--lab-line);
+  background: var(--lab-surface-2);
+}
+
+.biocity-topbar {
+  gap: 14px;
+}
+
+.biocity-topbar > .command-status:not(.biocity-ops-status) {
+  display: none;
+}
+
+.biocity-project-name {
+  align-self: center;
+  color: var(--lab-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.biocity-project-select {
+  width: min(24vw, 260px);
+  min-width: 170px;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  color: var(--lab-ink);
+  font-size: 0.72rem;
+}
+
+.biocity-ops-status {
+  flex: 1 1 auto;
+  grid-template-columns: repeat(8, minmax(72px, 1fr));
+  min-width: 0;
+}
+
+.biocity-ops-status article {
+  min-width: 0;
+  padding: 6px 8px;
+}
+
+.biocity-ops-status article strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar {
+  gap: 20px;
+  padding: 22px 18px 24px;
+  border-right: 1px solid var(--lab-line);
+  background: var(--product-sidebar);
+}
+
+.inspector {
+  gap: 16px;
+  padding: 20px 18px 26px;
+  border-left: 1px solid var(--lab-line);
+  background: var(--lab-surface);
+}
+
+.inspector-nav {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius);
+  background: var(--lab-surface);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.inspector-nav a {
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: var(--product-radius-sm);
+  color: var(--lab-muted);
+  font-size: 0.72rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-align: center;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  transition:
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+  white-space: nowrap;
+}
+
+.inspector-nav a:hover,
+.inspector-nav a:focus-visible {
+  background: var(--lab-surface-2);
+  color: var(--lab-blue);
+  outline: 0;
+}
+
+.inspector-nav a:active {
+  transform: translateY(1px);
+}
+
+.inspector-group {
+  display: grid;
+  gap: 12px;
+  scroll-margin-top: 64px;
+}
+
+.inspector-group + .inspector-group {
+  padding-top: 10px;
+  border-top: 1px solid var(--lab-line);
+}
+
+.inspector-group-header {
+  display: grid;
+  gap: 3px;
+  padding: 2px 2px 0;
+}
+
+.inspector-group-header span {
+  color: var(--lab-muted);
+  font-size: 0.66rem;
+  font-weight: 780;
+  line-height: 1.1;
+}
+
+.inspector-group-header h2 {
+  color: var(--lab-ink);
+  font-size: 1.05rem;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.eyebrow {
+  margin-bottom: 6px;
+  color: var(--lab-muted);
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+h1 {
+  max-width: none;
+  color: var(--lab-ink);
+  font-size: 1.6rem;
+  line-height: 1.02;
+  font-weight: 780;
+}
+
+h2 {
+  color: var(--lab-ink);
+  font-size: 1.02rem;
+  font-weight: 720;
+}
+
+h3 {
+  color: var(--lab-ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.biocity-sidebar-head {
+  display: grid;
+  gap: 10px;
+}
+
+.biocity-sidebar-head h1 {
+  max-width: 11em;
+}
+
+.biocity-sidebar-head .language-toggle {
+  width: 100%;
+}
+
+.biocity-toolbox {
+  display: grid;
+  gap: 14px;
+}
+
+.biocity-tool-group {
+  display: grid;
+  gap: 8px;
+}
+
+.biocity-tool-group h2 {
+  color: var(--lab-muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.biocity-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.biocity-tool-grid button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 8px;
+  text-align: left;
+}
+
+.biocity-tool-grid button span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--lab-line);
+  border-radius: 7px;
+  background: var(--lab-surface-2);
+  color: var(--lab-blue);
+  font-family: var(--lab-mono);
+  font-size: 0.64rem;
+  font-weight: 860;
+}
+
+.biocity-tool-grid button strong {
+  min-width: 0;
+  color: var(--lab-ink);
+  font-size: 0.72rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-list {
+  gap: 8px;
+}
+
+.sidebar-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.sidebar-summary article {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 9px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface-2);
+}
+
+.sidebar-summary span {
+  color: var(--lab-muted);
+  font-size: 0.66rem;
+  font-weight: 760;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-summary strong {
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-size: 1rem;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.task-list li {
+  min-height: 52px;
+  border-color: var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface-2);
+  color: var(--lab-ink);
+}
+
+.task-list li::before {
+  background: var(--lab-line-strong);
+  opacity: 0.75;
+}
+
+.task-list strong {
+  background: var(--lab-surface);
+  color: var(--lab-blue);
+  font-size: 0.62rem;
+}
+
+.sim-controls {
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius);
+  background: var(--lab-surface);
+}
+
+.sim-controls-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.sim-controls-header .eyebrow,
+.sim-controls-header h2 {
+  grid-column: 1;
+}
+
+.sim-controls-header span {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding: 5px 7px;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: var(--lab-surface-2);
+  color: var(--lab-muted);
+  font-family: var(--lab-mono);
+  font-size: 0.66rem;
+  font-weight: 820;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sim-controls-header span[data-state="running"] {
+  border-color: rgba(40, 122, 84, 0.24);
+  background: rgba(40, 122, 84, 0.08);
+  color: var(--lab-green);
+}
+
+.control-group {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--lab-line);
+}
+
+.control-group h3 {
+  color: var(--lab-muted);
+  font-size: 0.7rem;
+  font-weight: 780;
+  line-height: 1;
+}
+
+.control-group button {
+  min-width: 0;
+}
+
+.sim-primary {
+  border-color: #2557d6;
+  background: #2557d6;
+  color: #ffffff;
+  box-shadow: 0 12px 28px rgba(37, 87, 214, 0.18);
+}
+
+.sim-primary:hover {
+  border-color: #1f48ad;
+  background: #1f48ad;
+  color: #ffffff;
+}

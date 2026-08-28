@@ -99,10 +99,7 @@ export function buildCrowdContactNetwork(
   return { nodes, links };
 }
 
-function contactKind(
-  a: SimulationAgent,
-  b: SimulationAgent,
-): CrowdContactLink["kind"] {
+function contactKind(a: SimulationAgent, b: SimulationAgent): CrowdContactLink["kind"] {
   if (a.selectedStoreId && a.selectedStoreId === b.selectedStoreId) {
     if (a.lifecycleState === "queue" && b.lifecycleState === "queue") {
       return "queue";

@@ -19,11 +19,20 @@ const workerScope = globalThis as unknown as {
 
 let engine: SimulationEngine | undefined;
 let sharedMemory: SimulationWorkerSharedMemory | undefined;
+/**
+ * Messages are handled one at a time. `init` awaits a dynamic import of the wasm
+ * decision backend, and anything that arrived during that await used to run
+ * first and fail with "not initialized" — the client never recovered because the
+ * failed command was already answered with an error.
+ */
+let queue: Promise<void> = Promise.resolve();
 
 workerScope.onmessage = (event) => {
   const message = event.data;
 
-  void handleMessage(message);
+  // The catch keeps the chain alive: a rejected link would silently swallow every
+  // later message, which is the failure mode this queue exists to prevent.
+  queue = queue.then(() => handleMessage(message)).catch(() => undefined);
 };
 
 async function handleMessage(message: SimulationWorkerRequest) {

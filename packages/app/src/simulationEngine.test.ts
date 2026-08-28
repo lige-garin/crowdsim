@@ -246,6 +246,96 @@ describe("simulation engine", () => {
     );
   });
 
+  it("keeps arrivals through a bidirectional entrance in the scene", () => {
+    const engine = createSimulationEngineFromScene(
+      mallScene({
+        entrances: [
+          {
+            id: "gate",
+            kind: "bidirectional",
+            position: { x: 10, y: 40 },
+            width: 6,
+            arrivalRatePerMinute: 600,
+          },
+        ],
+      }),
+    );
+
+    const snapshot = engine.step(60);
+
+    // The gate is a sink too, and spawn jitter puts a newborn inside its radius:
+    // nobody may be counted as having left before walking anywhere.
+    expect(snapshot.spawnedCount).toBeGreaterThan(0);
+    expect(snapshot.exitedCount).toBe(0);
+    expect(snapshot.agentCount).toBe(snapshot.spawnedCount);
+  });
+
+  it("keeps an under-capacity mall flowing instead of deadlocking in the queue", () => {
+    const crowdedScene = () =>
+      mallScene({
+        shops: [
+          {
+            id: "shop-a",
+            name: "A",
+            position: { x: 40, y: 40 },
+            size: { width: 8, height: 8 },
+            attraction: 1,
+            capacity: 1,
+            dwellMeanSeconds: 600,
+          },
+        ],
+      });
+    const engine = createSimulationEngineFromScene(crowdedScene(), {
+      maxAgents: 200,
+    });
+
+    const snapshot = engine.step(60 * 120);
+
+    // One service slot and a 10 minute dwell against 5 arrivals a second: the
+    // line has to shed shoppers or the whole mall stops at the agent cap.
+    expect(snapshot.exitedCount).toBeGreaterThan(0);
+    expect(snapshot.agentCount).toBeLessThan(200);
+
+    // Renege patience and the fallback store choice must stay seed-driven.
+    const replay = createSimulationEngineFromScene(crowdedScene(), {
+      maxAgents: 200,
+    });
+
+    expect(replay.step(60 * 120)).toEqual(snapshot);
+  });
+
+  it("gives up on a shop the walls cut off instead of stalling forever", () => {
+    const engine = createSimulationEngineFromScene(
+      mallScene({
+        // Two parallel walls: an agent that slips through one still faces the
+        // other, so the shop is genuinely unreachable and the exit is not.
+        walls: [wall("wall-a", 25), wall("wall-b", 26)],
+        shops: [
+          {
+            id: "shop-a",
+            name: "A",
+            position: { x: 60, y: 40 },
+            size: { width: 8, height: 8 },
+            attraction: 1,
+            capacity: 50,
+            dwellMeanSeconds: 30,
+          },
+        ],
+      }),
+      { maxAgents: 224 },
+    );
+
+    const firstHalf = engine.step(60 * 150);
+    const secondHalf = engine.step(60 * 150);
+
+    // Shoppers that cannot reach the shop must give up and leave, so the scene
+    // keeps draining and refilling instead of freezing at the agent cap.
+    expect(firstHalf.exitedCount).toBeGreaterThan(0);
+    expect(secondHalf.exitedCount).toBeGreaterThan(firstHalf.exitedCount);
+    expect(secondHalf.spawnedCount).toBeGreaterThan(firstHalf.spawnedCount);
+    expect(secondHalf.agentCount).toBeLessThan(224);
+  });
+
   it("keeps wall-constrained scene agents from crossing blocked geometry", () => {
     const scene = parseScene({
       schemaVersion: "1.0.0",
@@ -303,6 +393,59 @@ describe("simulation engine", () => {
     expect(maxX).toBeLessThan(5);
   });
 });
+
+function wall(id: string, x: number) {
+  return {
+    id,
+    geometry: {
+      type: "polyline" as const,
+      points: [
+        { x, y: 0 },
+        { x, y: 80 },
+      ],
+    },
+    thickness: 0.2,
+  };
+}
+
+/** A source on the left, an exit next to it, and a shop to be reached. */
+function mallScene(overrides: Partial<Parameters<typeof parseScene>[0]>) {
+  return parseScene({
+    schemaVersion: "1.0.0",
+    id: "mall-flow",
+    name: "Mall Flow",
+    seed: 7,
+    world: { width: 120, height: 80 },
+    shops: [
+      {
+        id: "shop-a",
+        name: "A",
+        position: { x: 60, y: 40 },
+        size: { width: 8, height: 8 },
+        attraction: 1,
+        capacity: 50,
+        dwellMeanSeconds: 60,
+      },
+    ],
+    entrances: [
+      {
+        id: "gate",
+        kind: "source",
+        position: { x: 5, y: 40 },
+        width: 6,
+        arrivalRatePerMinute: 300,
+      },
+      {
+        id: "exit",
+        kind: "sink",
+        position: { x: 5, y: 5 },
+        width: 6,
+        arrivalRatePerMinute: 0,
+      },
+    ],
+    ...overrides,
+  });
+}
 
 function createOffsetMovementBackend(offsetX: number, offsetY: number) {
   let calls = 0;

@@ -1,0 +1,233 @@
+﻿.biocity-topbar .biocity-ops-status article strong[data-state="running"] {
+  color: #5ee6a8 !important;
+}
+
+.biocity-tool-grid button[aria-pressed="true"],
+.view-mode-toggle button[aria-pressed="true"],
+.speed-group button[aria-pressed="true"],
+.window-group button[aria-pressed="true"] {
+  border-color: rgba(120, 219, 255, 0.52);
+  background:
+    linear-gradient(180deg, rgba(33, 119, 174, 0.72), rgba(20, 72, 112, 0.8)),
+    rgba(14, 31, 48, 0.94);
+  color: #ffffff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 1px rgba(120, 219, 255, 0.12),
+    0 12px 28px rgba(22, 101, 160, 0.28);
+}
+
+.biocity-tool-grid button[aria-pressed="true"] span {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.render-city-label-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.render-city-label {
+  position: absolute;
+  display: grid;
+  min-width: 86px;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(120, 219, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(5, 17, 28, 0.74);
+  color: #dcefff;
+  box-shadow:
+    0 16px 34px rgba(1, 8, 15, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translate(-50%, -100%);
+  backdrop-filter: blur(14px) saturate(1.12);
+}
+
+.render-city-label strong {
+  max-width: 130px;
+  overflow: hidden;
+  color: #f4f8ff;
+  font-size: 0.72rem;
+  font-weight: 840;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.render-city-label span {
+  color: #8fb6d6;
+  font-family: var(--lab-mono);
+  font-size: 0.62rem;
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.render-city-label-shop {
+  border-color: rgba(250, 204, 21, 0.32);
+  background: rgba(66, 38, 8, 0.72);
+}
+
+.render-city-label-transit {
+  border-color: rgba(34, 211, 238, 0.34);
+}
+
+.render-city-label-hazard {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(67, 20, 18, 0.72);
+}
+
+.render-agent-marker {
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.render-agent-marker:hover {
+  transform: translate(-50%, -100%) scale(1.12);
+}
+
+.render-agent-intent {
+  min-width: 18px;
+  min-height: 18px;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
+/* --- Viewport: WebGPU unsupported notice -------------------------------- */
+/* The worst render state used to be the quietest: a black rectangle with one
+   0.7rem line in the HUD. This replaces it with a single restrained card. */
+.render-unsupported {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  /* Top-aligned: the scene-editor dock is a higher-z overlay across the lower
+     half of the stage, so a vertically centred card would be half-hidden. */
+  place-items: start center;
+  padding: 32px 24px;
+  background: radial-gradient(
+    120% 90% at 50% 0%,
+    rgba(10, 26, 41, 0.72),
+    rgba(4, 12, 20, 0.9)
+  );
+  backdrop-filter: blur(2px);
+}
+
+.render-unsupported-card {
+  max-width: 420px;
+  padding: 22px 24px;
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: 14px;
+  background: rgba(8, 20, 32, 0.92);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  text-align: left;
+}
+
+.render-unsupported-eyebrow {
+  margin: 0 0 6px;
+  color: #8fa7c0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.render-unsupported-card h3 {
+  margin: 0 0 10px;
+  color: #eef4fb;
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.render-unsupported-card p {
+  margin: 0 0 8px;
+  color: #cbd9e8;
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.render-unsupported-muted {
+  color: #93a6bc !important;
+  font-size: 0.8rem !important;
+}
+
+.render-unsupported-card details {
+  margin-top: 12px;
+  border-top: 1px solid rgba(126, 176, 215, 0.14);
+  padding-top: 10px;
+}
+
+.render-unsupported-card summary {
+  color: #93a6bc;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.render-unsupported-card code {
+  display: block;
+  margin-top: 8px;
+  color: #a9bed4;
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+/* --- Workspace palette + honest clock rail ------------------------------ */
+/* The palette groups are direct children of .sidebar now that the decorative
+   .biocity-toolbox wrapper (and the frozen milestone list under it) are gone. */
+.sidebar > .biocity-tool-group + .biocity-tool-group {
+  margin-top: -2px;
+}
+
+.biocity-tool-group h2 {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.biocity-tool-grid button {
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.biocity-tool-grid button strong {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.biocity-timeline {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.biocity-time-rail {
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* Replaces a readOnly <input type="range"> that looked draggable and was not.
+   A progressbar reads as an indicator to both sighted and assistive users. */
+.biocity-time-progress {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(126, 176, 215, 0.16);
+  overflow: hidden;
+}
+
+.biocity-time-progress > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(120, 219, 255, 0.55), var(--lab-blue));
+  transition: width 240ms linear;
+}

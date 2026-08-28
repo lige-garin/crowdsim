@@ -1,6 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import type { ChangeEvent, PointerEvent as ReactPointerEvent, RefObject } from "react";
-import type { ImageGeometryDraft, ImageScaleCalibration } from "./aiImageGeometry";
 import type { HeatmapCell } from "./heatmap";
 import type { Language, LocalizedText, TranslationKey } from "./i18n";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
@@ -20,16 +19,13 @@ import type {
   TransitStopNumberField,
   ZoneNumberField,
 } from "./sceneEditorMutations";
+import type { SceneImageOverlay } from "./sceneEditorImageOverlay";
 import { pointsToSvg } from "./sceneEditorUtils";
 import type { SimulationAgent } from "./simulationEngine";
 
-type AiImageOverlayState = {
-  calibration: ImageScaleCalibration;
-  draft: ImageGeometryDraft;
-} | null;
-
 type SceneEditorLayoutProps = {
-  aiImageOverlay: AiImageOverlayState;
+  aiImageOverlay: SceneImageOverlay | null;
+  aiPrompt: string;
   baseScene: CrowdSimScene;
   basemap: EditorBasemap | null;
   basemapInputRef: RefObject<HTMLInputElement | null>;
@@ -44,6 +40,7 @@ type SceneEditorLayoutProps = {
   language: Language;
   liveAgents: readonly SimulationAgent[];
   onAiDraft: () => void;
+  onAiPromptChange: (value: string) => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
@@ -55,6 +52,7 @@ type SceneEditorLayoutProps = {
   onFinishWall: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
+  onShowTracingFixture: () => void;
   onHazardKindChange: (kind: EditorDocument["hazards"][number]["kind"]) => void;
   onHazardNumberChange: (field: HazardNumberField, value: number) => void;
   onLoadSavedScene: () => void;
@@ -122,6 +120,7 @@ type SceneEditorLayoutProps = {
 
 export function SceneEditorLayout({
   aiImageOverlay,
+  aiPrompt,
   baseScene,
   basemap,
   basemapInputRef,
@@ -136,6 +135,7 @@ export function SceneEditorLayout({
   language,
   liveAgents,
   onAiDraft,
+  onAiPromptChange,
   onBasemapImport,
   onBasemapNumberChange,
   onBuildingKindChange,
@@ -147,6 +147,7 @@ export function SceneEditorLayout({
   onFinishWall,
   onGeoJsonImport,
   onImportScene,
+  onShowTracingFixture,
   onHazardKindChange,
   onHazardNumberChange,
   onLoadSavedScene,
@@ -214,12 +215,15 @@ export function SceneEditorLayout({
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
         language={language}
+        aiPrompt={aiPrompt}
         onAiDraft={onAiDraft}
+        onAiPromptChange={onAiPromptChange}
         onBasemapImport={onBasemapImport}
         onDeleteSelected={onDeleteSelected}
         onExportScene={onExportScene}
         onGeoJsonImport={onGeoJsonImport}
         onImportScene={onImportScene}
+        onShowTracingFixture={onShowTracingFixture}
         onLoadSavedScene={onLoadSavedScene}
         onRedo={onRedo}
         onSaveScene={onSaveScene}

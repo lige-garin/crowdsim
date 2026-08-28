@@ -13,35 +13,56 @@ import type {
  * `createCrowdSimBackend().fetch` so the same client drives the real backend
  * routes without a server. The client itself imports no backend code — only
  * shared `@crowdsim/collab` / `@crowdsim/scene-schema` types.
+ *
+ * Every data route needs a session, so callers must `login()` (or supply a
+ * `token`) before anything else; ownership and actor identity are taken from
+ * that session server-side and can no longer be passed in per request.
  */
 export type BackendFetch = (request: Request) => Promise<Response>;
 
 export type BackendClientOptions = {
   fetch?: BackendFetch;
   baseUrl?: string;
+  token?: string;
+};
+
+export type BackendSession = {
+  account: {
+    displayName: string;
+    id: string;
+  };
+  expiresAtIso: string;
+  token: string;
+};
+
+export type LoginInput = {
+  accountId: string;
+  credential?: string;
+  displayName?: string;
 };
 
 export type CreateProjectInput = {
   id: string;
   name: string;
-  ownerId: string;
   scene: CrowdSimScene;
 };
 
 export type UpdateSceneInput = {
   projectId: string;
-  actorId: string;
   expectedVersion: number;
   scene: CrowdSimScene;
 };
 
 export type BackendClient = {
   createProject(input: CreateProjectInput): Promise<ProjectRecord>;
-  listProjects(ownerId?: string): Promise<ProjectRecord[]>;
   getProject(id: string): Promise<ProjectRecord | null>;
-  updateScene(input: UpdateSceneInput): Promise<ProjectRecord>;
-  listVersions(projectId: string): Promise<ProjectVersionRecord[]>;
   getUsage(ownerId: string): Promise<UsageSnapshot>;
+  listProjects(ownerId?: string): Promise<ProjectRecord[]>;
+  listVersions(projectId: string): Promise<ProjectVersionRecord[]>;
+  login(input: LoginInput): Promise<BackendSession>;
+  logout(): Promise<void>;
+  setToken(token: string | null): void;
+  updateScene(input: UpdateSceneInput): Promise<ProjectRecord>;
 };
 
 export class BackendClientError extends Error {
@@ -55,12 +76,11 @@ export class BackendClientError extends Error {
   }
 }
 
-export function createBackendClient(
-  options: BackendClientOptions = {},
-): BackendClient {
+export function createBackendClient(options: BackendClientOptions = {}): BackendClient {
   const doFetch: BackendFetch =
     options.fetch ?? ((request) => globalThis.fetch(request));
   const baseUrl = (options.baseUrl ?? "http://localhost").replace(/\/+$/, "");
+  let sessionToken = options.token ?? null;
 
   async function send(
     path: string,
@@ -70,7 +90,10 @@ export function createBackendClient(
     return doFetch(
       new Request(`${baseUrl}${path}`, {
         method: init?.method ?? "GET",
-        headers: hasBody ? { "content-type": "application/json" } : undefined,
+        headers: {
+          ...(hasBody ? { "content-type": "application/json" } : {}),
+          ...(sessionToken ? { authorization: `Bearer ${sessionToken}` } : {}),
+        },
         body: hasBody ? JSON.stringify(init?.body) : undefined,
       }),
     );
@@ -92,6 +115,20 @@ export function createBackendClient(
   }
 
   return {
+    async login(input) {
+      const response = await send("/api/auth/login", { method: "POST", body: input });
+      const session = await unwrap(response, (data) => data.session as BackendSession);
+      sessionToken = session.token;
+      return session;
+    },
+    async logout() {
+      const response = await send("/api/auth/logout", { method: "POST" });
+      sessionToken = null;
+      await unwrap(response, () => null);
+    },
+    setToken(token) {
+      sessionToken = token;
+    },
     async createProject(input) {
       const response = await send("/api/projects", { method: "POST", body: input });
       return unwrap(response, (data) => data.project as ProjectRecord);
@@ -114,7 +151,6 @@ export function createBackendClient(
         {
           method: "PUT",
           body: {
-            actorId: input.actorId,
             expectedVersion: input.expectedVersion,
             scene: input.scene,
           },

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  canAttemptHalfMillionAgents,
   createIndirectDrawPlan,
   estimateScaleBudget,
+  projectHalfMillionAgentBudget,
 } from "./scaleBudget";
 
 describe("scale budget", () => {
@@ -22,19 +22,43 @@ describe("scale budget", () => {
     });
   });
 
-  it("gates the half-million agent target behind the hybrid LOD plan", () => {
-    expect(
-      canAttemptHalfMillionAgents(estimateScaleBudget({ agentCount: 499_999 })),
-    ).toBe(false);
-    expect(
-      canAttemptHalfMillionAgents(estimateScaleBudget({ agentCount: 500_000 })),
-    ).toBe(true);
+  it("projects the half-million target without claiming it was measured", () => {
+    const projection = projectHalfMillionAgentBudget(
+      estimateScaleBudget({ agentCount: 500_000 }),
+    );
+
+    expect(projection.projection).toBe("within-budget");
+    expect(projection.measurement).toBe("not-measured");
+    expect(projection.blockers).toEqual([]);
   });
 
-  it("builds WebGPU drawIndirect argument batches for large crowds", () => {
+  it("reports the agent count as a blocker below the target", () => {
+    const projection = projectHalfMillionAgentBudget(
+      estimateScaleBudget({ agentCount: 499_999 }),
+    );
+
+    expect(projection.projection).toBe("over-budget");
+    expect(projection.blockers).toEqual([
+      "agent count 499999 is below the 500000 target",
+    ]);
+  });
+
+  it("reports over-budget against a caller-supplied memory ceiling", () => {
+    const projection = projectHalfMillionAgentBudget(
+      estimateScaleBudget({ agentCount: 500_000 }),
+      { memoryBudgetMegabytes: 16, targetAgentCount: 500_000 },
+    );
+
+    expect(projection.projection).toBe("over-budget");
+    expect(projection.blockers).toEqual([
+      "estimated 30.52 MB exceeds the 16 MB budget",
+    ]);
+  });
+
+  it("builds drawIndirect argument batches for a mode that is not wired yet", () => {
     const plan = createIndirectDrawPlan(500_000, 65_536);
 
-    expect(plan.mode).toBe("drawIndirect");
+    expect(plan.mode).toBe("planned-drawIndirect");
     expect(plan.batchCount).toBe(8);
     expect(plan.argsBufferBytes).toBe(128);
     expect(plan.draws[0]).toEqual({

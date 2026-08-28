@@ -1,8 +1,8 @@
 // Push overlapping city labels downward so they stay readable instead of piling
 // up on the same spot (buildings/shops cluster in the scene centre).
-export function deconflictLabels<
-  T extends { leftPercent: number; topPercent: number },
->(labels: readonly T[]): T[] {
+export function deconflictLabels<T extends { leftPercent: number; topPercent: number }>(
+  labels: readonly T[],
+): T[] {
   const minDeltaX = 11;
   const minDeltaY = 3.4;
   const placed: T[] = [];

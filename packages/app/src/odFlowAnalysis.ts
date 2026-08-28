@@ -48,7 +48,11 @@ export function summarizeOdFlows(
     if (a.entranceId !== b.entranceId) {
       return a.entranceId < b.entranceId ? -1 : 1;
     }
-    return a.destinationId < b.destinationId ? -1 : a.destinationId > b.destinationId ? 1 : 0;
+    return a.destinationId < b.destinationId
+      ? -1
+      : a.destinationId > b.destinationId
+        ? 1
+        : 0;
   });
 
   const destinationRanking: OdDestinationRank[] = Object.entries(
@@ -59,7 +63,11 @@ export function summarizeOdFlows(
       if (b.arrivals !== a.arrivals) {
         return b.arrivals - a.arrivals;
       }
-      return a.destinationId < b.destinationId ? -1 : a.destinationId > b.destinationId ? 1 : 0;
+      return a.destinationId < b.destinationId
+        ? -1
+        : a.destinationId > b.destinationId
+          ? 1
+          : 0;
     });
 
   return {

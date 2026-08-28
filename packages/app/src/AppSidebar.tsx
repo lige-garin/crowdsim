@@ -1,15 +1,24 @@
 import type { Language, TranslationKey } from "./i18n";
-import { heatmapWindows, milestones } from "./appUi";
-import { useState, type ReactNode } from "react";
+import { heatmapWindows } from "./appUi";
+import type { ReactNode } from "react";
 import type { SimulationStatus } from "./simulationEngine";
-import { bioCityPlanningToolGroupText } from "./bioCityUiContract";
+import type { EditorTool } from "./sceneEditorState";
+import { workspacePaletteGroups } from "./workspacePalette";
+import {
+  viewportLayerText,
+  type ViewportLayerId,
+  type ViewportLayers,
+} from "./viewportLayers";
 
 type AppSidebarProps = {
   agentCount: number;
+  editorTool: EditorTool;
   exitedCount: number;
   heatmapWindowSeconds: number;
   language: Language;
+  layers: ViewportLayers;
   onClearEvacuation: () => void;
+  onEditorToolChange: (tool: EditorTool) => void;
   onEvacuate: () => void;
   onHeatmapWindowChange: (seconds: number) => void;
   onPause: () => void;
@@ -17,6 +26,7 @@ type AppSidebarProps = {
   onSetLanguage: (language: Language) => void;
   onSetTimeScale: (speed: number) => void;
   onStart: () => void;
+  onToggleLayer: (layer: ViewportLayerId) => void;
   simulationStatus: SimulationStatus;
   spawnedCount: number;
   t: (key: TranslationKey) => string;
@@ -25,10 +35,13 @@ type AppSidebarProps = {
 
 export function AppSidebar({
   agentCount,
+  editorTool,
   exitedCount,
   heatmapWindowSeconds,
   language,
+  layers,
   onClearEvacuation,
+  onEditorToolChange,
   onEvacuate,
   onHeatmapWindowChange,
   onPause,
@@ -36,12 +49,12 @@ export function AppSidebar({
   onSetLanguage,
   onSetTimeScale,
   onStart,
+  onToggleLayer,
   simulationStatus,
   spawnedCount,
   t,
   timeScale,
 }: AppSidebarProps) {
-  const [activePlanningTool, setActivePlanningTool] = useState("Roads");
   const controlLabels =
     language === "zh"
       ? {
@@ -49,20 +62,20 @@ export function AppSidebar({
           incident: "疏散",
           run: "运行控制",
           speed: "仿真倍率",
+          workspace: "工作台",
         }
       : {
           heatmap: "Heatmap window",
           incident: "Evacuation",
           run: "Run controls",
           speed: "Simulation speed",
+          workspace: "Workspace",
         };
 
   return (
-    <aside className="sidebar" aria-label={t("milestoneQueue")}>
+    <aside className="sidebar" aria-label={controlLabels.workspace}>
       <div className="biocity-sidebar-head">
-        <p className="eyebrow">
-          {language === "zh" ? "城市规划工具" : "City planning tools"}
-        </p>
+        <p className="eyebrow">{controlLabels.workspace}</p>
         <h1>BioCity Studio</h1>
         <div className="language-toggle" aria-label={t("language")}>
           <button
@@ -81,27 +94,44 @@ export function AppSidebar({
           </button>
         </div>
       </div>
-      <section className="biocity-toolbox" aria-label="BioCity planning toolbox">
-        {bioCityPlanningToolGroupText.map((group) => (
-          <div className="biocity-tool-group" key={group.title.en}>
-            <h2>{group.title[language]}</h2>
-            <div className="biocity-tool-grid">
-              {group.tools.map((tool) => (
+      {workspacePaletteGroups.map((group) => (
+        <section
+          className="biocity-tool-group"
+          key={group.title.en}
+          aria-label={group.title[language]}
+        >
+          <h2>{group.title[language]}</h2>
+          <div className="biocity-tool-grid">
+            {group.entries.map((entry) =>
+              entry.kind === "editor" ? (
                 <button
                   type="button"
-                  key={tool.label.en}
-                  aria-pressed={activePlanningTool === tool.label.en}
-                  onClick={() => setActivePlanningTool(tool.label.en)}
-                  title={tool.label[language]}
+                  key={entry.id}
+                  data-testid={`palette-${entry.id}`}
+                  aria-pressed={editorTool === entry.tool}
+                  onClick={() => onEditorToolChange(entry.tool)}
+                  title={entry.label[language]}
                 >
-                  <span>{tool.icon}</span>
-                  <strong>{tool.label[language]}</strong>
+                  <span aria-hidden="true">{entry.glyph}</span>
+                  <strong>{entry.label[language]}</strong>
                 </button>
-              ))}
-            </div>
+              ) : (
+                <button
+                  type="button"
+                  key={entry.id}
+                  data-testid={`palette-${entry.id}`}
+                  aria-pressed={layers[entry.layer]}
+                  onClick={() => onToggleLayer(entry.layer)}
+                  title={viewportLayerText[entry.layer][language]}
+                >
+                  <span aria-hidden="true">{entry.glyph}</span>
+                  <strong>{entry.label[language]}</strong>
+                </button>
+              ),
+            )}
           </div>
-        ))}
-      </section>
+        </section>
+      ))}
       <section className="sidebar-summary" aria-label={t("systemSignals")}>
         <article>
           <span>{t("agents")}</span>
@@ -116,15 +146,6 @@ export function AppSidebar({
           <strong>{exitedCount.toLocaleString()}</strong>
         </article>
       </section>
-      <ol className="task-list">
-        {milestones.map((milestone) => (
-          <li key={milestone.id}>
-            <span className="task-id">{milestone.id}</span>
-            <span>{t(milestone.labelKey)}</span>
-            <strong>{t(milestone.statusKey)}</strong>
-          </li>
-        ))}
-      </ol>
       <section className="sim-controls" aria-label={t("simulationControls")}>
         <header className="sim-controls-header">
           <p className="eyebrow">{t("engine")}</p>
@@ -136,11 +157,21 @@ export function AppSidebar({
         <ControlGroup title={controlLabels.run}>
           <div className="control-row">
             {simulationStatus === "running" ? (
-              <button type="button" className="sim-primary" onClick={onPause}>
+              <button
+                type="button"
+                className="sim-primary"
+                data-testid="sim-toggle"
+                onClick={onPause}
+              >
                 {t("pause")}
               </button>
             ) : (
-              <button type="button" className="sim-primary" onClick={onStart}>
+              <button
+                type="button"
+                className="sim-primary"
+                data-testid="sim-toggle"
+                onClick={onStart}
+              >
                 {t("start")}
               </button>
             )}

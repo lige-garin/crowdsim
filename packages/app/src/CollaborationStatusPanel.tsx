@@ -6,7 +6,10 @@ import { useI18n } from "./i18n";
 export function CollaborationStatusPanel() {
   const { language } = useI18n();
   const status = useMemo(() => {
-    const store = new InMemoryProjectStore();
+    // Fixed demo token: the store now mints share tokens itself.
+    const store = new InMemoryProjectStore({
+      createShareToken: () => "demo-read-only",
+    });
     const project = store.createProject({
       id: "demo-project",
       name: "Demo Project",
@@ -25,7 +28,6 @@ export function CollaborationStatusPanel() {
       actorId: "planner",
       projectId: project.id,
       timestampIso: "2026-06-12T00:02:00.000Z",
-      token: "demo-read-only",
     });
     store.recordUsage("planner", "experiment-runs", 4);
 

@@ -22,6 +22,16 @@ import { runSharedArrayBufferProbe } from "./sharedArrayBufferProbe";
 import { runSocialForceProbe, type SocialForceProbeResult } from "./socialForceProbe";
 import { runWebGpuProbe, type WebGpuProbeResult } from "./webgpuProbe";
 
+/**
+ * Probes are diagnostic-only: a rejection must never take the app down, but it
+ * must not vanish silently either (that is how "everything looks green" bugs
+ * survive). Surface it on the console and leave the probe in its checking state.
+ */
+function reportProbeFailure(label: string, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`[crowdsim] ${label} probe failed: ${message}`);
+}
+
 export function useAppProbes() {
   const [behaviorSmokeValue, setBehaviorSmokeValue] = useState("Loading");
   const [agentStateProbe, setAgentStateProbe] = useState<AgentStateProbeState>({
@@ -255,11 +265,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runHeatmapProbe().then((result) => {
-      if (!cancelled) {
-        setHeatmapProbe(result);
-      }
-    });
+    runHeatmapProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setHeatmapProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("heatmap", error);
+      });
 
     return () => {
       cancelled = true;
@@ -269,11 +283,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runMovementBackendProbe().then((result) => {
-      if (!cancelled) {
-        setMovementBackendProbe(result);
-      }
-    });
+    runMovementBackendProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setMovementBackendProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("movement-backend", error);
+      });
 
     return () => {
       cancelled = true;
@@ -283,11 +301,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runWebGpuProbe().then((result) => {
-      if (!cancelled) {
-        setWebGpuProbe(result);
-      }
-    });
+    runWebGpuProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setWebGpuProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("webgpu", error);
+      });
 
     return () => {
       cancelled = true;
@@ -297,11 +319,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runGpuGridProbe().then((result) => {
-      if (!cancelled) {
-        setGridProbe(result);
-      }
-    });
+    runGpuGridProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setGridProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("gpu-grid", error);
+      });
 
     return () => {
       cancelled = true;
@@ -311,11 +337,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runSocialForceProbe().then((result) => {
-      if (!cancelled) {
-        setSocialForceProbe(result);
-      }
-    });
+    runSocialForceProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setSocialForceProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("social-force", error);
+      });
 
     return () => {
       cancelled = true;
@@ -325,11 +355,15 @@ export function useAppProbes() {
   useEffect(() => {
     let cancelled = false;
 
-    runFlowFieldProbe().then((result) => {
-      if (!cancelled) {
-        setFlowFieldProbe(result);
-      }
-    });
+    runFlowFieldProbe()
+      .then((result) => {
+        if (!cancelled) {
+          setFlowFieldProbe(result);
+        }
+      })
+      .catch((error: unknown) => {
+        reportProbeFailure("flow-field", error);
+      });
 
     return () => {
       cancelled = true;

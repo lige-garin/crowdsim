@@ -13,7 +13,9 @@ describe("facadeWindows", () => {
     const facadeWidth = 12;
     const buildingHeight = 4;
     for (const w of facadeWindows(facadeWidth, buildingHeight)) {
-      expect(Math.abs(w.offset) + w.width / 2).toBeLessThanOrEqual(facadeWidth / 2 + 1e-9);
+      expect(Math.abs(w.offset) + w.width / 2).toBeLessThanOrEqual(
+        facadeWidth / 2 + 1e-9,
+      );
       expect(w.vertical - w.height / 2).toBeGreaterThanOrEqual(-1e-9);
       expect(w.vertical + w.height / 2).toBeLessThanOrEqual(buildingHeight + 1e-9);
     }

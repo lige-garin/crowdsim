@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
+import { rimeaCoreScenarios } from "./benchmarkScenarios";
 import { createValidationReport, renderValidationReportHtml } from "./validationReport";
 import { generateStoreLotsForZone } from "./storeLotGeneration";
 
@@ -9,16 +10,9 @@ describe("validation report", () => {
       generatedAtIso: "2026-06-12T00:00:00.000Z",
     });
 
-    expect(report.benchmarkSummary).toEqual({
-      failCount: 0,
-      passCount: 4,
-      totalCount: 4,
-    });
     expect(report.benchmarkResults).toHaveLength(4);
-    expect(report.neuralCorrectionValidation.correctedMeanError).toBeLessThan(
-      report.neuralCorrectionValidation.baselineMeanError,
-    );
-    expect(report.neuralCorrectionValidation.modelSource).toBe("fitted-projection");
+    expect(report.benchmarkSummary.totalCount).toBe(4);
+    expect(report.residualProjectionValidation.modelSource).toBe("fitted-projection");
     expect(report.speedDensityPoints).toHaveLength(4);
     expect(report.pedestrianPresetSummaries).toHaveLength(12);
     expect(report.referenceLinks.map((link) => link.label)).toEqual([
@@ -38,9 +32,47 @@ describe("validation report", () => {
     expect(html).toContain("@media print");
     expect(html).toContain("RiMEA straight corridor");
     expect(html).toContain("Weidmann");
-    expect(html).toContain("神经修正验证");
+    expect(html).toContain("残差投影验证");
+    expect(html).not.toContain("神经修正");
     expect(html).toContain("Physics + residual error");
+    expect(html).toContain("in-sample fit, not held-out validation");
     expect(html).toContain("MSC.1/Circ.1533");
+  });
+
+  it("labels the residual section as a residual projection in English too", () => {
+    const html = renderValidationReportHtml(
+      createValidationReport({ generatedAtIso: "2026-06-12T00:00:00.000Z" }),
+      "en",
+    );
+
+    expect(html).toContain("Residual projection validation");
+    expect(html).not.toContain("Neural correction");
+  });
+
+  // The default suite grades the engine against ranges the project picked, so a
+  // green summary proves nothing on its own; this pins the failing path instead.
+  it("counts a benchmark the engine cannot satisfy as a failure", () => {
+    const report = createValidationReport({
+      generatedAtIso: "2026-06-12T00:00:00.000Z",
+      scenarios: [
+        {
+          ...rimeaCoreScenarios[0],
+          expectations: [
+            { metric: "meanSpeedMetersPerSecond", range: { min: 99 } },
+            { metric: "exitedCount", range: { min: 0 } },
+          ],
+        },
+      ],
+    });
+
+    expect(report.benchmarkSummary).toEqual({
+      failCount: 1,
+      passCount: 0,
+      totalCount: 1,
+    });
+    expect(report.benchmarkResults[0].comparisons[0].pass).toBe(false);
+    expect(report.benchmarkResults[0].comparisons[1].pass).toBe(true);
+    expect(renderValidationReportHtml(report, "en")).toContain(">FAIL<");
   });
 
   it("adds commercial validation when a commercial scene is supplied", () => {

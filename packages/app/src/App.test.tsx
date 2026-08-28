@@ -139,13 +139,24 @@ afterEach(() => {
   localStorage.clear();
 });
 
+function renderWorkbench() {
+  render(<App />);
+  fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
+}
+
 describe("App", () => {
-  it("starts from the BioCity studio and can return home", () => {
+  it("starts from home, enters the BioCity studio, and can return home", () => {
     render(<App />);
+
+    expect(
+      screen.getByRole("heading", { name: "CrowdSim Operations" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 
     expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
+    expect(screen.getByLabelText("仿真时钟")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "首页" }));
 
@@ -169,13 +180,20 @@ describe("App", () => {
   });
 
   it("renders the compact BioCity studio shell", () => {
-    render(<App />);
+    renderWorkbench();
 
     expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
     expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity planning toolbox")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity simulation timeline")).toBeInTheDocument();
-    expect(screen.getByText("T0.1")).toBeInTheDocument();
+    expect(screen.getByLabelText("绘制")).toBeInTheDocument();
+    expect(screen.getByLabelText("图层")).toBeInTheDocument();
+    expect(screen.getByLabelText("仿真时钟")).toBeInTheDocument();
+    // The hardcoded milestone list (T0.1 scaffold / T0.2 wasm bridge / ...) was
+    // frozen months ago and reported progress that no longer existed.
+    expect(screen.queryByText("T0.1")).not.toBeInTheDocument();
+    // "Evidence: Verified" was a literal, next to a literal "WASM + SAB"
+    // kernel. Neither was measured and the GPU path is explicitly unverified.
+    expect(screen.queryByText("已验证")).not.toBeInTheDocument();
+    expect(screen.queryByText("WASM + SAB")).not.toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
     expect(screen.getAllByText("雨天商业街").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
@@ -185,7 +203,15 @@ describe("App", () => {
     expect(screen.getByLabelText("BioCity signal dock")).toBeInTheDocument();
     expect(screen.queryByText("Credibility loop")).not.toBeInTheDocument();
 
+    // The scene-draft button used to double as the image-tracing trigger, which
+    // put fixture geometry on screen for a scene nobody had traced. Tracing
+    // geometry now has its own labelled entry.
     fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
+
+    expect(screen.queryByLabelText("AI 图层")).not.toBeInTheDocument();
+    expect(screen.getByText("请先输入 AI 提示词")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "描图示例" }));
 
     expect(screen.getByLabelText("AI 图层")).toBeInTheDocument();
     expect(screen.getAllByText(/复核/).length).toBeGreaterThan(0);
@@ -217,7 +243,7 @@ describe("App", () => {
   });
 
   it("switches the viewport between 2D and 3D modes", () => {
-    render(<App />);
+    renderWorkbench();
 
     const twoDimensionalButton = screen.getByRole("button", { name: "2D" });
     const threeDimensionalButton = screen.getByRole("button", { name: "3D" });

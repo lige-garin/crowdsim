@@ -13,8 +13,8 @@ import { rimeaCoreScenarios } from "./benchmarkScenarios";
 import { runBenchmarkSuite } from "./benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkScenario } from "./benchmarkTypes";
 import {
-  createNeuralCorrectionValidationReport,
-  type NeuralCorrectionValidationReport,
+  createResidualProjectionValidationReport,
+  type ResidualProjectionValidationReport,
 } from "./socialForceCalibration";
 import {
   demoTrajectoryCsv,
@@ -33,7 +33,7 @@ export type ValidationReport = {
   };
   generatedAtIso: string;
   commercialValidation?: CommercialValidationBundle;
-  neuralCorrectionValidation: NeuralCorrectionValidationReport;
+  residualProjectionValidation: ResidualProjectionValidationReport;
   notes: string[];
   pedestrianPresetSummaries: ReturnType<typeof createPedestrianPresetSummary>[];
   referenceLinks: {
@@ -74,12 +74,13 @@ export function createValidationReport(
     commercialValidation: options.commercialScene
       ? createCommercialValidationBundle(options.commercialScene)
       : undefined,
-    neuralCorrectionValidation: createReportNeuralCorrectionValidation(
+    residualProjectionValidation: createReportResidualProjectionValidation(
       benchmarkResults[0],
     ),
     notes: [
       "Current M5 fixtures are deterministic regression baselines for the browser engine.",
       "Wall-aware routing and empirical calibration should be tightened before these results are treated as certified RiMEA validation.",
+      "The residual projection is fitted to the same trajectory target it is scored against, so its improvement is an in-sample fit, not held-out validation.",
     ],
     pedestrianPresetSummaries: pedestrianPresets.map(createPedestrianPresetSummary),
     referenceLinks: [
@@ -110,7 +111,7 @@ export function renderValidationReportHtml(
           density: "峰值密度",
           generated: "生成时间",
           notes: "说明",
-          neural: "神经修正验证",
+          residualProjection: "残差投影验证",
           pass: "通过",
           presets: "人群参数",
           references: "参考来源",
@@ -125,7 +126,7 @@ export function renderValidationReportHtml(
           density: "Peak density",
           generated: "Generated",
           notes: "Notes",
-          neural: "Neural correction validation",
+          residualProjection: "Residual projection validation",
           pass: "Pass",
           presets: "Pedestrian presets",
           references: "References",
@@ -213,7 +214,7 @@ export function renderValidationReportHtml(
         .join("")}
     </tbody>
   </table>
-  <h2>${escapeHtml(labels.neural)}</h2>
+  <h2>${escapeHtml(labels.residualProjection)}</h2>
   <table>
     <thead>
       <tr>
@@ -227,12 +228,12 @@ export function renderValidationReportHtml(
     </thead>
     <tbody>
       <tr>
-        <td>${report.neuralCorrectionValidation.targetMeanSpeedMetersPerSecond.toFixed(3)} m/s</td>
-        <td>${report.neuralCorrectionValidation.targetThroughputPerMinute.toFixed(2)} / min</td>
-        <td>${report.neuralCorrectionValidation.baselineMeanError.toFixed(4)}</td>
-        <td>${report.neuralCorrectionValidation.correctedMeanError.toFixed(4)}</td>
-        <td>${(report.neuralCorrectionValidation.improvementRatio * 100).toFixed(1)}%</td>
-        <td>${escapeHtml(report.neuralCorrectionValidation.modelSource)}</td>
+        <td>${report.residualProjectionValidation.targetMeanSpeedMetersPerSecond.toFixed(3)} m/s</td>
+        <td>${report.residualProjectionValidation.targetThroughputPerMinute.toFixed(2)} / min</td>
+        <td>${report.residualProjectionValidation.baselineMeanError.toFixed(4)}</td>
+        <td>${report.residualProjectionValidation.correctedMeanError.toFixed(4)}</td>
+        <td>${(report.residualProjectionValidation.improvementRatio * 100).toFixed(1)}%</td>
+        <td>${escapeHtml(report.residualProjectionValidation.modelSource)}</td>
       </tr>
     </tbody>
   </table>
@@ -275,7 +276,7 @@ export function renderValidationReportHtml(
 </html>`;
 }
 
-function createReportNeuralCorrectionValidation(result: BenchmarkRunResult) {
+function createReportResidualProjectionValidation(result: BenchmarkRunResult) {
   const dataset = parseTrajectoryDatasetCsv(demoTrajectoryCsv, {
     id: "report-bottleneck",
     name: "Report bottleneck trajectory",
@@ -283,7 +284,7 @@ function createReportNeuralCorrectionValidation(result: BenchmarkRunResult) {
   });
   const target = deriveTrajectoryCalibrationTarget(dataset);
 
-  return createNeuralCorrectionValidationReport(result, target);
+  return createResidualProjectionValidationReport(result, target);
 }
 
 function escapeHtml(value: string) {

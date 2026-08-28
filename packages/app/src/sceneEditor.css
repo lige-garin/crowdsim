@@ -1,4 +1,4 @@
-.scene-editor {
+﻿.scene-editor {
   display: grid;
   gap: 10px;
 }
@@ -476,79 +476,4 @@
 
 .editor-sink {
   fill: var(--lab-red);
-}
-
-.editor-target {
-  fill: var(--lab-acid);
-}
-
-.editor-node {
-  cursor: grab;
-}
-
-.editor-node text {
-  fill: #111827;
-  font-size: 1.5px;
-  font-weight: 850;
-  pointer-events: none;
-  text-anchor: middle;
-}
-
-.editor-node.selected .editor-source,
-.editor-node.selected .editor-sink,
-.editor-node.selected .editor-target,
-.editor-building.selected polygon,
-.editor-hazard.selected circle,
-.editor-obstacle.selected polygon,
-.editor-obstacle.selected polyline,
-.editor-road.selected,
-.editor-transit-stop.selected circle,
-.editor-zone.selected polygon,
-.editor-wall.selected,
-.editor-shop.selected rect,
-.editor-service.selected rect,
-.editor-count-line.selected {
-  outline: none;
-  stroke: var(--lab-blue);
-  stroke-width: 0.75;
-}
-
-.editor-param-panel {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--lab-line);
-  border-radius: 8px;
-  background: var(--lab-surface-2);
-  color: var(--lab-muted);
-  font-size: 0.78rem;
-}
-
-.editor-param-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
-  gap: 8px;
-}
-
-.editor-param-grid > span,
-.editor-param-grid label {
-  display: grid;
-  gap: 4px;
-  font-weight: 780;
-}
-
-.editor-param-grid input,
-.editor-param-grid select {
-  min-width: 0;
-  min-height: 32px;
-  border: 1px solid var(--lab-line);
-  border-radius: 7px;
-  background: var(--lab-surface);
-  color: var(--lab-ink);
-  font-family: var(--lab-mono);
-  font-weight: 800;
-}
-
-.editor-param-grid button {
-  min-height: 32px;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseScene } from "@crowdsim/scene-schema";
 import {
   addBuilding,
   addCountLine,
@@ -215,6 +216,52 @@ describe("scene editor state", () => {
     expect(
       scene.entrances.find((entrance) => entrance.kind === "source"),
     ).toBeDefined();
+  });
+
+  it("round-trips every entrance kind and its calibrated arrival rate", () => {
+    const scene = parseScene({
+      ...demoScene,
+      entrances: [
+        {
+          id: "north-gate",
+          kind: "bidirectional",
+          position: { x: 4, y: 9 },
+          width: 6,
+          arrivalRatePerMinute: 45,
+        },
+        {
+          id: "west-door",
+          kind: "source",
+          position: { x: 2, y: 5 },
+          width: 4,
+          arrivalRatePerMinute: 37,
+        },
+        {
+          id: "fire-exit",
+          kind: "sink",
+          position: { x: 30, y: 5 },
+          width: 5,
+          arrivalRatePerMinute: 0,
+        },
+      ],
+    });
+
+    const document = createEditorDocumentFromScene(scene);
+    const roundTripped = createSceneFromEditorDocument(scene, document);
+
+    expect(document.entrances).toHaveLength(3);
+    expect(roundTripped.entrances).toEqual(scene.entrances);
+  });
+
+  it("gives a newly drawn entrance a demand matching its kind", () => {
+    const document = addEntrance(
+      addEntrance(createEditorDocumentFromScene(demoScene), "source", { x: 8, y: 8 }),
+      "sink",
+      { x: 12, y: 8 },
+    );
+
+    expect(document.entrances.at(-2)).toMatchObject({ arrivalRatePerMinute: 120 });
+    expect(document.entrances.at(-1)).toMatchObject({ arrivalRatePerMinute: 0 });
   });
 
   it("exports commercial objects back to valid scene json", () => {

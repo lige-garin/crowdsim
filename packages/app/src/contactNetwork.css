@@ -9,7 +9,12 @@
   background:
     linear-gradient(rgba(77, 140, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(77, 140, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(135deg, var(--lab-surface) 0%, var(--lab-surface-2) 58%, var(--lab-surface) 100%);
+    linear-gradient(
+      135deg,
+      var(--lab-surface) 0%,
+      var(--lab-surface-2) 58%,
+      var(--lab-surface) 100%
+    );
   background-size:
     28px 28px,
     28px 28px,

@@ -1,4 +1,4 @@
-import {
+﻿import {
   useMemo,
   useRef,
   useState,
@@ -10,24 +10,22 @@ import {
   type CrowdSimScene,
   type ScenePoint,
 } from "@crowdsim/scene-schema";
-import { createLocalSceneAssistantDraft } from "./aiSceneAssistant";
-import { calibrateImageScale } from "./aiImageGeometry";
+import { createNaturalLanguageScenePlanDraft } from "./aiSceneAssistant";
 import { templateScenes } from "./industryTemplates";
 import { imageTracingFixtures } from "./imageTracingEvaluation";
+import {
+  createImportedImageOverlay,
+  createTracingFixtureOverlay,
+  type SceneImageOverlay,
+} from "./sceneEditorImageOverlay";
 import { createSceneFromGeoJson } from "./geojsonImport";
 import type { HeatmapCell } from "./heatmap";
 import { useI18n, type LocalizedText } from "./i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
+import { addImportedBasemap, getActiveBasemap } from "./sceneEditorBasemap";
 import {
-  addImportedBasemap,
-  getActiveBasemap,
-  toggleBasemapBoolean,
-  updateBasemapNumber,
-  type BasemapNumberField,
-} from "./sceneEditorBasemap";
-import {
-  addCountLine,
   addBuilding,
+  addCountLine,
   addEntrance,
   addHazard,
   addObstacle,
@@ -40,85 +38,40 @@ import {
   addZone,
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
+  editorTools,
   moveEntity,
   removeEntity,
   snapPoint,
   type EditorDocument,
   type EditorTool,
-  type EditorZoneCategory,
 } from "./sceneEditorState";
 import { downloadSceneJson } from "./sceneFileExport";
-import {
-  toggleDocumentObstacleBlocksMovement,
-  toggleDocumentRoadBoolean,
-  toggleDocumentTransitStopActive,
-  toggleDocumentZoneWalkable,
-  updateDocumentBuildingKind,
-  updateDocumentBuildingNumber,
-  updateDocumentHazardKind,
-  updateDocumentHazardNumber,
-  updateDocumentObstacleKind,
-  updateDocumentObstacleNumber,
-  updateDocumentRoadDirection,
-  updateDocumentRoadNumber,
-  updateDocumentServiceNumber,
-  updateDocumentShopNumber,
-  updateDocumentShopSize,
-  updateDocumentTransitStopKind,
-  updateDocumentTransitStopNumber,
-  updateDocumentZoneCategory,
-  updateDocumentZoneNumber,
-  type BuildingNumberField,
-  type HazardNumberField,
-  type ObstacleNumberField,
-  type RoadNumberField,
-  type ServiceNumberField,
-  type ShopNumberField,
-  type ShopSizeField,
-  type TransitStopNumberField,
-  type ZoneNumberField,
-} from "./sceneEditorMutations";
+import { createSceneEditorParamActions } from "./SceneEditorParamActions";
 import { fileNameValues, makeStatus, sceneNameValues } from "./sceneEditorStatus";
 import { clamp, readFileAsDataUrl } from "./sceneEditorUtils";
-import { toggleEditorViewMode } from "./sceneEditorViewMode";
 import type { SimulationSnapshot } from "./simulationEngine";
-import { generateStoreLotsForZone } from "./storeLotGeneration";
-
 type DragState = {
   before: EditorDocument;
   id: string;
   lastPoint: ScenePoint;
   moved: boolean;
 };
-
 const gridSize = 2;
 const storageKey = "crowdsim.scene.v1";
-const editorTools: readonly EditorTool[] = [
-  "select",
-  "road",
-  "zone",
-  "wall",
-  "building",
-  "source",
-  "sink",
-  "target",
-  "shop",
-  "transitStop",
-  "counter",
-  "gate",
-  "obstacle",
-  "hazard",
-  "countLine",
-];
-
 export function SceneEditor({
   heatmapCells = [],
+  onToolChange,
   scene,
   simulationSnapshot,
+  tool: controlledTool,
 }: {
   heatmapCells?: readonly HeatmapCell[];
+  /** Notified whenever the active tool changes, including internal resets. */
+  onToolChange?: (tool: EditorTool) => void;
   scene: CrowdSimScene;
   simulationSnapshot?: SimulationSnapshot;
+  /** Optional controlled tool, so a shell toolbar can drive the editor. */
+  tool?: EditorTool;
 }) {
   const { language, t, text } = useI18n();
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -127,7 +80,8 @@ export function SceneEditor({
   const basemapInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
   const [baseScene, setBaseScene] = useState(scene);
-  const [aiImageOverlayVisible, setAiImageOverlayVisible] = useState(false);
+  const [aiImageOverlay, setAiImageOverlay] = useState<SceneImageOverlay | null>(null);
+  const [aiPrompt, setAiPrompt] = useState("");
   const [document, setDocument] = useState(() => createEditorDocumentFromScene(scene));
   const [draftWallPoints, setDraftWallPoints] = useState<ScenePoint[]>([]);
   const [redoStack, setRedoStack] = useState<EditorDocument[]>([]);
@@ -136,14 +90,21 @@ export function SceneEditor({
   const [storageStatus, setStorageStatus] = useState<LocalizedText>(() =>
     makeStatus("ready"),
   );
-  const [tool, setTool] = useState<EditorTool>("select");
+  const [uncontrolledTool, setUncontrolledTool] = useState<EditorTool>("select");
+  // Controlled when the shell passes a tool, uncontrolled otherwise. Internal
+  // resets (scene swap, delete) still route through setTool so the shell's
+  // highlighted tool never drifts from the editor's real one.
+  const tool = controlledTool ?? uncontrolledTool;
   const [undoStack, setUndoStack] = useState<EditorDocument[]>([]);
   const [hasSavedScene, setHasSavedScene] = useState(() =>
     typeof localStorage === "undefined"
       ? false
       : localStorage.getItem(storageKey) !== null,
   );
-
+  function setTool(nextTool: EditorTool) {
+    setUncontrolledTool(nextTool);
+    onToolChange?.(nextTool);
+  }
   const selectedLabel = selectedId ?? t("none");
   const currentScene = useMemo(
     () => createSceneFromEditorDocument(baseScene, document),
@@ -152,32 +113,14 @@ export function SceneEditor({
   const activeBasemap = getActiveBasemap(currentScene);
   const selectableScenes = useMemo(() => {
     const scenes = [scene, ...templateScenes];
-
     if (scenes.some((candidate) => candidate.id === baseScene.id)) {
       return scenes;
     }
-
     return [baseScene, ...scenes];
   }, [baseScene, scene]);
   const visibleHeatmapCells = baseScene.id === scene.id ? heatmapCells : [];
   const visibleLiveAgents =
     baseScene.id === scene.id ? (simulationSnapshot?.agents ?? []) : [];
-  const aiImageOverlay = useMemo(() => {
-    if (!aiImageOverlayVisible) {
-      return null;
-    }
-
-    const fixture = imageTracingFixtures[0];
-
-    return {
-      calibration: calibrateImageScale({
-        knownDistanceMeters: fixture.knownDistanceMeters,
-        pixelA: { x: 0, y: 0 },
-        pixelB: { x: fixture.pixelDistance, y: 0 },
-      }),
-      draft: fixture.draft,
-    };
-  }, [aiImageOverlayVisible]);
   const selectedShop = document.shops.find((shop) => shop.id === selectedId);
   const selectedRoad = document.roads.find((road) => road.id === selectedId);
   const selectedBuilding = document.buildings.find(
@@ -195,10 +138,12 @@ export function SceneEditor({
     (point) => point.id === selectedId,
   );
   const selectedCountLine = document.countLines.find((line) => line.id === selectedId);
-
   function replaceScene(nextScene: CrowdSimScene, status: LocalizedText) {
     setBaseScene(nextScene);
     setDocument(createEditorDocumentFromScene(nextScene));
+    // The overlay describes one specific image; it says nothing about the next
+    // scene's basemap, so it does not survive a scene swap.
+    setAiImageOverlay(null);
     setDraftWallPoints([]);
     setRedoStack([]);
     setSelectedId(null);
@@ -206,74 +151,57 @@ export function SceneEditor({
     setTool("select");
     setUndoStack([]);
   }
-
   function switchTool(nextTool: EditorTool) {
     setTool(nextTool);
     setDraftWallPoints([]);
   }
-
   function commit(nextDocument: EditorDocument) {
     setUndoStack((stack) => [...stack, document]);
     setRedoStack([]);
     setDocument(nextDocument);
   }
-
   function undo() {
     const previous = undoStack.at(-1);
-
     if (!previous) {
       return;
     }
-
     setRedoStack((stack) => [...stack, document]);
     setUndoStack((stack) => stack.slice(0, -1));
     setDocument(previous);
     setSelectedId(null);
     setDraftWallPoints([]);
   }
-
   function redo() {
     const next = redoStack.at(-1);
-
     if (!next) {
       return;
     }
-
     setUndoStack((stack) => [...stack, document]);
     setRedoStack((stack) => stack.slice(0, -1));
     setDocument(next);
     setSelectedId(null);
     setDraftWallPoints([]);
   }
-
   function deleteSelected() {
     if (!selectedId) {
       return;
     }
-
     commit(removeEntity(document, selectedId));
     setSelectedId(null);
   }
-
   function pointFromEvent(event: ReactPointerEvent<SVGElement>) {
     const svg = svgRef.current;
-
     if (!svg) {
       return { x: 0, y: 0 };
     }
-
     const point = svg.createSVGPoint();
     const transform = svg.getScreenCTM();
-
     point.x = event.clientX;
     point.y = event.clientY;
-
     if (!transform) {
       return snapPoint({ x: point.x, y: point.y }, gridSize, snapEnabled);
     }
-
     const editorPoint = point.matrixTransform(transform.inverse());
-
     return snapPoint(
       {
         x: clamp(editorPoint.x, 0, baseScene.world.width),
@@ -283,78 +211,62 @@ export function SceneEditor({
       snapEnabled,
     );
   }
-
   function handleCanvasPointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     const point = pointFromEvent(event);
-
     if (tool === "select") {
       setSelectedId(null);
       return;
     }
-
     if (tool === "wall") {
       setDraftWallPoints((points) => [...points, point]);
       return;
     }
-
     if (tool === "zone") {
       commit(addZone(document, point));
       return;
     }
-
     if (tool === "road") {
       commit(addRoad(document, point));
       return;
     }
-
     if (tool === "building") {
       commit(addBuilding(document, point));
       return;
     }
-
     if (tool === "source" || tool === "sink") {
       commit(addEntrance(document, tool, point));
       return;
     }
-
     if (tool === "shop") {
       commit(addShop(document, point));
       return;
     }
-
     if (tool === "transitStop") {
       commit(addTransitStop(document, point));
       return;
     }
-
     if (tool === "counter" || tool === "gate") {
       commit(addServicePoint(document, tool, point));
       return;
     }
-
     if (tool === "obstacle") {
       commit(addObstacle(document, point));
       return;
     }
-
     if (tool === "hazard") {
       commit(addHazard(document, point));
       return;
     }
-
     if (tool === "countLine") {
       commit(addCountLine(document, point));
       return;
     }
-
     commit(addTarget(document, point));
   }
-
   function handleEntityPointerDown(event: ReactPointerEvent<SVGElement>, id: string) {
     if (tool !== "select") {
       return;
     }
-
     event.stopPropagation();
     setSelectedId(id);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -365,95 +277,74 @@ export function SceneEditor({
       moved: false,
     };
   }
-
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
     const drag = dragState.current;
-
     if (!drag) {
       return;
     }
-
     const nextPoint = pointFromEvent(event);
     const delta = {
       x: nextPoint.x - drag.lastPoint.x,
       y: nextPoint.y - drag.lastPoint.y,
     };
-
     if (delta.x === 0 && delta.y === 0) {
       return;
     }
-
     drag.lastPoint = nextPoint;
     drag.moved = true;
     setDocument((current) => moveEntity(current, drag.id, delta));
   }
-
   function handlePointerUp() {
     const drag = dragState.current;
-
     if (!drag) {
       return;
     }
-
     if (drag.moved) {
       setUndoStack((stack) => [...stack, drag.before]);
       setRedoStack([]);
     }
-
     dragState.current = null;
   }
-
   function finishWall() {
     if (draftWallPoints.length < 2) {
       return;
     }
-
     commit(addWall(document, draftWallPoints));
     setDraftWallPoints([]);
     setTool("select");
   }
-
   function selectExampleScene(sceneId: string) {
     const nextScene = selectableScenes.find((candidate) => candidate.id === sceneId);
-
     if (nextScene) {
       replaceScene(nextScene, makeStatus("loadedScene", sceneNameValues(nextScene)));
     }
   }
-
   function saveScene() {
     localStorage.setItem(storageKey, JSON.stringify(currentScene, null, 2));
     setHasSavedScene(true);
     setStorageStatus(makeStatus("savedLocally"));
   }
-
   function loadSavedScene() {
     const stored = localStorage.getItem(storageKey);
-
     if (!stored) {
       setStorageStatus(makeStatus("noSavedScene"));
       return;
     }
-
     try {
       replaceScene(parseScene(JSON.parse(stored)), makeStatus("loadedSavedScene"));
     } catch {
       setStorageStatus(makeStatus("savedSceneInvalid"));
     }
   }
-
   function exportScene() {
     downloadSceneJson(currentScene);
     setStorageStatus(makeStatus("exportedScene"));
   }
-
   async function importScene(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
     if (!file) {
       return;
     }
-
     try {
       replaceScene(
         parseScene(JSON.parse(await file.text())),
@@ -465,14 +356,11 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
-
   async function importGeoJson(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
     if (!file) {
       return;
     }
-
     try {
       replaceScene(
         createSceneFromGeoJson(currentScene, JSON.parse(await file.text())),
@@ -484,26 +372,23 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
-
   async function importBasemap(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-
     if (!file) {
       return;
     }
-
     try {
       const sourceUri = await readFileAsDataUrl(file);
-
       setBaseScene((current) =>
         addImportedBasemap(createSceneFromEditorDocument(current, document), {
           name: file.name,
           sourceUri,
         }),
       );
-      setAiImageOverlayVisible(true);
+      // Nothing has looked at the pixels: the overlay can only report that.
+      setAiImageOverlay(createImportedImageOverlay(file.name));
       setStorageStatus({
-        zh: `底图 ${file.name}`,
+        zh: `搴曞浘 ${file.name}`,
         en: `Basemap ${file.name}`,
       });
     } catch {
@@ -512,177 +397,40 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
-
+  function showTracingFixture() {
+    setAiImageOverlay(createTracingFixtureOverlay(imageTracingFixtures[0].id));
+  }
   function applyAiDraft() {
-    setAiImageOverlayVisible(true);
+    const prompt = aiPrompt.trim();
+    if (!prompt) {
+      setStorageStatus(makeStatus("aiPromptRequired"));
+      return;
+    }
     replaceScene(
-      createLocalSceneAssistantDraft(
-        "mall circulation with two attractive shops, one gate service point, and one count line",
-        currentScene,
-      ),
+      createNaturalLanguageScenePlanDraft(prompt, currentScene).scene,
       makeStatus("aiDraftReady"),
     );
   }
-
-  function updateShopNumber(field: ShopNumberField, value: number) {
-    if (!selectedShop || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentShopNumber(current, selectedShop.id, field, value),
-    );
-  }
-
-  function updateShopSize(field: ShopSizeField, value: number) {
-    if (!selectedShop || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentShopSize(current, selectedShop.id, field, value),
-    );
-  }
-
-  function updateServiceNumber(field: ServiceNumberField, value: number) {
-    if (!selectedServicePoint || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentServiceNumber(current, selectedServicePoint.id, field, value),
-    );
-  }
-
-  function updateRoadNumber(field: RoadNumberField, value: number) {
-    if (!selectedRoad || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentRoadNumber(current, selectedRoad.id, field, value),
-    );
-  }
-
-  function updateRoadDirection(
-    direction: EditorDocument["roads"][number]["direction"],
-  ) {
-    if (!selectedRoad) return;
-    setDocument((current) =>
-      updateDocumentRoadDirection(current, selectedRoad.id, direction),
-    );
-  }
-
-  function toggleRoadBoolean(field: "transitOnly" | "walkable") {
-    if (!selectedRoad) return;
-    setDocument((current) =>
-      toggleDocumentRoadBoolean(current, selectedRoad.id, field),
-    );
-  }
-
-  function updateBuildingNumber(field: BuildingNumberField, value: number) {
-    if (!selectedBuilding || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentBuildingNumber(current, selectedBuilding.id, field, value),
-    );
-  }
-
-  function updateBuildingKind(kind: EditorDocument["buildings"][number]["kind"]) {
-    if (!selectedBuilding) return;
-    setDocument((current) =>
-      updateDocumentBuildingKind(current, selectedBuilding.id, kind),
-    );
-  }
-
-  function updateTransitStopNumber(field: TransitStopNumberField, value: number) {
-    if (!selectedTransitStop || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentTransitStopNumber(current, selectedTransitStop.id, field, value),
-    );
-  }
-
-  function updateTransitStopKind(kind: EditorDocument["transitStops"][number]["kind"]) {
-    if (!selectedTransitStop) return;
-    setDocument((current) =>
-      updateDocumentTransitStopKind(current, selectedTransitStop.id, kind),
-    );
-  }
-
-  function toggleTransitStopActive() {
-    if (!selectedTransitStop) return;
-    setDocument((current) =>
-      toggleDocumentTransitStopActive(current, selectedTransitStop.id),
-    );
-  }
-
-  function updateObstacleNumber(field: ObstacleNumberField, value: number) {
-    if (!selectedObstacle || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentObstacleNumber(current, selectedObstacle.id, field, value),
-    );
-  }
-
-  function updateObstacleKind(kind: EditorDocument["obstacles"][number]["kind"]) {
-    if (!selectedObstacle) return;
-    setDocument((current) =>
-      updateDocumentObstacleKind(current, selectedObstacle.id, kind),
-    );
-  }
-
-  function toggleObstacleBlocksMovement() {
-    if (!selectedObstacle) return;
-    setDocument((current) =>
-      toggleDocumentObstacleBlocksMovement(current, selectedObstacle.id),
-    );
-  }
-
-  function updateHazardNumber(field: HazardNumberField, value: number) {
-    if (!selectedHazard || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentHazardNumber(current, selectedHazard.id, field, value),
-    );
-  }
-
-  function updateHazardKind(kind: EditorDocument["hazards"][number]["kind"]) {
-    if (!selectedHazard) return;
-    setDocument((current) =>
-      updateDocumentHazardKind(current, selectedHazard.id, kind),
-    );
-  }
-
-  function updateZoneNumber(field: ZoneNumberField, value: number) {
-    if (!selectedZone || !Number.isFinite(value)) return;
-    setDocument((current) =>
-      updateDocumentZoneNumber(current, selectedZone.id, field, value),
-    );
-  }
-
-  function updateZoneCategory(category: EditorZoneCategory) {
-    if (selectedZone)
-      setDocument((current) =>
-        updateDocumentZoneCategory(current, selectedZone.id, category),
-      );
-  }
-  function toggleZoneWalkable() {
-    if (selectedZone)
-      setDocument((current) => toggleDocumentZoneWalkable(current, selectedZone.id));
-  }
-  function generateStoresForSelectedZone() {
-    if (!selectedZone) return;
-    const generated = generateStoreLotsForZone(currentScene, selectedZone.id);
-    const count = generated.summary.shopIds.length;
-    replaceScene(generated.scene, {
-      zh: `已生成 ${count} 个店铺`,
-      en: `Generated ${count} stores`,
-    });
-  }
-  function updateBasemap(field: BasemapNumberField, value: number) {
-    if (!activeBasemap || !Number.isFinite(value)) return;
-    setBaseScene((current) =>
-      updateBasemapNumber(current, activeBasemap.id, field, value),
-    );
-  }
-  function toggleBasemap(field: "locked" | "visible") {
-    if (!activeBasemap) return;
-    setBaseScene((current) => toggleBasemapBoolean(current, activeBasemap.id, field));
-  }
-  function toggleViewMode() {
-    setBaseScene((current) =>
-      toggleEditorViewMode(createSceneFromEditorDocument(current, document)),
-    );
-  }
-
+  const paramActions = createSceneEditorParamActions({
+    activeBasemap,
+    currentScene,
+    document,
+    replaceScene,
+    selectedBuilding,
+    selectedHazard,
+    selectedObstacle,
+    selectedRoad,
+    selectedServicePoint,
+    selectedShop,
+    selectedTransitStop,
+    selectedZone,
+    setBaseScene,
+    setDocument,
+  });
   return (
     <SceneEditorLayout
       aiImageOverlay={aiImageOverlay}
+      aiPrompt={aiPrompt}
       basemap={activeBasemap}
       baseScene={baseScene}
       basemapInputRef={basemapInputRef}
@@ -697,49 +445,51 @@ export function SceneEditor({
       language={language}
       liveAgents={visibleLiveAgents}
       onAiDraft={applyAiDraft}
+      onAiPromptChange={setAiPrompt}
       onBasemapImport={importBasemap}
-      onBasemapNumberChange={updateBasemap}
-      onBuildingKindChange={updateBuildingKind}
-      onBuildingNumberChange={updateBuildingNumber}
+      onBasemapNumberChange={paramActions.updateBasemap}
+      onBuildingKindChange={paramActions.updateBuildingKind}
+      onBuildingNumberChange={paramActions.updateBuildingNumber}
       onCanvasPointerDown={handleCanvasPointerDown}
       onDeleteSelected={deleteSelected}
       onEntityPointerDown={handleEntityPointerDown}
       onExportScene={exportScene}
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
-      onGenerateZoneStores={generateStoresForSelectedZone}
-      onHazardKindChange={updateHazardKind}
-      onHazardNumberChange={updateHazardNumber}
+      onGenerateZoneStores={paramActions.generateStoresForSelectedZone}
+      onHazardKindChange={paramActions.updateHazardKind}
+      onHazardNumberChange={paramActions.updateHazardNumber}
       onImportScene={importScene}
       onLoadSavedScene={loadSavedScene}
-      onObstacleKindChange={updateObstacleKind}
-      onObstacleNumberChange={updateObstacleNumber}
+      onObstacleKindChange={paramActions.updateObstacleKind}
+      onObstacleNumberChange={paramActions.updateObstacleNumber}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onRedo={redo}
       onResetDraftWall={() => setDraftWallPoints([])}
-      onRoadDirectionChange={updateRoadDirection}
-      onRoadNumberChange={updateRoadNumber}
+      onRoadDirectionChange={paramActions.updateRoadDirection}
+      onRoadNumberChange={paramActions.updateRoadNumber}
       onSaveScene={saveScene}
       onSceneChange={selectExampleScene}
-      onServiceNumberChange={updateServiceNumber}
-      onShopNumberChange={updateShopNumber}
-      onShopSizeChange={updateShopSize}
-      onToggleZoneWalkable={toggleZoneWalkable}
-      onToggleBasemapLocked={() => toggleBasemap("locked")}
-      onToggleBasemapVisible={() => toggleBasemap("visible")}
-      onToggleEditorViewMode={toggleViewMode}
-      onToggleObstacleBlocksMovement={toggleObstacleBlocksMovement}
-      onToggleRoadTransitOnly={() => toggleRoadBoolean("transitOnly")}
-      onToggleRoadWalkable={() => toggleRoadBoolean("walkable")}
+      onServiceNumberChange={paramActions.updateServiceNumber}
+      onShowTracingFixture={showTracingFixture}
+      onShopNumberChange={paramActions.updateShopNumber}
+      onShopSizeChange={paramActions.updateShopSize}
+      onToggleZoneWalkable={paramActions.toggleZoneWalkable}
+      onToggleBasemapLocked={() => paramActions.toggleBasemap("locked")}
+      onToggleBasemapVisible={() => paramActions.toggleBasemap("visible")}
+      onToggleEditorViewMode={paramActions.toggleViewMode}
+      onToggleObstacleBlocksMovement={paramActions.toggleObstacleBlocksMovement}
+      onToggleRoadTransitOnly={() => paramActions.toggleRoadBoolean("transitOnly")}
+      onToggleRoadWalkable={() => paramActions.toggleRoadBoolean("walkable")}
       onToggleSnap={() => setSnapEnabled((value) => !value)}
-      onToggleTransitStopActive={toggleTransitStopActive}
+      onToggleTransitStopActive={paramActions.toggleTransitStopActive}
       onToolChange={switchTool}
-      onTransitStopKindChange={updateTransitStopKind}
-      onTransitStopNumberChange={updateTransitStopNumber}
+      onTransitStopKindChange={paramActions.updateTransitStopKind}
+      onTransitStopNumberChange={paramActions.updateTransitStopNumber}
       onUndo={undo}
-      onZoneCategoryChange={updateZoneCategory}
-      onZoneNumberChange={updateZoneNumber}
+      onZoneCategoryChange={paramActions.updateZoneCategory}
+      onZoneNumberChange={paramActions.updateZoneNumber}
       selectableScenes={selectableScenes}
       selectedBuilding={selectedBuilding}
       selectedCountLine={selectedCountLine}

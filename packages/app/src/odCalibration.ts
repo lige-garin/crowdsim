@@ -66,7 +66,11 @@ export function fitOdGravityParameters(
   let penaltyLo = PENALTY_LO;
   let penaltyHi = searchPenalty ? PENALTY_HI : 0;
 
-  let best = { distanceDecay: 0, floorChangePenalty: 0, error: Number.POSITIVE_INFINITY };
+  let best = {
+    distanceDecay: 0,
+    floorChangePenalty: 0,
+    error: Number.POSITIVE_INFINITY,
+  };
 
   for (let round = 0; round < rounds; round++) {
     const penaltySteps = searchPenalty ? steps : 0;
@@ -74,7 +78,9 @@ export function fitOdGravityParameters(
       const distanceDecay = decayLo + ((decayHi - decayLo) * i) / steps;
       for (let j = 0; j <= penaltySteps; j++) {
         const floorChangePenalty =
-          penaltySteps > 0 ? penaltyLo + ((penaltyHi - penaltyLo) * j) / penaltySteps : 0;
+          penaltySteps > 0
+            ? penaltyLo + ((penaltyHi - penaltyLo) * j) / penaltySteps
+            : 0;
         const error = odArrivalError(entrances, destinations, observed, {
           distanceDecay,
           floorChangePenalty,

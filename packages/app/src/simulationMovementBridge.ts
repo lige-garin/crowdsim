@@ -32,6 +32,13 @@ type LiveMovementSink = {
 export type SimulationMovementStepInput<TAgent extends LiveMovementAgent> = {
   agents: readonly TAgent[];
   backend: MovementBackend;
+  /**
+   * Whether reaching a sink removes the agent. The bridge cannot see lifecycle
+   * state, so the caller decides; without it a shopper standing at a shop that
+   * happens to sit near an exit (or a newborn at a `bidirectional` gate) would be
+   * counted as having left.
+   */
+  canExit?: (agent: TAgent) => boolean;
   fixedDtSeconds: number;
   sinks: readonly LiveMovementSink[];
   speedMetersPerSecond: number;
@@ -47,6 +54,7 @@ export type SimulationMovementStepResult<TAgent extends LiveMovementAgent> = {
 export async function stepAgentsWithMovementBackend<TAgent extends LiveMovementAgent>({
   agents,
   backend,
+  canExit,
   fixedDtSeconds,
   sinks,
   speedMetersPerSecond,
@@ -57,11 +65,13 @@ export async function stepAgentsWithMovementBackend<TAgent extends LiveMovementA
     return { agents: [], exitedCount: 0 };
   }
 
+  const exits = (agent: TAgent) =>
+    (canExit?.(agent) ?? true) && isAgentAtSink(agent, sinks);
   const activeAgents: TAgent[] = [];
   let exitedCount = 0;
 
   for (const agent of agents) {
-    if (isAgentAtSink(agent, sinks)) {
+    if (exits(agent)) {
       exitedCount++;
     } else {
       activeAgents.push(agent);
@@ -105,7 +115,7 @@ export async function stepAgentsWithMovementBackend<TAgent extends LiveMovementA
       y: resolved.y,
     };
 
-    if (isAgentAtSink(movedAgent, sinks)) {
+    if (exits(movedAgent)) {
       exitedCount++;
       return;
     }

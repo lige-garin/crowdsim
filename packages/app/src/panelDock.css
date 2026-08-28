@@ -47,3 +47,17 @@
   max-height: 320px;
   overflow: auto;
 }
+
+/* Fixture panels build their own hardcoded scenario. The badge is deliberately
+   quiet but always present: an unlabelled fixture panel reads as a finding. */
+.panel-dock-source {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: 8px;
+  background: rgba(126, 176, 215, 0.07);
+  color: #93a6bc;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}

@@ -5,6 +5,7 @@ import {
   createSimulationWorkerClient,
   readSimulationSharedAgents,
   readSimulationSharedMemory,
+  simulationWorkerDisposedMessage,
   writeSimulationSharedMemory,
   type SimulationWorkerLike,
   type SimulationWorkerRequest,
@@ -152,7 +153,41 @@ describe("simulation worker client", () => {
     client.dispose();
     expect(worker.terminated).toBe(true);
   });
+
+  it("rejects requests the terminated worker will never answer", async () => {
+    const worker = new SilentSimulationWorker();
+    const client = createSimulationWorkerClient({ workerFactory: () => worker });
+    const inFlight = client.tick(1 / 60);
+
+    client.dispose();
+
+    // A dropped request never settles, so the caller's `.finally` never runs:
+    // that is the silent freeze this rejection exists to prevent.
+    await expect(inFlight).rejects.toThrow(simulationWorkerDisposedMessage);
+    await expect(client.start()).rejects.toThrow(simulationWorkerDisposedMessage);
+    expect(worker.terminated).toBe(true);
+  });
+
+  it("rejects inline commands issued before init instead of throwing", async () => {
+    const client = createSimulationWorkerClient({ workerFactory: null });
+
+    await expect(client.tick(1 / 60)).rejects.toThrow(
+      "Simulation worker is not initialized",
+    );
+  });
 });
+
+class SilentSimulationWorker implements SimulationWorkerLike {
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  onmessage: ((event: MessageEvent<SimulationWorkerResponse>) => void) | null = null;
+  terminated = false;
+
+  postMessage() {}
+
+  terminate() {
+    this.terminated = true;
+  }
+}
 
 class FakeSimulationWorker implements SimulationWorkerLike {
   messages: SimulationWorkerRequest[] = [];

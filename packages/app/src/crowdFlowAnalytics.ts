@@ -33,10 +33,7 @@ export function crowdFlowAnalytics(
         (browsing.get(agent.selectedStoreId) ?? 0) + 1,
       );
     } else if (agent.lifecycleState === "queue") {
-      queuing.set(
-        agent.selectedStoreId,
-        (queuing.get(agent.selectedStoreId) ?? 0) + 1,
-      );
+      queuing.set(agent.selectedStoreId, (queuing.get(agent.selectedStoreId) ?? 0) + 1);
     }
   }
 

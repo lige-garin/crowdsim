@@ -67,13 +67,7 @@ function LiveWorkspace({
   );
 }
 
-function DemoWorkspace({
-  title,
-  language,
-}: {
-  title: string;
-  language: "zh" | "en";
-}) {
+function DemoWorkspace({ title, language }: { title: string; language: "zh" | "en" }) {
   const workspace = useMemo(() => createDemoProjectWorkspace(), []);
   const quotaLabel = workspace.quota.withinQuota ? "ok" : "blocked";
   const sessionLabel = workspace.authSession.active ? "active" : "expired";

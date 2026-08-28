@@ -29,6 +29,7 @@ export function PanelDock({
           <button
             key={entry.id}
             type="button"
+            data-testid={`panel-chip-${entry.id}`}
             aria-pressed={entry.id === activeId}
             onClick={() =>
               setActiveId((current) => (current === entry.id ? null : entry.id))
@@ -39,7 +40,16 @@ export function PanelDock({
         ))}
       </nav>
       {active ? (
-        <div className="panel-dock-body">{active.render(context)}</div>
+        <div className="panel-dock-body" data-testid="panel-dock-body">
+          {active.dataSource === "fixture" && (
+            <p className="panel-dock-source" data-testid="panel-source-fixture">
+              {language === "zh"
+                ? "样例数据 · 与当前场景和运行无关"
+                : "Sample data - unrelated to the open scene or the live run"}
+            </p>
+          )}
+          {active.render(context)}
+        </div>
       ) : null}
     </section>
   );

@@ -6,7 +6,8 @@
   background:
     radial-gradient(circle at 78% 24%, rgba(47, 208, 255, 0.12), transparent 28%),
     linear-gradient(rgba(120, 160, 220, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(120, 160, 220, 0.04) 1px, transparent 1px), var(--lab-bg);
+    linear-gradient(90deg, rgba(120, 160, 220, 0.04) 1px, transparent 1px),
+    var(--lab-bg);
   background-size:
     auto,
     28px 28px,

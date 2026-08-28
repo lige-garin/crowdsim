@@ -32,10 +32,21 @@ export function createBenchmarkReproducibilityContract(
   };
 }
 
+export type ReproducibilityMismatch = {
+  baselineHash: string;
+  candidateHash: string | null;
+  scenarioId: string;
+};
+
+export type ReproducibilityComparisonResult = {
+  match: boolean;
+  mismatches: ReproducibilityMismatch[];
+};
+
 export function compareReproducibilityContracts(
   baseline: BenchmarkReproducibilityContract,
   candidate: BenchmarkReproducibilityContract,
-) {
+): ReproducibilityComparisonResult {
   const mismatches = Object.entries(baseline.hashes)
     .filter(([scenarioId, hash]) => candidate.hashes[scenarioId] !== hash)
     .map(([scenarioId, hash]) => ({

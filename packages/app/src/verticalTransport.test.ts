@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  computeVerticalRouteCost,
-  type VerticalConnector,
-} from "./verticalTransport";
+import { computeVerticalRouteCost, type VerticalConnector } from "./verticalTransport";
 
 const escalator = (
   id: string,
@@ -59,10 +56,7 @@ describe("computeVerticalRouteCost", () => {
     const result = computeVerticalRouteCost(
       { position: { x: 0, y: 0 }, level: 0 },
       { position: { x: 0, y: 0 }, level: 1 },
-      [
-        escalator("broken", 5, 0, { outOfService: true }),
-        escalator("ok", 40, 0),
-      ],
+      [escalator("broken", 5, 0, { outOfService: true }), escalator("ok", 40, 0)],
     );
     expect(result.connectorId).toBe("ok");
   });

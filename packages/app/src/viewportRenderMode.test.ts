@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { describeViewportRenderMode } from "./viewportRenderMode";
+import {
+  describeViewportRenderMode,
+  describeViewportUnsupported,
+} from "./viewportRenderMode";
 
 describe("describeViewportRenderMode (ADR-0006 mode badge)", () => {
   it("labels the full GPU path without a caveat", () => {
@@ -26,5 +29,28 @@ describe("describeViewportRenderMode (ADR-0006 mode badge)", () => {
   it("shows no badge while detecting or when WebGPU is unsupported", () => {
     expect(describeViewportRenderMode("detecting", "zh")).toBeNull();
     expect(describeViewportRenderMode("unsupported", "en")).toBeNull();
+  });
+});
+
+describe("describeViewportUnsupported (blocking notice copy)", () => {
+  it("names the cause, what still works, and the requirement in both languages", () => {
+    for (const language of ["zh", "en"] as const) {
+      const copy = describeViewportUnsupported(language);
+
+      for (const value of Object.values(copy)) {
+        expect(value.trim().length).toBeGreaterThan(0);
+      }
+
+      expect(copy.reason).toMatch(/WebGPU/);
+      expect(copy.requirement).toMatch(/113|18/);
+    }
+  });
+
+  it("keeps the two languages distinct so neither falls back to the other", () => {
+    const zh = describeViewportUnsupported("zh");
+    const en = describeViewportUnsupported("en");
+
+    expect(zh.title).not.toEqual(en.title);
+    expect(zh.stillWorks).not.toEqual(en.stillWorks);
   });
 });

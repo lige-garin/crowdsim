@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
-import { AppInspector } from "./AppInspector";
-import { AppSidebar } from "./AppSidebar";
-import { AppStage } from "./AppStage";
-import { PanelDock } from "./PanelDock";
+import { AppWorkbench } from "./AppWorkbench";
 import type { EvacuationState, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
+import { createBioCityTopbarMetrics } from "./appTopbarMetrics";
 import { createDashboardStats, type DashboardSample } from "./dashboardStats";
 import { createDashboardV2Stats } from "./dashboardV2Stats";
 import { bioCityDemoScene as demoScene } from "./bioCityDemoScene";
@@ -23,10 +21,13 @@ import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { usesWorkerSimulationPath } from "./simulationThread";
-import { crowdFlowAnalytics } from "./crowdFlowAnalytics";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
-import { bioCityStudioTitle, bioCityTopbarMetricText } from "./bioCityUiContract";
-
+import type { EditorTool } from "./sceneEditorState";
+import {
+  defaultViewportLayers,
+  toggleViewportLayer,
+  type ViewportLayerId,
+} from "./viewportLayers";
 export function App() {
   return (
     <I18nProvider>
@@ -34,9 +35,7 @@ export function App() {
     </I18nProvider>
   );
 }
-
 type RuntimeArtifact = ReturnType<typeof createLiveSimulationRuntimeArtifact>;
-
 function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
   return (
     left.decisionBackend === right.decisionBackend &&
@@ -47,7 +46,6 @@ function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
     left.thread === right.thread
   );
 }
-
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
   const probes = useAppProbes();
@@ -64,7 +62,7 @@ function AppContent() {
   const forceMainSim =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("mainsim");
-  // Pick the simulation path from the stable ?mainsim flag only — never from the
+  // Pick the simulation path from the stable ?mainsim flag only, never from the
   // async WebGPU probe. Gating on webGpuMovementBackend.backend flipped the path
   // worker -> main the moment the probe resolved, abandoning the running worker
   // sim for a never-started main engine: the "empty city" bug on WebGPU machines.
@@ -102,7 +100,9 @@ function AppContent() {
     }),
   );
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
-  const [showHome, setShowHome] = useState(false);
+  const [editorTool, setEditorTool] = useState<EditorTool>("select");
+  const [layers, setLayers] = useState(defaultViewportLayers);
+  const [showHome, setShowHome] = useState(true);
   const [viewMode, setViewMode] = useState<StageViewMode>("3d");
   const [evacuation, setEvacuation] = useState<EvacuationState>({
     active: false,
@@ -172,11 +172,9 @@ function AppContent() {
       }),
     [dashboardStats, evacuation, heatmapSamples, currentRuntime, simulation.snapshot],
   );
-
   useEffect(() => {
     simulationSnapshotRef.current = simulation.snapshot;
   }, [simulation.snapshot]);
-
   // Auto-start the demo so opening the workbench shows a live crowd instead of
   // an empty city. Retries until the worker is ready, runs once, and never
   // fights a manual pause.
@@ -194,18 +192,15 @@ function AppContent() {
     const intervalId = window.setInterval(() => startSimulation(), 400);
     return () => window.clearInterval(intervalId);
   }, [simulationStatus, startSimulation]);
-
   useEffect(() => {
     if (!evacuation.active) {
       return;
     }
-
     const intervalId = window.setInterval(() => {
       setEvacuation((current) => {
         if (!current.active) {
           return current;
         }
-
         const snapshot = simulationSnapshotRef.current;
         const point = {
           elapsedSeconds: snapshot.elapsedSeconds - current.startedAtSeconds,
@@ -213,42 +208,34 @@ function AppContent() {
           remaining: snapshot.agentCount,
         };
         const lastPoint = current.curve.at(-1);
-
         if (
           lastPoint &&
           Math.floor(lastPoint.elapsedSeconds) === Math.floor(point.elapsedSeconds)
         ) {
           return current;
         }
-
         return {
           ...current,
           curve: [...current.curve, point].slice(-20),
         };
       });
     }, 1000);
-
     return () => window.clearInterval(intervalId);
   }, [evacuation.active]);
-
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       const snapshot = simulationSnapshotRef.current;
-
       if (snapshot.status !== "running") {
         return;
       }
-
       setHeatmapSamples((samples) => {
         const lastSample = samples.at(-1);
-
         if (
           lastSample &&
           Math.floor(lastSample.elapsedSeconds) === Math.floor(snapshot.elapsedSeconds)
         ) {
           return samples;
         }
-
         return [
           ...samples,
           {
@@ -261,17 +248,14 @@ function AppContent() {
           },
         ].slice(-120);
       });
-
       setDashboardSamples((samples) => {
         const lastSample = samples.at(-1);
-
         if (
           lastSample &&
           Math.floor(lastSample.elapsedSeconds) === Math.floor(snapshot.elapsedSeconds)
         ) {
           return samples;
         }
-
         return [
           ...samples,
           {
@@ -281,7 +265,6 @@ function AppContent() {
           },
         ].slice(-120);
       });
-
       setTrajectoryRecording((recording) =>
         appendTrajectoryFrame(
           sameRuntime(recording.runtime, currentRuntime)
@@ -296,10 +279,8 @@ function AppContent() {
         ),
       );
     }, 1000);
-
     return () => window.clearInterval(intervalId);
   }, [currentRuntime]);
-
   function resetSimulation() {
     simulation.reset();
     setDashboardSamples([
@@ -319,12 +300,10 @@ function AppContent() {
       }),
     );
   }
-
   async function triggerEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.triggerEvacuation();
     const snapshot = simulation.snapshot;
     const flowPlan = createEvacuationFlowPlan(demoScene, snapshot.agents);
-
     simulation.setEvacuation(true);
     simulation.start();
     setEvacuation({
@@ -342,10 +321,8 @@ function AppContent() {
       startedAtSeconds: snapshot.elapsedSeconds,
     });
   }
-
   async function clearEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.reset();
-
     simulation.setEvacuation(false);
     setEvacuation({
       active: behaviorMode.active,
@@ -356,7 +333,6 @@ function AppContent() {
       startedAtSeconds: simulation.snapshot.elapsedSeconds,
     });
   }
-
   const heatmapValue =
     heatmapCells.length > 0
       ? `${heatmapCells.length} ${t("cells")} / ${heatmapWindowSeconds}s`
@@ -396,57 +372,20 @@ function AppContent() {
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
   // Heuristic estimates, NOT measured (SP-5b honesty), but grounded in the real
-  // crowd: satisfaction drops with congestion (live queueing + density);
-  // commercial forecast rises with shoppers actually browsing stores. Surfaced
-  // as "Sales (est.) / Satisfaction (est.)" in the topbar.
-  const crowdFlow = crowdFlowAnalytics(simulation.snapshot.agents, demoScene.shops);
-  const satisfactionScore = Math.max(
-    60,
-    Math.min(
-      98,
-      94 - densityPeak * 2 - crowdFlow.totalQueuing * 0.5 - (evacuation.active ? 8 : 0),
-    ),
-  );
-  const commercialForecast = Math.round(
-    80 +
-      crowdFlow.totalShopping * 1.5 +
-      dashboardV2Stats.brandAttractionPercent * 0.5 +
-      densityPeak * 1.1,
-  );
-  const topbarLabels = bioCityTopbarMetricText.map((item) => item[language]);
-  const bioCityTopbarMetrics = [
-    {
-      label: topbarLabels[0],
-      state: simulation.snapshot.status,
-      value: runState,
-    },
-    {
-      label: topbarLabels[1],
-      value: `${Math.floor(simulation.snapshot.elapsedSeconds)}s`,
-    },
-    { label: topbarLabels[2], value: language === "zh" ? "雨 / 风" : "Rain / wind" },
-    {
-      label: topbarLabels[3],
-      value: simulation.snapshot.agentCount.toLocaleString(),
-    },
-    {
-      label: topbarLabels[4],
-      value: simulation.snapshot.spawnedCount.toLocaleString(),
-    },
-    {
-      label: topbarLabels[5],
-      value:
-        language === "zh" ? `¥${commercialForecast}千` : `CNY ${commercialForecast}k`,
-    },
-    { label: topbarLabels[6], value: `${satisfactionScore}%` },
-    { label: topbarLabels[7], value: "WASM + SAB" },
-  ] as const;
-
+  const bioCityTopbarMetrics = createBioCityTopbarMetrics({
+    brandAttractionPercent: dashboardV2Stats.brandAttractionPercent,
+    densityPeak,
+    evacuationActive: evacuation.active,
+    language,
+    runState,
+    runtime: currentRuntime,
+    scene: demoScene,
+    snapshot: simulation.snapshot,
+  });
   function enterLab(nextViewMode: StageViewMode = viewMode) {
     setViewMode(nextViewMode);
     setShowHome(false);
   }
-
   if (showHome) {
     return (
       <>
@@ -464,124 +403,94 @@ function AppContent() {
       </>
     );
   }
-
   return (
     <>
       <a className="skip-link" href="#main-content">
         {language === "zh" ? "跳到主内容" : "Skip to main content"}
       </a>
-      <main id="main-content" className="workspace">
-        <header className="command-bar biocity-topbar" aria-label={bioCityStudioTitle}>
-          <div className="command-brand">
-            <span>BioCity</span>
-            <strong>{bioCityStudioTitle}</strong>
-            <select className="biocity-project-select" aria-label="BioCity project">
-              <option>{formatSceneName(demoScene, language)}</option>
-            </select>
-            <button
-              type="button"
-              className="command-home"
-              onClick={() => setShowHome(true)}
-            >
-              {language === "zh" ? "首页" : "Home"}
-            </button>
-          </div>
-          <div
-            className="command-status biocity-ops-status"
-            aria-label="BioCity operating status"
-          >
-            {bioCityTopbarMetrics.map((metric) => (
-              <article key={metric.label}>
-                <span>{metric.label}</span>
-                <strong data-state={"state" in metric ? metric.state : undefined}>
-                  {metric.value}
-                </strong>
-              </article>
-            ))}
-          </div>
-          <div className="command-status" aria-label={t("systemSignals")}>
-            <article>
-              <span>{language === "zh" ? "运行" : "Runtime"}</span>
-              <strong data-state={simulation.snapshot.status}>{runState}</strong>
-            </article>
-            <article>
-              <span>WebGPU</span>
-              <strong>{probes.webGpuProbe.status}</strong>
-            </article>
-            <article>
-              <span>{language === "zh" ? "内核" : "Kernel"}</span>
-              <strong>WASM + SAB</strong>
-            </article>
-            <article>
-              <span>{language === "zh" ? "证据" : "Evidence"}</span>
-              <strong>{language === "zh" ? "已验证" : "Verified"}</strong>
-            </article>
-          </div>
-        </header>
-        <AppSidebar
-          agentCount={simulation.snapshot.agentCount}
-          exitedCount={simulation.snapshot.exitedCount}
-          heatmapWindowSeconds={heatmapWindowSeconds}
-          language={language}
-          onClearEvacuation={() => void clearEvacuation()}
-          onEvacuate={() => void triggerEvacuation()}
-          onHeatmapWindowChange={setHeatmapWindowSeconds}
-          onPause={simulation.pause}
-          onReset={resetSimulation}
-          onSetLanguage={setLanguage}
-          onSetTimeScale={simulation.setTimeScale}
-          onStart={simulation.start}
-          simulationStatus={simulation.snapshot.status}
-          spawnedCount={simulation.snapshot.spawnedCount}
-          t={t}
-          timeScale={simulation.snapshot.timeScale}
-        />
-        <AppStage
-          heatmapCells={heatmapCells}
-          language={language}
-          onViewModeChange={setViewMode}
-          scene={demoScene}
-          sharedAgentOverlay={
-            simulation === workerSimulation
-              ? workerSimulation.worker.sharedAgentOverlay
-              : undefined
-          }
-          simulationSnapshot={simulation.snapshot}
-          runtime={currentRuntime}
-          t={t}
-          viewMode={viewMode}
-        />
-        <AppInspector
-          agentStateProbe={probes.agentStateProbe}
-          dashboardStats={dashboardStats}
-          dashboardV2Stats={dashboardV2Stats}
-          discreteEventProbe={probes.discreteEventProbe}
-          elapsedSeconds={simulation.snapshot.elapsedSeconds}
-          evacuation={evacuation}
-          flowFieldProbe={probes.flowFieldProbe}
-          gridProbe={probes.gridProbe}
-          heatmapCells={heatmapCells}
-          heatmapProbe={probes.heatmapProbe}
-          queueSystemProbe={probes.queueSystemProbe}
-          scene={demoScene}
-          shopDecisionProbe={probes.shopDecisionProbe}
-          signals={signals}
-          simulationCredibility={simulationCredibility}
-          socialForceProbe={probes.socialForceProbe}
-          trajectoryRecording={trajectoryRecording}
-          webGpuProbe={probes.webGpuProbe}
-        />
-        <PanelDock
-          language={language}
-          context={{
+      <div id="main-content">
+        <AppWorkbench
+          inspectorProps={{
+            agentStateProbe: probes.agentStateProbe,
+            dashboardStats,
+            dashboardV2Stats,
+            discreteEventProbe: probes.discreteEventProbe,
+            elapsedSeconds: simulation.snapshot.elapsedSeconds,
+            evacuation,
+            flowFieldProbe: probes.flowFieldProbe,
+            gridProbe: probes.gridProbe,
+            heatmapCells,
+            heatmapProbe: probes.heatmapProbe,
+            queueSystemProbe: probes.queueSystemProbe,
+            scene: demoScene,
+            shopDecisionProbe: probes.shopDecisionProbe,
+            signals,
+            simulationCredibility,
+            socialForceProbe: probes.socialForceProbe,
             trajectoryRecording,
-            brandInsight:
-              probes.shopDecisionProbe.status === "ready"
-                ? probes.shopDecisionProbe.brandInsight
-                : undefined,
+            webGpuProbe: probes.webGpuProbe,
           }}
+          language={language}
+          onHome={() => setShowHome(true)}
+          panelDockProps={{
+            context: {
+              brandInsight:
+                probes.shopDecisionProbe.status === "ready"
+                  ? probes.shopDecisionProbe.brandInsight
+                  : undefined,
+              trajectoryRecording,
+            },
+            language,
+          }}
+          runState={runState}
+          runtime={currentRuntime}
+          sceneName={formatSceneName(demoScene, language)}
+          sidebarProps={{
+            agentCount: simulation.snapshot.agentCount,
+            editorTool,
+            exitedCount: simulation.snapshot.exitedCount,
+            heatmapWindowSeconds,
+            language,
+            layers,
+            onClearEvacuation: () => void clearEvacuation(),
+            onEditorToolChange: setEditorTool,
+            onEvacuate: () => void triggerEvacuation(),
+            onHeatmapWindowChange: setHeatmapWindowSeconds,
+            onPause: simulation.pause,
+            onReset: resetSimulation,
+            onSetLanguage: setLanguage,
+            onSetTimeScale: simulation.setTimeScale,
+            onStart: simulation.start,
+            onToggleLayer: (layer: ViewportLayerId) =>
+              setLayers((current) => toggleViewportLayer(current, layer)),
+            simulationStatus: simulation.snapshot.status,
+            spawnedCount: simulation.snapshot.spawnedCount,
+            t,
+            timeScale: simulation.snapshot.timeScale,
+          }}
+          simulationStatus={simulation.snapshot.status}
+          stageProps={{
+            editorTool,
+            heatmapCells,
+            language,
+            layers,
+            onEditorToolChange: setEditorTool,
+            onViewModeChange: setViewMode,
+            runtime: currentRuntime,
+            scene: demoScene,
+            sharedAgentOverlay:
+              simulation === workerSimulation
+                ? workerSimulation.worker.sharedAgentOverlay
+                : undefined,
+            simulationSnapshot: simulation.snapshot,
+            t,
+            viewMode,
+          }}
+          t={t}
+          topbarMetrics={bioCityTopbarMetrics}
+          webGpuStatus={probes.webGpuProbe.status}
         />
-      </main>
+      </div>
     </>
   );
 }

@@ -52,9 +52,20 @@ const copy = {
 
 export function ContactNetworkView({ network }: { network: CrowdContactNetwork }) {
   const { language } = useI18n();
+  const positionedNodes = useMemo(() => positionContactNodes(network), [network]);
   const nodeById = useMemo(
-    () => new Map(network.nodes.map((node) => [node.id, node])),
-    [network.nodes],
+    () => new Map(positionedNodes.map((node) => [node.id, node])),
+    [positionedNodes],
+  );
+  const labeledLinks = useMemo(
+    () =>
+      new Set(
+        [...network.links]
+          .sort((left, right) => right.strength - left.strength)
+          .slice(0, 6)
+          .map((link) => link.id),
+      ),
+    [network.links],
   );
 
   return (
@@ -101,36 +112,43 @@ export function ContactNetworkView({ network }: { network: CrowdContactNetwork }
                 <g key={link.id}>
                   <line
                     className="contact-edge"
-                    x1={source.xPercent}
-                    x2={target.xPercent}
-                    y1={source.yPercent}
-                    y2={target.yPercent}
+                    x1={source.x}
+                    x2={target.x}
+                    y1={source.y}
+                    y2={target.y}
                     stroke={kindColor[link.kind]}
                     style={{ strokeWidth: 0.3 + link.strength * 1.2, opacity: 0.55 }}
                   />
-                  <text
-                    className="contact-edge-label"
-                    x={(source.xPercent + target.xPercent) / 2}
-                    y={(source.yPercent + target.yPercent) / 2 - 1.1}
-                  >
-                    {kindLabel[link.kind][language]}
-                  </text>
+                  {labeledLinks.has(link.id) && (
+                    <text
+                      className="contact-edge-label"
+                      x={(source.x + target.x) / 2}
+                      y={(source.y + target.y) / 2 - 1.1}
+                    >
+                      {kindLabel[link.kind][language]}
+                    </text>
+                  )}
                 </g>
               );
             })}
           </g>
           <g className="contact-network-nodes">
-            {network.nodes.map((node) => {
+            {positionedNodes.map((node) => {
               const color = stateColor[node.state] ?? "#4d8cff";
               return (
                 <g
                   key={node.id}
                   className="contact-node"
-                  transform={`translate(${node.xPercent} ${node.yPercent})`}
+                  transform={`translate(${node.x} ${node.y})`}
                 >
-                  <circle className="contact-node-halo" r={4} fill={color} opacity={0.16} />
-                  <circle className="contact-node-core" r={2.1} fill={color} />
-                  <text y={6}>
+                  <circle
+                    className="contact-node-halo"
+                    r={5.8}
+                    fill={color}
+                    opacity={0.16}
+                  />
+                  <circle className="contact-node-core" r={2.7} fill={color} />
+                  <text y={8.2}>
                     {node.label} · {stateLabel[node.state]?.[language] ?? node.state}
                   </text>
                 </g>
@@ -149,6 +167,54 @@ export function ContactNetworkView({ network }: { network: CrowdContactNetwork }
   );
 }
 
+type PositionedContactNode = CrowdContactNetwork["nodes"][number] & {
+  degree: number;
+  x: number;
+  y: number;
+};
+
+function positionContactNodes(network: CrowdContactNetwork): PositionedContactNode[] {
+  const degreeById = new Map(network.nodes.map((node) => [node.id, 0]));
+
+  for (const link of network.links) {
+    degreeById.set(link.source, (degreeById.get(link.source) ?? 0) + 1);
+    degreeById.set(link.target, (degreeById.get(link.target) ?? 0) + 1);
+  }
+
+  const sorted = [...network.nodes].sort((left, right) => {
+    const degreeDelta =
+      (degreeById.get(right.id) ?? 0) - (degreeById.get(left.id) ?? 0);
+    return degreeDelta || left.id.localeCompare(right.id);
+  });
+
+  return sorted.map((node, index) => {
+    const degree = degreeById.get(node.id) ?? 0;
+    if (index === 0) {
+      return { ...node, degree, x: 50, y: 52 };
+    }
+
+    const ringIndex = index - 1;
+    const innerCount = Math.min(6, sorted.length - 1);
+    const outerCount = Math.max(1, sorted.length - 1 - innerCount);
+    const inner = ringIndex < innerCount;
+    const slot = inner ? ringIndex : ringIndex - innerCount;
+    const count = inner ? innerCount : outerCount;
+    const angle = -Math.PI / 2 + (slot / count) * Math.PI * 2 + (inner ? 0 : 0.28);
+    const radius = inner ? 31 : 42;
+
+    return {
+      ...node,
+      degree,
+      x: clampNetworkCoord(50 + Math.cos(angle) * radius, 9, 91),
+      y: clampNetworkCoord(52 + Math.sin(angle) * radius * 0.78, 12, 89),
+    };
+  });
+}
+
+function clampNetworkCoord(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function NetworkStat({ label, value }: { label: string; value: number }) {
   return (
     <article>
@@ -161,10 +227,7 @@ function NetworkStat({ label, value }: { label: string; value: number }) {
 function LegendItem({ color, label }: { color: string; label: string }) {
   return (
     <span>
-      <i
-        className="contact-legend-line"
-        style={{ background: color }}
-      />
+      <i className="contact-legend-line" style={{ background: color }} />
       {label}
     </span>
   );

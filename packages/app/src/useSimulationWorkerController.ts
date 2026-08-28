@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import {
   createSimulationSharedMemory,
@@ -55,6 +63,35 @@ export function useSimulationWorkerController(
       sharedMetrics: readMetrics(sharedMemoryRef.current),
     }));
   }, []);
+  /**
+   * Every command is fire-and-forget from the UI, so a rejected request has
+   * nowhere to surface except here. Results from a client that has since been
+   * replaced (scene change, StrictMode remount) are dropped rather than reported:
+   * disposing that client is what rejected them.
+   */
+  const runCommand = useCallback(
+    (command: (client: SimulationWorkerClient) => Promise<SimulationSnapshot>) => {
+      const client = clientRef.current;
+
+      if (!client) {
+        return;
+      }
+
+      command(client).then(
+        (nextSnapshot) => {
+          if (clientRef.current === client) {
+            publish(nextSnapshot);
+          }
+        },
+        (error: unknown) => {
+          if (clientRef.current === client) {
+            reportWorkerError(setWorker, error);
+          }
+        },
+      );
+    },
+    [publish],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +140,13 @@ export function useSimulationWorkerController(
 
     return () => {
       cancelled = true;
+      // Clear the ref before disposing: dispose rejects the in-flight requests,
+      // and those handlers use the ref to tell "my client" from "the client that
+      // replaced me".
+      if (clientRef.current === currentClient) {
+        clientRef.current = undefined;
+      }
+
       currentClient.dispose();
     };
   }, [scene]);
@@ -135,11 +179,20 @@ export function useSimulationWorkerController(
       tickInFlightRef.current = true;
       void client
         .tick(deltaSeconds)
-        .then((nextSnapshot) => {
-          if (!cancelled) {
-            publish(nextSnapshot);
-          }
-        })
+        .then(
+          (nextSnapshot) => {
+            if (!cancelled) {
+              publish(nextSnapshot);
+            }
+          },
+          (error: unknown) => {
+            // A tick that fails on a live client is a real failure; one that
+            // fails because its client was disposed is just the scene changing.
+            if (!cancelled && clientRef.current === client) {
+              reportWorkerError(setWorker, error);
+            }
+          },
+        )
         .finally(() => {
           tickInFlightRef.current = false;
         });
@@ -174,30 +227,30 @@ export function useSimulationWorkerController(
 
   const start = useCallback(() => {
     lastFrameAtRef.current = null;
-    void clientRef.current?.start().then(publish);
-  }, [publish]);
+    runCommand((client) => client.start());
+  }, [runCommand]);
 
   const pause = useCallback(() => {
-    void clientRef.current?.pause().then(publish);
-  }, [publish]);
+    runCommand((client) => client.pause());
+  }, [runCommand]);
 
   const reset = useCallback(() => {
     lastFrameAtRef.current = null;
-    void clientRef.current?.reset().then(publish);
-  }, [publish]);
+    runCommand((client) => client.reset());
+  }, [runCommand]);
 
   const setTimeScale = useCallback(
     (timeScale: number) => {
-      void clientRef.current?.setTimeScale(timeScale).then(publish);
+      runCommand((client) => client.setTimeScale(timeScale));
     },
-    [publish],
+    [runCommand],
   );
 
   const setEvacuation = useCallback(
     (active: boolean) => {
-      void clientRef.current?.setEvacuation(active).then(publish);
+      runCommand((client) => client.setEvacuation(active));
     },
-    [publish],
+    [runCommand],
   );
 
   return {
@@ -211,6 +264,17 @@ export function useSimulationWorkerController(
   };
 }
 
+function reportWorkerError(
+  setWorker: Dispatch<SetStateAction<SimulationWorkerControllerState>>,
+  error: unknown,
+) {
+  setWorker((current) => ({
+    ...current,
+    message: error instanceof Error ? error.message : "Simulation worker failed",
+    status: "error",
+  }));
+}
+
 function readMetrics(sharedMemory: SimulationWorkerSharedMemory | undefined) {
   return sharedMemory ? readSimulationSharedMemory(sharedMemory) : undefined;
 }
@@ -220,7 +284,7 @@ function readAgentSample(sharedMemory: SimulationWorkerSharedMemory | undefined)
     return undefined;
   }
 
-  const frame = readSimulationSharedAgents(sharedMemory, 240);
+  const frame = readSimulationSharedAgents(sharedMemory);
 
   return {
     firstAgentId: frame.agents[0]?.id ?? null,
@@ -229,8 +293,16 @@ function readAgentSample(sharedMemory: SimulationWorkerSharedMemory | undefined)
   };
 }
 
+/**
+ * Live agent positions for the viewport.
+ *
+ * This used to pass an explicit `limit` of 240 while the shared buffer holds
+ * 2,000 agents and the HUD printed `snapshot.agentCount` — so the readout said
+ * 1,800 while the viewport drew 240 people. Reading the whole frame (the
+ * default limit is the buffer capacity) makes the number and the picture agree.
+ */
 function readAgentOverlay(sharedMemory: SimulationWorkerSharedMemory | undefined) {
-  return sharedMemory ? readSimulationSharedAgents(sharedMemory, 240) : undefined;
+  return sharedMemory ? readSimulationSharedAgents(sharedMemory) : undefined;
 }
 
 function createEmptySnapshot(): SimulationSnapshot {

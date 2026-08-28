@@ -14,7 +14,8 @@ import type { StageViewMode } from "./AppTypes";
 import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
-import { bioCityLayerText } from "./bioCityUiContract";
+import type { EditorTool } from "./sceneEditorState";
+import type { ViewportLayers } from "./viewportLayers";
 
 const SimulationViewport = lazy(() =>
   import("./SimulationViewport").then((module) => ({
@@ -23,8 +24,11 @@ const SimulationViewport = lazy(() =>
 );
 
 type AppStageProps = {
+  editorTool: EditorTool;
   heatmapCells: readonly HeatmapCell[];
   language: Language;
+  layers: ViewportLayers;
+  onEditorToolChange: (tool: EditorTool) => void;
   onViewModeChange: (viewMode: StageViewMode) => void;
   scene: CrowdSimScene;
   sharedAgentOverlay?: ViewportAgentOverlayFrame;
@@ -35,8 +39,11 @@ type AppStageProps = {
 };
 
 export function AppStage({
+  editorTool,
   heatmapCells,
   language,
+  layers,
+  onEditorToolChange,
   onViewModeChange,
   scene,
   sharedAgentOverlay,
@@ -63,6 +70,14 @@ export function AppStage({
       value: `${runtime.thread}/${runtime.sharedMemory}`,
     },
   ];
+
+  // The rail shows progress through a rolling hour rather than pretending to
+  // know a wall-clock start time.
+  const elapsedWindowSeconds = 3600;
+  const elapsedFraction = Math.min(
+    1,
+    Math.max(0, simulationSnapshot.elapsedSeconds / elapsedWindowSeconds),
+  );
 
   return (
     <section className="stage" aria-label={t("simulationViewport")}>
@@ -110,38 +125,48 @@ export function AppStage({
             >
               <SimulationViewport
                 heatmapCells={heatmapCells}
+                layers={layers}
                 scene={scene}
                 sharedAgentOverlay={sharedAgentOverlay}
                 snapshot={simulationSnapshot}
                 viewMode={viewMode}
               />
             </Suspense>
-            <div className="biocity-timeline" aria-label="BioCity simulation timeline">
-              <div className="biocity-layer-toggles" aria-label="BioCity layers">
-                {bioCityLayerText.map((layer) => (
-                  <label key={layer.en}>
-                    <input type="checkbox" checked readOnly />
-                    <span>{layer[language]}</span>
-                  </label>
-                ))}
-              </div>
+            {/*
+              This strip used to hold five permanently-ticked readOnly
+              checkboxes and a readOnly range input labelled "05/20 06:00",
+              none of which controlled anything. Layer toggles moved to the
+              workspace palette where they really work; what remains is an
+              honest, non-interactive elapsed readout. Scrubbing needs
+              trajectory replay, which the live loop does not have yet.
+            */}
+            <div
+              className="biocity-timeline"
+              aria-label={language === "zh" ? "仿真时钟" : "Simulation clock"}
+            >
               <div className="biocity-time-rail">
-                <span>05/20 06:00</span>
-                <input
-                  aria-label="Simulation timeline"
-                  max={3600}
-                  min={0}
-                  readOnly
-                  type="range"
-                  value={Math.min(3600, simulationSnapshot.elapsedSeconds)}
-                />
+                <span>{language === "zh" ? "已运行" : "Elapsed"}</span>
+                <div
+                  className="biocity-time-progress"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={elapsedWindowSeconds}
+                  aria-valuenow={Math.min(
+                    elapsedWindowSeconds,
+                    Math.floor(simulationSnapshot.elapsedSeconds),
+                  )}
+                >
+                  <span style={{ width: `${elapsedFraction * 100}%` }} />
+                </div>
                 <span>{formatSimulationClock(simulationSnapshot.elapsedSeconds)}</span>
               </div>
             </div>
             <SceneEditor
               heatmapCells={heatmapCells}
+              onToolChange={onEditorToolChange}
               scene={scene}
               simulationSnapshot={simulationSnapshot}
+              tool={editorTool}
             />
           </>
         )}

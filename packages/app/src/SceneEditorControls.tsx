@@ -10,21 +10,21 @@ import {
 import type { EditorTool } from "./sceneEditorState";
 
 const TOOL_GLYPH: Record<EditorTool, string> = {
-  select: "⬚",
-  road: "🛣️",
-  zone: "▦",
-  wall: "🧱",
-  building: "🏢",
-  source: "🟢",
-  sink: "🔴",
-  target: "🎯",
-  shop: "🏪",
-  transitStop: "🚌",
-  counter: "🧾",
-  gate: "🚪",
-  obstacle: "⛔",
-  hazard: "⚠️",
-  countLine: "📊",
+  select: "SE",
+  road: "RD",
+  zone: "ZN",
+  wall: "WL",
+  building: "BL",
+  source: "IN",
+  sink: "EX",
+  target: "TG",
+  shop: "SH",
+  transitStop: "BU",
+  counter: "CT",
+  gate: "GT",
+  obstacle: "OB",
+  hazard: "HZ",
+  countLine: "CL",
 };
 
 type DocumentCounts = {
@@ -43,6 +43,7 @@ type DocumentCounts = {
 };
 
 type SceneEditorControlsProps = {
+  aiPrompt: string;
   baseSceneId: string;
   basemapInputRef: RefObject<HTMLInputElement | null>;
   canDelete: boolean;
@@ -54,6 +55,7 @@ type SceneEditorControlsProps = {
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   language: Language;
   onAiDraft: () => void;
+  onAiPromptChange: (value: string) => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeleteSelected: () => void;
   onExportScene: () => void;
@@ -63,6 +65,7 @@ type SceneEditorControlsProps = {
   onRedo: () => void;
   onSaveScene: () => void;
   onSceneChange: (sceneId: string) => void;
+  onShowTracingFixture: () => void;
   onToggleSnap: () => void;
   onToggleEditorViewMode: () => void;
   onToolChange: (tool: EditorTool) => void;
@@ -79,6 +82,7 @@ type SceneEditorControlsProps = {
 };
 
 export function SceneEditorControls({
+  aiPrompt,
   baseSceneId,
   basemapInputRef,
   canDelete,
@@ -90,6 +94,7 @@ export function SceneEditorControls({
   geoJsonInputRef,
   language,
   onAiDraft,
+  onAiPromptChange,
   onBasemapImport,
   onDeleteSelected,
   onExportScene,
@@ -99,6 +104,7 @@ export function SceneEditorControls({
   onRedo,
   onSaveScene,
   onSceneChange,
+  onShowTracingFixture,
   onToggleSnap,
   onToggleEditorViewMode,
   onToolChange,
@@ -148,6 +154,19 @@ export function SceneEditorControls({
         <button type="button" onClick={() => basemapInputRef.current?.click()}>
           {t("basemap")}
         </button>
+        <button type="button" onClick={onShowTracingFixture}>
+          {t("imageTracingDemo")}
+        </button>
+        <label>
+          <span className="visually-hidden">{t("aiPrompt")}</span>
+          <input
+            aria-label={t("aiPrompt")}
+            type="text"
+            value={aiPrompt}
+            placeholder={t("aiPromptPlaceholder")}
+            onChange={(event) => onAiPromptChange(event.target.value)}
+          />
+        </label>
         <button type="button" onClick={onAiDraft}>
           {t("aiDraft")}
         </button>
@@ -180,6 +199,7 @@ export function SceneEditorControls({
             type="button"
             key={toolId}
             className="editor-tool"
+            data-testid={`editor-tool-${toolId}`}
             aria-pressed={tool === toolId}
             onClick={() => onToolChange(toolId)}
           >
@@ -199,7 +219,7 @@ export function SceneEditorControls({
           onClick={onToggleSnap}
         >
           <span className="editor-tool-glyph" aria-hidden="true">
-            🧲
+            SN
           </span>
           <span className="editor-tool-text">{t("snap")}</span>
         </button>
@@ -210,7 +230,7 @@ export function SceneEditorControls({
           onClick={onToggleEditorViewMode}
         >
           <span className="editor-tool-glyph" aria-hidden="true">
-            {viewMode === "isometric" ? "🧊" : "🗺️"}
+            {viewMode === "isometric" ? "3D" : "2D"}
           </span>
           <span className="editor-tool-text">
             {viewMode === "isometric" ? t("view2d5") : t("view2dPlan")}
@@ -219,11 +239,12 @@ export function SceneEditorControls({
         <button
           type="button"
           className="editor-tool"
+          data-testid="editor-undo"
           onClick={onUndo}
           disabled={!canUndo}
         >
           <span className="editor-tool-glyph" aria-hidden="true">
-            ↩️
+            UN
           </span>
           <span className="editor-tool-text">{t("undo")}</span>
         </button>
@@ -234,7 +255,7 @@ export function SceneEditorControls({
           disabled={!canRedo}
         >
           <span className="editor-tool-glyph" aria-hidden="true">
-            ↪️
+            RE
           </span>
           <span className="editor-tool-text">{t("redo")}</span>
         </button>
@@ -245,7 +266,7 @@ export function SceneEditorControls({
           disabled={!canDelete}
         >
           <span className="editor-tool-glyph" aria-hidden="true">
-            🗑️
+            DL
           </span>
           <span className="editor-tool-text">{t("delete")}</span>
         </button>

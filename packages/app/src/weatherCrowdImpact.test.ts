@@ -4,7 +4,8 @@ import { weatherCrowdImpact } from "./weatherCrowdImpact";
 describe("weatherCrowdImpact", () => {
   it("does not change dwell in clear weather", () => {
     expect(
-      weatherCrowdImpact({ riskScore: 0, storeAttractionMultiplier: 1 }).dwellMultiplier,
+      weatherCrowdImpact({ riskScore: 0, storeAttractionMultiplier: 1 })
+        .dwellMultiplier,
     ).toBe(1);
   });
 
@@ -21,13 +22,17 @@ describe("weatherCrowdImpact", () => {
 
   it("a weather-driven store-attraction boost also lengthens dwell", () => {
     const base = weatherCrowdImpact({ riskScore: 0.4, storeAttractionMultiplier: 1 });
-    const boosted = weatherCrowdImpact({ riskScore: 0.4, storeAttractionMultiplier: 1.3 });
+    const boosted = weatherCrowdImpact({
+      riskScore: 0.4,
+      storeAttractionMultiplier: 1.3,
+    });
     expect(boosted.dwellMultiplier).toBeGreaterThan(base.dwellMultiplier);
   });
 
   it("clamps an out-of-range risk score", () => {
     expect(
-      weatherCrowdImpact({ riskScore: 5, storeAttractionMultiplier: 1 }).dwellMultiplier,
+      weatherCrowdImpact({ riskScore: 5, storeAttractionMultiplier: 1 })
+        .dwellMultiplier,
     ).toBeLessThanOrEqual(2);
   });
 });

@@ -16,3 +16,15 @@ export function benchmarkAgentPosition(index: number): { x: number; y: number } 
     y: (row - performanceGridRows / 2) * performanceAgentSpacing,
   };
 }
+
+/**
+ * InstancedMesh capacity for the live crowd in the viewport.
+ *
+ * This is an allocation, not a claim. The viewport used to allocate
+ * `performanceAgentCount` (100,000) instances, which meant every frame uploaded
+ * a 6.4 MB instance-matrix buffer and shaded ~2.4M vertices in order to display
+ * fewer than 2,000 agents. The engine's own cap is 2,000 (simulationEngine
+ * `defaultMaxAgents`); this leaves 4x headroom for larger scenes without
+ * pretending the renderer is doing 100k.
+ */
+export const viewportAgentCapacity = 8_192;

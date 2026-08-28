@@ -34,10 +34,10 @@ describe("ProjectWorkspacePanel", () => {
       fetch: backend.fetch,
       baseUrl: "http://backend.local",
     });
+    await client.login({ accountId: "demo-owner" });
     await client.createProject({
       id: "px",
       name: "Plaza",
-      ownerId: "demo-owner",
       scene: bioCityDemoScene,
     });
 
@@ -57,8 +57,6 @@ describe("ProjectWorkspacePanel", () => {
       </I18nProvider>,
     );
 
-    expect(
-      within(container).getByText(/sample data|样例数据/i),
-    ).toBeInTheDocument();
+    expect(within(container).getByText(/sample data|样例数据/i)).toBeInTheDocument();
   });
 });

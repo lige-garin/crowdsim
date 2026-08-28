@@ -5,7 +5,7 @@ import type {
   SimulationServicePoint,
   SimulationShop,
 } from "./simulationDecisionBackend";
-import type { SimulationSink } from "./simulationEngine";
+import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import { chooseBrandStore, type BrandStoreCandidate } from "./brandAttraction";
 import { createAgentMindset } from "./agentPersona";
 import { gravityWeight } from "./odEntryModel";
@@ -71,6 +71,27 @@ function pickShopByGravity(
   return shops[shops.length - 1];
 }
 
+/**
+ * Waiting room per shop, expressed in service slots. A shop with no cap on the
+ * line accepts arrivals forever, which is how an under-capacity mall used to
+ * freeze: every shopper ended up queuing and nobody could reach a state that
+ * ever leaves the world.
+ */
+const queueSlotsPerCapacity = 2;
+/** Patience window (seconds) spanned by the persona `patience` trait 0..1. */
+const queuePatienceMinSeconds = 30;
+const queuePatienceRangeSeconds = 120;
+/** Distance decay used to rank fallback shops after a balk/renege/blocked walk. */
+const fallbackDistanceDecay = 0.05;
+/** A walk counts as progress only if it closes at least this much distance. */
+const walkProgressEpsilonMeters = 0.25;
+/** Decision ticks without progress before a walker gives up (10 Hz => 5 s). */
+const walkStallDecisionTicks = 50;
+
+function distanceBetween(from: ScenePoint, to: ScenePoint) {
+  return Math.hypot(to.x - from.x, to.y - from.y);
+}
+
 function nearestSink(
   point: ScenePoint,
   sinks: readonly SimulationSink[],
@@ -131,29 +152,52 @@ export function createMallCrowdDecisionBackend(options: {
   return {
     id: "rule-ts",
     decisionHz: options.decisionHz ?? 10,
-    decideAgents({ agents, elapsedSeconds, sinks, shops, servicePoints, evacuationActive }) {
+    decideAgents({
+      agents,
+      decisionTick,
+      elapsedSeconds,
+      sinks,
+      shops,
+      servicePoints,
+      evacuationActive,
+    }) {
       const activeShops = shops ?? options.shops;
       const activeServicePoints = servicePoints ?? [];
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
 
-      // Live occupancy (current browsers) per shop; enter() reserves a slot so
-      // concurrent arrivals in one tick cannot overfill a shop.
+      // Live occupancy (current browsers) and line length per shop; enter() and
+      // joinQueue() reserve a slot so concurrent arrivals in one tick cannot
+      // overfill a shop or its line.
       const occupancy = new Map<string, number>();
+      const queueLength = new Map<string, number>();
+      const bump = (counter: Map<string, number>, shopId: string, delta: number) =>
+        counter.set(shopId, Math.max(0, (counter.get(shopId) ?? 0) + delta));
       for (const agent of agents) {
-        if (agent.lifecycleState === "browse" && agent.selectedStoreId) {
-          occupancy.set(
-            agent.selectedStoreId,
-            (occupancy.get(agent.selectedStoreId) ?? 0) + 1,
-          );
+        if (!agent.selectedStoreId) {
+          continue;
+        }
+
+        if (agent.lifecycleState === "browse") {
+          bump(occupancy, agent.selectedStoreId, 1);
+        } else if (agent.lifecycleState === "queue") {
+          bump(queueLength, agent.selectedStoreId, 1);
         }
       }
       const hasRoom = (shopId: string) => {
         const shop = shopById.get(shopId);
         return shop ? (occupancy.get(shopId) ?? 0) < shop.capacity : false;
       };
-      const enter = (shopId: string) =>
-        occupancy.set(shopId, (occupancy.get(shopId) ?? 0) + 1);
+      const hasQueueRoom = (shopId: string) => {
+        const shop = shopById.get(shopId);
+        return shop
+          ? (queueLength.get(shopId) ?? 0) <
+              Math.max(1, Math.ceil(shop.capacity * queueSlotsPerCapacity))
+          : false;
+      };
+      const enter = (shopId: string) => bump(occupancy, shopId, 1);
+      const joinQueue = (shopId: string) => bump(queueLength, shopId, 1);
+      const leaveQueue = (shopId: string) => bump(queueLength, shopId, -1);
       const browseDecision = (
         agentId: number,
         shop: SimulationShop,
@@ -163,7 +207,89 @@ export function createMallCrowdDecisionBackend(options: {
         selectedStoreId: shop.id,
         target: shop.position,
         browseUntilSeconds: elapsedSeconds + shop.dwellSeconds,
+        queueUntilSeconds: null,
+        walkProgress: null,
       });
+      const leaveDecision = (agent: SimulationAgent): SimulationAgentDecision => {
+        const sink = nearestSink(agent, sinks);
+        return {
+          agentId: agent.id,
+          nextState: "leave",
+          target: sink.position,
+          targetSinkId: sink.id,
+          selectedStoreId: undefined,
+          browseUntilSeconds: null,
+          queueUntilSeconds: null,
+          walkProgress: null,
+        };
+      };
+      const walkDecision = (
+        agent: SimulationAgent,
+        shop: SimulationShop,
+      ): SimulationAgentDecision => ({
+        agentId: agent.id,
+        nextState: "walk",
+        selectedStoreId: shop.id,
+        target: shop.position,
+        queueUntilSeconds: null,
+        walkProgress: null,
+      });
+      const queueDecision = (
+        agent: SimulationAgent,
+        shop: SimulationShop,
+      ): SimulationAgentDecision => ({
+        agentId: agent.id,
+        nextState: "queue",
+        selectedStoreId: shop.id,
+        target: shop.queuePosition,
+        // Patience comes from the persona traits, which are a pure hash of
+        // (agentId, seed): the renege deadline stays reproducible per run.
+        queueUntilSeconds:
+          elapsedSeconds +
+          queuePatienceMinSeconds +
+          createAgentMindset({ agentId: agent.id, seed: mindsetSeed }).traits.patience *
+            queuePatienceRangeSeconds,
+        walkProgress: null,
+      });
+      /**
+       * Next-best shop that can still take the shopper, ranked by attraction
+       * attenuated by distance. Deliberately not RNG-driven: a balking or
+       * reneging shopper picks the best remaining option, and the draw order of
+       * fresh shoppers stays untouched.
+       */
+      const fallbackShop = (agent: SimulationAgent, excludedShopId: string) => {
+        let best: SimulationShop | undefined;
+        let bestWeight = 0;
+
+        for (const shop of activeShops) {
+          if (shop.id === excludedShopId) {
+            continue;
+          }
+
+          if (!hasRoom(shop.id) && !hasQueueRoom(shop.id)) {
+            continue;
+          }
+
+          const weight = gravityWeight(
+            shop.attraction,
+            distanceBetween(agent, shop.position),
+            fallbackDistanceDecay,
+          );
+
+          if (weight > bestWeight) {
+            bestWeight = weight;
+            best = shop;
+          }
+        }
+
+        return best;
+      };
+      const divertOrLeave = (agent: SimulationAgent, excludedShopId: string) => {
+        const alternative = fallbackShop(agent, excludedShopId);
+        decisions.push(
+          alternative ? walkDecision(agent, alternative) : leaveDecision(agent),
+        );
+      };
 
       for (const agent of agents) {
         const state = agent.lifecycleState;
@@ -179,6 +305,8 @@ export function createMallCrowdDecisionBackend(options: {
               targetSinkId: sink.id,
               selectedStoreId: undefined,
               browseUntilSeconds: null,
+              queueUntilSeconds: null,
+              walkProgress: null,
             });
           }
           continue;
@@ -195,6 +323,7 @@ export function createMallCrowdDecisionBackend(options: {
             nextState: "leave",
             target: sink.position,
             targetSinkId: sink.id,
+            walkProgress: null,
           });
           continue;
         }
@@ -221,17 +350,10 @@ export function createMallCrowdDecisionBackend(options: {
                 target: counter.position,
                 selectedStoreId: undefined,
                 browseUntilSeconds: null,
+                walkProgress: null,
               });
             } else {
-              const sink = nearestSink(agent, sinks);
-              decisions.push({
-                agentId: agent.id,
-                nextState: "leave",
-                target: sink.position,
-                targetSinkId: sink.id,
-                selectedStoreId: undefined,
-                browseUntilSeconds: null,
-              });
+              decisions.push(leaveDecision(agent));
             }
           }
           continue;
@@ -261,47 +383,78 @@ export function createMallCrowdDecisionBackend(options: {
             agent.browseUntilSeconds != null &&
             elapsedSeconds >= agent.browseUntilSeconds
           ) {
-            const sink = nearestSink(agent, sinks);
-            decisions.push({
-              agentId: agent.id,
-              nextState: "leave",
-              target: sink.position,
-              targetSinkId: sink.id,
-              browseUntilSeconds: null,
-            });
+            decisions.push(leaveDecision(agent));
           }
           continue;
         }
 
-        // Queued: enter as soon as a slot frees, otherwise keep waiting.
+        // Queued: enter as soon as a slot frees, give up when patience runs out.
         if (state === "queue" && agent.selectedStoreId) {
           const shop = shopById.get(agent.selectedStoreId);
-          if (shop && hasRoom(shop.id)) {
+          if (!shop) {
+            continue;
+          }
+
+          if (hasRoom(shop.id)) {
+            leaveQueue(shop.id);
             enter(shop.id);
             decisions.push(browseDecision(agent.id, shop));
+            continue;
+          }
+
+          if (agent.queueUntilSeconds === undefined) {
+            decisions.push(queueDecision(agent, shop));
+            continue;
+          }
+
+          // Renege: an unbounded wait is what deadlocked an under-capacity mall.
+          if (elapsedSeconds >= agent.queueUntilSeconds) {
+            leaveQueue(shop.id);
+            divertOrLeave(agent, shop.id);
           }
           continue;
         }
 
-        // Walking and arrived: browse if there is room, else join the queue.
+        // Walking and arrived: browse if there is room, queue if the line has
+        // room, otherwise balk to another shop (or leave).
         if (state === "walk" && agent.selectedStoreId) {
           const shop = shopById.get(agent.selectedStoreId);
-          if (shop) {
-            const dx = shop.position.x - agent.x;
-            const dy = shop.position.y - agent.y;
-            if (Math.hypot(dx, dy) <= shop.radius) {
-              if (hasRoom(shop.id)) {
-                enter(shop.id);
-                decisions.push(browseDecision(agent.id, shop));
-              } else {
-                decisions.push({
-                  agentId: agent.id,
-                  nextState: "queue",
-                  selectedStoreId: shop.id,
-                  target: shop.queuePosition,
-                });
-              }
+          if (!shop) {
+            continue;
+          }
+
+          const distance = distanceBetween(agent, shop.position);
+
+          if (distance <= shop.radius) {
+            if (hasRoom(shop.id)) {
+              enter(shop.id);
+              decisions.push(browseDecision(agent.id, shop));
+            } else if (hasQueueRoom(shop.id)) {
+              joinQueue(shop.id);
+              decisions.push(queueDecision(agent, shop));
+            } else {
+              divertOrLeave(agent, shop.id);
             }
+            continue;
+          }
+
+          // Blocked route detection: walls make sliding movement stall dead, and
+          // `walk` only ends inside the arrival radius, so a shopper cut off from
+          // its shop used to occupy an agent slot forever.
+          const progress = agent.walkProgress;
+
+          if (!progress || distance <= progress.distance - walkProgressEpsilonMeters) {
+            decisions.push({
+              agentId: agent.id,
+              nextState: "walk",
+              selectedStoreId: shop.id,
+              walkProgress: { distance, tick: decisionTick },
+            });
+          } else if (decisionTick - progress.tick >= walkStallDecisionTicks) {
+            // Head for an exit rather than another shop: the shopper has proven
+            // it cannot reach this target, and re-picking shops could bounce it
+            // between equally unreachable ones forever.
+            decisions.push(leaveDecision(agent));
           }
           continue;
         }
@@ -329,12 +482,7 @@ export function createMallCrowdDecisionBackend(options: {
                 )
               : pickShopByAttraction(activeShops, random());
         }
-        decisions.push({
-          agentId: agent.id,
-          nextState: "walk",
-          selectedStoreId: chosen.id,
-          target: chosen.position,
-        });
+        decisions.push(walkDecision(agent, chosen));
       }
 
       return decisions;

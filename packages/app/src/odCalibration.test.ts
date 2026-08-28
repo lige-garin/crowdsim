@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildGravityOdAllocation, type ODDestination, type ODEntrance } from "./odEntryModel";
+import {
+  buildGravityOdAllocation,
+  type ODDestination,
+  type ODEntrance,
+} from "./odEntryModel";
 import { fitOdGravityParameters, odArrivalError } from "./odCalibration";
 
 const entrances: ODEntrance[] = [

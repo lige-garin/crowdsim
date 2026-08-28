@@ -46,9 +46,9 @@ export function ValidationReportPanel() {
         PDF-ready {exportBundle.pdfReady ? "yes" : "no"} | {exportBundle.filename}
       </code>
       <code>
-        physics error {report.neuralCorrectionValidation.baselineMeanError} | +residual{" "}
-        {report.neuralCorrectionValidation.correctedMeanError} | improve{" "}
-        {Math.round(report.neuralCorrectionValidation.improvementRatio * 100)}%
+        physics error {report.residualProjectionValidation.baselineMeanError} |
+        +residual {report.residualProjectionValidation.correctedMeanError} | in-sample{" "}
+        {Math.round(report.residualProjectionValidation.improvementRatio * 100)}%
       </code>
       <p>
         {aiSummary.title}: {aiSummary.paragraphs[0]} Risk {aiSummary.riskLevel}

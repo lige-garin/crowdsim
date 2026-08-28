@@ -14,9 +14,9 @@ import { demoScene } from "./demoScene";
 import { createMultiFloorScene, summarizeMultiFloorScene } from "./multifloorScene";
 import { createPhotorealisticTilesConfig } from "./photorealisticTiles";
 import {
-  canAttemptHalfMillionAgents,
   createIndirectDrawPlan,
   estimateScaleBudget,
+  projectHalfMillionAgentBudget,
 } from "./scaleBudget";
 import { useI18n } from "./i18n";
 import { demoVisualAssetManifest } from "./visualAssets";
@@ -82,16 +82,20 @@ export function ScaleReadinessPanel() {
         sampleFlowFieldAtlasCpu(atlasProbeAgents, flowAtlas)[0] !==
         sampleFlowFieldAtlasCpu(atlasProbeAgents, flowAtlas)[2],
       budget,
-      canAttempt: canAttemptHalfMillionAgents(budget),
       demoPlan,
       demoReady: validateDemoModePlan(demoPlan).ready,
       indirectDraw,
       multiFloor: summarizeMultiFloorScene(multiFloor),
+      projection: projectHalfMillionAgentBudget(budget),
     };
   }, []);
-  const title = language === "zh" ? "规模就绪" : "Scale readiness";
+  const title = language === "zh" ? "规模投影" : "Scale projection";
   const floorsLabel = language === "zh" ? "楼层" : "floors";
   const agentsLabel = language === "zh" ? "50万 agent" : "500k agents";
+  const projectionNote =
+    language === "zh"
+      ? "以下为预算推算，未在任何设备上实测。"
+      : "Budget arithmetic below; never measured on any device.";
 
   return (
     <section className="probe-panel" aria-label={title}>
@@ -99,9 +103,10 @@ export function ScaleReadinessPanel() {
       <p>
         {summary.multiFloor.floorCount} {floorsLabel} | {agentsLabel}
       </p>
+      <p>{projectionNote}</p>
       <code>
         {summary.budget.renderStrategy} | {summary.budget.estimatedAgentMemoryMegabytes}{" "}
-        MB | {summary.canAttempt ? "ready" : "blocked"}
+        MB | 500k {summary.projection.projection} ({summary.projection.measurement})
       </code>
       <code>
         demo {summary.demoPlan.steps.length} steps | assets{" "}
@@ -113,8 +118,9 @@ export function ScaleReadinessPanel() {
         {Math.round(summary.atlasBytes / 1024)} KB
       </code>
       <code>
-        indirect {summary.indirectDraw.mode} | batches {summary.indirectDraw.batchCount}{" "}
-        | args {summary.indirectDraw.argsBufferBytes} B
+        indirect {summary.indirectDraw.mode} (no renderer wired) | batches{" "}
+        {summary.indirectDraw.batchCount} | args {summary.indirectDraw.argsBufferBytes}{" "}
+        B
       </code>
     </section>
   );

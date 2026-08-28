@@ -1,11 +1,4 @@
-import {
-  createFlowFieldCpu,
-  createSpatialHashGridLayout,
-  rasterizeWallsToBlockedCells,
-  type FlowField,
-  type SpatialHashGridLayout,
-  type WallSegment,
-} from "@crowdsim/core-gpu";
+﻿import type { WallSegment } from "@crowdsim/core-gpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import {
   clampPointToWorld,
@@ -20,6 +13,7 @@ import {
   calculateSimulationDecisionTick,
   shouldRunDecisionTick,
   type SimulationAgentDecisionState,
+  type SimulationAgentWalkProgress,
   type SimulationDecisionBackend,
   type SimulationServicePoint,
   type SimulationShop,
@@ -28,9 +22,9 @@ import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
 import { weatherCrowdImpact } from "./weatherCrowdImpact";
 import { createBrandStoresFromScene } from "./brandAttraction";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
-
+import { buildNavigationFields, pointToCellId } from "./simulationEngineNavigation";
+import { createSeededRng, samplePoisson } from "./simulationEngineRandom";
 export type SimulationStatus = "paused" | "running";
-
 export type SimulationAgent = {
   decisionTick?: number;
   id: number;
@@ -38,6 +32,10 @@ export type SimulationAgent = {
   selectedStoreId?: string;
   /** When browsing a shop, the sim time at which the dwell ends and the agent leaves. */
   browseUntilSeconds?: number;
+  /** While queuing, the sim time at which the shopper runs out of patience. */
+  queueUntilSeconds?: number;
+  /** Closest approach to the current walk target, used to detect a blocked route. */
+  walkProgress?: SimulationAgentWalkProgress;
   x: number;
   y: number;
   vx: number;
@@ -46,20 +44,17 @@ export type SimulationAgent = {
   targetY: number;
   targetSinkId?: string;
 };
-
 export type SimulationSource = {
   id: string;
   position: ScenePoint;
   width: number;
   arrivalRatePerSecond: number;
 };
-
 export type SimulationSink = {
   id: string;
   position: ScenePoint;
   radius: number;
 };
-
 export type SimulationEngineConfig = {
   decisionBackend?: SimulationDecisionBackend;
   fixedDtSeconds?: number;
@@ -74,7 +69,6 @@ export type SimulationEngineConfig = {
   walls?: WallSegment[];
   world?: SceneWorldBounds;
 };
-
 export type SimulationSnapshot = {
   status: SimulationStatus;
   elapsedSeconds: number;
@@ -85,7 +79,6 @@ export type SimulationSnapshot = {
   exitedCount: number;
   agents: SimulationAgent[];
 };
-
 export type SimulationEngine = {
   pause: () => SimulationSnapshot;
   reset: () => SimulationSnapshot;
@@ -98,13 +91,10 @@ export type SimulationEngine = {
   tick: (realDeltaSeconds: number) => SimulationSnapshot;
   tickAsync: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
 };
-
 const defaultFixedDtSeconds = 1 / 60;
 const defaultMaxAgents = 2_000;
 const defaultSpeedMetersPerSecond = 8;
 const maxRealDeltaSeconds = 0.25;
-const navigationCellSize = 2;
-
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
   decisionHz: 10,
@@ -112,13 +102,6 @@ export const simulationRuntimeProfile = {
   movementBackend: "cpu-compat",
   movementHz: 60,
 } as const;
-
-type SinkNavigationField = {
-  flowField: FlowField;
-  layout: SpatialHashGridLayout;
-  sinkId: string;
-};
-
 export function createSimulationEngineFromScene(
   scene: CrowdSimScene,
   overrides: Partial<SimulationEngineConfig> = {},
@@ -140,13 +123,9 @@ export function createSimulationEngineFromScene(
       position: entrance.position,
       radius: Math.max(1, entrance.width / 2),
     }));
-
-  // Bad weather makes shoppers shelter longer (dwell stretches with riskScore).
   const weather = weatherCrowdImpact(environmentImpact);
   const shops: SimulationShop[] = scene.shops.map((shop) => ({
     id: shop.id,
-    // Prefer the shop entrance (reachable, at the building edge) over the centre,
-    // which can sit inside a wall.
     position: shop.entrancePosition ?? shop.position,
     radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
     attraction: shop.attraction,
@@ -163,18 +142,13 @@ export function createSimulationEngineFromScene(
       serviceSeconds: servicePoint.serviceMeanSeconds,
     }),
   );
-  // Default to the rule-based mall-crowd behaviour (enter -> shop -> browse ->
-  // leave) so the crowd moves with a reason; callers may override.
   const decisionBackend =
     overrides.decisionBackend ??
     createMallCrowdDecisionBackend({
       shops,
       seed: scene.seed,
-      // Persona/brand-driven store choice: different shoppers favour different
-      // shops (commuters -> coffee/grocery, browsers -> fashion).
       brandStores: createBrandStoresFromScene(scene),
     });
-
   return createSimulationEngine({
     seed: scene.seed,
     sources,
@@ -188,7 +162,6 @@ export function createSimulationEngineFromScene(
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
   });
 }
-
 export function createSimulationEngine(
   config: SimulationEngineConfig,
 ): SimulationEngine {
@@ -206,7 +179,6 @@ export function createSimulationEngine(
   const walls = config.walls ?? [];
   const world = config.world;
   const navigationFields = buildNavigationFields(world, walls, sinks);
-
   let rng = createSeededRng(seed);
   let status: SimulationStatus = "paused";
   let elapsedSeconds = 0;
@@ -218,7 +190,6 @@ export function createSimulationEngine(
   let exitedCount = 0;
   let agents: SimulationAgent[] = [];
   let evacuationActive = false;
-
   function makeSnapshot(): SimulationSnapshot {
     return {
       status,
@@ -231,12 +202,10 @@ export function createSimulationEngine(
       agents: agents.map((agent) => ({ ...agent })),
     };
   }
-
   function spawnAgent(source: SimulationSource) {
     if (agents.length >= maxAgents || sinks.length === 0) {
       return;
     }
-
     const jitter = (rng() - 0.5) * source.width;
     const spawnPoint = clampPointToWorld(
       {
@@ -248,7 +217,6 @@ export function createSimulationEngine(
     const x = spawnPoint.x;
     const y = spawnPoint.y;
     const sink = nearestSink({ x, y });
-
     agents.push({
       id: nextAgentId++,
       x,
@@ -261,25 +229,20 @@ export function createSimulationEngine(
     });
     spawnedCount++;
   }
-
   function nearestSink(point: ScenePoint): SimulationSink {
     let best = sinks[0];
     let bestDistanceSq = Number.POSITIVE_INFINITY;
-
     for (const sink of sinks) {
       const dx = sink.position.x - point.x;
       const dy = sink.position.y - point.y;
       const distanceSq = dx * dx + dy * dy;
-
       if (distanceSq < bestDistanceSq) {
         best = sink;
         bestDistanceSq = distanceSq;
       }
     }
-
     return best;
   }
-
   function runFixedStep() {
     spawnArrivals();
     runDecisionTickIfNeeded();
@@ -287,39 +250,33 @@ export function createSimulationEngine(
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
   }
-
   async function runFixedStepAsync() {
     if (!movementBackend) {
       runFixedStep();
       return;
     }
-
     spawnArrivals();
     runDecisionTickIfNeeded();
-
     const result = await stepAgentsWithMovementBackend({
       agents,
       backend: movementBackend,
+      canExit: isExitBound,
       fixedDtSeconds,
       sinks,
       speedMetersPerSecond,
       walls,
       world,
     });
-
     agents = result.agents;
     exitedCount += result.exitedCount;
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
   }
-
   function runDecisionTickIfNeeded() {
     if (!decisionBackend || agents.length === 0) {
       return;
     }
-
     const nextStepCount = stepCount + 1;
-
     if (
       !shouldRunDecisionTick({
         decisionHz: decisionBackend.decisionHz,
@@ -329,13 +286,11 @@ export function createSimulationEngine(
     ) {
       return;
     }
-
     const decisionTick = calculateSimulationDecisionTick({
       decisionHz: decisionBackend.decisionHz,
       movementHz: simulationRuntimeProfile.movementHz,
       stepCount: nextStepCount,
     });
-
     agents = applySimulationAgentDecisions(
       agents,
       decisionBackend.decideAgents({
@@ -350,45 +305,28 @@ export function createSimulationEngine(
       decisionTick,
     );
   }
-
   function spawnArrivals() {
     for (const source of sources) {
       const arrivals = samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
-
       for (let index = 0; index < arrivals; index++) {
         spawnAgent(source);
       }
     }
   }
-
   function advanceAgentsCpu() {
     const nextAgents: SimulationAgent[] = [];
-
     for (const agent of agents) {
-      // Browsing shoppers and shoppers being served at a checkout dwell in place.
-      if (
-        agent.lifecycleState === "browse" ||
-        agent.lifecycleState === "enterStore"
-      ) {
+      if (agent.lifecycleState === "browse" || agent.lifecycleState === "enterStore") {
         nextAgents.push({ ...agent, vx: 0, vy: 0 });
         continue;
       }
-
       const dx = agent.targetX - agent.x;
       const dy = agent.targetY - agent.y;
       const distance = Math.hypot(dx, dy);
-
-      // Exit on reaching the sink, unless heading to a shop or queuing for one.
-      // Agents with no decision backend head straight to the sink and still exit.
-      const headingToShop =
-        agent.lifecycleState === "walk" ||
-        agent.lifecycleState === "queue" ||
-        agent.lifecycleState === "checkout";
-      if (!headingToShop && distance <= nearestSink(agent).radius) {
+      if (isExitBound(agent) && distance <= nearestSink(agent).radius) {
         exitedCount++;
         continue;
       }
-
       const direction = movementDirection(agent, dx, dy, distance);
       const travelDistance = Math.min(distance, speedMetersPerSecond * fixedDtSeconds);
       const proposed = {
@@ -398,7 +336,6 @@ export function createSimulationEngine(
       const resolved = constrainMovement(agent, proposed, walls, world);
       const vx = (resolved.x - agent.x) / fixedDtSeconds;
       const vy = (resolved.y - agent.y) / fixedDtSeconds;
-
       nextAgents.push({
         ...agent,
         vx,
@@ -407,59 +344,63 @@ export function createSimulationEngine(
         y: resolved.y,
       });
     }
-
     agents = nextAgents;
   }
-
+  /**
+   * Only an agent that a decision sent to an exit may leave the world. The old
+   * rule was the inverse ("exit unless walking/queuing/checking out"), which made
+   * a freshly spawned agent 鈥?lifecycleState still undefined until the first
+   * decision tick 鈥?exit-bound. At a `bidirectional` entrance that agent is born
+   * inside the sink radius of the very gate it walked through (spawn jitter is
+   * +/- width/2, sink radius is width/2), so it was deleted on its first step and
+   * both exitedCount and throughput counted arrivals that never walked anywhere.
+   * With no decision backend nobody ever assigns a state, and every agent is
+   * spawned pointing at a sink, so reaching one is still the exit.
+   */
+  function isExitBound(agent: SimulationAgent) {
+    if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
+      return true;
+    }
+    return !decisionBackend && agent.lifecycleState === undefined;
+  }
   function movementDirection(
     agent: SimulationAgent,
     dx: number,
     dy: number,
     distance: number,
   ) {
-    // The flow field only knows routes to sinks, so use it when heading for an
-    // exit (leaving or evacuating); a shopper walking to a shop steers straight.
     if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
       const fieldDirection = sampleNavigationDirection(agent);
-
       if (fieldDirection) {
         return fieldDirection;
       }
     }
-
     const invDistance = distance > 0 ? 1 / distance : 0;
-
     return {
       x: dx * invDistance,
       y: dy * invDistance,
     };
   }
-
   function sampleNavigationDirection(agent: SimulationAgent) {
     if (!world || navigationFields.length === 0) {
       return undefined;
     }
-
     const field =
       navigationFields.find((candidate) => candidate.sinkId === agent.targetSinkId) ??
       navigationFields.find(
         (candidate) =>
           candidate.sinkId === nearestSink({ x: agent.targetX, y: agent.targetY }).id,
       );
-
     if (!field) {
       return undefined;
     }
-
     const cell = pointToCellId(agent, field.layout);
     const direction = {
       x: field.flowField.directions[cell * 2],
       y: field.flowField.directions[cell * 2 + 1],
     };
-
     return Math.hypot(direction.x, direction.y) > 0 ? direction : undefined;
   }
-
   return {
     pause() {
       status = "paused";
@@ -496,118 +437,37 @@ export function createSimulationEngine(
       for (let index = 0; index < steps; index++) {
         runFixedStep();
       }
-
       return makeSnapshot();
     },
     async stepAsync(steps = 1) {
       for (let index = 0; index < steps; index++) {
         await runFixedStepAsync();
       }
-
       return makeSnapshot();
     },
     tick(realDeltaSeconds: number) {
       if (status !== "running") {
         return makeSnapshot();
       }
-
       accumulatorSeconds +=
         Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
-
       while (accumulatorSeconds >= fixedDtSeconds) {
         runFixedStep();
         accumulatorSeconds -= fixedDtSeconds;
       }
-
       return makeSnapshot();
     },
     async tickAsync(realDeltaSeconds: number) {
       if (status !== "running") {
         return makeSnapshot();
       }
-
       accumulatorSeconds +=
         Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
-
       while (accumulatorSeconds >= fixedDtSeconds) {
         await runFixedStepAsync();
         accumulatorSeconds -= fixedDtSeconds;
       }
-
       return makeSnapshot();
     },
-  };
-}
-
-function buildNavigationFields(
-  world: SceneWorldBounds | undefined,
-  walls: readonly WallSegment[],
-  sinks: readonly SimulationSink[],
-): SinkNavigationField[] {
-  if (!world || walls.length === 0 || sinks.length === 0) {
-    return [];
-  }
-
-  const layout = createSpatialHashGridLayout({
-    width: world.width,
-    height: world.height,
-    cellSize: navigationCellSize,
-  });
-  const blocked = rasterizeWallsToBlockedCells(layout, [...walls]);
-
-  return sinks.map((sink) => {
-    const sinkCell = pointToCellId(sink.position, layout);
-    const sinkBlocked = new Uint8Array(blocked);
-    sinkBlocked[sinkCell] = 0;
-
-    return {
-      flowField: createFlowFieldCpu({
-        layout,
-        targetCell: sinkCell,
-        blocked: sinkBlocked,
-      }),
-      layout,
-      sinkId: sink.id,
-    };
-  });
-}
-
-function pointToCellId(point: ScenePoint, layout: SpatialHashGridLayout): number {
-  const column = clamp(Math.floor(point.x / layout.cellSize), 0, layout.columns - 1);
-  const row = clamp(Math.floor(point.y / layout.cellSize), 0, layout.rows - 1);
-
-  return row * layout.columns + column;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function samplePoisson(lambda: number, rng: () => number): number {
-  if (lambda <= 0) {
-    return 0;
-  }
-
-  const limit = Math.exp(-lambda);
-  let product = 1;
-  let count = 0;
-
-  do {
-    count++;
-    product *= rng();
-  } while (product > limit);
-
-  return count - 1;
-}
-
-function createSeededRng(seed: number) {
-  let state = seed >>> 0;
-
-  return () => {
-    state += 0x6d2b79f5;
-    let value = state;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
   };
 }

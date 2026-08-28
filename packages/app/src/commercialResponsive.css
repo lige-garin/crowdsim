@@ -1,21 +1,18 @@
-@media (max-width: 1180px) {
+﻿@media (max-width: 1180px) {
   .home-shell {
     overflow: visible;
   }
-
   .home-hero {
     width: min(100% - 48px, 900px);
     min-height: auto;
     padding: 32px 0 48px;
   }
-
   .home-copy {
     position: relative;
     top: auto;
     left: auto;
     max-width: 640px;
   }
-
   .home-copy h1 {
     max-width: 10em;
   }
@@ -239,9 +236,20 @@
   bottom: 76px;
 }
 
-.scene-editor .editor-canvas-wrap,
+/*
+ * These two rules used to be `display: none` and, despite living in the
+ * responsive stylesheet, they sat outside every media query 鈥?so the scene
+ * editor rendered as a headless toolbar at every viewport size: no drawing
+ * surface, no parameter panel, nothing to edit. Restored here; the dock keeps
+ * a bounded height so it never swallows the 3D viewport.
+ */
+.scene-editor .editor-canvas-wrap {
+  max-height: min(38vh, 340px);
+}
+
 .scene-editor .editor-param-panel {
-  display: none;
+  max-height: min(38vh, 340px);
+  overflow-y: auto;
 }
 
 .scene-editor .editor-filebar,
@@ -453,21 +461,20 @@
   gap: 10px;
 }
 
-.biocity-tool-group:nth-of-type(n + 3),
-.task-list,
-.sim-controls .control-group:nth-of-type(n + 3) {
-  display: none;
-}
-
+/*
+ * These rules used to amputate the sidebar instead of scrolling it, and -- like
+ * the scene-editor ones above -- they sat outside every media query, so the
+ * amputation applied at every viewport size. Hidden were: tool groups 3 and 4,
+ * the live agent/spawned/exited readouts, and control groups 3 and 4 (playback
+ * speed and heatmap window). None of that was reachable at any screen size.
+ * A scrollable column shows all of it and still fits the fixed shell height.
+ */
 .sidebar {
   gap: 14px;
   height: calc(100dvh - 58px);
   max-height: calc(100dvh - 58px);
-  overflow: hidden;
-}
-
-.sidebar-summary {
-  display: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .biocity-topbar {
