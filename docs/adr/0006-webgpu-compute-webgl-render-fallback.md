@@ -4,6 +4,7 @@
 - Supersedes: ADR-0004 (WebGPU-only, remove WebGL fallback)
 
 ## Context
+
 ADR-0004 reaffirmed "WebGPU-only: remove the WebGL fallback / show an explicit
 unsupported notice." But the SP-2 viewport rewrite did NOT remove the fallback:
 `SimulationViewport.tsx` imports both `WebGLRenderer` and `WebGPURenderer` and
@@ -12,6 +13,7 @@ docs and code contradicted each other, and the fallback degraded silently with
 no user-visible indication of which path was running.
 
 Two facts drive the decision:
+
 - The GPU-resident 100k crowd core (SP-1 / P1) can only run on WebGPU. A machine
   without WebGPU can never run that path.
 - Retail-device coverage matters for the product direction
@@ -20,6 +22,7 @@ Two facts drive the decision:
   scale-limited preview path.
 
 ## Decision
+
 1. **Simulation compute requires WebGPU.** The GPU-resident 100k core runs only
    on WebGPU. Without WebGPU the simulation degrades to the CPU worker path
    (~2000-agent cap) — a preview/edit experience, NOT the full crowd. This is a
@@ -37,6 +40,7 @@ Two facts drive the decision:
    presented with the caliber of full-scale analysis results.
 
 ## Consequences
+
 - ADR-0004 is superseded; its WebGPU-only / remove-WebGL stance no longer holds.
 - The viewport gains a tested mode badge (`describeViewportRenderMode`,
   `SimulationViewport.renderMode.test.ts`) and sets the mode on each render path

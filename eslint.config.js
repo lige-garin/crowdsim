@@ -35,6 +35,34 @@ export default tseslint.config(
     },
   },
   {
+    // Type-aware rules. These are the gate that catches the class of bug where a
+    // rejected promise silently disappears (worker commands, evacuation trigger).
+    files: ["packages/*/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/setupTests.ts"],
+    languageOptions: {
+      parserOptions: {
+        // tsconfig.test.json includes all of src (the build tsconfig of some
+        // packages only includes the entry point, which leaves leaf modules
+        // unparsable for type-aware rules).
+        project: [
+          "./packages/app/tsconfig.json",
+          "./packages/backend/tsconfig.test.json",
+          "./packages/collab/tsconfig.test.json",
+          "./packages/core-gpu/tsconfig.test.json",
+          "./packages/scene-schema/tsconfig.test.json",
+        ],
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": [
+        "error",
+        { checksVoidReturn: { arguments: false, attributes: false } },
+      ],
+    },
+  },
+  {
     files: ["**/*.config.ts", "**/*.test.{ts,tsx}", "**/setupTests.ts"],
     languageOptions: {
       globals: {

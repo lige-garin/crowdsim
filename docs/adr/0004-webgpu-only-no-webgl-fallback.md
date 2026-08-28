@@ -8,16 +8,19 @@
 > with no silent degradation. The original decision is kept here for history.
 
 ## Context
+
 projectplan.md §2/§5 mandate WebGPU-only with an explicit unsupported notice,
 but SimulationViewport.tsx:150-159 silently falls back to WebGL, violating the
 hard constraint.
 
 ## Decision
+
 Reaffirm WebGPU-only. The WebGL fallback in the viewport is removed in SP-2
 (the viewport rewrite); when WebGPU is unavailable the app shows an explicit
 unsupported message instead of degrading. (SP-0 only records the decision; the
 code change lands in SP-2 to avoid touching runtime behavior here.)
 
 ## Consequences
+
 - SP-2 must implement the explicit unsupported state.
 - No WebGL code paths are added anywhere going forward.

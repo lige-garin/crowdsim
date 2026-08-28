@@ -49,7 +49,7 @@ Cross-Origin-Embedder-Policy: require-corp
 In any environment, confirm in the browser console:
 
 ```js
-crossOriginIsolated === true
+crossOriginIsolated === true;
 ```
 
 and check the in-app SAB signal reads `SAB ready | isolated` (not
