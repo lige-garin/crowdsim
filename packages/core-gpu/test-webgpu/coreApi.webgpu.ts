@@ -8,9 +8,7 @@ import {
 import { enqueueCopyToReadbackBuffer, readFloat32Array } from "../src/gpuUtils";
 
 // Self-skips without a real WebGPU adapter (see test-webgpu/README.md).
-const maybeNavigator = globalThis.navigator as
-  | (Navigator & { gpu?: GPU })
-  | undefined;
+const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | undefined;
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 async function readPositions(device: GPUDevice, buffer: GPUBuffer, count: number) {
@@ -76,11 +74,17 @@ describe("createGpuSimCore (real WebGPU)", () => {
       core.setCount(N);
       core.uploadSpawns(spawns);
 
-      const initialCom = centreOfMass(await readPositions(device!, core.positionsBuffer(), N), N);
+      const initialCom = centreOfMass(
+        await readPositions(device!, core.positionsBuffer(), N),
+        N,
+      );
       for (let i = 0; i < 30; i++) {
         core.step(1 / 60);
       }
-      const finalCom = centreOfMass(await readPositions(device!, core.positionsBuffer(), N), N);
+      const finalCom = centreOfMass(
+        await readPositions(device!, core.positionsBuffer(), N),
+        N,
+      );
 
       const aggregates = await core.readAggregates();
       const totalDensity = aggregates.cellCounts.reduce((sum, value) => sum + value, 0);

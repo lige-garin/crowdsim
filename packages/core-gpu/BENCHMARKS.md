@@ -5,6 +5,9 @@
 recorded. The 60fps gate (`< 16.6 ms/step`) verdict is **PENDING** a real-WebGPU
 machine. The GPU core (T2–T4) is authored but GPU-UNVERIFIED.
 
+Re-probed 2026-07-28: `pnpm test:webgpu` still reports `5 skipped (5)` files /
+`7 skipped (7)` tests. Nothing has been measured since this file was written.
+
 ## How to measure
 
 On a machine where `chrome://gpu` shows WebGPU enabled, enable a real device
@@ -29,6 +32,6 @@ then set the verdict honestly:
 
 ## Recorded results
 
-| Date | Hardware / driver | 100k ms/step | Verdict |
-|------|-------------------|--------------|---------|
-| —    | (pending real WebGPU machine) | (pending) | PENDING |
+| Date | Hardware / driver             | 100k ms/step | Verdict |
+| ---- | ----------------------------- | ------------ | ------- |
+| —    | (pending real WebGPU machine) | (pending)    | PENDING |

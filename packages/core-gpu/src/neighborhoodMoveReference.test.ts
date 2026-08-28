@@ -81,9 +81,9 @@ describe("stepSocialForceNeighborhoodCpu equals all-pairs when range <= cellSize
       };
     }
     for (let i = 0; i < N * 2; i++) {
-      expect(
-        Math.abs(neighborhood.positions[i] - allPairs.positions[i]),
-      ).toBeLessThan(1e-4);
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-4,
+      );
     }
   });
 

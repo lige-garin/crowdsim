@@ -7,10 +7,7 @@ import { exclusiveScanCpu } from "./prefixScanCpu";
 // can be checked against the simple exclusiveScanCpu oracle in Node, without a GPU.
 // This validates the ALGORITHM only; it does NOT verify the WGSL itself -- that
 // still requires `pnpm test:webgpu` on real hardware.
-export function blockScanReference(
-  counts: Uint32Array,
-  workgroup = 256,
-): Uint32Array {
+export function blockScanReference(counts: Uint32Array, workgroup = 256): Uint32Array {
   const n = counts.length;
   const offsets = new Uint32Array(n + 1);
   const numBlocks = Math.max(1, Math.ceil(n / workgroup));
@@ -47,10 +44,7 @@ export function blockScanReference(
 }
 
 // Convenience: assert the blocked algorithm agrees with the simple oracle.
-export function blockScanMatchesOracle(
-  counts: Uint32Array,
-  workgroup = 256,
-): boolean {
+export function blockScanMatchesOracle(counts: Uint32Array, workgroup = 256): boolean {
   const blocked = blockScanReference(counts, workgroup);
   const oracle = exclusiveScanCpu(counts);
   if (blocked.length !== oracle.length) {

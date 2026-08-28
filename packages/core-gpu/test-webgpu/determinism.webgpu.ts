@@ -9,9 +9,7 @@ import {
 import { enqueueCopyToReadbackBuffer, readFloat32Array } from "../src/gpuUtils";
 
 // Self-skips without a real WebGPU adapter (see test-webgpu/README.md).
-const maybeNavigator = globalThis.navigator as
-  | (Navigator & { gpu?: GPU })
-  | undefined;
+const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | undefined;
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 const N = 256;

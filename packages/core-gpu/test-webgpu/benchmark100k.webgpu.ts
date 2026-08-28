@@ -8,9 +8,7 @@ import {
 
 // Self-skips without a real WebGPU adapter (see test-webgpu/README.md). On real
 // hardware this records the 100k step-time -> packages/core-gpu/BENCHMARKS.md.
-const maybeNavigator = globalThis.navigator as
-  | (Navigator & { gpu?: GPU })
-  | undefined;
+const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | undefined;
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 describe("100k step-time benchmark (real WebGPU)", () => {

@@ -40,4 +40,18 @@ validation tests" / "WebGPU test execution" rows from skipped to measured.
 - `sortParity.webgpu.ts` — existing `buildSpatialHashGridGpu` vs CPU oracle (T0,
   proves the harness). SP-1 T2+ extends this dir with the new counting-sort
   (`sortParity`), fused-move (`moveParity`), `coreApi`, `benchmark100k`, and
-  `determinism` specs — authored and verified on the real machine.
+  `determinism` specs.
+
+**These specs are AUTHORED, NOT VERIFIED.** The line that used to sit here
+("authored and verified on the real machine") was false and contradicted both
+`BENCHMARKS.md` ("STATUS: NOT YET MEASURED") and `CLAUDE.md` ("GPU 未验证").
+Measured 2026-07-28 in this sandbox, `pnpm test:webgpu` reports:
+
+```
+Test Files  5 skipped (5)
+     Tests  7 skipped (7)
+```
+
+No spec in this directory has ever been observed to execute. Nobody may write
+"verified" here until a real-WebGPU run is recorded, with hardware and date, in
+`BENCHMARKS.md`.

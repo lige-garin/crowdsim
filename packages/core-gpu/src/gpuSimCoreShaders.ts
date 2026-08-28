@@ -197,4 +197,3 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
   velocitiesOut[i] = cv;
   positionsOut[i] = p + cv * params.dt;
 }`;
-

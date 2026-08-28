@@ -11,9 +11,7 @@ import {
 import { stepForParity } from "../src/gpuSimCore";
 
 // Self-skips without a real WebGPU adapter (see test-webgpu/README.md).
-const maybeNavigator = globalThis.navigator as
-  | (Navigator & { gpu?: GPU })
-  | undefined;
+const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | undefined;
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 describe("fused move parity (real WebGPU)", () => {
@@ -75,9 +73,7 @@ describe("fused move parity (real WebGPU)", () => {
       );
 
       for (let i = 0; i < N * 2; i++) {
-        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(
-          1e-3,
-        );
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
       }
 
       device!.destroy();
