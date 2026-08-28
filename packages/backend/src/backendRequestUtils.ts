@@ -8,10 +8,12 @@ const jsonHeaders = {
   "content-type": "application/json; charset=utf-8",
 };
 const usageMetrics = new Set<UsageMetric>([
+  "ai-calls",
   "experiment-runs",
   "projects",
   "share-links",
   "stored-replays",
+  "tiles-requests",
 ]);
 
 export async function readJson(request: Request): Promise<Record<string, unknown>> {
@@ -144,4 +146,16 @@ export function jsonResponse(body: unknown, status = 200) {
     headers: jsonHeaders,
     status,
   });
+}
+
+export function quotaResponse(metric: UsageMetric, limit: number) {
+  return jsonResponse(
+    {
+      error: "usage-quota-exceeded",
+      limit,
+      message: `Usage quota for '${metric}' is exhausted.`,
+      metric,
+    },
+    429,
+  );
 }

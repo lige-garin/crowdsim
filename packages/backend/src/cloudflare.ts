@@ -1,7 +1,13 @@
 import {
+  ProjectAlreadyExistsError,
   ProjectVersionConflictError,
+  UsageQuotaExceededError,
+  createRandomShareToken,
+  defaultUsageLimits,
+  findExceededUsageMetric,
   type ProjectCreateInput,
   type ProjectRecord,
+  type ProjectStoreOptions,
   type ProjectUpdateInput,
   type ShareLinkCreateInput,
   type ShareLinkRecord,
@@ -65,20 +71,26 @@ export type R2ObjectBodyLike = {
   body?: BodyInit | null;
 };
 
-const usageLimits: Record<UsageMetric, number> = {
-  "experiment-runs": 500,
-  projects: 25,
-  "share-links": 100,
-  "stored-replays": 50,
-};
-
 export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
+  private readonly createShareToken: () => string;
+  private readonly usageLimits: Record<UsageMetric, number>;
+
   constructor(
     private readonly db: D1DatabaseLike,
     private readonly bucket?: R2BucketLike,
-  ) {}
+    options: ProjectStoreOptions = {},
+  ) {
+    this.createShareToken = options.createShareToken ?? createRandomShareToken;
+    this.usageLimits = { ...defaultUsageLimits, ...options.usageLimits };
+  }
 
   async createProject(input: ProjectCreateInput) {
+    if (await this.getProject(input.id)) {
+      throw new ProjectAlreadyExistsError(input.id);
+    }
+
+    await this.assertWritable(input.ownerId, "projects");
+
     const timestampIso = input.timestampIso ?? new Date().toISOString();
     const project: ProjectRecord = {
       createdAtIso: timestampIso,
@@ -159,6 +171,8 @@ export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
       );
     }
 
+    await this.assertWritable(project.ownerId);
+
     const timestampIso = input.timestampIso ?? new Date().toISOString();
     const nextProject: ProjectRecord = {
       ...project,
@@ -201,6 +215,8 @@ export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
       return null;
     }
 
+    await this.assertWritable(project.ownerId, "share-links");
+
     const timestampIso = input.timestampIso ?? new Date().toISOString();
     const shareLink: ShareLinkRecord = {
       access: "read-only",
@@ -208,7 +224,7 @@ export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
       createdBy: input.actorId,
       expiresAtIso: input.expiresAtIso,
       projectId: input.projectId,
-      token: input.token,
+      token: await this.mintShareToken(),
     };
 
     await run(
@@ -273,18 +289,20 @@ export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
       rows.map((row) => [row.metric, row.amount]),
     ) as Partial<Record<UsageMetric, number>>;
     const usage: Record<UsageMetric, number> = {
+      "ai-calls": manual["ai-calls"] ?? 0,
       "experiment-runs": manual["experiment-runs"] ?? 0,
       projects: await this.countOwnerRows("projects", ownerId),
       "share-links": await this.countOwnerRows("share_links", ownerId),
       "stored-replays": manual["stored-replays"] ?? 0,
+      "tiles-requests": manual["tiles-requests"] ?? 0,
     };
 
     return {
-      limits: { ...usageLimits },
+      limits: { ...this.usageLimits },
       ownerId,
       usage,
       withinQuota: (Object.keys(usage) as UsageMetric[]).every(
-        (metric) => usage[metric] <= usageLimits[metric],
+        (metric) => usage[metric] <= this.usageLimits[metric],
       ),
     };
   }
@@ -368,6 +386,36 @@ export class D1R2ProjectStore implements ProjectStore, ProjectArtifactStore {
       body: object.body ?? (object.arrayBuffer ? await object.arrayBuffer() : null),
       record,
     };
+  }
+
+  private async assertWritable(ownerId: string, metric?: UsageMetric) {
+    const snapshot = await this.getUsageSnapshot(ownerId);
+    const exceeded =
+      findExceededUsageMetric(snapshot) ??
+      (metric && snapshot.usage[metric] >= snapshot.limits[metric]
+        ? metric
+        : undefined);
+
+    if (exceeded) {
+      throw new UsageQuotaExceededError(ownerId, exceeded, snapshot.limits[exceeded]);
+    }
+  }
+
+  private async mintShareToken() {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const token = this.createShareToken();
+      const existing = await first<ShareLinkRow>(
+        this.db,
+        "SELECT * FROM share_links WHERE token = ?",
+        token,
+      );
+
+      if (!existing) {
+        return token;
+      }
+    }
+
+    throw new Error("Unable to mint a unique share link token");
   }
 
   private async countOwnerRows(table: "projects" | "share_links", ownerId: string) {

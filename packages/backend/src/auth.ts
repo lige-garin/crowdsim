@@ -16,10 +16,22 @@ export type LoginInput = {
   nowIso: string;
 };
 
+export type RandomBytesSource = (byteLength: number) => Uint8Array;
+
+export type AuthSessionStoreOptions = {
+  randomBytes?: RandomBytesSource;
+};
+
 const defaultSessionDurationMs = 8 * 60 * 60 * 1000;
+const sessionTokenBytes = 32;
 
 export class AuthSessionStore {
+  private readonly randomBytes: RandomBytesSource;
   private readonly sessions = new Map<string, AuthSessionRecord>();
+
+  constructor(options: AuthSessionStoreOptions = {}) {
+    this.randomBytes = options.randomBytes ?? webCryptoRandomBytes;
+  }
 
   createSession(input: LoginInput) {
     const createdAt = new Date(input.nowIso);
@@ -38,7 +50,7 @@ export class AuthSessionStore {
       expiresAtIso: new Date(
         createdAt.valueOf() + defaultSessionDurationMs,
       ).toISOString(),
-      token: createToken(input.accountId, input.nowIso),
+      token: this.createToken(),
     };
 
     this.sessions.set(session.token, session);
@@ -58,6 +70,29 @@ export class AuthSessionStore {
   revokeSession(token: string) {
     return this.sessions.delete(token);
   }
+
+  /**
+   * Derived from a CSPRNG only. Deriving it from the account id and a
+   * timestamp made every live token reconstructable by anyone who knew who
+   * logged in and roughly when.
+   */
+  private createToken() {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const bytes = this.randomBytes(sessionTokenBytes);
+
+      if (bytes.length !== sessionTokenBytes) {
+        throw new Error(`Session token source must return ${sessionTokenBytes} bytes`);
+      }
+
+      const token = `csess_${toHex(bytes)}`;
+
+      if (!this.sessions.has(token)) {
+        return token;
+      }
+    }
+
+    throw new Error("Unable to generate a unique session token");
+  }
 }
 
 function cloneSession(session: AuthSessionRecord): AuthSessionRecord {
@@ -67,17 +102,14 @@ function cloneSession(session: AuthSessionRecord): AuthSessionRecord {
   };
 }
 
-function createToken(accountId: string, timestampIso: string) {
-  return `csess_${fnv1a32(`${accountId}|${timestampIso}`)}`;
+function webCryptoRandomBytes(byteLength: number) {
+  const bytes = new Uint8Array(byteLength);
+
+  globalThis.crypto.getRandomValues(bytes);
+
+  return bytes;
 }
 
-function fnv1a32(input: string) {
-  let hash = 0x811c9dc5;
-
-  for (let index = 0; index < input.length; index++) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-
-  return (hash >>> 0).toString(16).padStart(8, "0");
+function toHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

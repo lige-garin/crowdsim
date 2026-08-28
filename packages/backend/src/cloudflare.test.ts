@@ -63,14 +63,14 @@ describe("Cloudflare D1/R2 backend adapter", () => {
       actorId: "planner",
       projectId: "project-d1",
       timestampIso: "2026-06-12T00:06:00.000Z",
-      token: "d1-share",
     });
 
     expect(created.version).toBe(1);
     expect(updated?.version).toBe(2);
     expect(await store.listProjectVersions("project-d1")).toHaveLength(2);
     expect(shareLink?.access).toBe("read-only");
-    expect(await store.resolveShareLink("d1-share")).toMatchObject({
+    expect(shareLink?.token).toMatch(/^csl_[0-9a-f]{48}$/);
+    expect(await store.resolveShareLink(shareLink?.token ?? "")).toMatchObject({
       project: { id: "project-d1" },
     });
     await expect(
@@ -93,14 +93,16 @@ describe("Cloudflare D1/R2 backend adapter", () => {
       store,
     });
 
+    const token = await login(backend.fetch, "planner");
+
     await requestJson(backend.fetch, "/api/projects", {
       body: {
         id: "project-artifact",
         name: "Artifact Project",
-        ownerId: "planner",
         scene,
       },
       method: "POST",
+      token,
     });
 
     const uploaded = await backend.fetch(
@@ -109,8 +111,9 @@ describe("Cloudflare D1/R2 backend adapter", () => {
         {
           body: new TextEncoder().encode("packed-replay"),
           headers: {
+            authorization: `Bearer ${token}`,
             "content-type": "application/vnd.crowdsim.replay",
-            "x-crowdsim-actor": "planner",
+            "x-crowdsim-actor": "impostor",
           },
           method: "POST",
         },
@@ -120,12 +123,16 @@ describe("Cloudflare D1/R2 backend adapter", () => {
     const downloaded = await backend.fetch(
       new Request(
         "https://crowdsim.local/api/projects/project-artifact/artifacts/replay/run-1.csr",
+        { headers: { authorization: `Bearer ${token}` } },
       ),
     );
-    const usage = await requestJson<UsagePayload>(backend.fetch, "/api/usage/planner");
+    const usage = await requestJson<UsagePayload>(backend.fetch, "/api/usage/planner", {
+      token,
+    });
 
     expect(uploaded.status).toBe(201);
     expect(uploadJson.artifact.key).toBe("projects/project-artifact/replays/run-1.csr");
+    expect(uploadJson.artifact.createdBy).toBe("planner");
     expect(r2.objects.has(uploadJson.artifact.key)).toBe(true);
     expect(downloaded.headers.get("x-crowdsim-artifact-key")).toBe(
       uploadJson.artifact.key,
@@ -133,10 +140,67 @@ describe("Cloudflare D1/R2 backend adapter", () => {
     expect(await downloaded.text()).toBe("packed-replay");
     expect(usage.body.usage.usage["stored-replays"]).toBe(1);
   });
+
+  it("keeps D1-backed artifacts away from other accounts", async () => {
+    const store = new D1R2ProjectStore(new FakeD1Database(), new FakeR2Bucket());
+    const backend = createCrowdSimBackend({
+      artifacts: store,
+      nowIso: () => "2026-06-12T00:00:00.000Z",
+      store,
+    });
+    const ownerToken = await login(backend.fetch, "planner");
+    const intruderToken = await login(backend.fetch, "intruder");
+
+    await requestJson(backend.fetch, "/api/projects", {
+      body: { id: "project-private", name: "Private", scene },
+      method: "POST",
+      token: ownerToken,
+    });
+    await backend.fetch(
+      new Request(
+        "https://crowdsim.local/api/projects/project-private/artifacts/replay/run-1.csr",
+        {
+          body: new TextEncoder().encode("packed-replay"),
+          headers: { authorization: `Bearer ${ownerToken}` },
+          method: "POST",
+        },
+      ),
+    );
+
+    const intruderRead = await backend.fetch(
+      new Request(
+        "https://crowdsim.local/api/projects/project-private/artifacts/replay/run-1.csr",
+        { headers: { authorization: `Bearer ${intruderToken}` } },
+      ),
+    );
+    const anonymousRead = await backend.fetch(
+      new Request(
+        "https://crowdsim.local/api/projects/project-private/artifacts/replay/run-1.csr",
+      ),
+    );
+
+    expect(intruderRead.status).toBe(404);
+    expect(anonymousRead.status).toBe(401);
+    expect(await intruderRead.text()).not.toContain("packed-replay");
+  });
 });
+
+async function login(
+  fetchHandler: (request: Request) => Promise<Response>,
+  accountId: string,
+) {
+  const response = await requestJson<{ session: { token: string } }>(
+    fetchHandler,
+    "/api/auth/login",
+    { body: { accountId }, method: "POST" },
+  );
+
+  return response.body.session.token;
+}
 
 type ArtifactPayload = {
   artifact: {
+    createdBy: string;
     key: string;
   };
 };
@@ -341,12 +405,15 @@ class FakeR2Bucket implements R2BucketLike {
 async function requestJson<TBody>(
   fetchHandler: (request: Request) => Promise<Response>,
   path: string,
-  options: { body?: unknown; method?: string } = {},
+  options: { body?: unknown; method?: string; token?: string } = {},
 ) {
   const response = await fetchHandler(
     new Request(`https://crowdsim.local${path}`, {
       body: options.body ? JSON.stringify(options.body) : undefined,
-      headers: options.body ? { "content-type": "application/json" } : {},
+      headers: {
+        ...(options.body ? { "content-type": "application/json" } : {}),
+        ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+      },
       method: options.method ?? "GET",
     }),
   );
