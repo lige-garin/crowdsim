@@ -41,6 +41,7 @@ type SceneEditorLayoutProps = {
   liveAgents: readonly SimulationAgent[];
   onAiDraft: () => void;
   onAiPromptChange: (value: string) => void;
+  onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
@@ -136,6 +137,7 @@ export function SceneEditorLayout({
   liveAgents,
   onAiDraft,
   onAiPromptChange,
+  onApplyScene,
   onBasemapImport,
   onBasemapNumberChange,
   onBuildingKindChange,
@@ -218,6 +220,7 @@ export function SceneEditorLayout({
         aiPrompt={aiPrompt}
         onAiDraft={onAiDraft}
         onAiPromptChange={onAiPromptChange}
+        onApplyScene={onApplyScene}
         onBasemapImport={onBasemapImport}
         onDeleteSelected={onDeleteSelected}
         onExportScene={onExportScene}

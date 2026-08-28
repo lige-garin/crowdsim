@@ -28,6 +28,7 @@ type AppStageProps = {
   heatmapCells: readonly HeatmapCell[];
   language: Language;
   layers: ViewportLayers;
+  onApplyScene: (scene: CrowdSimScene) => void;
   onEditorToolChange: (tool: EditorTool) => void;
   onViewModeChange: (viewMode: StageViewMode) => void;
   scene: CrowdSimScene;
@@ -43,6 +44,7 @@ export function AppStage({
   heatmapCells,
   language,
   layers,
+  onApplyScene,
   onEditorToolChange,
   onViewModeChange,
   scene,
@@ -163,6 +165,7 @@ export function AppStage({
             </div>
             <SceneEditor
               heatmapCells={heatmapCells}
+              onApplyScene={onApplyScene}
               onToolChange={onEditorToolChange}
               scene={scene}
               simulationSnapshot={simulationSnapshot}

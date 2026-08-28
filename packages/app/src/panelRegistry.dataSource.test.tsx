@@ -49,7 +49,9 @@ describe("panel dock data-source labelling", () => {
         ).toBeNull();
       }
     }
-  });
+    // Mounts and unmounts every registered panel in one pass; ~1.2s alone but
+    // several seconds under a parallel full-suite run, so it needs headroom.
+  }, 20_000);
 
   it("keeps the majority of panels honest about being fixtures", () => {
     // Guards against someone flipping the flags to silence the badge: the audit

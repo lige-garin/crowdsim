@@ -36,5 +36,8 @@ describe("PanelDock interaction", () => {
       const body = container.querySelector(".panel-dock-body");
       expect((body?.textContent ?? "").length, entry.id).toBeGreaterThan(0);
     }
-  });
+    // Renders every registered panel in one pass; ~1.2s alone but several
+    // seconds when the whole suite runs in parallel, so it needs headroom over
+    // the 5s default.
+  }, 20_000);
 });

@@ -1,3 +1,4 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
 import { AppWorkbench } from "./AppWorkbench";
@@ -6,7 +7,7 @@ import { createSystemSignals } from "./appSignals";
 import { createBioCityTopbarMetrics } from "./appTopbarMetrics";
 import { createDashboardStats, type DashboardSample } from "./dashboardStats";
 import { createDashboardV2Stats } from "./dashboardV2Stats";
-import { bioCityDemoScene as demoScene } from "./bioCityDemoScene";
+import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";
@@ -48,14 +49,19 @@ function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
 }
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
+  // The live scene is shell state, not a module constant. The editor hands its
+  // working copy back through `applyScene`, and swapping this value is what
+  // re-inits both simulation paths with the new geometry — this is the
+  // editor -> simulation loop that used to be hard-wired to the demo scene.
+  const [scene, setScene] = useState(initialScene);
   const probes = useAppProbes();
   const webGpuMovementBackend = useWebGpuMovementBackend();
-  const mainThreadSimulation = useSimulationController(demoScene, {
+  const mainThreadSimulation = useSimulationController(scene, {
     // Default to the engine's mall-crowd decision backend so agents shop with a
     // reason; the wasm DES backend stays available for other scenarios.
     movementBackend: webGpuMovementBackend.backend,
   });
-  const workerSimulation = useSimulationWorkerController(demoScene);
+  const workerSimulation = useSimulationWorkerController(scene);
   // `?mainsim` forces the main-thread CPU simulation. It is the working path
   // when there is no WebGPU (otherwise the app falls back to the worker path)
   // and is also what headless visual testing uses to render a live crowd.
@@ -95,8 +101,8 @@ function AppContent() {
     createTrajectoryRecording({
       id: "live-recording",
       runtime: currentRuntime,
-      sceneId: demoScene.id,
-      seed: demoScene.seed,
+      sceneId: scene.id,
+      seed: scene.seed,
     }),
   );
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
@@ -114,11 +120,11 @@ function AppContent() {
   });
   const heatmapCells = useMemo(
     () =>
-      createHeatmapCellsFromSamples(demoScene, heatmapSamples, {
+      createHeatmapCellsFromSamples(scene, heatmapSamples, {
         cellSize: 4,
         windowSeconds: heatmapWindowSeconds,
       }),
-    [heatmapSamples, heatmapWindowSeconds],
+    [heatmapSamples, heatmapWindowSeconds, scene],
   );
   const densityPeak = useMemo(
     () => heatmapCells.reduce((peak, cell) => Math.max(peak, cell.count), 0),
@@ -167,10 +173,17 @@ function AppContent() {
         evacuation,
         heatmapSamples,
         runtime: currentRuntime,
-        scene: demoScene,
+        scene: scene,
         simulationSnapshot: simulation.snapshot,
       }),
-    [dashboardStats, evacuation, heatmapSamples, currentRuntime, simulation.snapshot],
+    [
+      currentRuntime,
+      dashboardStats,
+      evacuation,
+      heatmapSamples,
+      scene,
+      simulation.snapshot,
+    ],
   );
   useEffect(() => {
     simulationSnapshotRef.current = simulation.snapshot;
@@ -272,15 +285,34 @@ function AppContent() {
             : createTrajectoryRecording({
                 id: "live-recording",
                 runtime: currentRuntime,
-                sceneId: demoScene.id,
-                seed: demoScene.seed,
+                sceneId: scene.id,
+                seed: scene.seed,
               }),
           snapshot,
         ),
       );
     }, 1000);
     return () => window.clearInterval(intervalId);
-  }, [currentRuntime]);
+  }, [currentRuntime, scene.id, scene.seed]);
+  function applyScene(nextScene: CrowdSimScene) {
+    // Swapping the scene re-inits whichever simulation path is mounted: the
+    // worker controller rebuilds its client on `[scene]`, the main-thread
+    // controller rebuilds its engine. Clear the series that describe the OLD
+    // scene so charts never mix two geometries.
+    setScene(nextScene);
+    setDashboardSamples([
+      { agentCount: 0, elapsedSeconds: 0, exitedCount: 0 },
+    ]);
+    setHeatmapSamples([]);
+    setTrajectoryRecording(
+      createTrajectoryRecording({
+        id: "live-recording",
+        runtime: currentRuntime,
+        sceneId: nextScene.id,
+        seed: nextScene.seed,
+      }),
+    );
+  }
   function resetSimulation() {
     simulation.reset();
     setDashboardSamples([
@@ -295,15 +327,15 @@ function AppContent() {
       createTrajectoryRecording({
         id: "live-recording",
         runtime: currentRuntime,
-        sceneId: demoScene.id,
-        seed: demoScene.seed,
+        sceneId: scene.id,
+        seed: scene.seed,
       }),
     );
   }
   async function triggerEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.triggerEvacuation();
     const snapshot = simulation.snapshot;
-    const flowPlan = createEvacuationFlowPlan(demoScene, snapshot.agents);
+    const flowPlan = createEvacuationFlowPlan(scene, snapshot.agents);
     simulation.setEvacuation(true);
     simulation.start();
     setEvacuation({
@@ -350,7 +382,7 @@ function AppContent() {
     movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
     movementBackendProbe: probes.movementBackendProbe,
     queueSystemProbe: probes.queueSystemProbe,
-    scene: demoScene,
+    scene: scene,
     sharedArrayBufferProbe: probes.sharedArrayBufferProbe,
     shopDecisionProbe: probes.shopDecisionProbe,
     simulationSnapshot: simulation.snapshot,
@@ -379,7 +411,7 @@ function AppContent() {
     language,
     runState,
     runtime: currentRuntime,
-    scene: demoScene,
+    scene: scene,
     snapshot: simulation.snapshot,
   });
   function enterLab(nextViewMode: StageViewMode = viewMode) {
@@ -422,7 +454,7 @@ function AppContent() {
             heatmapCells,
             heatmapProbe: probes.heatmapProbe,
             queueSystemProbe: probes.queueSystemProbe,
-            scene: demoScene,
+            scene: scene,
             shopDecisionProbe: probes.shopDecisionProbe,
             signals,
             simulationCredibility,
@@ -444,7 +476,7 @@ function AppContent() {
           }}
           runState={runState}
           runtime={currentRuntime}
-          sceneName={formatSceneName(demoScene, language)}
+          sceneName={formatSceneName(scene, language)}
           sidebarProps={{
             agentCount: simulation.snapshot.agentCount,
             editorTool,
@@ -474,10 +506,11 @@ function AppContent() {
             heatmapCells,
             language,
             layers,
+            onApplyScene: applyScene,
             onEditorToolChange: setEditorTool,
             onViewModeChange: setViewMode,
             runtime: currentRuntime,
-            scene: demoScene,
+            scene: scene,
             sharedAgentOverlay:
               simulation === workerSimulation
                 ? workerSimulation.worker.sharedAgentOverlay

@@ -56,6 +56,7 @@ type SceneEditorControlsProps = {
   language: Language;
   onAiDraft: () => void;
   onAiPromptChange: (value: string) => void;
+  onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeleteSelected: () => void;
   onExportScene: () => void;
@@ -95,6 +96,7 @@ export function SceneEditorControls({
   language,
   onAiDraft,
   onAiPromptChange,
+  onApplyScene,
   onBasemapImport,
   onDeleteSelected,
   onExportScene,
@@ -269,6 +271,18 @@ export function SceneEditorControls({
             DL
           </span>
           <span className="editor-tool-text">{t("delete")}</span>
+        </button>
+        <span className="editor-toolbar-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="editor-tool editor-tool-apply"
+          data-testid="editor-apply-scene"
+          onClick={onApplyScene}
+        >
+          <span className="editor-tool-glyph" aria-hidden="true">
+            AP
+          </span>
+          <span className="editor-tool-text">{t("applyToSimulation")}</span>
         </button>
       </div>
       <div className="editor-status" aria-label={t("editorStatus")}>

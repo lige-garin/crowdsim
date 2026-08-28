@@ -60,12 +60,19 @@ const gridSize = 2;
 const storageKey = "crowdsim.scene.v1";
 export function SceneEditor({
   heatmapCells = [],
+  onApplyScene,
   onToolChange,
   scene,
   simulationSnapshot,
   tool: controlledTool,
 }: {
   heatmapCells?: readonly HeatmapCell[];
+  /**
+   * Called with the editor's working scene when the user explicitly asks to
+   * apply it. Deliberately NOT called on every edit: restarting the simulation
+   * for each drawn primitive would make the editor unusable.
+   */
+  onApplyScene?: (scene: CrowdSimScene) => void;
   /** Notified whenever the active tool changes, including internal resets. */
   onToolChange?: (tool: EditorTool) => void;
   scene: CrowdSimScene;
@@ -150,6 +157,12 @@ export function SceneEditor({
     setStorageStatus(status);
     setTool("select");
     setUndoStack([]);
+  }
+  function applySceneToSimulation() {
+    // Hand the editor's working copy upward; the shell owns the live scene and
+    // re-inits the simulation with it.
+    onApplyScene?.(currentScene);
+    setStorageStatus(makeStatus("sceneApplied"));
   }
   function switchTool(nextTool: EditorTool) {
     setTool(nextTool);
@@ -446,6 +459,7 @@ export function SceneEditor({
       liveAgents={visibleLiveAgents}
       onAiDraft={applyAiDraft}
       onAiPromptChange={setAiPrompt}
+      onApplyScene={applySceneToSimulation}
       onBasemapImport={importBasemap}
       onBasemapNumberChange={paramActions.updateBasemap}
       onBuildingKindChange={paramActions.updateBuildingKind}

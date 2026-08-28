@@ -68,6 +68,15 @@
   background: var(--lab-line);
 }
 
+.editor-tool-apply {
+  border-color: rgba(11, 99, 229, 0.46) !important;
+  background: rgba(11, 99, 229, 0.14) !important;
+}
+
+.editor-tool-apply .editor-tool-text {
+  color: var(--lab-blue-strong);
+}
+
 .editor-filebar button:disabled,
 .editor-toolbar button:disabled,
 .editor-draft-actions button:disabled {

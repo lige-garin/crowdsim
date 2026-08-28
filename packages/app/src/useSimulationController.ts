@@ -36,6 +36,16 @@ export function useSimulationController(
   const lastFrameAtRef = useRef<number | null>(null);
 
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
+  // The engine is rebuilt whenever the scene changes, but `useState` only reads
+  // the initial snapshot once. Reset both while rendering (React's documented
+  // "adjust state when a prop changes" pattern) instead of in an effect, which
+  // would cascade an extra render on every scene swap.
+  const [snapshotEngine, setSnapshotEngine] = useState(engine);
+
+  if (snapshotEngine !== engine) {
+    setSnapshotEngine(engine);
+    setSnapshot(engine.snapshot());
+  }
 
   useEffect(() => {
     if (snapshot.status !== "running" || typeof window === "undefined") {

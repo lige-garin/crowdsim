@@ -1,7 +1,9 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { demoScene } from "./demoScene";
 import { I18nProvider } from "./i18n";
+import { templateScenes } from "./industryTemplates";
 import { SceneEditor } from "./SceneEditor";
 
 afterEach(() => {
@@ -113,5 +115,71 @@ describe("SceneEditor AI scene draft", () => {
     fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
 
     expect(screen.getByRole("option", { name: "AI 商场草稿" })).toBeInTheDocument();
+  });
+});
+
+describe("SceneEditor applies its working scene to the simulation", () => {
+  function renderWithApply() {
+    const applied: CrowdSimScene[] = [];
+
+    render(
+      <I18nProvider>
+        <SceneEditor
+          scene={demoScene}
+          onApplyScene={(nextScene) => applied.push(nextScene)}
+        />
+      </I18nProvider>,
+    );
+
+    return applied;
+  }
+
+  it("hands the working scene back when the user asks to apply it", () => {
+    const applied = renderWithApply();
+
+    fireEvent.click(screen.getByTestId("editor-apply-scene"));
+
+    expect(applied).toHaveLength(1);
+    expect(applied[0].id).toBe(demoScene.id);
+  });
+
+  it("applies the EDITED scene, not the scene the shell is still running", () => {
+    const applied = renderWithApply();
+    const template = templateScenes[1];
+
+    // Swap the editor's working copy to a template. The shell still runs
+    // `demoScene` — applying must carry the editor's copy, which is the whole
+    // point of the editor -> simulation loop.
+    fireEvent.change(screen.getByLabelText("示例场景"), {
+      target: { value: template.id },
+    });
+    fireEvent.click(screen.getByTestId("editor-apply-scene"));
+
+    expect(applied).toHaveLength(1);
+    expect(applied[0].id).toBe(template.id);
+    expect(applied[0].id).not.toBe(demoScene.id);
+  });
+
+  it("never applies while editing — only the explicit button restarts the sim", () => {
+    const applied = renderWithApply();
+
+    fireEvent.change(screen.getByLabelText("示例场景"), {
+      target: { value: templateScenes[1].id },
+    });
+
+    // Implicit sync here would restart the simulation on every drawn primitive.
+    expect(applied).toHaveLength(0);
+
+    fireEvent.click(screen.getByTestId("editor-apply-scene"));
+
+    expect(applied).toHaveLength(1);
+  });
+
+  it("labels the control in both languages", () => {
+    renderWithApply();
+
+    expect(screen.getByTestId("editor-apply-scene").textContent).toContain(
+      "应用到仿真",
+    );
   });
 });
