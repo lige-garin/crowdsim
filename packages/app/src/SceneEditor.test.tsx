@@ -183,3 +183,60 @@ describe("SceneEditor applies its working scene to the simulation", () => {
     );
   });
 });
+
+describe("SceneEditor DXF import wiring", () => {
+  it("imports a DXF floor plan through the hidden file input", async () => {
+    const { container } = renderEditor();
+
+    // The control is there and routes through a hidden, typed file input.
+    expect(screen.getByRole("button", { name: "导入 DXF" })).toBeInTheDocument();
+
+    const input = container.querySelector<HTMLInputElement>(
+      'input[accept*=".dxf"]',
+    );
+    expect(input).not.toBeNull();
+
+    // A minimal four-vertex polyline -> one imported wall.
+    const dxf = [
+      "0", "SECTION",
+      "2", "ENTITIES",
+      "0", "LWPOLYLINE",
+      "8", "WALLS",
+      "10", "0",
+      "20", "0",
+      "10", "10",
+      "20", "0",
+      "10", "10",
+      "20", "10",
+      "10", "0",
+      "20", "10",
+      "0", "ENDSEC",
+      "0", "EOF",
+    ].join("\n");
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File([dxf], "plan.dxf", { type: "application/dxf" })],
+      },
+    });
+
+    expect(await screen.findByText(/已导入 DXF：1 面墙/)).toBeInTheDocument();
+  });
+
+  it("reports an invalid DXF instead of silently importing nothing", async () => {
+    const { container } = renderEditor();
+
+    const input = container.querySelector<HTMLInputElement>(
+      'input[accept*=".dxf"]',
+    );
+    expect(input).not.toBeNull();
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(["not a dxf"], "broken.dxf", { type: "application/dxf" })],
+      },
+    });
+
+    expect(await screen.findByText("DXF 无效")).toBeInTheDocument();
+  });
+});

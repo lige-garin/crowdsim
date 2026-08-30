@@ -51,6 +51,7 @@ type SceneEditorControlsProps = {
   canRedo: boolean;
   canUndo: boolean;
   documentCounts: DocumentCounts;
+  dxfInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   language: Language;
@@ -59,6 +60,7 @@ type SceneEditorControlsProps = {
   onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeleteSelected: () => void;
+  onDxfImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onExportScene: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -91,6 +93,7 @@ export function SceneEditorControls({
   canRedo,
   canUndo,
   documentCounts,
+  dxfInputRef,
   fileInputRef,
   geoJsonInputRef,
   language,
@@ -99,6 +102,7 @@ export function SceneEditorControls({
   onApplyScene,
   onBasemapImport,
   onDeleteSelected,
+  onDxfImport,
   onExportScene,
   onGeoJsonImport,
   onImportScene,
@@ -153,6 +157,9 @@ export function SceneEditorControls({
         <button type="button" onClick={() => geoJsonInputRef.current?.click()}>
           {t("geoJsonImport")}
         </button>
+        <button type="button" onClick={() => dxfInputRef.current?.click()}>
+          {t("dxfImport")}
+        </button>
         <button type="button" onClick={() => basemapInputRef.current?.click()}>
           {t("basemap")}
         </button>
@@ -185,6 +192,13 @@ export function SceneEditorControls({
           type="file"
           accept=".geojson,.json,application/geo+json,application/json"
           onChange={onGeoJsonImport}
+        />
+        <input
+          ref={dxfInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".dxf,application/dxf,image/vnd.dxf"
+          onChange={onDxfImport}
         />
         <input
           ref={basemapInputRef}

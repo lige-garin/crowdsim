@@ -66,6 +66,12 @@ export const messages = {
   desQueue: { zh: "DES queue", en: "DES queue" },
   desQueueVerified: { zh: "DES queue verified", en: "DES queue verified" },
   dwell: { zh: "停留", en: "Dwell" },
+  dxfImport: { zh: "导入 DXF", en: "Import DXF" },
+  dxfImportedWalls: {
+    zh: "已导入 DXF：{count} 面墙",
+    en: "Imported DXF: {count} walls",
+  },
+  dxfInvalid: { zh: "DXF 无效", en: "DXF invalid" },
   editableSceneCanvas: { zh: "Editable scene canvas", en: "Editable scene canvas" },
   editorStatus: { zh: "编辑器状态", en: "Editor status" },
   editorTools: { zh: "编辑工具", en: "Editor tools" },

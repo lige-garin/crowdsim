@@ -34,6 +34,7 @@ type SceneEditorLayoutProps = {
   canUndo: boolean;
   document: EditorDocument;
   draftWallPoints: ScenePoint[];
+  dxfInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   gridSize: number;
@@ -48,6 +49,7 @@ type SceneEditorLayoutProps = {
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onDeleteSelected: () => void;
+  onDxfImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
   onExportScene: () => void;
   onFinishWall: () => void;
@@ -130,6 +132,7 @@ export function SceneEditorLayout({
   canUndo,
   document,
   draftWallPoints,
+  dxfInputRef,
   fileInputRef,
   geoJsonInputRef,
   gridSize,
@@ -144,6 +147,7 @@ export function SceneEditorLayout({
   onBuildingNumberChange,
   onCanvasPointerDown,
   onDeleteSelected,
+  onDxfImport,
   onEntityPointerDown,
   onExportScene,
   onFinishWall,
@@ -214,6 +218,7 @@ export function SceneEditorLayout({
         canRedo={canRedo}
         canUndo={canUndo}
         documentCounts={countDocumentObjects(document)}
+        dxfInputRef={dxfInputRef}
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
         language={language}
@@ -223,6 +228,7 @@ export function SceneEditorLayout({
         onApplyScene={onApplyScene}
         onBasemapImport={onBasemapImport}
         onDeleteSelected={onDeleteSelected}
+        onDxfImport={onDxfImport}
         onExportScene={onExportScene}
         onGeoJsonImport={onGeoJsonImport}
         onImportScene={onImportScene}

@@ -19,6 +19,7 @@ import {
   type SceneImageOverlay,
 } from "./sceneEditorImageOverlay";
 import { createSceneFromGeoJson } from "./geojsonImport";
+import { createSceneFromDxfWithReport } from "./dxfImport";
 import type { HeatmapCell } from "./heatmap";
 import { useI18n, type LocalizedText } from "./i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
@@ -85,6 +86,7 @@ export function SceneEditor({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const geoJsonInputRef = useRef<HTMLInputElement | null>(null);
   const basemapInputRef = useRef<HTMLInputElement | null>(null);
+  const dxfInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
   const [baseScene, setBaseScene] = useState(scene);
   const [aiImageOverlay, setAiImageOverlay] = useState<SceneImageOverlay | null>(null);
@@ -385,6 +387,44 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
+  async function importDxf(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const result = createSceneFromDxfWithReport(
+        currentScene,
+        await file.text(),
+      );
+
+      if (result.wallCount === 0) {
+        setStorageStatus(makeStatus("dxfInvalid"));
+        return;
+      }
+
+      replaceScene(
+        result.scene,
+        makeStatus("dxfImportedWalls", {
+          en: { count: result.wallCount },
+          zh: { count: result.wallCount },
+        }),
+      );
+
+      // Entity types we could not convert are reported rather than dropped
+      // silently: a plan that comes in missing its arcs is a different plan.
+      if (result.skippedEntityTypes.length > 0) {
+        setStorageStatus({
+          zh: `已导入 ${result.wallCount} 面墙；忽略类型：${result.skippedEntityTypes.join("、")}`,
+          en: `Imported ${result.wallCount} walls; ignored types: ${result.skippedEntityTypes.join(", ")}`,
+        });
+      }
+    } catch {
+      setStorageStatus(makeStatus("dxfInvalid"));
+    } finally {
+      event.target.value = "";
+    }
+  }
   async function importBasemap(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -401,7 +441,7 @@ export function SceneEditor({
       // Nothing has looked at the pixels: the overlay can only report that.
       setAiImageOverlay(createImportedImageOverlay(file.name));
       setStorageStatus({
-        zh: `搴曞浘 ${file.name}`,
+        zh: `底图 ${file.name}`,
         en: `Basemap ${file.name}`,
       });
     } catch {
@@ -452,6 +492,7 @@ export function SceneEditor({
       canUndo={undoStack.length > 0}
       document={document}
       draftWallPoints={draftWallPoints}
+      dxfInputRef={dxfInputRef}
       fileInputRef={fileInputRef}
       geoJsonInputRef={geoJsonInputRef}
       gridSize={gridSize}
@@ -470,6 +511,7 @@ export function SceneEditor({
       onExportScene={exportScene}
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
+      onDxfImport={importDxf}
       onGenerateZoneStores={paramActions.generateStoresForSelectedZone}
       onHazardKindChange={paramActions.updateHazardKind}
       onHazardNumberChange={paramActions.updateHazardNumber}
