@@ -58,8 +58,12 @@ describe("validation report", () => {
         {
           ...rimeaCoreScenarios[0],
           expectations: [
-            { metric: "meanSpeedMetersPerSecond", range: { min: 99 } },
-            { metric: "exitedCount", range: { min: 0 } },
+            {
+              metric: "meanSpeedMetersPerSecond",
+              range: { min: 99 },
+              source: "self-authored",
+            },
+            { metric: "exitedCount", range: { min: 0 }, source: "self-authored" },
           ],
         },
       ],

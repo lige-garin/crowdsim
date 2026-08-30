@@ -54,6 +54,9 @@ describe("benchmark runner", () => {
         {
           metric: "spawnedCount" as const,
           range: { min: 10_000 },
+          // Deliberately unattainable: this asserts the runner reports a
+          // failure, so the range must not be one the engine can satisfy.
+          source: "self-authored" as const,
         },
       ],
     };

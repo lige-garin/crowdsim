@@ -1,3 +1,22 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md and ./pedestrianFundamentalDiagram.ts)
+//
+// These scenarios are named after RiMEA test cases but they are NOT the RiMEA
+// geometry, and every expectation below is `source: "self-authored"` -- the
+// ranges were chosen to bracket what this engine currently produces, so they
+// are regression guards, not evidence of correctness.
+//
+// The clearest example: the engine walks every agent at a constant 1.34 m/s
+// and the corridor expectation is 1.25-1.38 m/s. 1.34 is Weidmann's free-flow
+// mean, so the engine cannot miss as long as it keeps moving -- the range was
+// fitted to the engine, not to the world.
+//
+// What the engine does not do is slow anyone down as density rises. Weidmann's
+// published curve (`weidmannSpeedAtDensity`) puts the corridor at 0.61 m/s at
+// 2 P/m^2; this engine still reports 1.34. RiMEA test 4 asks whether a model
+// reproduces the shape of that curve, and this model currently does not have
+// one to reproduce. `pedestrianFundamentalDiagram.ts` holds the published
+// numbers; closing the gap means giving the engine a density-speed coupling,
+// not widening these ranges.
 import { parseScene } from "@crowdsim/scene-schema";
 import type { BenchmarkScenario } from "./benchmarkTypes";
 
@@ -12,10 +31,10 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
     description: "Single-direction corridor flow with one source and one sink.",
     durationSeconds: 90,
     expectations: [
-      { metric: "spawnedCount", range: { min: 80, max: 240 } },
-      { metric: "exitedCount", range: { min: 40, max: 220 } },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.25, max: 1.38 } },
-      { metric: "throughputPerMinute", range: { min: 25, max: 150 } },
+      { metric: "spawnedCount", range: { min: 80, max: 240 }, source: "self-authored" },
+      { metric: "exitedCount", range: { min: 40, max: 220 }, source: "self-authored" },
+      { metric: "meanSpeedMetersPerSecond", range: { min: 1.25, max: 1.38 }, source: "self-authored" },
+      { metric: "throughputPerMinute", range: { min: 25, max: 150 }, source: "self-authored" },
     ],
     id: "rimea-straight-corridor",
     name: "RiMEA straight corridor",
@@ -50,10 +69,10 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       "Higher demand corridor used as a bottleneck proxy until wall-aware routing is benchmarked.",
     durationSeconds: 90,
     expectations: [
-      { metric: "spawnedCount", range: { min: 140, max: 340 } },
-      { metric: "exitedCount", range: { min: 70, max: 300 } },
-      { metric: "densityPeak", range: { min: 0.01, max: 1.5 } },
-      { metric: "throughputPerMinute", range: { min: 45, max: 220 } },
+      { metric: "spawnedCount", range: { min: 140, max: 340 }, source: "self-authored" },
+      { metric: "exitedCount", range: { min: 70, max: 300 }, source: "self-authored" },
+      { metric: "densityPeak", range: { min: 0.01, max: 1.5 }, source: "self-authored" },
+      { metric: "throughputPerMinute", range: { min: 45, max: 220 }, source: "self-authored" },
     ],
     id: "rimea-bottleneck",
     name: "RiMEA bottleneck",
@@ -113,9 +132,9 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       "L-shaped route with a corner geometry fixture for turning benchmarks.",
     durationSeconds: 100,
     expectations: [
-      { metric: "spawnedCount", range: { min: 80, max: 260 } },
-      { metric: "exitedCount", range: { min: 35, max: 230 } },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.05, max: 1.35 } },
+      { metric: "spawnedCount", range: { min: 80, max: 260 }, source: "self-authored" },
+      { metric: "exitedCount", range: { min: 35, max: 230 }, source: "self-authored" },
+      { metric: "meanSpeedMetersPerSecond", range: { min: 1.05, max: 1.35 }, source: "self-authored" },
     ],
     id: "rimea-corner",
     name: "RiMEA corner",
@@ -166,10 +185,10 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       "Two opposing flows with balanced source rates for deterministic counterflow regression.",
     durationSeconds: 90,
     expectations: [
-      { metric: "spawnedCount", range: { min: 120, max: 360 } },
-      { metric: "exitedCount", range: { min: 60, max: 320 } },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.0, max: 1.32 } },
-      { metric: "densityPeak", range: { min: 0.01, max: 1.6 } },
+      { metric: "spawnedCount", range: { min: 120, max: 360 }, source: "self-authored" },
+      { metric: "exitedCount", range: { min: 60, max: 320 }, source: "self-authored" },
+      { metric: "meanSpeedMetersPerSecond", range: { min: 1.0, max: 1.32 }, source: "self-authored" },
+      { metric: "densityPeak", range: { min: 0.01, max: 1.6 }, source: "self-authored" },
     ],
     id: "rimea-counterflow",
     name: "RiMEA counterflow",

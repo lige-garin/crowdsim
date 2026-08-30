@@ -14,9 +14,29 @@ export type BenchmarkRange = {
   min?: number;
 };
 
+/**
+ * Where the numbers in a `BenchmarkExpectation` come from.
+ *
+ * "self-authored" means the range was chosen to bracket what this engine
+ * currently produces. Such a range is a regression guard -- it fires when the
+ * behaviour changes -- and proves nothing about correctness. A range that was
+ * fitted to the engine cannot fail while the engine stays the same, which is
+ * why the source has to be recorded next to the numbers.
+ *
+ * "literature" means the range is quoted from a published source; the
+ * expectation must then carry a `reference`.
+ */
+export type BenchmarkExpectationSource = "literature" | "self-authored";
+
 export type BenchmarkExpectation = {
   metric: BenchmarkMetric;
+  /**
+   * Citation for a literature range, e.g. "Weidmann 1993". Omitted for
+   * self-authored ranges, which have nothing to cite.
+   */
+  reference?: string;
   range: BenchmarkRange;
+  source: BenchmarkExpectationSource;
 };
 
 export type BenchmarkScenario = {
