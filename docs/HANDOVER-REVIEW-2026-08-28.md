@@ -23,7 +23,7 @@
 | `pnpm lint`                             | **红** — 3 个 Parsing error                     | backend 2 个 + scene-schema 1 个                                                   |
 | `pnpm format:check`                     | **红** — 5 个文件                               | 同上                                                                               |
 | `pnpm test`                             | **红** — scene-schema 先挂，pnpm 递归中断       | **app 的 454 个用例根本没被执行到**                                                |
-| `pnpm --filter @crowdsim/app test`      | 135 文件 / **454 用例全过**（37s）              | 但 vitest **进程不退出**，`timeout` 后被 SIGTERM（exit 143）                       |
+| `pnpm --filter @crowdsim/app test`      | 135 文件 / **454 用例全过**（37s）              | ~~vitest 进程不退出（exit 143）~~ **2026-08-30 复核：误判，见清单第 9 条**         |
 | `pnpm test:rust`                        | **11/11 过**                                    | Rust DES/FSM/queue 是真的                                                          |
 | `pnpm --filter @crowdsim/backend test`  | 19 过 / **1 失败** / 2 文件语法错误             | 失败项见下                                                                         |
 | `pnpm --filter @crowdsim/core-gpu test` | 30 过 / **5 skip**                              | skip 是 `navigator?.gpu ? it : it.skip`，沙箱无 WebGPU                             |
@@ -79,7 +79,7 @@ ReferenceError: aiPayload is not defined
 | 6   | `reportExport.test.ts` 自比假绿            | `:26-40` baseline 由同一个 `createReport()` 现算再自比，`match` 恒 true，且结果写进可导出报告                                                                                          |
 | 7   | 实验面板仍主线程同步跑（4.86 万步）        | `ExperimentSweepPanel.tsx:21` / `ExperimentSummaryPanel.tsx:12` / `ScenarioComparisonPanel.tsx:7`；现成的 `experimentWorkerClient` 没人用                                              |
 | 8   | 视口 overlay 仍硬截 240 人                 | `simulationViewportOverlay.ts:36 slice(0, 240)`（InstancedMesh 路径已修，overlay 路径没修）                                                                                            |
-| 9   | vitest 进程跑完不退出                      | app 454 用例全绿但进程 hang，被 SIGTERM                                                                                                                                                |
+| ~~9~~ | ~~vitest 进程跑完不退出~~  | **2026-08-30 复核：不存在此 bug，原记录为误判。** 三次实测定时：app 全量 22s 退出（exit 0）、`pnpm -r test` 20s 退出、完整 `lint && typecheck && test` 链 77s 退出。并注入临时 `afterAll` 探针打印 `process._getActiveHandles()`，测试结束后仅剩 **4 个 vitest 自身的 IPC socket（Pipe + 3×Socket）**，无任何遗留定时器/服务器句柄。原先的 exit 143 是 `timeout` 对**首次 `wasm-pack` 冷编译 Rust**（含 cargo 全量构建）的正常耗时误杀，不是进程 hang。教训：把"等了很久"当成"挂住"，正是本项目 CLAIMS_LEDGER 反复清理的那类未验证断言 |
 
 ---
 
