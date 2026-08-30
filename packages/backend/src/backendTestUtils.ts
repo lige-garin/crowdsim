@@ -1,4 +1,24 @@
-﻿export const scene = {
+﻿import {
+  createCrowdSimBackend,
+  type BackendOptions,
+  type CrowdSimBackend,
+} from "./index";
+
+/**
+ * A backend for tests. Since the login route fails closed, tests have to opt in
+ * explicitly to the unauthenticated login they were relying on implicitly. The
+ * opt-in lives here, in one place, so no test can quietly reintroduce a
+ * permissive login -- and so the default in `createCrowdSimBackend` can stay
+ * safe without breaking the suite.
+ */
+export function createTestBackend(options: BackendOptions = {}): CrowdSimBackend {
+  return createCrowdSimBackend({
+    allowUnauthenticatedLogin: true,
+    ...options,
+  });
+}
+
+export const scene = {
   schemaVersion: "1.0.0",
   id: "backend-demo",
   name: "Backend Demo",

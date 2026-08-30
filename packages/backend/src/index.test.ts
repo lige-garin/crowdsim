@@ -2,6 +2,7 @@
 import { AuthSessionStore } from "./auth";
 import { createCrowdSimBackend } from "./index";
 import {
+  createTestBackend,
   requestJson,
   type AuthSessionPayload,
   type ErrorPayload,
@@ -10,7 +11,7 @@ import {
 
 describe("CrowdSim backend auth routes", () => {
   it("creates, resolves, and revokes account sessions", async () => {
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       nowIso: () => "2026-06-12T00:00:00.000Z",
     });
     const login = await requestJson<AuthSessionPayload>(
@@ -65,7 +66,7 @@ describe("CrowdSim backend auth routes", () => {
 
   it("rejects expired account sessions", async () => {
     let nowIso = "2026-06-12T00:00:00.000Z";
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       nowIso: () => nowIso,
     });
     const login = await requestJson<AuthSessionPayload>(
@@ -98,7 +99,7 @@ describe("CrowdSim backend auth routes", () => {
   });
 
   it("issues unpredictable session tokens decoupled from the account", async () => {
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       nowIso: () => "2026-06-12T00:00:00.000Z",
     });
     const tokens: string[] = [];
@@ -170,7 +171,7 @@ describe("CrowdSim backend auth routes", () => {
 
   it("hands login to the configured credential verifier", async () => {
     const attempts: string[] = [];
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       verifyLogin: ({ accountId, body }) => {
         attempts.push(accountId);
 
@@ -203,5 +204,57 @@ describe("CrowdSim backend auth routes", () => {
     expect(accepted.status).toBe(201);
     expect(projects.status).toBe(200);
     expect(attempts).toEqual(["planner", "planner"]);
+  });
+
+  it("refuses login outright when no credential verifier is configured", async () => {
+    // The regression this guards: the check used to be
+    // `options.verifyLogin && !(await options.verifyLogin(...))`, so a backend
+    // created without the hook accepted any accountId and handed back a valid
+    // session token, making every downstream session check decorative.
+    const backend = createCrowdSimBackend({
+      nowIso: () => "2026-06-12T00:00:00.000Z",
+    });
+
+    const login = await requestJson<ErrorPayload>(
+      backend.fetch,
+      "/api/auth/login",
+      { body: { accountId: "planner" }, method: "POST" },
+    );
+
+    expect(login.status).toBe(503);
+    expect(login.body.error).toBe("login-verifier-not-configured");
+  });
+
+  it("keeps protected routes closed when login is refused", async () => {
+    const backend = createCrowdSimBackend({
+      nowIso: () => "2026-06-12T00:00:00.000Z",
+    });
+
+    // Nothing was minted, so there is no token to forge: the route is gated on
+    // a session the server never issued.
+    const projects = await requestJson<ErrorPayload>(
+      backend.fetch,
+      "/api/projects",
+      { token: "forged-token" },
+    );
+
+    expect(projects.status).toBe(401);
+    expect(projects.body.error).toBe("auth-required");
+  });
+
+  it("accepts unauthenticated login only when explicitly opted in", async () => {
+    const backend = createCrowdSimBackend({
+      allowUnauthenticatedLogin: true,
+      nowIso: () => "2026-06-12T00:00:00.000Z",
+    });
+
+    const login = await requestJson<AuthSessionPayload>(
+      backend.fetch,
+      "/api/auth/login",
+      { body: { accountId: "planner" }, method: "POST" },
+    );
+
+    expect(login.status).toBe(201);
+    expect(login.body.session.account.id).toBe("planner");
   });
 });

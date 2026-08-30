@@ -1,6 +1,6 @@
 ﻿import { InMemoryProjectStore } from "@crowdsim/collab";
 import { describe, expect, it } from "vitest";
-import { createCrowdSimBackend } from "./index";
+import { createTestBackend } from "./backendTestUtils";
 import {
   login,
   requestJson,
@@ -11,7 +11,7 @@ import {
 
 describe("CrowdSim backend tile and CORS routes", () => {
   it("blocks client-side tile keys and reports missing server tile secrets", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
     const leakedSecret = await requestJson<ErrorPayload>(
       backend.fetch,
@@ -32,7 +32,7 @@ describe("CrowdSim backend tile and CORS routes", () => {
 
   it("proxies Google tiles through a server-side key without leaking it", async () => {
     let upstreamRequestUrl = "";
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       tiles: {
         fetch: async (request) => {
           upstreamRequestUrl = request.url;
@@ -67,7 +67,7 @@ describe("CrowdSim backend tile and CORS routes", () => {
 
   it("returns 429 once the tiles quota is exhausted", async () => {
     let upstreamCalls = 0;
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       store: new InMemoryProjectStore({ usageLimits: { "tiles-requests": 1 } }),
       tiles: {
         fetch: async () => {
@@ -99,7 +99,7 @@ describe("CrowdSim backend tile and CORS routes", () => {
 
   it("answers CORS preflight only for configured origins", async () => {
     const allowedOrigin = "https://studio.crowdsim.local";
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       cors: { allowCredentials: true, allowedOrigins: [allowedOrigin] },
     });
 
@@ -156,7 +156,7 @@ describe("CrowdSim backend tile and CORS routes", () => {
   });
 
   it("stays same-origin by default and refuses wildcard credentials", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const crossOrigin = await backend.fetch(
       new Request("https://crowdsim.local/health", {
         headers: { origin: "https://studio.crowdsim.local" },
@@ -173,7 +173,7 @@ describe("CrowdSim backend tile and CORS routes", () => {
     expect(crossOrigin.headers.get("access-control-allow-origin")).toBeNull();
     expect(preflight.status).toBe(403);
     expect(() =>
-      createCrowdSimBackend({
+      createTestBackend({
         cors: { allowCredentials: true, allowedOrigins: ["*"] },
       }),
     ).toThrow(/wildcard origin/i);

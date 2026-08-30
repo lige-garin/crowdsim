@@ -4,7 +4,7 @@ import { bioCityDemoScene } from "./bioCityDemoScene";
 import { BackendClientError, createBackendClient } from "./backendClient";
 
 function newClient() {
-  const backend = createCrowdSimBackend();
+  const backend = createCrowdSimBackend({ allowUnauthenticatedLogin: true });
   return createBackendClient({
     fetch: backend.fetch,
     baseUrl: "http://backend.local",
@@ -78,7 +78,7 @@ describe("backendClient against the real in-process backend", () => {
   });
 
   it("fails every data call until a session exists", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createCrowdSimBackend({ allowUnauthenticatedLogin: true });
     const client = createBackendClient({
       fetch: backend.fetch,
       baseUrl: "http://backend.local",
@@ -97,7 +97,7 @@ describe("backendClient against the real in-process backend", () => {
   });
 
   it("never returns another account's project", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createCrowdSimBackend({ allowUnauthenticatedLogin: true });
     const owner = createBackendClient({
       fetch: backend.fetch,
       baseUrl: "http://backend.local",

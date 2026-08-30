@@ -1,6 +1,6 @@
 ﻿import { InMemoryProjectStore } from "@crowdsim/collab";
 import { describe, expect, it } from "vitest";
-import { createCrowdSimBackend } from "./index";
+import { createTestBackend } from "./backendTestUtils";
 import {
   aiPayload,
   login,
@@ -19,7 +19,7 @@ import {
 
 describe("CrowdSim backend project routes", () => {
   it("rejects every data route without a valid session", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const routes: { body?: unknown; method: string; path: string }[] = [
       { body: { id: "p", name: "P", scene }, method: "POST", path: "/api/projects" },
       { method: "GET", path: "/api/projects" },
@@ -61,7 +61,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("serves projects, versions, share links, and quota through HTTP", async () => {
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       nowIso: () => "2026-06-12T00:00:00.000Z",
     });
     const token = await login(backend.fetch, "planner");
@@ -144,7 +144,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("hides other accounts' projects behind a 404", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const ownerToken = await login(backend.fetch, "planner");
     const intruderToken = await login(backend.fetch, "intruder");
 
@@ -203,7 +203,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("files projects under the session account, not the request body", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
     const victimToken = await login(backend.fetch, "victim");
 
@@ -228,7 +228,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("mints share tokens server-side and keeps the shared payload read-only", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
 
     await requestJson(backend.fetch, "/api/projects", {
@@ -265,7 +265,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("returns 409 for stale project updates and duplicate project ids", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
     const intruderToken = await login(backend.fetch, "intruder");
 
@@ -315,7 +315,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("returns 429 once the project quota is exhausted", async () => {
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       store: new InMemoryProjectStore({ usageLimits: { projects: 1 } }),
     });
     const token = await login(backend.fetch, "planner");
@@ -344,7 +344,7 @@ describe("CrowdSim backend project routes", () => {
   });
 
   it("rejects unknown quota metrics and missing projects", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
 
     const missingProject = await requestJson<ErrorPayload>(

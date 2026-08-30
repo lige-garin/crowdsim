@@ -1,6 +1,6 @@
 ﻿import { InMemoryProjectStore } from "@crowdsim/collab";
 import { describe, expect, it } from "vitest";
-import { createCrowdSimBackend } from "./index";
+import { createTestBackend } from "./backendTestUtils";
 import {
   aiPayload,
   login,
@@ -13,7 +13,7 @@ import {
 
 describe("CrowdSim backend AI proxy routes", () => {
   it("routes AI requests through server-side secrets without leaking them", async () => {
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       aiResponder: ({ payload, provider }) => ({
         payload,
         provider,
@@ -49,7 +49,7 @@ describe("CrowdSim backend AI proxy routes", () => {
 
   it("calls AI upstream providers through injectable server fetch", async () => {
     const upstreamRequests: Request[] = [];
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       aiFetch: async (request) => {
         upstreamRequests.push(request);
 
@@ -85,7 +85,7 @@ describe("CrowdSim backend AI proxy routes", () => {
   });
 
   it("blocks client-side AI secrets and reports missing server secrets", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createTestBackend();
     const token = await login(backend.fetch, "planner");
 
     const leakedSecret = await requestJson<ErrorPayload>(
@@ -120,7 +120,7 @@ describe("CrowdSim backend AI proxy routes", () => {
 
   it("rejects AI payloads outside the model and output-token allowlist", async () => {
     const upstreamCalls: unknown[] = [];
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       aiResponder: ({ payload }) => {
         upstreamCalls.push(payload);
 
@@ -179,7 +179,7 @@ describe("CrowdSim backend AI proxy routes", () => {
 
   it("returns 429 once the AI call quota is exhausted", async () => {
     let providerCalls = 0;
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       aiResponder: () => {
         providerCalls++;
 

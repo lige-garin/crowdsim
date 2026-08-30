@@ -56,6 +56,11 @@ export type AiProxyResponder = (input: {
 }) => Promise<unknown> | unknown;
 
 export type BackendOptions = {
+  /**
+   * Opt in to unauthenticated login. Off by default: see the note on
+   * `LoginVerifier`. Set this only for local development or tests.
+   */
+  allowUnauthenticatedLogin?: boolean;
   auth?: AuthSessionStore;
   aiFetch?: AiProviderFetch;
   aiPolicy?: AiPayloadPolicy;
@@ -71,8 +76,14 @@ export type BackendOptions = {
 
 /**
  * The login route has no credential store of its own, so a deployment that
- * needs real authentication plugs it in here. Without a verifier any caller
- * can claim any accountId, which is only acceptable for local development.
+ * needs real authentication plugs it in here.
+ *
+ * The verifier is optional, but its absence is no longer silently permissive.
+ * A backend created without a verifier **rejects every login** unless the
+ * deployment also passes `allowUnauthenticatedLogin: true`. Previously the
+ * check was `options.verifyLogin && !(await ... )`, so omitting the hook let
+ * any caller claim any `accountId` and mint a valid session -- which made every
+ * other session check downstream worthless. Fail closed instead.
  */
 export type LoginVerifier = (input: {
   accountId: string;
@@ -81,6 +92,7 @@ export type LoginVerifier = (input: {
 }) => boolean | Promise<boolean>;
 
 type RouteOptions = {
+  allowUnauthenticatedLogin?: boolean;
   aiFetch?: AiProviderFetch;
   aiPolicy: AiPayloadPolicy;
   aiResponder?: AiProxyResponder;
@@ -118,6 +130,7 @@ export function createCrowdSimBackend(options: BackendOptions = {}): CrowdSimBac
           artifacts: options.artifacts,
           nowIso,
           tiles: options.tiles ?? {},
+          allowUnauthenticatedLogin: options.allowUnauthenticatedLogin,
           verifyLogin: options.verifyLogin,
         });
 
@@ -181,11 +194,16 @@ async function routeRequest(
     const body = await readJson(request);
     const accountId = readString(body, "accountId");
 
-    if (
-      options.verifyLogin &&
-      !(await options.verifyLogin({ accountId, body, request }))
-    ) {
-      return jsonResponse({ error: "login-rejected" }, 401);
+    if (options.verifyLogin) {
+      if (!(await options.verifyLogin({ accountId, body, request }))) {
+        return jsonResponse({ error: "login-rejected" }, 401);
+      }
+    } else if (options.allowUnauthenticatedLogin === true) {
+      // Explicit opt-in, for local development and tests only. This used to be
+      // the default (the guard was `options.verifyLogin && ...`), which let any
+      // caller claim any accountId and mint a session.
+    } else {
+      return jsonResponse({ error: "login-verifier-not-configured" }, 503);
     }
 
     const session = auth.createSession({

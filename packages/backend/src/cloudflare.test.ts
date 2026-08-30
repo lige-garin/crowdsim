@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
-import {
-  createCrowdSimBackend,
-  D1R2ProjectStore,
-  cloudflareD1SchemaSql,
-} from "./index";
+import { createTestBackend } from "./backendTestUtils";
+import { D1R2ProjectStore, cloudflareD1SchemaSql } from "./index";
 import type {
   D1DatabaseLike,
   D1PreparedStatementLike,
@@ -87,7 +84,7 @@ describe("Cloudflare D1/R2 backend adapter", () => {
     const d1 = new FakeD1Database();
     const r2 = new FakeR2Bucket();
     const store = new D1R2ProjectStore(d1, r2);
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       artifacts: store,
       nowIso: () => "2026-06-12T00:00:00.000Z",
       store,
@@ -143,7 +140,7 @@ describe("Cloudflare D1/R2 backend adapter", () => {
 
   it("keeps D1-backed artifacts away from other accounts", async () => {
     const store = new D1R2ProjectStore(new FakeD1Database(), new FakeR2Bucket());
-    const backend = createCrowdSimBackend({
+    const backend = createTestBackend({
       artifacts: store,
       nowIso: () => "2026-06-12T00:00:00.000Z",
       store,

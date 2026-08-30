@@ -29,7 +29,7 @@ describe("ProjectWorkspacePanel", () => {
   });
 
   it("lists live projects from a real backend client", async () => {
-    const backend = createCrowdSimBackend();
+    const backend = createCrowdSimBackend({ allowUnauthenticatedLogin: true });
     const client = createBackendClient({
       fetch: backend.fetch,
       baseUrl: "http://backend.local",
