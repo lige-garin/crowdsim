@@ -187,3 +187,65 @@ withdrawn.
   determinism check that _cannot_ detect cross-browser divergence, and
   `benchmarkRunner.test.ts:47` asserts the worker and main-thread hashes
   differ. A real Playwright matrix is deferred to SP-5.
+
+---
+
+## 2026-08-30: benchmark expectations labelled, Weidmann reference added
+
+### The self-licensing loop this closes
+
+`benchmarkScenarios.ts` set the corridor speed expectation to **1.25–1.38 m/s**
+while the engine walks every agent at a constant **1.34 m/s**. That range is
+bracketed around the engine's own constant, so it could not fail as long as
+agents kept moving. It was a regression guard wearing the costume of a
+validation test.
+
+The engine's 1.34 m/s is not arbitrary — it is Weidmann's free-flow mean — but
+free-flow speed is only the ρ→0 end of the curve. The engine has no
+density-speed coupling at all.
+
+### What was changed
+
+- `BenchmarkExpectation.source` is now **required** (`"literature"` or
+  `"self-authored"`), with an optional `reference` field. All 15 existing
+  expectations are labelled `"self-authored"`. Making it required is the point:
+  a range with no stated origin silently invites the next one.
+- New `pedestrianFundamentalDiagram.ts` carries the published curve and the
+  comparison helpers (`weidmannSpeedAtDensity`, `compareToWeidmann`,
+  `maxAbsoluteWeidmannDeviation`), with 7 tests pinning hand-computed points.
+
+### The literature values, and where they are from
+
+Weidmann (1993), a review of 25 investigations — the diagram RiMEA test 4
+points at:
+
+```
+v(ρ) = v0 · (1 − exp(−γ · (1/ρ − 1/ρmax)))
+v0    = 1.34 m/s   (free-flow speed, Gaussian, σ = 0.26 m/s)
+ρmax  = 5.4 P/m²   (jam density)
+γ     = 1.913 P/m² (shape parameter)
+```
+
+Sources: Jülich _Validated force-based modeling of pedestrian dynamics_, IAS
+Series 13, eq. 1.12; _Physics of Human Crowds_, Annual Review of Condensed
+Matter Physics, fig. 2 caption; Nikolić/Bierlaire/Farooq, STRC 2014, eq. 13;
+and the Kladek-form restatement in the ECCMAS COMPDYN 2015 paper.
+
+### The comparison result (this is the honest part)
+
+| Density (P/m²) | Weidmann | This engine | Delta |
+| --- | --- | --- | --- |
+| 0.5 | 1.30 | 1.34 | +0.04 |
+| 2.0 | 0.61 | 1.34 | **+0.73** |
+| 4.0 | 0.16 | 1.34 | **+1.18** |
+
+**RiMEA test 4 does not pass.** The engine matches the literature at low
+density and diverges badly from it everywhere else, because speed is a constant
+rather than a function of density.
+
+Closing this means giving the engine a density-speed coupling and measuring the
+result against the table above. It explicitly does _not_ mean widening the
+existing ranges — that would restore the loop this entry removes.
+
+Also note the scenario geometries are still self-authored approximations named
+after RiMEA cases, not the RiMEA geometries.
