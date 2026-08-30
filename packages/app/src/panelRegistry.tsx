@@ -112,8 +112,8 @@ export const panelRegistry: PanelRegistryEntry[] = [
   {
     dataSource: "fixture",
     id: "ai-workflow",
-    labelZh: "AI 工作流",
-    labelEn: "AI workflow",
+    labelZh: "脚本与校验",
+    labelEn: "Script & validation",
     render: () => <AiWorkflowPanel />,
   },
   {

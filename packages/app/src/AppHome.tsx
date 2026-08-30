@@ -94,7 +94,10 @@ export function AppHome({
   const pulses = [
     { label: "SIM", value: runState },
     { label: "GPU", value: webGpuStatus },
-    { label: "TRACE", value: "AI" },
+    // Was "AI". Image tracing has no model: it only runs hand-written demo
+    // fixtures, so the home screen no longer advertises a capability that
+    // does not exist. See docs/CLAIMS_LEDGER.md.
+    { label: "TRACE", value: "fixture" },
     { label: "DATA", value: "D1/R2" },
   ];
 

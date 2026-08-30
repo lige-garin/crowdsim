@@ -1,3 +1,12 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): nothing in this module is AI.
+// There is no model, no inference and no natural-language understanding. Every
+// entry point is keyword matching over the prompt string -- `includes("mall")`,
+// `includes("hospital")` -- selecting one of several hard-coded scene layouts.
+// A prompt that matches nothing falls through to the same fixed commercial
+// template. The `ai` in the module name and the `ai-*` object ids are historical
+// identifiers, not capability claims; the user-facing wording says "template"
+// so the UI does not promise a model it does not have. Frozen 2026-08-30: do
+// not reintroduce "AI" into user-visible copy until a real model is wired up.
 import { parseScene, safeParseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 
 export type AiSceneEventDraft = {
@@ -143,7 +152,7 @@ export function createLocalSceneAssistantDraft(
   return parseScene({
     ...baseScene,
     id: `${baseScene.id}-ai-draft`,
-    name: mallMode ? "AI Mall Draft" : "AI Scene Draft",
+    name: mallMode ? "Mall Template Draft" : "Scene Template Draft",
     shops: [
       {
         id: "ai-shop-1",
@@ -248,7 +257,7 @@ function createHospitalDraft(baseScene: CrowdSimScene) {
   return parseScene({
     ...baseScene,
     id: `${baseScene.id}-hospital-ai-draft`,
-    name: "AI Hospital Draft",
+    name: "Hospital Template Draft",
     servicePoints: [
       {
         id: "ai-triage-counter",
@@ -304,7 +313,7 @@ function createStationDraft(baseScene: CrowdSimScene) {
   return parseScene({
     ...baseScene,
     id: `${baseScene.id}-station-ai-draft`,
-    name: "AI Station Draft",
+    name: "Station Template Draft",
     entrances: [
       ...baseScene.entrances,
       {

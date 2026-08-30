@@ -1,3 +1,12 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this overlay is not the output of
+// image recognition. There is no model and no pixel analysis anywhere in the
+// pipeline. Every line and entrance is a hand-written constant in the demo
+// fixtures (`imageTracingEvaluation.ts`), including the `confidence` values --
+// 0.91, 0.88, 0.94 -- which are authored numbers, not anything measured or
+// inferred. User-uploaded images are never traced: they land in the
+// `not-traced` state and draw no geometry. The layer is therefore labelled a
+// demo so the percentages are not misread as model output. Frozen 2026-08-30:
+// do not call this "AI" in user-visible copy until real tracing exists.
 import {
   findLowConfidenceGeometry,
   imagePointToScenePoint,
@@ -14,7 +23,7 @@ type AiImageOverlayProps = {
 
 const copy = {
   confidence: { zh: "置信度", en: "confidence" },
-  layer: { zh: "AI 图层", en: "AI layer" },
+  layer: { zh: "描图图层（示例）", en: "Traced layer (demo)" },
   review: { zh: "复核", en: "review" },
 };
 

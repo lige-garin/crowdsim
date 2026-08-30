@@ -1,3 +1,10 @@
+// HONESTY NOTE (see docs/CLAIMS_LEDGER.md): this panel used to be titled
+// "AI 闭环" / "AI workflow". Nothing here calls a model. The event script is
+// parsed by regex plus an alias table (`eventScript.ts`), the "experiment
+// suggestions" are template rules, and `createAiProxyRequest` only *builds* a
+// request object -- the `provider: "anthropic"` value is a string in a URL that
+// is never sent. The panel demonstrates that these local pieces are wired
+// together, so it is named after what it actually shows. Frozen 2026-08-30.
 import { useMemo } from "react";
 import { createAiProxyRequest } from "./aiProxy";
 import { createAiExperimentSuggestions } from "./aiExperimentSuggestion";
@@ -38,7 +45,7 @@ export function AiWorkflowPanel() {
       suggestionCount: suggestions.length,
     };
   }, []);
-  const title = language === "zh" ? "AI 闭环" : "AI workflow";
+  const title = language === "zh" ? "脚本与校验" : "Script & validation";
 
   return (
     <section className="probe-panel" aria-label={title}>

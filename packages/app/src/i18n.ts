@@ -135,12 +135,12 @@ export function formatSceneName(
     return language === "zh" ? (zhSceneNames[scene.id] ?? knownName.zh) : knownName.en;
   }
 
-  if (scene.name === "AI Mall Draft") {
-    return language === "zh" ? "AI 商场草稿" : scene.name;
+  if (scene.name === "Mall Template Draft") {
+    return language === "zh" ? "商场模板草稿" : scene.name;
   }
 
-  if (scene.name === "AI Scene Draft") {
-    return language === "zh" ? "AI 场景草稿" : scene.name;
+  if (scene.name === "Scene Template Draft") {
+    return language === "zh" ? "场景模板草稿" : scene.name;
   }
 
   return scene.name;

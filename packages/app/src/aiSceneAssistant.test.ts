@@ -82,7 +82,7 @@ describe("AI scene assistant", () => {
     const scene = createLocalSceneAssistantDraft("mall", demoScene);
 
     expect(scene.id).toBe("atrium-demo-ai-draft");
-    expect(scene.name).toBe("AI Mall Draft");
+    expect(scene.name).toBe("Mall Template Draft");
     expect(scene.shops).toHaveLength(2);
     expect(scene.servicePoints[0].kind).toBe("gate");
     expect(scene.countLines).toHaveLength(1);

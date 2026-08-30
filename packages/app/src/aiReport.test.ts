@@ -10,9 +10,9 @@ describe("AI report summary", () => {
     const zh = createAiValidationReportSummary(report, "zh");
     const en = createAiValidationReportSummary(report, "en");
 
-    expect(zh.title).toBe("AI 校准摘要");
+    expect(zh.title).toBe("校准摘要");
     expect(zh.paragraphs[0]).toContain("基准通过 4/4");
-    expect(en.title).toBe("AI calibration summary");
+    expect(en.title).toBe("Calibration summary");
     expect(en.paragraphs[2]).toContain("not formal certification");
     expect(en.riskLevel).toMatch(/low|medium|high/);
   });

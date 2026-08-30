@@ -42,7 +42,7 @@ const draft: ImageGeometryDraft = {
 };
 
 describe("AiImageOverlay", () => {
-  it("renders AI geometry over the scene and marks low confidence review items", () => {
+  it("renders the traced demo layer and marks low confidence review items", () => {
     const calibration = calibrateImageScale({
       knownDistanceMeters: 10,
       pixelA: { x: 0, y: 0 },
@@ -56,7 +56,7 @@ describe("AiImageOverlay", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByLabelText("AI 图层")).toBeInTheDocument();
+    expect(screen.getByLabelText("描图图层（示例）")).toBeInTheDocument();
     expect(screen.getByText("置信度 92%")).toBeInTheDocument();
     expect(screen.getAllByText(/复核/)).toHaveLength(2);
     expect(container.querySelectorAll("[data-review='required']")).toHaveLength(2);

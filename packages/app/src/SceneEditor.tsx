@@ -88,7 +88,7 @@ export function SceneEditor({
   const dragState = useRef<DragState | null>(null);
   const [baseScene, setBaseScene] = useState(scene);
   const [aiImageOverlay, setAiImageOverlay] = useState<SceneImageOverlay | null>(null);
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [templatePrompt, setAiPrompt] = useState("");
   const [document, setDocument] = useState(() => createEditorDocumentFromScene(scene));
   const [draftWallPoints, setDraftWallPoints] = useState<ScenePoint[]>([]);
   const [redoStack, setRedoStack] = useState<EditorDocument[]>([]);
@@ -413,15 +413,15 @@ export function SceneEditor({
   function showTracingFixture() {
     setAiImageOverlay(createTracingFixtureOverlay(imageTracingFixtures[0].id));
   }
-  function applyAiDraft() {
-    const prompt = aiPrompt.trim();
+  function applyTemplateDraft() {
+    const prompt = templatePrompt.trim();
     if (!prompt) {
-      setStorageStatus(makeStatus("aiPromptRequired"));
+      setStorageStatus(makeStatus("templatePromptRequired"));
       return;
     }
     replaceScene(
       createNaturalLanguageScenePlanDraft(prompt, currentScene).scene,
-      makeStatus("aiDraftReady"),
+      makeStatus("templateDraftReady"),
     );
   }
   const paramActions = createSceneEditorParamActions({
@@ -443,7 +443,7 @@ export function SceneEditor({
   return (
     <SceneEditorLayout
       aiImageOverlay={aiImageOverlay}
-      aiPrompt={aiPrompt}
+      templatePrompt={templatePrompt}
       basemap={activeBasemap}
       baseScene={baseScene}
       basemapInputRef={basemapInputRef}
@@ -457,8 +457,8 @@ export function SceneEditor({
       gridSize={gridSize}
       language={language}
       liveAgents={visibleLiveAgents}
-      onAiDraft={applyAiDraft}
-      onAiPromptChange={setAiPrompt}
+      onTemplateDraft={applyTemplateDraft}
+      onTemplatePromptChange={setAiPrompt}
       onApplyScene={applySceneToSimulation}
       onBasemapImport={importBasemap}
       onBasemapNumberChange={paramActions.updateBasemap}

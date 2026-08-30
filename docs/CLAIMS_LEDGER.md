@@ -145,3 +145,45 @@ repository** (no file matching `*REVIEW*` outside `node_modules`). Its P1-6/N7
 finding, "no eslint config at the repo root", was flagged in advance as a
 misjudgement and is indeed wrong: `eslint.config.js` is present at the root, and
 `pnpm lint` passes with no output. That finding was not carried into any doc.
+
+---
+
+## 2026-08-30 freeze: unverifiable "AI" and "100k GPU" claims
+
+Every row below was re-verified against the tree on 2026-08-30 before being
+frozen. Two claims from the earlier list were **confirmed already clean** and
+are recorded here so nobody re-investigates them.
+
+### Frozen: anything labelled "AI" with no model behind it
+
+| Where                                      | Old user-visible wording                                                         | What it actually does                                                                                                                                                              | New wording                                       |
+| ------------------------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `aiSceneAssistant.ts`                      | `AI 草稿` / `AI draft`, `AI Mall Draft`, `AI Hospital Draft`, `AI Station Draft` | Keyword matching: `includes("mall")`, `includes("hospital")`, `includes("station")` selecting a hard-coded layout                                                                  | `模板草稿` / `Template draft`, `… Template Draft` |
+| `AiImageOverlay.tsx`                       | `AI 图层` / `AI layer`                                                           | Renders hand-written fixtures from `imageTracingEvaluation.ts`; the `confidence` values (0.91 / 0.88 / 0.94) are authored constants                                                | `描图图层（示例）` / `Traced layer (demo)`        |
+| `ImageGeometryPanel.tsx`                   | `AI 描图` / `AI image tracing`                                                   | Runs the cleanup pipeline over three fixtures; user uploads stay `not-traced` and draw nothing                                                                                     | `图片描图（示例）` / `Image tracing (demo)`       |
+| `AiWorkflowPanel.tsx`, `panelRegistry.tsx` | `AI 闭环` / `AI 工作流` / `AI workflow`                                          | Regex + alias table (`eventScript.ts`), template rules, and `createAiProxyRequest` which only _builds_ a request — `provider: "anthropic"` is a string in a URL that is never sent | `脚本与校验` / `Script & validation`              |
+| `aiReport.ts`                              | `AI 校准摘要` / `AI calibration summary`                                         | Two arithmetic expressions (pass rate, max density-speed delta) dropped into fixed sentence templates. **Exported into the shareable validation report**                           | `校准摘要` / `Calibration summary`                |
+| `AppHome.tsx`                              | `TRACE` pulse value `"AI"`                                                       | No tracing capability exists                                                                                                                                                       | `"fixture"`                                       |
+
+The `ai*` module names and `ai-*` object ids are kept as historical
+identifiers; each file now carries a HONESTY NOTE stating that no model runs
+there.
+
+### Frozen: 100k GPU agents
+
+`simulationEngine.ts` still defaults to `maxAgents = 2_000` and
+`movementBackend = "cpu-compat"`, and `gpuSimCore` has zero imports from
+`packages/app/src`. The 100k core has never executed on hardware with WebGPU,
+so `BENCHMARKS.md` stays PENDING and this must not appear as a shipped
+capability. Frozen rather than deleted: the code is real, only the claim is
+withdrawn.
+
+### Verified already clean (no action taken)
+
+- **"工作量削减 %"** — removed in P0 T2. Only the HONESTY NOTE in
+  `imageTracingEvaluation.ts:1` remains.
+- **Cross-browser reproducibility matrix** — removed in P0 T2.
+  `benchmarkReproducibility.ts:1` documents that the hash is a same-build
+  determinism check that _cannot_ detect cross-browser divergence, and
+  `benchmarkRunner.test.ts:47` asserts the worker and main-thread hashes
+  differ. A real Playwright matrix is deferred to SP-5.

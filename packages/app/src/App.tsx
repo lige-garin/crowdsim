@@ -300,9 +300,7 @@ function AppContent() {
     // controller rebuilds its engine. Clear the series that describe the OLD
     // scene so charts never mix two geometries.
     setScene(nextScene);
-    setDashboardSamples([
-      { agentCount: 0, elapsedSeconds: 0, exitedCount: 0 },
-    ]);
+    setDashboardSamples([{ agentCount: 0, elapsedSeconds: 0, exitedCount: 0 }]);
     setHeatmapSamples([]);
     setTrajectoryRecording(
       createTrajectoryRecording({

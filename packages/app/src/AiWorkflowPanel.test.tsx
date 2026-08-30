@@ -16,7 +16,7 @@ describe("AiWorkflowPanel", () => {
       </I18nProvider>,
     );
 
-    expect(screen.getByRole("heading", { name: "AI 闭环" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "脚本与校验" })).toBeInTheDocument();
     expect(screen.getByText(/close-entrance/)).toBeInTheDocument();
     expect(screen.getByText(/experiments/)).toBeInTheDocument();
     expect(screen.getByText(/schema accepted 2/)).toBeInTheDocument();

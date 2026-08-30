@@ -43,7 +43,7 @@ type DocumentCounts = {
 };
 
 type SceneEditorControlsProps = {
-  aiPrompt: string;
+  templatePrompt: string;
   baseSceneId: string;
   basemapInputRef: RefObject<HTMLInputElement | null>;
   canDelete: boolean;
@@ -54,8 +54,8 @@ type SceneEditorControlsProps = {
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   language: Language;
-  onAiDraft: () => void;
-  onAiPromptChange: (value: string) => void;
+  onTemplateDraft: () => void;
+  onTemplatePromptChange: (value: string) => void;
   onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onDeleteSelected: () => void;
@@ -83,7 +83,7 @@ type SceneEditorControlsProps = {
 };
 
 export function SceneEditorControls({
-  aiPrompt,
+  templatePrompt,
   baseSceneId,
   basemapInputRef,
   canDelete,
@@ -94,8 +94,8 @@ export function SceneEditorControls({
   fileInputRef,
   geoJsonInputRef,
   language,
-  onAiDraft,
-  onAiPromptChange,
+  onTemplateDraft,
+  onTemplatePromptChange,
   onApplyScene,
   onBasemapImport,
   onDeleteSelected,
@@ -160,17 +160,17 @@ export function SceneEditorControls({
           {t("imageTracingDemo")}
         </button>
         <label>
-          <span className="visually-hidden">{t("aiPrompt")}</span>
+          <span className="visually-hidden">{t("templatePrompt")}</span>
           <input
-            aria-label={t("aiPrompt")}
+            aria-label={t("templatePrompt")}
             type="text"
-            value={aiPrompt}
-            placeholder={t("aiPromptPlaceholder")}
-            onChange={(event) => onAiPromptChange(event.target.value)}
+            value={templatePrompt}
+            placeholder={t("templatePromptPlaceholder")}
+            onChange={(event) => onTemplatePromptChange(event.target.value)}
           />
         </label>
-        <button type="button" onClick={onAiDraft}>
-          {t("aiDraft")}
+        <button type="button" onClick={onTemplateDraft}>
+          {t("templateDraft")}
         </button>
         <input
           ref={fileInputRef}

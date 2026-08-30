@@ -9,14 +9,6 @@ export const messages = {
     en: "Agent state machine verified",
   },
   agentsUnit: { zh: "人", en: "agents" },
-  aiDraft: { zh: "AI 草稿", en: "AI draft" },
-  aiDraftReady: { zh: "AI 草稿已就绪", en: "AI draft ready" },
-  aiPrompt: { zh: "AI 提示词", en: "AI prompt" },
-  aiPromptPlaceholder: {
-    zh: "描述场景：商场、医院、车站",
-    en: "Describe the scene: mall, hospital, station",
-  },
-  aiPromptRequired: { zh: "请先输入 AI 提示词", en: "Enter an AI prompt first" },
   alighting: { zh: "Alighting", en: "Alighting" },
   appName: { zh: "CrowdSim Web", en: "CrowdSim Web" },
   applyToSimulation: { zh: "应用到仿真", en: "Apply to simulation" },
@@ -238,6 +230,20 @@ export const messages = {
   target: { zh: "目标", en: "Target" },
   targets: { zh: "目标", en: "Targets" },
   targetShort: { zh: "T", en: "T" },
+  // The template assistant is keyword matching, not a model: the wording below
+  // deliberately says "template" so the UI never promises AI it does not have.
+  // See the HONESTY NOTE in aiSceneAssistant.ts.
+  templateDraft: { zh: "模板草稿", en: "Template draft" },
+  templateDraftReady: { zh: "模板草稿已就绪", en: "Template draft ready" },
+  templatePrompt: { zh: "模板提示词", en: "Template prompt" },
+  templatePromptPlaceholder: {
+    zh: "描述场景：商场、医院、车站",
+    en: "Describe the scene: mall, hospital, station",
+  },
+  templatePromptRequired: {
+    zh: "请先输入模板提示词",
+    en: "Enter a template prompt first",
+  },
   tool: { zh: "工具", en: "Tool" },
   transitKind: { zh: "Transit type", en: "Transit type" },
   transitOnly: { zh: "公交专用", en: "Transit only" },

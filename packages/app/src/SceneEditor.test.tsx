@@ -69,26 +69,26 @@ describe("SceneEditor image geometry overlay", () => {
   });
 });
 
-describe("SceneEditor AI scene draft", () => {
+describe("SceneEditor template scene draft", () => {
   it("refuses to draft anything until the user has typed a prompt", () => {
     renderEditor();
 
-    fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
 
-    expect(screen.getByText("请先输入 AI 提示词")).toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: /AI/ })).toBeNull();
+    expect(screen.getByText("请先输入模板提示词")).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Template Draft/ })).toBeNull();
   });
 
   it("drafts a hospital scene when the prompt asks for a hospital", () => {
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("AI 提示词"), {
+    fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "hospital outpatient hall" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
 
     expect(
-      screen.getByRole("option", { name: "AI Hospital Draft" }),
+      screen.getByRole("option", { name: "Hospital Template Draft" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/服务 2/)).toBeInTheDocument();
   });
@@ -96,25 +96,25 @@ describe("SceneEditor AI scene draft", () => {
   it("drafts a station scene when the prompt asks for a station", () => {
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("AI 提示词"), {
+    fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "train station concourse" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
 
     expect(
-      screen.getByRole("option", { name: "AI Station Draft" }),
+      screen.getByRole("option", { name: "Station Template Draft" }),
     ).toBeInTheDocument();
   });
 
   it("drafts a mall scene when the prompt asks for a mall", () => {
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("AI 提示词"), {
+    fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "mall circulation" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "AI 草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
 
-    expect(screen.getByRole("option", { name: "AI 商场草稿" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "商场模板草稿" })).toBeInTheDocument();
   });
 });
 

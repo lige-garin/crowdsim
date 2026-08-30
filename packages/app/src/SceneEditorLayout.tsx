@@ -25,7 +25,7 @@ import type { SimulationAgent } from "./simulationEngine";
 
 type SceneEditorLayoutProps = {
   aiImageOverlay: SceneImageOverlay | null;
-  aiPrompt: string;
+  templatePrompt: string;
   baseScene: CrowdSimScene;
   basemap: EditorBasemap | null;
   basemapInputRef: RefObject<HTMLInputElement | null>;
@@ -39,8 +39,8 @@ type SceneEditorLayoutProps = {
   gridSize: number;
   language: Language;
   liveAgents: readonly SimulationAgent[];
-  onAiDraft: () => void;
-  onAiPromptChange: (value: string) => void;
+  onTemplateDraft: () => void;
+  onTemplatePromptChange: (value: string) => void;
   onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
@@ -121,7 +121,7 @@ type SceneEditorLayoutProps = {
 
 export function SceneEditorLayout({
   aiImageOverlay,
-  aiPrompt,
+  templatePrompt,
   baseScene,
   basemap,
   basemapInputRef,
@@ -135,8 +135,8 @@ export function SceneEditorLayout({
   gridSize,
   language,
   liveAgents,
-  onAiDraft,
-  onAiPromptChange,
+  onTemplateDraft,
+  onTemplatePromptChange,
   onApplyScene,
   onBasemapImport,
   onBasemapNumberChange,
@@ -217,9 +217,9 @@ export function SceneEditorLayout({
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
         language={language}
-        aiPrompt={aiPrompt}
-        onAiDraft={onAiDraft}
-        onAiPromptChange={onAiPromptChange}
+        templatePrompt={templatePrompt}
+        onTemplateDraft={onTemplateDraft}
+        onTemplatePromptChange={onTemplatePromptChange}
         onApplyScene={onApplyScene}
         onBasemapImport={onBasemapImport}
         onDeleteSelected={onDeleteSelected}
