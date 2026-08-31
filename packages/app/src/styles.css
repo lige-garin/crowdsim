@@ -372,6 +372,10 @@ h3 {
   display: grid;
   min-width: 0;
   min-height: 0;
+  /* Scroll internally instead of spilling: without this, stage content taller
+     than the row (editor toolbar + canvas at 720p) paints over the panel dock,
+     which then intercepts clicks meant for the toolbar. */
+  overflow: auto;
   padding: 18px;
 }
 
