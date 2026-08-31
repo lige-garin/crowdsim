@@ -191,27 +191,39 @@ describe("SceneEditor DXF import wiring", () => {
     // The control is there and routes through a hidden, typed file input.
     expect(screen.getByRole("button", { name: "导入 DXF" })).toBeInTheDocument();
 
-    const input = container.querySelector<HTMLInputElement>(
-      'input[accept*=".dxf"]',
-    );
+    const input = container.querySelector<HTMLInputElement>('input[accept*=".dxf"]');
     expect(input).not.toBeNull();
 
     // A minimal four-vertex polyline -> one imported wall.
     const dxf = [
-      "0", "SECTION",
-      "2", "ENTITIES",
-      "0", "LWPOLYLINE",
-      "8", "WALLS",
-      "10", "0",
-      "20", "0",
-      "10", "10",
-      "20", "0",
-      "10", "10",
-      "20", "10",
-      "10", "0",
-      "20", "10",
-      "0", "ENDSEC",
-      "0", "EOF",
+      "0",
+      "SECTION",
+      "2",
+      "ENTITIES",
+      "0",
+      "LWPOLYLINE",
+      "8",
+      "WALLS",
+      "10",
+      "0",
+      "20",
+      "0",
+      "10",
+      "10",
+      "20",
+      "0",
+      "10",
+      "10",
+      "20",
+      "10",
+      "10",
+      "0",
+      "20",
+      "10",
+      "0",
+      "ENDSEC",
+      "0",
+      "EOF",
     ].join("\n");
 
     fireEvent.change(input!, {
@@ -226,9 +238,7 @@ describe("SceneEditor DXF import wiring", () => {
   it("reports an invalid DXF instead of silently importing nothing", async () => {
     const { container } = renderEditor();
 
-    const input = container.querySelector<HTMLInputElement>(
-      'input[accept*=".dxf"]',
-    );
+    const input = container.querySelector<HTMLInputElement>('input[accept*=".dxf"]');
     expect(input).not.toBeNull();
 
     fireEvent.change(input!, {

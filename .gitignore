@@ -11,3 +11,6 @@ packages/app/src/wasm/core-behavior/
 .env
 .env.*
 !.env.example
+.workbuddy/
+.pnpm-store/
+.vite-5184.log

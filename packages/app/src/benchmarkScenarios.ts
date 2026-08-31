@@ -33,8 +33,16 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
     expectations: [
       { metric: "spawnedCount", range: { min: 80, max: 240 }, source: "self-authored" },
       { metric: "exitedCount", range: { min: 40, max: 220 }, source: "self-authored" },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.25, max: 1.38 }, source: "self-authored" },
-      { metric: "throughputPerMinute", range: { min: 25, max: 150 }, source: "self-authored" },
+      {
+        metric: "meanSpeedMetersPerSecond",
+        range: { min: 1.25, max: 1.38 },
+        source: "self-authored",
+      },
+      {
+        metric: "throughputPerMinute",
+        range: { min: 25, max: 150 },
+        source: "self-authored",
+      },
     ],
     id: "rimea-straight-corridor",
     name: "RiMEA straight corridor",
@@ -69,10 +77,22 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       "Higher demand corridor used as a bottleneck proxy until wall-aware routing is benchmarked.",
     durationSeconds: 90,
     expectations: [
-      { metric: "spawnedCount", range: { min: 140, max: 340 }, source: "self-authored" },
+      {
+        metric: "spawnedCount",
+        range: { min: 140, max: 340 },
+        source: "self-authored",
+      },
       { metric: "exitedCount", range: { min: 70, max: 300 }, source: "self-authored" },
-      { metric: "densityPeak", range: { min: 0.01, max: 1.5 }, source: "self-authored" },
-      { metric: "throughputPerMinute", range: { min: 45, max: 220 }, source: "self-authored" },
+      {
+        metric: "densityPeak",
+        range: { min: 0.01, max: 1.5 },
+        source: "self-authored",
+      },
+      {
+        metric: "throughputPerMinute",
+        range: { min: 45, max: 220 },
+        source: "self-authored",
+      },
     ],
     id: "rimea-bottleneck",
     name: "RiMEA bottleneck",
@@ -134,7 +154,11 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
     expectations: [
       { metric: "spawnedCount", range: { min: 80, max: 260 }, source: "self-authored" },
       { metric: "exitedCount", range: { min: 35, max: 230 }, source: "self-authored" },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.05, max: 1.35 }, source: "self-authored" },
+      {
+        metric: "meanSpeedMetersPerSecond",
+        range: { min: 1.05, max: 1.35 },
+        source: "self-authored",
+      },
     ],
     id: "rimea-corner",
     name: "RiMEA corner",
@@ -185,10 +209,22 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       "Two opposing flows with balanced source rates for deterministic counterflow regression.",
     durationSeconds: 90,
     expectations: [
-      { metric: "spawnedCount", range: { min: 120, max: 360 }, source: "self-authored" },
+      {
+        metric: "spawnedCount",
+        range: { min: 120, max: 360 },
+        source: "self-authored",
+      },
       { metric: "exitedCount", range: { min: 60, max: 320 }, source: "self-authored" },
-      { metric: "meanSpeedMetersPerSecond", range: { min: 1.0, max: 1.32 }, source: "self-authored" },
-      { metric: "densityPeak", range: { min: 0.01, max: 1.6 }, source: "self-authored" },
+      {
+        metric: "meanSpeedMetersPerSecond",
+        range: { min: 1.0, max: 1.32 },
+        source: "self-authored",
+      },
+      {
+        metric: "densityPeak",
+        range: { min: 0.01, max: 1.6 },
+        source: "self-authored",
+      },
     ],
     id: "rimea-counterflow",
     name: "RiMEA counterflow",

@@ -72,10 +72,7 @@ function insunits(code: number): string[] {
 
 describe("DXF import", () => {
   it("turns LINE entities into walls", () => {
-    const result = createSceneFromDxfWithReport(
-      demoScene,
-      dxf([...line(0, 0, 10, 0)]),
-    );
+    const result = createSceneFromDxfWithReport(demoScene, dxf([...line(0, 0, 10, 0)]));
 
     expect(result.wallCount).toBe(1);
     expect(result.scene.walls.at(-1)).toMatchObject({
@@ -154,10 +151,7 @@ describe("DXF import", () => {
   it("imports only the requested layers", () => {
     const result = createSceneFromDxfWithReport(
       demoScene,
-      dxf([
-        ...line(0, 0, 10, 0, "A-WALL"),
-        ...line(0, 0, 10, 10, "A-ANNO-TEXT"),
-      ]),
+      dxf([...line(0, 0, 10, 0, "A-WALL"), ...line(0, 0, 10, 10, "A-ANNO-TEXT")]),
       { layers: ["A-WALL"] },
     );
 

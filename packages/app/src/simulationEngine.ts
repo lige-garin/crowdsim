@@ -349,8 +349,8 @@ export function createSimulationEngine(
   /**
    * Only an agent that a decision sent to an exit may leave the world. The old
    * rule was the inverse ("exit unless walking/queuing/checking out"), which made
-   * a freshly spawned agent 鈥?lifecycleState still undefined until the first
-   * decision tick 鈥?exit-bound. At a `bidirectional` entrance that agent is born
+   * a freshly spawned agent — lifecycleState still undefined until the first
+   * decision tick — exit-bound. At a `bidirectional` entrance that agent is born
    * inside the sink radius of the very gate it walked through (spawn jitter is
    * +/- width/2, sink radius is width/2), so it was deleted on its first step and
    * both exitedCount and throughput counted arrivals that never walked anywhere.

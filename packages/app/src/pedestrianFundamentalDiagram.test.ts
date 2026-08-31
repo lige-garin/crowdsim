@@ -11,9 +11,7 @@ describe("Weidmann fundamental diagram", () => {
     expect(weidmannFundamentalDiagram.freeFlowSpeedMetersPerSecond).toBe(1.34);
     expect(weidmannFundamentalDiagram.jamDensityPerSquareMeter).toBe(5.4);
     expect(weidmannFundamentalDiagram.shapeParameterPerSquareMeter).toBe(1.913);
-    expect(
-      weidmannFundamentalDiagram.freeFlowSpeedStdDevMetersPerSecond,
-    ).toBe(0.26);
+    expect(weidmannFundamentalDiagram.freeFlowSpeedStdDevMetersPerSecond).toBe(0.26);
   });
 
   it("returns the free-flow speed when there is no density", () => {
@@ -39,9 +37,7 @@ describe("Weidmann fundamental diagram", () => {
   });
 
   it("decreases monotonically with density", () => {
-    const speeds = [0.25, 0.5, 1, 1.5, 2, 3, 4, 5].map(
-      weidmannSpeedAtDensity,
-    );
+    const speeds = [0.25, 0.5, 1, 1.5, 2, 3, 4, 5].map(weidmannSpeedAtDensity);
 
     for (let index = 1; index < speeds.length; index++) {
       expect(speeds[index]).toBeLessThan(speeds[index - 1]);
@@ -65,9 +61,7 @@ describe("Weidmann fundamental diagram", () => {
       expect.closeTo(1.183, 2),
     ]);
     // Every delta is positive: the model is uniformly too fast.
-    expect(deviations.every((entry) => entry.deltaMetersPerSecond > 0)).toBe(
-      true,
-    );
+    expect(deviations.every((entry) => entry.deltaMetersPerSecond > 0)).toBe(true);
     expect(maxAbsoluteWeidmannDeviation(samples)).toBeCloseTo(1.183, 2);
   });
 

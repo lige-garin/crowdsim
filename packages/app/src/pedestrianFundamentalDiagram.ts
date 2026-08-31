@@ -54,10 +54,7 @@ export function weidmannSpeedAtDensity(densityPerSquareMeter: number): number {
 
   return (
     freeFlowSpeed *
-    (1 -
-      Math.exp(
-        -shapeParameter * (1 / densityPerSquareMeter - 1 / jamDensity),
-      ))
+    (1 - Math.exp(-shapeParameter * (1 / densityPerSquareMeter - 1 / jamDensity)))
   );
 }
 

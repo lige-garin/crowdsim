@@ -24,9 +24,16 @@ function captureRuntimeErrors(page: Page): ErrorSink {
   return sink;
 }
 
-/** True when the canvas has drawn something other than a flat background. */
+/**
+ * True when the canvas has drawn something other than a flat background.
+ * Direct 2D scratch-canvas readback (drawImage) works for WebGL and 2D
+ * contexts, but on WebGPU canvases it reads a cleared buffer, so it reports a
+ * rendering viewport as empty. For those, decode the canvas's own
+ * toDataURL() snapshot (which captures the presented frame) and run the same
+ * pixel-variance check on it.
+ */
 async function canvasHasContent(page: Page) {
-  return page.evaluate(() => {
+  return page.evaluate(async () => {
     const canvas = document.querySelector<HTMLCanvasElement>(
       '[data-testid="viewport-canvas"]',
     );
@@ -35,33 +42,67 @@ async function canvasHasContent(page: Page) {
       return false;
     }
 
-    // Re-read through a 2D scratch canvas: works for both WebGL and WebGPU
-    // contexts, which cannot be read with getImageData directly.
+    const hasVariance = (data: Uint8ClampedArray) => {
+      const first = [data[0], data[1], data[2]];
+
+      for (let index = 4; index < data.length; index += 4) {
+        if (
+          Math.abs(data[index] - first[0]) > 6 ||
+          Math.abs(data[index + 1] - first[1]) > 6 ||
+          Math.abs(data[index + 2] - first[2]) > 6
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    // Fast path: works for WebGL and 2D contexts.
     const scratch = document.createElement("canvas");
     scratch.width = Math.min(canvas.width, 320);
     scratch.height = Math.min(canvas.height, 180);
     const context = scratch.getContext("2d");
 
-    if (!context) {
-      return false;
-    }
-
-    context.drawImage(canvas, 0, 0, scratch.width, scratch.height);
-    const { data } = context.getImageData(0, 0, scratch.width, scratch.height);
-    const first = [data[0], data[1], data[2]];
-
-    for (let index = 4; index < data.length; index += 4) {
-      if (
-        Math.abs(data[index] - first[0]) > 6 ||
-        Math.abs(data[index + 1] - first[1]) > 6 ||
-        Math.abs(data[index + 2] - first[2]) > 6
-      ) {
+    if (context) {
+      context.drawImage(canvas, 0, 0, scratch.width, scratch.height);
+      if (hasVariance(context.getImageData(0, 0, scratch.width, scratch.height).data)) {
         return true;
       }
     }
 
-    return false;
+    // WebGPU path: decode the canvas snapshot.
+    try {
+      const blob = await (await fetch(canvas.toDataURL())).blob();
+      const bitmap = await createImageBitmap(blob);
+      const snapshot = document.createElement("canvas");
+      snapshot.width = 80;
+      snapshot.height = 45;
+      const snapContext = snapshot.getContext("2d");
+
+      if (!snapContext) {
+        return false;
+      }
+
+      snapContext.drawImage(bitmap, 0, 0, 80, 45);
+      return hasVariance(snapContext.getImageData(0, 0, 80, 45).data);
+    } catch {
+      return false;
+    }
   });
+}
+
+/**
+ * The app boots into a landing page (AppHome) whose primary action enters the
+ * workbench. Tests used to assume `/` was the workbench itself, so the whole
+ * suite failed the moment the landing page shipped. The journey now includes
+ * this click; the primary button is matched by its stable class because its
+ * label is localized (进入运营台 / Open console).
+ */
+async function enterWorkbench(page: Page) {
+  const enter = page.locator("button.home-primary");
+  await expect(enter).toBeVisible();
+  await enter.click();
 }
 
 test("workbench boots into a running simulation and renders a crowd", async ({
@@ -70,6 +111,7 @@ test("workbench boots into a running simulation and renders a crowd", async ({
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
+  await enterWorkbench(page);
 
   const controls = page.getByRole("region", { name: /Simulation controls|仿真控制/ });
   await expect(controls).toBeVisible();
@@ -133,6 +175,7 @@ test("viewport initialises the GPU once, not once per simulated second", async (
   });
 
   await page.goto("/");
+  await enterWorkbench(page);
 
   const controls = page.getByRole("region", { name: /Simulation controls|仿真控制/ });
   await expect(controls.getByTestId("sim-toggle")).toHaveText(/Pause|暂停/, {
@@ -164,6 +207,7 @@ test("editor places an entity, undoes it, and keeps the document consistent", as
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
+  await enterWorkbench(page);
 
   const canvas = page.getByTestId("editor-canvas");
   await canvas.scrollIntoViewIfNeeded();
@@ -199,6 +243,7 @@ test("panel dock opens panels without runtime errors or long freezes", async ({
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
+  await enterWorkbench(page);
 
   const dock = page.getByRole("region", { name: /Tool panels|工具面板/ });
   await dock.scrollIntoViewIfNeeded();

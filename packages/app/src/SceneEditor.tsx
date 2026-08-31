@@ -393,10 +393,7 @@ export function SceneEditor({
       return;
     }
     try {
-      const result = createSceneFromDxfWithReport(
-        currentScene,
-        await file.text(),
-      );
+      const result = createSceneFromDxfWithReport(currentScene, await file.text());
 
       if (result.wallCount === 0) {
         setStorageStatus(makeStatus("dxfInvalid"));

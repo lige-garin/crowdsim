@@ -215,11 +215,10 @@ describe("CrowdSim backend auth routes", () => {
       nowIso: () => "2026-06-12T00:00:00.000Z",
     });
 
-    const login = await requestJson<ErrorPayload>(
-      backend.fetch,
-      "/api/auth/login",
-      { body: { accountId: "planner" }, method: "POST" },
-    );
+    const login = await requestJson<ErrorPayload>(backend.fetch, "/api/auth/login", {
+      body: { accountId: "planner" },
+      method: "POST",
+    });
 
     expect(login.status).toBe(503);
     expect(login.body.error).toBe("login-verifier-not-configured");
@@ -232,11 +231,9 @@ describe("CrowdSim backend auth routes", () => {
 
     // Nothing was minted, so there is no token to forge: the route is gated on
     // a session the server never issued.
-    const projects = await requestJson<ErrorPayload>(
-      backend.fetch,
-      "/api/projects",
-      { token: "forged-token" },
-    );
+    const projects = await requestJson<ErrorPayload>(backend.fetch, "/api/projects", {
+      token: "forged-token",
+    });
 
     expect(projects.status).toBe(401);
     expect(projects.body.error).toBe("auth-required");

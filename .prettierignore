@@ -8,3 +8,6 @@ pnpm-lock.yaml
 projectplan.md
 packages/core-behavior/target/
 packages/app/src/wasm/
+.workbuddy
+.pnpm-store
+_to_delete

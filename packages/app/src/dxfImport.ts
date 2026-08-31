@@ -236,10 +236,7 @@ function inAllowedLayer(
   return !layers || layers.length === 0 || layers.includes(entity.layer);
 }
 
-function pointsFromEntity(
-  entity: DxfEntity,
-  scale: number,
-): ScenePoint[] {
+function pointsFromEntity(entity: DxfEntity, scale: number): ScenePoint[] {
   switch (entity.type) {
     case "LINE":
       return linePoints(entity, scale);
