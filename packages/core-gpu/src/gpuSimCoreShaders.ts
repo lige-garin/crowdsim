@@ -53,13 +53,13 @@ export const scanShader = /* wgsl */ `
 @group(0) @binding(0) var<storage, read> counts: array<u32>;
 @group(0) @binding(1) var<storage, read_write> offsets: array<u32>;  // len = n+1
 @group(0) @binding(2) var<storage, read_write> blockTotals: array<u32>;
-@group(0) @binding(3) var<storage, read> meta: array<u32>;           // [n]
+@group(0) @binding(3) var<storage, read> scanMeta: array<u32>;           // [n]
 var<workgroup> tile: array<u32, 256>;
 @compute @workgroup_size(256)
 fn scan_blocks(@builtin(global_invocation_id) gid: vec3<u32>,
                @builtin(local_invocation_id) lid: vec3<u32>,
                @builtin(workgroup_id) wid: vec3<u32>) {
-  let n = meta[0];
+  let n = scanMeta[0];
   let i = gid.x;
   tile[lid.x] = select(0u, counts[i], i < n);
   workgroupBarrier();
@@ -79,7 +79,7 @@ fn scan_blocks(@builtin(global_invocation_id) gid: vec3<u32>,
 @compute @workgroup_size(256)
 fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
                      @builtin(workgroup_id) wid: vec3<u32>) {
-  let n = meta[0];
+  let n = scanMeta[0];
   let i = gid.x;
   if (i >= n) { return; }
   var acc = 0u;

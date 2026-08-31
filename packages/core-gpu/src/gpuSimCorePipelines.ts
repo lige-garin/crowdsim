@@ -91,6 +91,21 @@ export function createMovePipeline(device: GPUDevice): {
   layout: GPUBindGroupLayout;
   pipeline: GPUComputePipeline;
 } {
+  // The fused move binds 10 storage buffers — above the WebGPU default of 8.
+  // Without this check the pipeline fails validation *silently* (async device
+  // error) and every step() becomes a no-op that still costs submission time,
+  // which is exactly how a benchmark measures a dead pipeline.
+  const needed = 10;
+
+  if (device.limits.maxStorageBuffersPerShaderStage < needed) {
+    throw new Error(
+      `fused-move binds ${needed} storage buffers but this device allows ` +
+        `${device.limits.maxStorageBuffersPerShaderStage} per stage. Request the ` +
+        `adapter limit first: requestDevice({ requiredLimits: { ` +
+        `maxStorageBuffersPerShaderStage: ${needed} } }).`,
+    );
+  }
+
   const module = device.createShaderModule({
     label: "fused-move",
     code: fusedMoveShader,

@@ -36,7 +36,9 @@ describe("createGpuSimCore (real WebGPU)", () => {
     "spawns, steps with no readback, and aggregates density == count",
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
-      const device = await adapter?.requestDevice();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 10 },
+      });
       expect(device).toBeDefined();
 
       const N = 512;

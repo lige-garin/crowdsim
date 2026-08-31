@@ -19,7 +19,9 @@ describe("fused move parity (real WebGPU)", () => {
     "fused GPU move matches stepSocialForceCpu within 1e-3 over 20 steps",
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
-      const device = await adapter?.requestDevice();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 10 },
+      });
       expect(device).toBeDefined();
 
       const N = 256;
