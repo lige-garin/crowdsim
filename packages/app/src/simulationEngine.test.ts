@@ -4,6 +4,7 @@ import {
   createSimulationEngine,
   createSimulationEngineFromScene,
 } from "./simulationEngine";
+import { weidmannSpeedRatioAtDensity } from "./pedestrianFundamentalDiagram";
 import type { MovementBackend } from "./movementBackend";
 import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
 
@@ -273,6 +274,19 @@ describe("simulation engine", () => {
   it("keeps an under-capacity mall flowing instead of deadlocking in the queue", () => {
     const crowdedScene = () =>
       mallScene({
+        // 1 arrival a second against a 200 cap is genuinely under capacity;
+        // the 5/s this fixture used only drained because agents used to walk
+        // through each other at a fixed 8 m/s.
+        entrances: [
+          {
+            id: "gate",
+            kind: "source",
+            position: { x: 5, y: 40 },
+            width: 6,
+            arrivalRatePerMinute: 60,
+          },
+          ...mallExits,
+        ],
         shops: [
           {
             id: "shop-a",
@@ -291,8 +305,8 @@ describe("simulation engine", () => {
 
     const snapshot = engine.step(60 * 120);
 
-    // One service slot and a 10 minute dwell against 5 arrivals a second: the
-    // line has to shed shoppers or the whole mall stops at the agent cap.
+    // One service slot and a 10 minute dwell: the line has to shed shoppers or
+    // the whole mall stops at the agent cap.
     expect(snapshot.exitedCount).toBeGreaterThan(0);
     expect(snapshot.agentCount).toBeLessThan(200);
 
@@ -398,38 +412,139 @@ describe("simulation engine", () => {
 });
 
 describe("scene speed persistence", () => {
-  /** One second of straight-line walking distance for the fastest agent. */
-  function maxOneSecondDisplacement(
+  /**
+   * One second of straight-line walking, measured on a scene capped to a single
+   * agent: no neighbours means no jostling, so the displacement is the walking
+   * speed itself. The shop sits 55 m from the gate, so the walker never arrives
+   * inside the measured window.
+   */
+  function oneSecondWalkingDistance(
     engine: ReturnType<typeof createSimulationEngineFromScene>,
   ) {
     engine.start();
     engine.step(60);
-    const before = engine.snapshot();
-    const after = engine.step(60);
+    const before = engine.snapshot().agents[0];
+    const after = engine.step(60).agents[0];
 
-    return Math.max(
-      ...after.agents.map((agent) => {
-        const previous = before.agents.find((b) => b.id === agent.id);
-
-        return previous ? Math.hypot(agent.x - previous.x, agent.y - previous.y) : 0;
-      }),
-    );
+    return Math.hypot(after.x - before.x, after.y - before.y);
   }
 
   it("simulates editor scenes at Weidmann free-flow speed, not the legacy 8 m/s", () => {
-    const engine = createSimulationEngineFromScene(mallScene({}));
+    const engine = createSimulationEngineFromScene(mallScene({}), {
+      maxAgents: 1,
+    });
 
-    // The shop is 55 m from the gate, so every walker is still en route and
-    // covers exactly one second of walking in the measured window.
-    expect(maxOneSecondDisplacement(engine)).toBeCloseTo(1.34, 1);
+    expect(oneSecondWalkingDistance(engine)).toBeCloseTo(1.34, 2);
   });
 
   it("honours a scene-persisted speed instead of the default", () => {
     const engine = createSimulationEngineFromScene(
       mallScene({ speedMetersPerSecond: 0.5 }),
+      { maxAgents: 1 },
     );
 
-    expect(maxOneSecondDisplacement(engine)).toBeCloseTo(0.5, 1);
+    expect(oneSecondWalkingDistance(engine)).toBeCloseTo(0.5, 2);
+  });
+});
+
+describe("crowd coupling", () => {
+  it("slows walkers as local density rises, in Weidmann's shape", () => {
+    // The pure ratio the engine applies, against the published curve.
+    expect(weidmannSpeedRatioAtDensity(0)).toBeCloseTo(1, 5);
+    expect(weidmannSpeedRatioAtDensity(0.5)).toBeCloseTo(1.3 / 1.34, 2);
+    expect(weidmannSpeedRatioAtDensity(2)).toBeCloseTo(0.61 / 1.34, 2);
+    expect(weidmannSpeedRatioAtDensity(4)).toBeCloseTo(0.16 / 1.34, 2);
+    expect(weidmannSpeedRatioAtDensity(5.4)).toBe(0);
+  });
+
+  it("keeps a jammed crowd slower than the same scene flowing freely", () => {
+    // Same geometry, same seed, same target: only the arrival rate differs, so
+    // anything that changes the average speed is the crowd, not the route.
+    const walkDistance = (arrivalRatePerMinute: number) => {
+      const engine = createSimulationEngineFromScene(
+        mallScene({
+          entrances: [
+            {
+              id: "gate",
+              kind: "source",
+              position: { x: 5, y: 40 },
+              width: 4,
+              arrivalRatePerMinute,
+            },
+            ...mallExits,
+          ],
+        }),
+      );
+      engine.start();
+      engine.step(60 * 20);
+      const before = engine.snapshot();
+      const after = engine.step(60);
+      const walking = after.agents.filter((agent) => {
+        const previous = before.agents.find((b) => b.id === agent.id);
+
+        return previous !== undefined;
+      });
+
+      if (walking.length === 0) {
+        return 0;
+      }
+
+      const total = walking.reduce((sum, agent) => {
+        const previous = before.agents.find((b) => b.id === agent.id)!;
+
+        return sum + Math.hypot(agent.x - previous.x, agent.y - previous.y);
+      }, 0);
+
+      return total / walking.length;
+    };
+
+    const sparse = walkDistance(30);
+    const dense = walkDistance(3000);
+
+    expect(sparse).toBeGreaterThan(0);
+    expect(dense).toBeLessThan(sparse * 0.9);
+  });
+
+  it("pushes overlapping walkers apart instead of letting them share a point", () => {
+    const engine = createSimulationEngineFromScene(
+      mallScene({
+        entrances: [
+          {
+            id: "gate",
+            kind: "source",
+            // A narrow gate floods the same few squares, so without separation
+            // agents would stack on the spawn line.
+            position: { x: 5, y: 40 },
+            width: 0.2,
+            arrivalRatePerMinute: 6000,
+          },
+          ...mallExits,
+        ],
+      }),
+      { maxAgents: 400 },
+    );
+
+    engine.start();
+    const { agents } = engine.step(60 * 30);
+
+    expect(agents.length).toBeGreaterThan(50);
+
+    let closestPair = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < agents.length; i++) {
+      for (let j = i + 1; j < agents.length; j++) {
+        const distance = Math.hypot(
+          agents[i].x - agents[j].x,
+          agents[i].y - agents[j].y,
+        );
+
+        if (distance < closestPair) {
+          closestPair = distance;
+        }
+      }
+    }
+
+    // Nobody should be standing inside anybody else.
+    expect(closestPair).toBeGreaterThan(0.05);
   });
 });
 
@@ -474,17 +589,21 @@ function mallScene(overrides: Partial<Parameters<typeof parseScene>[0]>) {
         width: 6,
         arrivalRatePerMinute: 300,
       },
-      {
-        id: "exit",
-        kind: "sink",
-        position: { x: 5, y: 5 },
-        width: 6,
-        arrivalRatePerMinute: 0,
-      },
+      ...mallExits,
     ],
     ...overrides,
   });
 }
+
+const mallExits = [
+  {
+    id: "exit",
+    kind: "sink" as const,
+    position: { x: 5, y: 5 },
+    width: 6,
+    arrivalRatePerMinute: 0,
+  },
+];
 
 function createOffsetMovementBackend(offsetX: number, offsetY: number) {
   let calls = 0;

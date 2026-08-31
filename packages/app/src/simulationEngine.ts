@@ -24,6 +24,7 @@ import { createBrandStoresFromScene } from "./brandAttraction";
 import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
 import { buildNavigationFields, pointToCellId } from "./simulationEngineNavigation";
 import { createSeededRng, samplePoisson } from "./simulationEngineRandom";
+import { weidmannSpeedRatioAtDensity } from "./pedestrianFundamentalDiagram";
 export type SimulationStatus = "paused" | "running";
 export type SimulationAgent = {
   decisionTick?: number;
@@ -98,6 +99,21 @@ const defaultMaxAgents = 2_000;
 // passes an explicit speed, so editor-built scenes ran at sprint pace. Must
 // match the scene-schema default (sceneSchema speedMetersPerSecond).
 const defaultSpeedMetersPerSecond = 1.34;
+/**
+ * Local crowd interaction on the CPU path — the three constants below are the
+ * whole thing. Before this existed, `advanceAgentsCpu` moved every walker at a
+ * fixed speed with no awareness of anybody else: density never slowed anyone
+ * (RiMEA test 4 failed by +0.73 m/s at 2 P/m²) and agents walked straight
+ * through each other, so jams, queues and arches could not form.
+ *
+ * The GPU core (`gpuSimCore`) already had this physics; this is the CPU
+ * equivalent so the default, backend-less path behaves the same.
+ */
+const densityCellSizeMeters = 2;
+/** Shoulder width: two walkers closer than this are overlapping, not walking. */
+const agentSeparationMeters = 0.5;
+/** Per-step cap on the separation push, so nobody is teleported out of a crowd. */
+const maxSeparationStepMeters = 0.2;
 const maxRealDeltaSeconds = 0.25;
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
@@ -323,10 +339,27 @@ export function createSimulationEngine(
     }
   }
   function advanceAgentsCpu() {
+    const grid = buildAgentGrid(agents);
     const nextAgents: SimulationAgent[] = [];
     for (const agent of agents) {
       if (agent.lifecycleState === "browse" || agent.lifecycleState === "enterStore") {
-        nextAgents.push({ ...agent, vx: 0, vy: 0 });
+        // Standing still, but they still take up space and still act as
+        // obstacles: separate them too, otherwise a browsing crowd or a shop
+        // queue collapses onto one anchor point and occupies no area.
+        const settled = constrainMovement(
+          agent,
+          separateFromNeighbours(grid, agent, agent),
+          walls,
+          world,
+        );
+
+        nextAgents.push({
+          ...agent,
+          vx: (settled.x - agent.x) / fixedDtSeconds,
+          vy: (settled.y - agent.y) / fixedDtSeconds,
+          x: settled.x,
+          y: settled.y,
+        });
         continue;
       }
       const dx = agent.targetX - agent.x;
@@ -337,12 +370,19 @@ export function createSimulationEngine(
         continue;
       }
       const direction = movementDirection(agent, dx, dy, distance);
-      const travelDistance = Math.min(distance, speedMetersPerSecond * fixedDtSeconds);
+      const density = localDensityPerSquareMeter(grid, agent.x, agent.y);
+      const crowdSpeed = speedMetersPerSecond * weidmannSpeedRatioAtDensity(density);
+      const travelDistance = Math.min(distance, crowdSpeed * fixedDtSeconds);
       const proposed = {
         x: agent.x + direction.x * travelDistance,
         y: agent.y + direction.y * travelDistance,
       };
-      const resolved = constrainMovement(agent, proposed, walls, world);
+      const separated = separateFromNeighbours(
+        grid,
+        agent,
+        constrainMovement(agent, proposed, walls, world),
+      );
+      const resolved = constrainMovement(agent, separated, walls, world);
       const vx = (resolved.x - agent.x) / fixedDtSeconds;
       const vy = (resolved.y - agent.y) / fixedDtSeconds;
       nextAgents.push({
@@ -479,4 +519,137 @@ export function createSimulationEngine(
       return makeSnapshot();
     },
   };
+}
+
+/**
+ * Local crowd interaction for the CPU path.
+ *
+ * HONESTY NOTE: the density here is a 3x3-cell sample of agent positions, not a
+ * measurement of a real crowd, and the separation push is a positional
+ * correction rather than a force. What this buys is the two properties that
+ * were missing entirely: speed falls as local density rises (in Weidmann's
+ * shape, see `pedestrianFundamentalDiagram`) and walkers no longer occupy the
+ * same point. It is not a validated social-force model; `gpuSimCore` is.
+ */
+type AgentGrid = {
+  agents: readonly SimulationAgent[];
+  cellIds: Map<number, number[]>;
+};
+
+function buildAgentGrid(agents: readonly SimulationAgent[]): AgentGrid {
+  const cellIds = new Map<number, number[]>();
+
+  agents.forEach((agent, index) => {
+    const cellId = gridCellId(agent.x, agent.y);
+    const bucket = cellIds.get(cellId);
+
+    if (bucket) {
+      bucket.push(index);
+    } else {
+      cellIds.set(cellId, [index]);
+    }
+  });
+
+  return { agents, cellIds };
+}
+
+function gridCellId(x: number, y: number) {
+  const cx = Math.floor(x / densityCellSizeMeters) + 32768;
+  const cy = Math.floor(y / densityCellSizeMeters) + 32768;
+
+  return cx * 65536 + cy;
+}
+
+/**
+ * Agents per square metre in the 3x3 neighbourhood around a point. The 3x3
+ * window is the measurement area, so a lone walker reads as ~0.03 P/m² rather
+ * than 1/36th of nothing: density has to be an area measurement to mean
+ * anything against the literature curve.
+ */
+function localDensityPerSquareMeter(grid: AgentGrid, x: number, y: number) {
+  let count = 0;
+
+  forEachNeighbour(grid, x, y, () => count++);
+
+  return count / (9 * densityCellSizeMeters * densityCellSizeMeters);
+}
+
+function forEachNeighbour(
+  grid: AgentGrid,
+  x: number,
+  y: number,
+  visit: (agent: SimulationAgent) => void,
+) {
+  const cx = Math.floor(x / densityCellSizeMeters);
+  const cy = Math.floor(y / densityCellSizeMeters);
+
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const bucket = grid.cellIds.get(
+        gridCellId(
+          (cx + dx) * densityCellSizeMeters,
+          (cy + dy) * densityCellSizeMeters,
+        ),
+      );
+
+      if (!bucket) {
+        continue;
+      }
+
+      for (const index of bucket) {
+        visit(grid.agents[index]);
+      }
+    }
+  }
+}
+
+/**
+ * Push a walker out of anyone it overlaps. Neighbours are read at their
+ * step-start positions (the grid is built once per step), so the result does
+ * not depend on processing order and stays reproducible from a seed.
+ */
+function separateFromNeighbours(
+  grid: AgentGrid,
+  agent: SimulationAgent,
+  position: ScenePoint,
+): ScenePoint {
+  let x = position.x;
+  let y = position.y;
+
+  forEachNeighbour(grid, x, y, (other) => {
+    if (other.id === agent.id) {
+      return;
+    }
+
+    const dx = x - other.x;
+    const dy = y - other.y;
+    const distanceSq = dx * dx + dy * dy;
+
+    if (distanceSq >= agentSeparationMeters * agentSeparationMeters) {
+      return;
+    }
+
+    const distance = Math.sqrt(distanceSq);
+
+    // Exactly coincident walkers (a narrow gate can stack spawns on one point)
+    // have no axis to separate along. Nudge them by a deterministic,
+    // id-derived angle so the stack always breaks up instead of freezing.
+    if (distance < 1e-6) {
+      const angle = (agent.id * 2.399963) % (Math.PI * 2);
+
+      x += Math.cos(angle) * maxSeparationStepMeters;
+      y += Math.sin(angle) * maxSeparationStepMeters;
+      return;
+    }
+
+    const push = Math.min(
+      (agentSeparationMeters - distance) / 2,
+      maxSeparationStepMeters,
+    );
+
+    x += (dx / distance) * push;
+    y += (dy / distance) * push;
+  });
+
+  return { x, y };
 }

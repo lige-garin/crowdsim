@@ -58,6 +58,20 @@ export function weidmannSpeedAtDensity(densityPerSquareMeter: number): number {
   );
 }
 
+/**
+ * The same curve expressed as a fraction of free-flow speed. The engine uses
+ * this form so an explicit speed (scene field, industry template, benchmark
+ * override) still sets the absolute pace while the *shape* stays the
+ * literature one: a walker at 2 P/m² keeps ~45% of its speed, at 4 P/m² ~12%,
+ * and at the jam density none of it.
+ */
+export function weidmannSpeedRatioAtDensity(densityPerSquareMeter: number): number {
+  return (
+    weidmannSpeedAtDensity(densityPerSquareMeter) /
+    weidmannFundamentalDiagram.freeFlowSpeedMetersPerSecond
+  );
+}
+
 export type SpeedDensitySample = {
   densityPerSquareMeter: number;
   speedMetersPerSecond: number;

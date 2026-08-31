@@ -239,13 +239,29 @@ and the Kladek-form restatement in the ECCMAS COMPDYN 2015 paper.
 | 2.0            | 0.61     | 1.34        | **+0.73** |
 | 4.0            | 0.16     | 1.34        | **+1.18** |
 
-**RiMEA test 4 does not pass.** The engine matches the literature at low
-density and diverges badly from it everywhere else, because speed is a constant
-rather than a function of density.
+**RiMEA test 4 did not pass** against the constant-speed engine recorded
+above — speed was a constant, not a function of density.
 
-Closing this means giving the engine a density-speed coupling and measuring the
-result against the table above. It explicitly does _not_ mean widening the
-existing ranges — that would restore the loop this entry removes.
+**Closed on the CPU path 2026-08-31.** `advanceAgentsCpu` now measures local
+density (3×3 cells of a 2 m grid) and scales speed by
+`weidmannSpeedRatioAtDensity(ρ)` — the same Weidmann curve, normalised so
+explicit speed overrides keep their absolute meaning — and pushes overlapping
+walkers apart (0.5 m separation, 0.2 m/step cap; browsing/queueing agents
+participate so a queue occupies area, not a point). The table below is what the
+engine applies by construction; the *shape* is now literature-shaped, and
+`simulationEngine.test.ts` pins the ratio at 0.5/2/4/5.4 P/m² plus two
+integration checks (a jammed crowd walks measurably slower than the same scene
+sparse; no two walkers share a point).
+
+Scope caveats, kept honest:
+
+- The density input is a 3×3-cell sample of agent positions, not a validated
+  measurement; the RiMEA scenarios' own geometries are still self-authored.
+- The benchmark bands (all `self-authored`) were re-run after the change and
+  **all still pass** — the scenarios are sparse enough that the ratio stays
+  ≈1. That is consistency, not proof.
+- The WebGPU movement path (`simulationMovementBridge`) had social-force
+  parameters already; this change is the CPU path only.
 
 Also note the scenario geometries are still self-authored approximations named
 after RiMEA cases, not the RiMEA geometries.
