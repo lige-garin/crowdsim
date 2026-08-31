@@ -21,5 +21,10 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/setupTests.ts",
     css: true,
+    // Forks instead of threads: some handle created on the SceneEditor path
+    // (worker/MessagePort in jsdom) survives thread-worker teardown, so a fully
+    // green run never exits (CI killed it at the timeout, exit 124). Fork
+    // workers are processes and get torn down for real.
+    pool: "forks",
   },
 });
