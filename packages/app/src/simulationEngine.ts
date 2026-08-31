@@ -93,7 +93,11 @@ export type SimulationEngine = {
 };
 const defaultFixedDtSeconds = 1 / 60;
 const defaultMaxAgents = 2_000;
-const defaultSpeedMetersPerSecond = 8;
+// Weidmann free-flow speed. Was 8 m/s (~29 km/h, 6x a walking human): every UI
+// path simulates at this default because neither the controller nor the worker
+// passes an explicit speed, so editor-built scenes ran at sprint pace. Must
+// match the scene-schema default (sceneSchema speedMetersPerSecond).
+const defaultSpeedMetersPerSecond = 1.34;
 const maxRealDeltaSeconds = 0.25;
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
@@ -107,7 +111,12 @@ export function createSimulationEngineFromScene(
   overrides: Partial<SimulationEngineConfig> = {},
 ): SimulationEngine {
   const environmentImpact = calculateEnvironmentImpact(scene, 0);
-  const baseSpeed = overrides.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
+  // Precedence: explicit override > scene-persisted field > engine default
+  // (which equals the schema default, so both fall in line at 1.34).
+  const baseSpeed =
+    overrides.speedMetersPerSecond ??
+    scene.speedMetersPerSecond ??
+    defaultSpeedMetersPerSecond;
   const sources = scene.entrances
     .filter((entrance) => entrance.kind !== "sink" && entrance.arrivalRatePerMinute > 0)
     .map((entrance) => ({

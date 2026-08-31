@@ -37,6 +37,10 @@ export const sceneSchema = z
     name: z.string().min(1),
     units: z.literal("meters").default("meters"),
     seed: z.number().int().nonnegative().default(1),
+    // Pedestrian base speed, meters/second, before environment multipliers.
+    // Defaults to Weidmann free-flow speed; the engine's own default must match
+    // this so scenes that predate the field simulate at a plausible pace.
+    speedMetersPerSecond: z.number().positive().default(1.34),
     world: z.object({
       width: z.number().positive(),
       height: z.number().positive(),

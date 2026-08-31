@@ -322,7 +322,10 @@ describe("simulation engine", () => {
           },
         ],
       }),
-      { maxAgents: 224 },
+      // The 5 arrivals/second vs cap-224 balance was tuned at 8 m/s walking;
+      // this test pins the route give-up behaviour, not the speed, so keep the
+      // legacy pace explicitly instead of re-tuning the fixture around 1.34.
+      { maxAgents: 224, speedMetersPerSecond: 8 },
     );
 
     const firstHalf = engine.step(60 * 150);
@@ -391,6 +394,42 @@ describe("simulation engine", () => {
     expect(snapshot.spawnedCount).toBeGreaterThan(0);
     expect(snapshot.exitedCount).toBe(0);
     expect(maxX).toBeLessThan(5);
+  });
+});
+
+describe("scene speed persistence", () => {
+  /** One second of straight-line walking distance for the fastest agent. */
+  function maxOneSecondDisplacement(
+    engine: ReturnType<typeof createSimulationEngineFromScene>,
+  ) {
+    engine.start();
+    engine.step(60);
+    const before = engine.snapshot();
+    const after = engine.step(60);
+
+    return Math.max(
+      ...after.agents.map((agent) => {
+        const previous = before.agents.find((b) => b.id === agent.id);
+
+        return previous ? Math.hypot(agent.x - previous.x, agent.y - previous.y) : 0;
+      }),
+    );
+  }
+
+  it("simulates editor scenes at Weidmann free-flow speed, not the legacy 8 m/s", () => {
+    const engine = createSimulationEngineFromScene(mallScene({}));
+
+    // The shop is 55 m from the gate, so every walker is still en route and
+    // covers exactly one second of walking in the measured window.
+    expect(maxOneSecondDisplacement(engine)).toBeCloseTo(1.34, 1);
+  });
+
+  it("honours a scene-persisted speed instead of the default", () => {
+    const engine = createSimulationEngineFromScene(
+      mallScene({ speedMetersPerSecond: 0.5 }),
+    );
+
+    expect(maxOneSecondDisplacement(engine)).toBeCloseTo(0.5, 1);
   });
 });
 
