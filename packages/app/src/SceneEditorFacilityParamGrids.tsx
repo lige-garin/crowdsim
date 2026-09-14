@@ -2,6 +2,7 @@
 import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import type {
   BuildingNumberField,
+  EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
   RoadNumberField,
@@ -16,6 +17,9 @@ type TransitStop = EditorDocument["transitStops"][number];
 type Obstacle = EditorDocument["obstacles"][number];
 type Hazard = EditorDocument["hazards"][number];
 type Zone = EditorDocument["zones"][number];
+type Entrance = EditorDocument["entrances"][number];
+
+const entranceKinds: readonly Entrance["kind"][] = ["source", "sink", "bidirectional"];
 const roadDirections: readonly Road["direction"][] = [
   "twoWay",
   "oneWayForward",
@@ -411,6 +415,53 @@ export function ZoneParamGrid({
       <button type="button" onClick={onGenerateStores}>
         {t("generateStores")}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Entrances had no editor at all: you could draw a door and then had no way to
+ * say how many people come through it. Arrival rate is the most consequential
+ * input in a crowd model — it is what "how busy is this place" means — and it
+ * was the one number that could only be changed by hand-editing JSON.
+ */
+export function EntranceParamGrid({
+  onKindChange,
+  onNumberChange,
+  selectedEntrance,
+  t,
+}: {
+  onKindChange: (kind: Entrance["kind"]) => void;
+  onNumberChange: (field: EntranceNumberField, value: number) => void;
+  selectedEntrance: Entrance;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <div className="editor-param-grid">
+      <span>{selectedEntrance.id}</span>
+      <SelectInput
+        label={t("entranceKind")}
+        options={entranceKinds}
+        value={selectedEntrance.kind}
+        onChange={onKindChange}
+      />
+      {/* A pure exit spawns nobody, so the rate is not offered for one. */}
+      {selectedEntrance.kind === "sink" ? null : (
+        <NumberInput
+          label={t("arrivalRate")}
+          min={0}
+          step={10}
+          value={selectedEntrance.arrivalRatePerMinute}
+          onChange={(value) => onNumberChange("arrivalRatePerMinute", value)}
+        />
+      )}
+      <NumberInput
+        label={t("width")}
+        min={0.5}
+        step={0.5}
+        value={selectedEntrance.width}
+        onChange={(value) => onNumberChange("width", value)}
+      />
     </div>
   );
 }

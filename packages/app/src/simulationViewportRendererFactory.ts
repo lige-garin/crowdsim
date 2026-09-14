@@ -1,4 +1,9 @@
-import { WebGLRenderer } from "three";
+import {
+  ACESFilmicToneMapping,
+  PCFSoftShadowMap,
+  SRGBColorSpace,
+  WebGLRenderer,
+} from "three";
 import { WebGPURenderer } from "three/webgpu";
 
 import { performanceBenchmarkFrames } from "./renderBenchmark";
@@ -9,26 +14,37 @@ export function createGpuViewportRenderer(
 ) {
   const renderer = new WebGPURenderer({
     alpha: true,
-    antialias: false,
+    antialias: true,
     canvas,
     device,
     powerPreference: "high-performance",
     stencil: false,
   });
-  renderer.shadowMap.enabled = true;
+  configureViewportRenderer(renderer);
+
   return renderer;
 }
 
 export function createFallbackViewportRenderer(canvas: HTMLCanvasElement) {
   const renderer = new WebGLRenderer({
     alpha: true,
-    antialias: false,
+    antialias: true,
     canvas,
     powerPreference: "high-performance",
     stencil: false,
   });
-  renderer.shadowMap.enabled = true;
+  configureViewportRenderer(renderer);
+
   return renderer;
+}
+
+function configureViewportRenderer(renderer: WebGLRenderer | WebGPURenderer) {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.toneMapping = ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = PCFSoftShadowMap;
 }
 
 export async function benchmarkViewportRenderer(

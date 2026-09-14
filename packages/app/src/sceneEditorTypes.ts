@@ -48,6 +48,7 @@ export type EditorEntrance = {
   position: ScenePoint;
   width: number;
   arrivalRatePerMinute: number;
+  exitIds?: string[];
 };
 
 export type EditorTarget = {
@@ -85,6 +86,8 @@ export type EditorShop = {
 
 export type EditorServicePoint = {
   id: string;
+  name?: string;
+  servers?: number;
   kind: "counter" | "gate";
   position: ScenePoint;
   width: number;

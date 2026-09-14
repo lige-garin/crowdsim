@@ -1,0 +1,138 @@
+.workspace-list {
+  display: grid;
+  gap: 7px;
+}
+
+.workspace::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 48% 38%, rgba(54, 145, 188, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 22%);
+}
+
+.workspace > * {
+  position: relative;
+  z-index: 1;
+}
+
+.workspace-row span {
+  color: var(--lab-muted);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  font-weight: 760;
+}
+
+.workspace-row strong {
+  color: var(--lab-ink);
+  overflow-wrap: anywhere;
+  font-weight: 760;
+}
+
+.workspace-row::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--lab-line-strong);
+  opacity: 0.42;
+}
+
+.workspace-row {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--lab-line);
+  border-radius: var(--product-radius-sm);
+  background: rgba(255, 255, 255, 0.9);
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 10px;
+  border-color: rgba(206, 220, 232, 0.92);
+  box-shadow: 0 12px 32px rgba(34, 66, 98, 0.07);
+}
+
+.workspace {
+  display: grid;
+  grid-template-areas:
+    "bar bar bar"
+    "side stage inspect"
+    "dock dock dock";
+  grid-template-columns: 238px minmax(0, 1fr) 318px;
+  grid-template-rows: 60px minmax(0, 1fr) auto;
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 54% 10%, rgba(200, 169, 107, 0.035), transparent 34%),
+    #0c0f0d;
+  overflow: hidden;
+  background-size:
+    44px 44px,
+    44px 44px,
+    auto;
+  color: var(--lab-ink);
+  height: 100dvh;
+  max-height: 100dvh;
+  --lab-bg: #0c0f0d;
+  --lab-surface: #111512;
+  --lab-surface-2: #171c18;
+  --lab-ink: #eef0eb;
+  --lab-muted: #98a097;
+  --lab-faint: #687168;
+  --lab-line: rgba(228, 234, 224, 0.09);
+  --lab-line-strong: rgba(228, 234, 224, 0.18);
+  --lab-blue: #c8a96b;
+  --lab-blue-strong: #dcc18b;
+  --lab-cyan: #91a59a;
+  --lab-acid: #b5c786;
+  --lab-green: #78ae8c;
+  --lab-red: #cf8176;
+  --lab-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+  --product-radius: 10px;
+  --product-radius-sm: 7px;
+  width: 100%;
+  font-family:
+    "Segoe UI Variable", "Aptos", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1320px) {
+  .workspace {
+    grid-template-columns: 222px minmax(0, 1fr) 286px;
+  }
+}
+@media (max-width: 1120px) {
+  .workspace {
+    grid-template-columns: 210px minmax(0, 1fr) 264px;
+  }
+}
+@media (max-width: 980px) {
+  .workspace {
+    grid-template-areas:
+      "bar bar"
+      "side stage"
+      "inspect inspect"
+      "dock dock";
+    grid-template-columns: 210px minmax(0, 1fr);
+    grid-template-rows: 60px auto auto auto;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+}
+@media (max-width: 760px) {
+  .workspace {
+    grid-template-areas:
+      "bar"
+      "stage"
+      "side"
+      "inspect"
+      "dock";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+}

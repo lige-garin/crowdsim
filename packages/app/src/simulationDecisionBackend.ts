@@ -23,8 +23,15 @@ export type SimulationShop = {
   dwellSeconds: number;
   /** Max simultaneous browsers; arrivals beyond this queue instead of entering. */
   capacity: number;
-  /** Where queued shoppers wait for a free slot. */
+  /** Where the head of the line stands. */
   queuePosition: ScenePoint;
+  /** Unit direction the line grows in from `queuePosition`; +y when absent. */
+  queueDirection?: ScenePoint;
+  /**
+   * The shop floor browsers spread over: centre and half extents, already inset
+   * from the walls. Browsers stand at `position` when absent.
+   */
+  browseArea?: { x: number; y: number; halfWidth: number; halfHeight: number };
   /** Probability a browser buys (and so heads to checkout) after browsing. */
   conversionRate: number;
 };
@@ -36,6 +43,8 @@ export type SimulationServicePoint = {
   radius: number;
   /** How long a checkout takes once served, in seconds. */
   serviceSeconds: number;
+  /** People served at once; absent means no limit. */
+  servers?: number;
 };
 
 export type SimulationAgentWalkProgress = {
@@ -53,6 +62,10 @@ export type SimulationAgentDecision = {
   browseUntilSeconds?: number | null;
   /** Clears the field when explicitly null (e.g. on leaving a queue). */
   queueUntilSeconds?: number | null;
+  /** When the shopper joined the line; clears when explicitly null. */
+  queueJoinedSeconds?: number | null;
+  /** The checkout counter the buyer is using; clears when explicitly null. */
+  servicePointId?: string | null;
   /** Clears the field when explicitly null (e.g. when the target changes). */
   walkProgress?: SimulationAgentWalkProgress | null;
   target?: ScenePoint;
@@ -68,6 +81,12 @@ export type SimulationDecisionTickInput = {
   servicePoints?: readonly SimulationServicePoint[];
   /** When true, all agents abandon shopping and head for the nearest exit. */
   evacuationActive?: boolean;
+  /**
+   * Walking distance around walls. Progress toward a target is measured with
+   * it, so a shopper detouring round a building is not mistaken for one stuck
+   * against a wall. Straight-line distance when absent.
+   */
+  routeDistance?: (from: ScenePoint, to: ScenePoint) => number;
 };
 
 export type SimulationDecisionBackend = {
@@ -78,6 +97,40 @@ export type SimulationDecisionBackend = {
     input: SimulationDecisionTickInput,
   ) => readonly SimulationAgentDecision[];
 };
+
+/**
+ * The exit an agent should head for: the nearest of the exits its entrance
+ * allows (ADR-0008), or the nearest of all when it allows none that exist.
+ */
+export function nearestAllowedSink(
+  point: ScenePoint,
+  sinks: readonly SimulationSink[],
+  exitIds?: readonly string[],
+): SimulationSink {
+  const allowed =
+    exitIds && exitIds.length > 0
+      ? sinks.filter((sink) => exitIds.includes(sink.id))
+      : [];
+  return nearest(point, allowed.length > 0 ? allowed : sinks);
+}
+
+/** The candidate whose position is closest to `point`. */
+export function nearest<T extends { position: ScenePoint }>(
+  point: ScenePoint,
+  candidates: readonly T[],
+): T {
+  let best = candidates[0];
+  let bestSq = Number.POSITIVE_INFINITY;
+  for (const candidate of candidates) {
+    const sq =
+      (candidate.position.x - point.x) ** 2 + (candidate.position.y - point.y) ** 2;
+    if (sq < bestSq) {
+      best = candidate;
+      bestSq = sq;
+    }
+  }
+  return best;
+}
 
 export function shouldRunDecisionTick(options: {
   decisionHz: number;
@@ -143,6 +196,14 @@ export function applySimulationAgentDecisions(
         decision.queueUntilSeconds === null
           ? undefined
           : (decision.queueUntilSeconds ?? agent.queueUntilSeconds),
+      queueJoinedSeconds:
+        decision.queueJoinedSeconds === null
+          ? undefined
+          : (decision.queueJoinedSeconds ?? agent.queueJoinedSeconds),
+      servicePointId:
+        decision.servicePointId === null
+          ? undefined
+          : (decision.servicePointId ?? agent.servicePointId),
       walkProgress:
         decision.walkProgress === null
           ? undefined

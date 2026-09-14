@@ -1,3 +1,5 @@
+import { crowdBudget } from "./crowdBudget";
+
 export const performanceAgentCount = 100_000;
 export const performanceAgentSpacing = 0.14;
 export const performanceBenchmarkFrames = 45;
@@ -27,4 +29,4 @@ export function benchmarkAgentPosition(index: number): { x: number; y: number } 
  * `defaultMaxAgents`); this leaves 4x headroom for larger scenes without
  * pretending the renderer is doing 100k.
  */
-export const viewportAgentCapacity = 8_192;
+export const viewportAgentCapacity = crowdBudget.renderCapacity;

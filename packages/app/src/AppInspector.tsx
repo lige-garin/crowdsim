@@ -1,55 +1,28 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
-import type {
-  AgentStateProbeState,
-  DiscreteEventProbeState,
-  EvacuationState,
-  QueueSystemProbeState,
-  ShopDecisionProbeState,
-  SystemSignal,
-} from "./AppTypes";
-import type { DashboardStats } from "./dashboardStats";
-import type { DashboardV2Stats } from "./dashboardV2Stats";
-import type { FlowFieldProbeResult } from "./flowFieldProbe";
-import type { GpuGridProbeResult } from "./gpuGridProbe";
+import type { EvacuationState, SystemSignal } from "./AppTypes";
 import type { HeatmapCell } from "./heatmap";
-import type { HeatmapProbeResult } from "./heatmapProbe";
 import { formatSceneName, useI18n } from "./i18n";
 import type { SimulationCredibilityReport } from "./simulationCredibility";
-import type { SocialForceProbeResult } from "./socialForceProbe";
 import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
 type AppInspectorProps = {
-  agentStateProbe: AgentStateProbeState;
-  dashboardStats: DashboardStats;
-  dashboardV2Stats: DashboardV2Stats;
-  discreteEventProbe: DiscreteEventProbeState;
   elapsedSeconds: number;
   evacuation: EvacuationState;
-  flowFieldProbe: FlowFieldProbeResult;
-  gridProbe: GpuGridProbeResult;
   heatmapCells: readonly HeatmapCell[];
-  heatmapProbe: HeatmapProbeResult;
-  queueSystemProbe: QueueSystemProbeState;
   scene: CrowdSimScene;
-  shopDecisionProbe: ShopDecisionProbeState;
   signals: readonly SystemSignal[];
   simulationCredibility: SimulationCredibilityReport;
-  socialForceProbe: SocialForceProbeResult;
   trajectoryRecording: TrajectoryRecording;
   webGpuProbe: WebGpuProbeResult;
 };
 
 export function AppInspector({
-  dashboardStats,
-  dashboardV2Stats,
   elapsedSeconds,
   evacuation,
   heatmapCells,
-  queueSystemProbe,
   scene,
-  shopDecisionProbe,
   signals,
   simulationCredibility,
   trajectoryRecording,
@@ -65,28 +38,17 @@ export function AppInspector({
       aria-label={t("systemSignals")}
     >
       <header className="biocity-inspector-title">
-        <span>{language === "zh" ? "分析看板" : "Analytics panel"}</span>
+        <span>{language === "zh" ? "实时分析" : "Live analytics"}</span>
         <strong>{formatSceneName(scene, language)}</strong>
       </header>
 
-      <section className="biocity-score-strip" aria-label="BioCity key metrics">
-        <Metric
-          label={language === "zh" ? "客流" : "Footfall"}
-          value={dashboardStats.currentAgentCount.toLocaleString()}
-        />
-        <Metric
-          label={language === "zh" ? "离场" : "Exited"}
-          value={dashboardStats.exitedCount.toLocaleString()}
-        />
-        <Metric
-          label={language === "zh" ? "密度峰值" : "Density peak"}
-          value={String(dashboardStats.densityPeak)}
-        />
-        <Metric
-          label={language === "zh" ? "选店概率" : "Store-choice"}
-          value={`${dashboardV2Stats.shopEntryRatePercent}%`}
-        />
-      </section>
+      {/*
+        The key-metrics strip that used to open this rail is gone: footfall,
+        exited and density peak now render once, in the stage telemetry beside
+        the crowd, and the trajectory frame count is already reported below
+        under "system & recording". This rail is analysis, not a fourth copy of
+        the same four numbers.
+      */}
 
       <BioCityAnalyticsPanel
         elapsedSeconds={elapsedSeconds}
@@ -94,7 +56,10 @@ export function AppInspector({
         scene={scene}
       />
 
-      <section className="biocity-compact-panel" aria-label="BioCity scene objects">
+      <section
+        className="biocity-compact-panel"
+        aria-label={language === "zh" ? "场景对象" : "Scene objects"}
+      >
         <header>
           <span>{language === "zh" ? "场景对象" : "Scene objects"}</span>
           <strong>{areaCount}</strong>
@@ -119,32 +84,18 @@ export function AppInspector({
         </div>
       </section>
 
-      <section className="biocity-compact-panel" aria-label="BioCity system status">
+      <section
+        className="biocity-compact-panel"
+        aria-label={language === "zh" ? "系统与记录" : "System & recording"}
+      >
         <header>
-          <span>{language === "zh" ? "系统状态" : "System status"}</span>
+          <span>{language === "zh" ? "系统与记录" : "System & recording"}</span>
           <strong>{formatStatus(simulationCredibility.status, language)}</strong>
         </header>
         <div className="biocity-status-list">
           <Row
             label={language === "zh" ? "内核" : "Kernel"}
             value={formatStatus(webGpuProbe.status, language)}
-          />
-          <Row
-            label={language === "zh" ? "队列" : "Queue"}
-            value={
-              queueSystemProbe.status === "ready"
-                ? `${queueSystemProbe.throughput}/30s`
-                : formatStatus(queueSystemProbe.status, language)
-            }
-          />
-          <Row
-            label={language === "zh" ? "品牌" : "Brand"}
-            value={
-              shopDecisionProbe.status === "ready"
-                ? (shopDecisionProbe.brandInsight?.selectedBrandName ??
-                  formatStatus("ready", language))
-                : formatStatus(shopDecisionProbe.status, language)
-            }
           />
           <Row
             label={language === "zh" ? "回放" : "Replay"}
@@ -171,7 +122,7 @@ export function AppInspector({
 
       <section
         className="biocity-compact-panel biocity-signal-dock"
-        aria-label="BioCity signal dock"
+        aria-label={language === "zh" ? "工程状态" : "Engineering signals"}
       >
         <header>
           <span>{language === "zh" ? "工程状态" : "Engineering signals"}</span>

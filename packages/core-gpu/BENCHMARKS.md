@@ -17,7 +17,7 @@ fixed:
    Chrome 149's parser rejects, so any pipeline touching it failed to compile.
 2. The fused move shader binds **10 storage buffers**, above the WebGPU default
    per-stage limit of 8. On a default `requestDevice()` the move pipeline fails
-   validation *silently*, and every `step()` still costs submission time —
+   validation _silently_, and every `step()` still costs submission time —
    which is exactly how the earlier run measured a dead pipeline.
 
 Both are fixed: `scanMeta` rename in `gpuSimCoreShaders.ts`, a fail-loud
@@ -73,7 +73,53 @@ hardware/driver and date:
 
 ## Recorded results
 
-| Date | Hardware / driver | 100k ms/step | Verdict |
-| ---- | ----------------- | ------------ | ------- |
-| 2026-08-31 | NVIDIA Lovelace, Chrome 149.0.7827.55, Windows 10, page-context harness, **working pipeline** (post `scanMeta` + storage-limit fixes, liveness proven) | 0.465 / 5.759 / 0.446 (3 runs of 100 steps) | **60fps gate MET for the core step** (~36× headroom); full-app fps unmeasured |
-| 2026-08-31 | same, **invalid** — measured on a silently-dead move pipeline (see correction above) | 0.211 / 0.131 / 0.148 | superseded — do not quote |
+| Date       | Hardware / driver                                                                                                                                      | 100k ms/step                                | Verdict                                                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 2026-08-31 | NVIDIA Lovelace, Chrome 149.0.7827.55, Windows 10, page-context harness, **working pipeline** (post `scanMeta` + storage-limit fixes, liveness proven) | 0.465 / 5.759 / 0.446 (3 runs of 100 steps) | **60fps gate MET for the core step** (~36× headroom); full-app fps unmeasured                  |
+| 2026-09-13 | NVIDIA Lovelace, user's Chrome (`maxStorageBuffersPerShaderStage: 16`), driven live from the app page via `/@fs` import of the built core              | 1.347 / 0.781 / 0.411 (3 runs of 100 steps) | re-confirmed on live hardware; **liveness checked** — 61,505 non-empty cells, max 298 per cell |
+| 2026-08-31 | same, **invalid** — measured on a silently-dead move pipeline (see correction above)                                                                   | 0.211 / 0.131 / 0.148                       | superseded — do not quote                                                                      |
+
+## CPU path scaling (why the GPU core is needed, not a nice-to-have)
+
+Measured 2026-09-12 on the `biocity-rainy-high-street` demo scene, Node/vitest,
+`createSimulationEngineFromScene(...).step(1)` wall-clock per fixed step
+(includes the per-step snapshot the app also pays). The crowd was filled to the
+target count, warmed up 10 steps, then 40 steps timed.
+
+| agents | median ms/step | p95    | verdict                     |
+| ------ | -------------- | ------ | --------------------------- |
+| 1,000  | 2.78           | 4.54   | 60Hz, 17% of frame          |
+| 2,000  | 8.64           | 10.96  | 60Hz, 52% of frame          |
+| 5,000  | 31.79          | 34.65  | 30Hz only                   |
+| 10,000 | 170.27         | 253.52 | an order of magnitude short |
+
+Cost is **super-linear**: ×5 agents costs ×19.7 time (≈ O(n^1.85)). The 2m grid
+with a 3×3 neighbourhood is O(n) only when agents spread out; this scene is a
+corridor ~15m tall in a 96m world, so density per cell grows with the crowd and
+the neighbour scan degrades with it.
+
+Consequences, recorded so nobody re-derives them:
+
+- `crowdBudget.maxAgents = 2,000` is an **honest 60Hz ceiling** for the CPU
+  path on this scene, not a placeholder or a conservative guess.
+- "上万顾客" is not reachable by raising a constant. It needs the resident GPU
+  core, which is what the retail-first spec already called the 命门.
+- A different scene geometry (a wide atrium rather than a corridor) would move
+  these numbers; they are scene-specific, not a universal engine figure.
+
+### The two paths, per agent per step
+
+Same machine, 2026-09-13. This is the number that decides whether the resident
+core is worth its architectural seam:
+
+| path                                               | agents  | ms/step | per agent     |
+| -------------------------------------------------- | ------- | ------- | ------------- |
+| CPU engine (object array, 2m grid)                 | 10,000  | 170.27  | **17 µs**     |
+| resident GPU core (SoA, counting sort, fused move) | 100,000 | 0.411   | **0.0041 µs** |
+
+Four orders of magnitude. The caveat that keeps this honest: these measure
+different work. The CPU figure is a full engine step — spawn, decisions,
+movement, wall constraints, exits, and the per-step snapshot the UI consumes.
+The GPU figure is the movement kernel only, with no decisions, no spawning and
+no readback. The comparison says the movement kernel is not the bottleneck at
+100k; it does not say the whole app runs at 100k.

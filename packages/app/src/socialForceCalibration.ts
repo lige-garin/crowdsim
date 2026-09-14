@@ -37,6 +37,12 @@ export type ResidualProjectionValidationReport = {
   targetThroughputPerMinute: number;
 };
 
+/**
+ * HONESTY NOTE (2026-09-14): despite the name this is not a fit. It scales
+ * parameter hints by the ratio of a target speed and throughput to one
+ * benchmark run, without running the model again. The movement model's
+ * parameters are fitted in `fundamentalDiagramFit.ts` (docs/calibration).
+ */
 export function calibrateSocialForceParameters(
   result: BenchmarkRunResult,
   target: TrajectoryCalibrationTarget,

@@ -1,0 +1,545 @@
+.render-viewport-3d {
+  background:
+    linear-gradient(rgba(0, 91, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 183, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(135deg, #0a1424 0%, #0c1830 100%);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+}
+
+.render-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.render-agent-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.render-selected-agent strong {
+  color: #ffb43c;
+}
+
+.biocity-time-rail input {
+  width: 100%;
+  accent-color: #2557d6;
+}
+
+.render-viewport-skeleton {
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  padding: 18px;
+}
+
+.render-viewport-skeleton span:nth-child(2) {
+  width: min(320px, 56%);
+}
+
+.render-viewport-skeleton span:nth-child(3) {
+  width: min(220px, 42%);
+}
+
+.render-city-label-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.render-city-label strong {
+  max-width: 130px;
+  overflow: hidden;
+  color: #f4f8ff;
+  font-size: var(--fs-body);
+  font-weight: 840;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.render-city-label-shop {
+  border-color: rgba(250, 204, 21, 0.32);
+  background: rgba(66, 38, 8, 0.72);
+}
+
+.render-city-label-transit {
+  border-color: rgba(34, 211, 238, 0.34);
+}
+
+.render-city-label-hazard {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(67, 20, 18, 0.72);
+}
+
+.render-agent-marker:hover {
+  transform: translate(-50%, -100%) scale(1.12);
+}
+
+.render-unsupported-eyebrow {
+  margin: 0 0 6px;
+  color: #8fa7c0;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.render-unsupported-card h3 {
+  margin: 0 0 10px;
+  font-size: var(--fs-title);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.render-unsupported-card p {
+  margin: 0 0 8px;
+  font-size: var(--fs-lede);
+  line-height: 1.6;
+}
+
+.render-unsupported-card details {
+  margin-top: 12px;
+  border-top: 1px solid rgba(126, 176, 215, 0.14);
+  padding-top: 10px;
+}
+
+.render-unsupported-card summary {
+  cursor: pointer;
+  font-size: var(--fs-body);
+}
+
+.render-unsupported-card code {
+  display: block;
+  margin-top: 8px;
+  color: #a9bed4;
+  font-size: var(--fs-body);
+  overflow-wrap: anywhere;
+}
+
+.biocity-time-progress > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  display: block;
+  border-radius: inherit;
+  transition: width 240ms linear;
+}
+
+.render-viewport-skeleton span {
+  display: block;
+  overflow: hidden;
+  border-radius: var(--product-radius-sm);
+  background: linear-gradient(90deg, #eef4f8 0%, #ffffff 42%, #eef4f8 100%);
+  background-size: 220% 100%;
+  animation: skeletonSweep 1.4s ease-in-out infinite;
+  width: min(420px, 72%);
+  height: 16px;
+}
+
+.render-unsupported {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  padding: 32px 24px;
+  backdrop-filter: blur(2px);
+}
+
+.biocity-time-rail {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font-family: var(--lab-mono);
+  letter-spacing: 0.04em;
+}
+
+.stage {
+  display: grid;
+}
+
+.stage-stack {
+  min-width: 0;
+}
+
+.render-viewport {
+  position: relative;
+  overflow: hidden;
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  border-color: rgba(103, 185, 224, 0.18);
+}
+
+.render-viewport::before {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  border: 1px solid rgba(0, 183, 255, 0.16);
+}
+
+.render-hud {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 91, 255, 0.16);
+  border-radius: var(--product-radius-sm);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-body);
+  bottom: auto;
+  left: auto;
+}
+
+.render-agent-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.render-selected-agent {
+  position: absolute;
+  right: 14px;
+  top: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 122, 20, 0.4);
+  border-radius: 7px;
+  font-family: var(--lab-mono);
+  font-size: var(--fs-body);
+}
+
+.render-city-label {
+  position: absolute;
+  display: grid;
+  min-width: 86px;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(120, 219, 255, 0.22);
+  border-radius: 8px;
+  transform: translate(-50%, -100%);
+}
+
+.render-unsupported-card {
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: 14px;
+}
+
+.render-agent-intent {
+  position: absolute;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 15px;
+  padding: 0 3px;
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #9db2c8;
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 7px 16px rgba(4, 16, 28, 0.2);
+  transform: translateY(-2px);
+  border-color: rgba(8, 22, 34, 0.84);
+  min-height: 18px;
+}
+
+.render-city-label span {
+  color: #9db2c8;
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  font-weight: 760;
+  line-height: 1.1;
+}
+
+.render-unsupported-muted {
+  font-size: var(--fs-lede);
+}
+
+.render-agent-dot {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  background: #f2a93b;
+  box-shadow:
+    0 0 0 2px rgba(242, 169, 59, 0.22),
+    0 0 18px rgba(242, 169, 59, 0.3);
+}
+
+.biocity-timeline {
+  align-items: center;
+  border-color: rgba(126, 176, 215, 0.16);
+  backdrop-filter: blur(18px) saturate(1.08);
+  right: 18px;
+  bottom: 18px;
+  left: 18px;
+  color: var(--lab-ink);
+  top: auto;
+}
+
+.biocity-time-progress {
+  position: relative;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.workspace .stage {
+  grid-area: stage;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 16px 22px;
+  overflow: auto;
+  background: #0b0e0c;
+  scrollbar-color: rgba(220, 193, 139, 0.2) transparent;
+}
+
+.workspace .stage-stack {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto auto auto auto;
+  align-content: start;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+}
+
+.workspace .render-viewport {
+  width: 100%;
+  height: clamp(420px, 56vh, 650px);
+  min-height: 420px;
+  aspect-ratio: auto;
+  border: 1px solid var(--lab-line-strong);
+  border-radius: 12px;
+  background: #0a0d0b;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.018);
+}
+
+.workspace .render-viewport::before {
+  inset: 10px;
+  border-color: rgba(228, 234, 224, 0.07);
+  border-radius: 8px;
+}
+
+.workspace .render-hud {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.workspace .render-agent-marker {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.workspace .render-selected-agent {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.workspace .render-city-label {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.workspace .render-hud strong {
+  color: var(--lab-blue-strong);
+}
+
+.workspace .render-mode-badge {
+  color: var(--lab-blue-strong);
+}
+
+.workspace .stage-3d .render-city-label {
+  min-width: 0;
+  padding: 5px 7px;
+}
+
+.workspace .stage-3d .render-city-label > span {
+  display: none;
+}
+
+.workspace .render-unsupported {
+  place-items: start center;
+  padding-top: 32px;
+  background: rgba(10, 13, 11, 0.74);
+}
+
+.workspace .render-unsupported-card {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+  max-width: 430px;
+  padding: 22px 24px;
+  text-align: left;
+}
+
+.workspace .render-unsupported-card h3 {
+  color: var(--lab-ink);
+}
+
+.workspace .render-unsupported-card p {
+  color: var(--lab-muted);
+}
+
+.workspace .render-unsupported-muted {
+  color: var(--lab-muted);
+}
+
+.workspace .render-unsupported-card summary {
+  color: var(--lab-muted);
+}
+
+.workspace .biocity-timeline {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: 9px;
+  background: #111512;
+  box-shadow: none;
+}
+
+.workspace .biocity-time-rail {
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.workspace .biocity-time-progress {
+  height: 3px;
+  background: rgba(228, 234, 224, 0.08);
+}
+
+.workspace .biocity-time-progress > span {
+  background: var(--lab-blue);
+}
+
+@media (max-width: 980px) {
+  .workspace .stage {
+    min-height: 680px;
+  }
+}
+@media (max-width: 820px) {
+  .biocity-time-rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .workspace .stage {
+    min-height: 620px;
+    padding: 12px;
+  }
+
+  .workspace .render-viewport {
+    height: 430px;
+  }
+}
+@media (max-width: 520px) {
+  .render-hud {
+    right: 10px;
+    left: 10px;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: var(--fs-body);
+  }
+}
+
+/* Stage tabs ───────────────────────────────────────────────────────────────
+ * The stage shows one thing at a time. Stacking the viewport, the clock and
+ * the scene editor in one scrolling column put the editor ~92% below the fold
+ * with nothing on screen to say it was there, and made it impossible to see
+ * the run and the geometry at the same scroll position. Tabs make the choice
+ * explicit and give each side the full height.
+ */
+
+/* On the edit tab the editor is the only content, so give it the height the
+   viewport had instead of letting it collapse to its intrinsic size. */
+.workspace .stage-tab-edit .stage-stack,
+.workspace .stage.stage-tab-edit .stage-stack {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+.workspace .stage.stage-tab-edit {
+  overflow: hidden;
+}
+
+.workspace .stage-tab-edit .scene-editor {
+  min-height: 0;
+  grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+}
+
+/* The editor canvas keeps the scene's aspect ratio, so a short wide box
+ * letterboxes the plan into a narrow band with dead margins either side —
+ * clicks near the edges then land outside the world. Give it real height and
+ * let the stage scroll rather than squashing it. */
+.workspace .stage-tab-edit .editor-canvas-wrap {
+  /* Small enough that every editor row still fits at 1280×720 with the build
+     tray open; the viewBox scales the plan down rather than cropping it. */
+  min-height: 120px;
+  height: 100%;
+}
+
+/* The canvas used to keep a 5:3 box at full width inside a wrapper that clips:
+ * at 1366×768 the SVG was 702 px tall in a 340 px wrapper, so the lower half of
+ * the plan (the avenue, the entrances) could not be seen or clicked. Fill the
+ * wrapper instead and let the viewBox letterbox the whole world into it. */
+.workspace .stage-tab-edit .editor-canvas {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* Crowd telemetry describes the run; while you are drawing geometry it is
+ * just 44px of vertical budget taken from the canvas. */
+
+.workspace .stage.stage-tab-edit {
+  overflow: auto;
+}

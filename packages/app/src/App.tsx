@@ -2,11 +2,10 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
 import { AppWorkbench } from "./AppWorkbench";
-import type { EvacuationState, StageViewMode } from "./AppTypes";
+import type { EvacuationState, StageTab, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
-import { createBioCityTopbarMetrics } from "./appTopbarMetrics";
+import { createHudReadouts } from "./appTopbarMetrics";
 import { createDashboardStats, type DashboardSample } from "./dashboardStats";
-import { createDashboardV2Stats } from "./dashboardV2Stats";
 import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
@@ -20,10 +19,13 @@ import {
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
-import { useWebGpuMovementBackend } from "./useWebGpuMovementBackend";
 import { usesWorkerSimulationPath } from "./simulationThread";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import type { EditorTool } from "./sceneEditorState";
+import { placesInWorld } from "./worldPlacement";
+import { useWorldBuilding } from "./useWorldBuilding";
+import { hotUpdateBlocker } from "./simulationEngine";
+import { createLiveCrowd } from "./liveCrowd";
 import {
   defaultViewportLayers,
   toggleViewportLayer,
@@ -51,16 +53,16 @@ function AppContent() {
   const { language, setLanguage, t } = useI18n();
   // The live scene is shell state, not a module constant. The editor hands its
   // working copy back through `applyScene`, and swapping this value is what
-  // re-inits both simulation paths with the new geometry — this is the
+  // puts the new geometry into both simulation paths (hot when the world and
+  // seed are unchanged, a re-init otherwise; ADR-0007) — this is the
   // editor -> simulation loop that used to be hard-wired to the demo scene.
   const [scene, setScene] = useState(initialScene);
   const probes = useAppProbes();
-  const webGpuMovementBackend = useWebGpuMovementBackend();
-  const mainThreadSimulation = useSimulationController(scene, {
-    // Default to the engine's mall-crowd decision backend so agents shop with a
-    // reason; the wasm DES backend stays available for other scenarios.
-    movementBackend: webGpuMovementBackend.backend,
-  });
+  // Both paths run the same CPU social-force model. The main-thread path used
+  // to hand movement to a separate WebGPU backend (its own GPU device, an
+  // O(N²) shader, no notion of browsing or queuing), so `?mainsim` simulated a
+  // different crowd from the default worker path.
+  const mainThreadSimulation = useSimulationController(scene, {});
   const workerSimulation = useSimulationWorkerController(scene);
   // `?mainsim` forces the main-thread CPU simulation. It is the working path
   // when there is no WebGPU (otherwise the app falls back to the worker path)
@@ -74,18 +76,25 @@ function AppContent() {
   // sim for a never-started main engine: the "empty city" bug on WebGPU machines.
   const usesWorkerSimulation = usesWorkerSimulationPath({ forceMainSim });
   const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
+  const sharedAgentOverlay =
+    simulation === workerSimulation
+      ? workerSimulation.worker.sharedAgentOverlay
+      : undefined;
+  // The crowd reaches the views through this store, not as props (see liveCrowd).
+  const [liveCrowd] = useState(() =>
+    createLiveCrowd({ snapshot: simulation.snapshot }),
+  );
+  useEffect(() => {
+    liveCrowd.set({ sharedAgentOverlay, snapshot: simulation.snapshot });
+  }, [liveCrowd, sharedAgentOverlay, simulation.snapshot]);
   const currentRuntime = useMemo(
     () =>
       createLiveSimulationRuntimeArtifact({
-        movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
+        movementBackend: "cpu-compat",
         sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
         thread: usesWorkerSimulation ? "worker" : "main",
       }),
-    [
-      usesWorkerSimulation,
-      webGpuMovementBackend.backend?.id,
-      workerSimulation.worker.sharedMemory,
-    ],
+    [usesWorkerSimulation, workerSimulation.worker.sharedMemory],
   );
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
@@ -97,19 +106,49 @@ function AppContent() {
     },
   ]);
   const [heatmapSamples, setHeatmapSamples] = useState<HeatmapSample[]>([]);
-  const [trajectoryRecording, setTrajectoryRecording] = useState(() =>
+  const newRecording = (forScene: CrowdSimScene) =>
     createTrajectoryRecording({
       id: "live-recording",
       runtime: currentRuntime,
-      sceneId: scene.id,
-      seed: scene.seed,
-    }),
+      sceneId: forScene.id,
+      seed: forScene.seed,
+    });
+  const [trajectoryRecording, setTrajectoryRecording] = useState(() =>
+    newRecording(scene),
   );
+  /** Start the charts and the recording over: they describe a new run. */
+  function clearRunSeries(forScene: CrowdSimScene) {
+    setDashboardSamples([{ agentCount: 0, elapsedSeconds: 0, exitedCount: 0 }]);
+    setHeatmapSamples([]);
+    setTrajectoryRecording(newRecording(forScene));
+  }
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
   const [editorTool, setEditorTool] = useState<EditorTool>("select");
+  const [stageTab, setStageTab] = useState<StageTab>("run");
   const [layers, setLayers] = useState(defaultViewportLayers);
   const [showHome, setShowHome] = useState(true);
   const [viewMode, setViewMode] = useState<StageViewMode>("3d");
+  // Picking a tool is a request to build. In the 3D city it builds right there
+  // under the cursor; tools the world cannot place yet (a multi-click wall), and
+  // the flat views, open the 2D editor instead of leaving the tool dead.
+  function selectEditorTool(tool: EditorTool) {
+    setEditorTool(tool);
+    const inWorld = stageTab === "run" && viewMode === "3d" && placesInWorld(tool);
+    if (tool !== "select" && !inWorld) {
+      setStageTab("edit");
+    }
+  }
+  // Going to a view is also a statement about the tool in your hand: a held
+  // tool the destination cannot use (any tool on the 2D or network view, a
+  // multi-click wall in 3D) is dropped rather than left lit and dead, where a
+  // click silently did nothing.
+  function showView(nextViewMode: StageViewMode) {
+    setStageTab("run");
+    setViewMode(nextViewMode);
+    if (!(nextViewMode === "3d" && placesInWorld(editorTool))) {
+      setEditorTool("select");
+    }
+  }
   const [evacuation, setEvacuation] = useState<EvacuationState>({
     active: false,
     baselineExited: 0,
@@ -140,32 +179,6 @@ function AppContent() {
       }),
     [dashboardSamples, densityPeak, evacuation.active, evacuation.curve],
   );
-  const dashboardV2Stats = useMemo(
-    () =>
-      createDashboardV2Stats({
-        brandInsight:
-          probes.shopDecisionProbe.status === "ready"
-            ? probes.shopDecisionProbe.brandInsight
-            : undefined,
-        heatmapSamples,
-        queueThroughput:
-          probes.queueSystemProbe.status === "ready"
-            ? probes.queueSystemProbe.throughput
-            : 0,
-        samples: dashboardSamples,
-        shopDecisionSummary:
-          probes.shopDecisionProbe.status === "ready"
-            ? probes.shopDecisionProbe.browserSummary
-            : "",
-      }),
-    [
-      dashboardSamples,
-      heatmapSamples,
-      probes.queueSystemProbe.status,
-      probes.queueSystemProbe.throughput,
-      probes.shopDecisionProbe,
-    ],
-  );
   const simulationCredibility = useMemo(
     () =>
       createSimulationCredibilityReport({
@@ -188,14 +201,24 @@ function AppContent() {
   useEffect(() => {
     simulationSnapshotRef.current = simulation.snapshot;
   }, [simulation.snapshot]);
-  // Auto-start the demo so opening the workbench shows a live crowd instead of
-  // an empty city. Retries until the worker is ready, runs once, and never
-  // fights a manual pause.
+  // Auto-start so the workbench opens on a live crowd instead of an empty city.
+  //
+  // The latch is per ENGINE, not per session. Applying an edit swaps the scene,
+  // which rebuilds the worker on the new geometry, and a fresh engine starts
+  // paused. With a once-per-session latch the run stopped dead at "apply to
+  // simulation" and never came back: the city emptied to zero agents and stayed
+  // there until the user found the play button. That is the one loop the whole
+  // product is built around — edit, apply, watch — so it restarts per engine.
+  //
+  // A deliberate pause is still respected, which is what the second ref is for:
+  // "has an engine been started" and "does the user want it stopped" are two
+  // different questions and were previously answered by the same flag.
   const autoStartedRef = useRef(false);
+  const userPausedRef = useRef(false);
   const startSimulation = simulation.start;
   const simulationStatus = simulation.snapshot.status;
   useEffect(() => {
-    if (autoStartedRef.current) {
+    if (autoStartedRef.current || userPausedRef.current) {
       return;
     }
     if (simulationStatus === "running") {
@@ -205,6 +228,14 @@ function AppContent() {
     const intervalId = window.setInterval(() => startSimulation(), 400);
     return () => window.clearInterval(intervalId);
   }, [simulationStatus, startSimulation]);
+  function pauseSimulation() {
+    userPausedRef.current = true;
+    simulation.pause();
+  }
+  function startSimulationFromControls() {
+    userPausedRef.current = false;
+    simulation.start();
+  }
   useEffect(() => {
     if (!evacuation.active) {
       return;
@@ -282,12 +313,7 @@ function AppContent() {
         appendTrajectoryFrame(
           sameRuntime(recording.runtime, currentRuntime)
             ? recording
-            : createTrajectoryRecording({
-                id: "live-recording",
-                runtime: currentRuntime,
-                sceneId: scene.id,
-                seed: scene.seed,
-              }),
+            : newRecording(scene),
           snapshot,
         ),
       );
@@ -295,40 +321,39 @@ function AppContent() {
     return () => window.clearInterval(intervalId);
   }, [currentRuntime, scene.id, scene.seed]);
   function applyScene(nextScene: CrowdSimScene) {
-    // Swapping the scene re-inits whichever simulation path is mounted: the
-    // worker controller rebuilds its client on `[scene]`, the main-thread
-    // controller rebuilds its engine. Clear the series that describe the OLD
-    // scene so charts never mix two geometries.
     setScene(nextScene);
-    setDashboardSamples([{ agentCount: 0, elapsedSeconds: 0, exitedCount: 0 }]);
-    setHeatmapSamples([]);
-    setTrajectoryRecording(
-      createTrajectoryRecording({
-        id: "live-recording",
-        runtime: currentRuntime,
-        sceneId: nextScene.id,
-        seed: nextScene.seed,
-      }),
-    );
+    // Same world and seed: the controllers swap the geometry into the running
+    // engine (ADR-0007). It is the same run, so its series, recording and
+    // auto-start state all carry on.
+    if (hotUpdateBlocker(scene, nextScene) === null) return;
+    // Otherwise the run is rebuilt from scratch. Clear the series that describe
+    // the OLD run so charts never mix two geometries.
+    autoStartedRef.current = false;
+    clearRunSeries(nextScene);
   }
+  const worldBuilding = useWorldBuilding({
+    applyScene,
+    enabled: stageTab === "run" && viewMode === "3d",
+    onCancelTool: () => setEditorTool("select"),
+    scene,
+  });
   function resetSimulation() {
+    autoStartedRef.current = false;
     simulation.reset();
-    setDashboardSamples([
-      {
-        agentCount: 0,
-        elapsedSeconds: 0,
-        exitedCount: 0,
-      },
-    ]);
-    setHeatmapSamples([]);
-    setTrajectoryRecording(
-      createTrajectoryRecording({
-        id: "live-recording",
-        runtime: currentRuntime,
-        sceneId: scene.id,
-        seed: scene.seed,
+    // The engine's reset ends an evacuation; the shell's record of it must end
+    // with it, or the hazard key stays pressed and the evacuation curve keeps
+    // appending points measured against a baseline from before the reset.
+    void wasmDecisionRuntime.reset().then((behaviorMode) =>
+      setEvacuation({
+        active: behaviorMode.active,
+        baselineExited: 0,
+        curve: [],
+        flowPlan: null,
+        label: behaviorMode.label,
+        startedAtSeconds: 0,
       }),
     );
+    clearRunSeries(scene);
   }
   async function triggerEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.triggerEvacuation();
@@ -377,7 +402,7 @@ function AppContent() {
     heatmapProbe: probes.heatmapProbe,
     heatmapValue,
     language,
-    movementBackend: webGpuMovementBackend.backend?.id ?? "cpu-compat",
+    movementBackend: "cpu-compat",
     movementBackendProbe: probes.movementBackendProbe,
     queueSystemProbe: probes.queueSystemProbe,
     scene: scene,
@@ -393,7 +418,7 @@ function AppContent() {
       simulation === workerSimulation
         ? workerSimulation.worker
         : {
-            message: "Main thread GPU movement active",
+            message: "Main-thread CPU simulation (?mainsim)",
             mode: "inline",
             sharedMemory: false,
             status: "ready",
@@ -401,15 +426,9 @@ function AppContent() {
   });
   const runState =
     simulation.snapshot.status === "running" ? t("running") : t("paused");
-  // Heuristic estimates, NOT measured (SP-5b honesty), but grounded in the real
-  const bioCityTopbarMetrics = createBioCityTopbarMetrics({
-    brandAttractionPercent: dashboardV2Stats.brandAttractionPercent,
-    densityPeak,
-    evacuationActive: evacuation.active,
+  const hudReadouts = createHudReadouts({
     language,
-    runState,
-    runtime: currentRuntime,
-    scene: scene,
+    scene,
     snapshot: simulation.snapshot,
   });
   function enterLab(nextViewMode: StageViewMode = viewMode) {
@@ -440,86 +459,73 @@ function AppContent() {
       </a>
       <div id="main-content">
         <AppWorkbench
+          controls={{
+            agentCount: simulation.snapshot.agentCount,
+            canUndoBuild: worldBuilding.canUndo,
+            editorTool,
+            evacuationActive: evacuation.active,
+            exitedCount: simulation.snapshot.exitedCount,
+            heatmapWindowSeconds,
+            layers,
+            onClearEvacuation: () => void clearEvacuation(),
+            onEditorToolChange: selectEditorTool,
+            onEvacuate: () => void triggerEvacuation(),
+            onHeatmapWindowChange: setHeatmapWindowSeconds,
+            onPause: pauseSimulation,
+            onReset: resetSimulation,
+            onSetLanguage: setLanguage,
+            onSetTimeScale: simulation.setTimeScale,
+            onStart: startSimulationFromControls,
+            onUndoBuild: worldBuilding.undo,
+            onToggleLayer: (layer: ViewportLayerId) =>
+              setLayers((current) => toggleViewportLayer(current, layer)),
+            simulationStatus: simulation.snapshot.status,
+            timeScale: simulation.snapshot.timeScale,
+          }}
           inspectorProps={{
-            agentStateProbe: probes.agentStateProbe,
-            dashboardStats,
-            dashboardV2Stats,
-            discreteEventProbe: probes.discreteEventProbe,
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
-            flowFieldProbe: probes.flowFieldProbe,
-            gridProbe: probes.gridProbe,
             heatmapCells,
-            heatmapProbe: probes.heatmapProbe,
-            queueSystemProbe: probes.queueSystemProbe,
             scene: scene,
-            shopDecisionProbe: probes.shopDecisionProbe,
             signals,
             simulationCredibility,
-            socialForceProbe: probes.socialForceProbe,
             trajectoryRecording,
             webGpuProbe: probes.webGpuProbe,
           }}
           language={language}
           onHome={() => setShowHome(true)}
+          onStageTabChange={setStageTab}
+          onViewModeChange={showView}
           panelDockProps={{
             context: {
               brandInsight:
                 probes.shopDecisionProbe.status === "ready"
                   ? probes.shopDecisionProbe.brandInsight
                   : undefined,
+              scene,
               trajectoryRecording,
             },
             language,
           }}
-          runState={runState}
-          runtime={currentRuntime}
           sceneName={formatSceneName(scene, language)}
-          sidebarProps={{
-            agentCount: simulation.snapshot.agentCount,
-            editorTool,
-            exitedCount: simulation.snapshot.exitedCount,
-            heatmapWindowSeconds,
-            language,
-            layers,
-            onClearEvacuation: () => void clearEvacuation(),
-            onEditorToolChange: setEditorTool,
-            onEvacuate: () => void triggerEvacuation(),
-            onHeatmapWindowChange: setHeatmapWindowSeconds,
-            onPause: simulation.pause,
-            onReset: resetSimulation,
-            onSetLanguage: setLanguage,
-            onSetTimeScale: simulation.setTimeScale,
-            onStart: simulation.start,
-            onToggleLayer: (layer: ViewportLayerId) =>
-              setLayers((current) => toggleViewportLayer(current, layer)),
-            simulationStatus: simulation.snapshot.status,
-            spawnedCount: simulation.snapshot.spawnedCount,
-            t,
-            timeScale: simulation.snapshot.timeScale,
-          }}
-          simulationStatus={simulation.snapshot.status}
           stageProps={{
             editorTool,
             heatmapCells,
             language,
             layers,
             onApplyScene: applyScene,
-            onEditorToolChange: setEditorTool,
-            onViewModeChange: setViewMode,
-            runtime: currentRuntime,
+            onEditorToolChange: selectEditorTool,
+            onPlaceInWorld: worldBuilding.place,
             scene: scene,
-            sharedAgentOverlay:
-              simulation === workerSimulation
-                ? workerSimulation.worker.sharedAgentOverlay
-                : undefined,
-            simulationSnapshot: simulation.snapshot,
+            crowd: liveCrowd,
+            stageTab,
             t,
             viewMode,
           }}
+          stageTab={stageTab}
           t={t}
-          topbarMetrics={bioCityTopbarMetrics}
-          webGpuStatus={probes.webGpuProbe.status}
+          readouts={hudReadouts}
+          viewMode={viewMode}
         />
       </div>
     </>

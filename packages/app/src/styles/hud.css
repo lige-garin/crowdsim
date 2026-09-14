@@ -1,0 +1,684 @@
+/* Game HUD ─────────────────────────────────────────────────────────────────
+ *
+ * The city fills the window; the chrome sits in the corners and along the
+ * bottom, the way a city builder lays it out. Panels are chunky, rounded and
+ * lit from above; tools are big colour-coded tiles; nothing docked carries a
+ * written label (names live in `aria-label` + `title`).
+ *
+ * This replaced a full-width translucent strip and two thin icon columns that
+ * read as an IDE rather than a game.
+ */
+
+.workspace.game-shell {
+  --hud-ink: #eef3f8;
+  --hud-muted: #9eabb8;
+  --hud-accent: #3aa9ff;
+  --hud-accent-deep: #1f7fd6;
+  --hud-green: #37c07a;
+  --hud-red: #e5534b;
+  --hud-panel: linear-gradient(180deg, rgba(44, 53, 66, 0.95), rgba(24, 30, 39, 0.95));
+  --hud-edge: rgba(255, 255, 255, 0.09);
+  --hud-lift: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.45);
+
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+  background: #9fb4c4;
+  color: var(--hud-ink);
+  font-family:
+    "Segoe UI Variable Display", "Segoe UI", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+}
+
+/* ── the scene ──────────────────────────────────────────────────────────── */
+
+.game-shell .stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* The scene runs under the HUD; editor chrome must not, or the HUD swallows
+ * its clicks (it once blocked all eleven file-bar controls). */
+.game-shell .stage.stage-tab-edit {
+  padding: 84px 84px 128px;
+  overflow: auto;
+  background: #1c232c;
+}
+
+/* An open build tray reaches 260 px above the bottom edge; while it is open the
+ * editor steps up out from under it rather than losing its bottom edge. */
+.game-shell:has(.hud-tray) .stage.stage-tab-edit {
+  padding-bottom: 272px;
+}
+
+.game-shell .stage-stack {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+}
+
+.game-shell .render-viewport,
+.game-shell .contact-network-view {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.game-shell .render-compat-badge {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 5;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(229, 83, 75, 0.9);
+  color: #fff;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  transform: translateX(-50%);
+}
+
+/* Every HUD selector below is scoped under .game-shell: the region theme's
+ * generic `.workspace button` rule (0,1,1) otherwise out-ranks a single-class
+ * HUD rule and paints every coloured tile the same grey. */
+
+/* The elapsed-time strip is permanent text along the bottom edge. */
+.game-shell .biocity-timeline {
+  display: none;
+}
+
+/* ── panels and keys ────────────────────────────────────────────────────── */
+
+.game-shell .hud-corners {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.game-shell .hud-panel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--hud-edge);
+  border-radius: 16px;
+  background: var(--hud-panel);
+  box-shadow: var(--hud-lift);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.game-shell .hud-sep {
+  width: 1px;
+  height: 26px;
+  margin: 0 3px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.game-shell .hud-sep-tall {
+  height: 44px;
+  margin: 0 5px;
+}
+
+.game-shell .hud-key,
+.game-shell .hud-round,
+.game-shell .hud-rail-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 11px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02)
+  );
+  color: var(--hud-muted);
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    background 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.game-shell .hud-round {
+  border-radius: 50%;
+}
+
+.game-shell .hud-key:hover,
+.game-shell .hud-round:hover,
+.game-shell .hud-rail-button:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.05)
+  );
+  color: var(--hud-ink);
+  transform: translateY(-1px);
+}
+
+.game-shell .hud-key:active,
+.game-shell .hud-rail-button:active {
+  transform: translateY(1px);
+}
+
+.game-shell .hud-key[aria-pressed="true"],
+.game-shell .hud-rail-button[aria-pressed="true"] {
+  border-color: rgba(120, 200, 255, 0.55);
+  background: linear-gradient(180deg, var(--hud-accent), var(--hud-accent-deep));
+  color: #fff;
+  box-shadow:
+    0 0 0 3px rgba(58, 169, 255, 0.18),
+    0 4px 14px rgba(31, 127, 214, 0.45);
+}
+
+.game-shell .hud-key-danger[aria-pressed="true"] {
+  border-color: rgba(255, 150, 140, 0.6);
+  background: linear-gradient(180deg, #f06a60, #c43d35);
+  box-shadow:
+    0 0 0 3px rgba(229, 83, 75, 0.22),
+    0 4px 14px rgba(196, 61, 53, 0.5);
+}
+
+.game-shell .hud-key-text {
+  width: 34px;
+  font-size: var(--fs-body);
+  font-weight: 800;
+}
+
+.game-shell .hud-key:focus-visible,
+.game-shell .hud-round:focus-visible,
+.game-shell .hud-rail-button:focus-visible,
+.game-shell .hud-tile:focus-visible,
+.game-shell .hud-card:focus-visible,
+.game-shell .hud-play:focus-visible,
+.game-shell .hud-speed:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.game-shell .hud-icon {
+  display: block;
+}
+
+/* ── corners ────────────────────────────────────────────────────────────── */
+
+.game-shell .hud-plate {
+  top: 14px;
+  left: 14px;
+  gap: 10px;
+  padding-right: 18px;
+}
+
+.game-shell .hud-plate-name {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--hud-ink);
+  font-size: var(--fs-lede);
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-shell .hud-views {
+  top: 14px;
+  right: 14px;
+}
+
+.game-shell .hud-lang {
+  display: flex;
+  gap: 4px;
+}
+
+.game-shell .hud-stats {
+  bottom: 14px;
+  left: 14px;
+  gap: 16px;
+  padding: 9px 18px 9px 10px;
+}
+
+.game-shell .hud-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.game-shell .hud-stat b {
+  min-width: 34px;
+  color: var(--hud-ink);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-lede);
+  font-weight: 750;
+}
+
+.game-shell .hud-badge {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 3px 10px rgba(0, 0, 0, 0.35);
+}
+
+.game-shell .hud-badge-blue {
+  background: linear-gradient(180deg, #4fb4ff, #1f7fd6);
+}
+
+.game-shell .hud-badge-slate {
+  background: linear-gradient(180deg, #9aa7b4, #5f6b78);
+}
+
+.game-shell .hud-badge-teal {
+  background: linear-gradient(180deg, #45d0bd, #1f9384);
+}
+
+.game-shell .hud-clock {
+  right: 14px;
+  bottom: 14px;
+  gap: 8px;
+  padding: 7px 9px 7px 16px;
+}
+
+.game-shell .hud-clock-time {
+  min-width: 58px;
+  color: var(--hud-ink);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-title);
+  font-weight: 750;
+}
+
+.game-shell .hud-play {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #4fdc8e, #22a35e);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    0 6px 18px rgba(34, 163, 94, 0.45);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+/* Paused is the state that wants attention. */
+.game-shell .hud-play[aria-pressed="true"] {
+  background: linear-gradient(180deg, #5b6878, #3a4452);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.game-shell .hud-play:hover {
+  transform: scale(1.05);
+}
+
+.game-shell .hud-speeds {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 11px;
+}
+
+.game-shell .hud-speed {
+  min-width: 38px;
+  height: 40px;
+  padding: 0 6px;
+  border: 0;
+  border-right: 1px solid rgba(0, 0, 0, 0.25);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.02)
+  );
+  color: var(--hud-muted);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -0.28em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.game-shell .hud-speed:last-child {
+  border-right: 0;
+}
+
+.game-shell .hud-speed[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--hud-accent), var(--hud-accent-deep));
+  color: #fff;
+}
+
+/* ── build toolbar ──────────────────────────────────────────────────────── */
+
+.game-shell .hud-toolbar-wrap {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  z-index: 32;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.game-shell .hud-toolbar,
+.game-shell .hud-tray {
+  position: static;
+}
+
+.game-shell .hud-toolbar {
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 20px;
+}
+
+.game-shell .hud-tile {
+  --tile-color: #58687a;
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 55%),
+    var(--tile-color);
+  color: #fff;
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.22),
+    0 6px 14px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.game-shell .hud-tile-neutral {
+  --tile-color: #5d6b7b;
+}
+
+.game-shell .hud-tile:hover {
+  transform: translateY(-3px);
+}
+
+.game-shell .hud-tile[aria-expanded="true"],
+.game-shell .hud-tile[aria-pressed="true"] {
+  border-color: #fff;
+  box-shadow:
+    inset 0 -3px 0 rgba(0, 0, 0, 0.22),
+    0 0 0 4px rgba(255, 255, 255, 0.22),
+    0 8px 20px rgba(0, 0, 0, 0.45);
+  transform: translateY(-3px);
+}
+
+.game-shell .hud-tray {
+  --tile-color: #58687a;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border-top: 3px solid var(--tile-color);
+  border-radius: 18px;
+}
+
+.game-shell .hud-tray header {
+  color: var(--hud-muted);
+  font-size: var(--fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.game-shell .hud-tray-cards {
+  display: flex;
+  gap: 10px;
+}
+
+.game-shell .hud-card {
+  display: grid;
+  width: 104px;
+  gap: 8px;
+  justify-items: center;
+  padding: 8px 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--hud-ink);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    background 140ms ease;
+}
+
+.game-shell .hud-card:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.game-shell .hud-card[aria-pressed="true"] {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.18);
+}
+
+.game-shell .hud-card-art {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 56px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 60%),
+    var(--tile-color);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.game-shell .hud-card-name {
+  font-size: var(--fs-micro);
+  font-weight: 700;
+}
+
+/* ── info rail ──────────────────────────────────────────────────────────── */
+
+.game-shell .hud-rail {
+  position: absolute;
+  top: 50%;
+  z-index: 25;
+  display: flex;
+  transform: translateY(-50%);
+}
+
+.game-shell .hud-rail-info {
+  right: 14px;
+}
+
+.game-shell .hud-rail-buttons {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--hud-edge);
+  border-radius: 16px;
+  background: var(--hud-panel);
+  box-shadow: var(--hud-lift);
+}
+
+.game-shell .hud-rail-divider {
+  height: 1px;
+  margin: 2px 4px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.game-shell .hud-layer-options {
+  position: absolute;
+  top: 50%;
+  right: 80px;
+  z-index: 25;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--hud-edge);
+  border-radius: 14px;
+  background: var(--hud-panel);
+  box-shadow: var(--hud-lift);
+  transform: translateY(-50%);
+}
+
+.game-shell .hud-layer-options button {
+  min-width: 48px;
+  height: 32px;
+  min-height: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--hud-muted);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.game-shell .hud-layer-options button[aria-pressed="true"] {
+  background: linear-gradient(180deg, var(--hud-accent), var(--hud-accent-deep));
+  color: #fff;
+}
+
+/* ── floating windows ───────────────────────────────────────────────────── */
+
+.game-shell .hud-window {
+  position: absolute;
+  z-index: 40;
+  display: grid;
+  max-height: min(72dvh, 720px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--hud-edge);
+  border-radius: 18px;
+  background: var(--hud-panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+.game-shell .hud-window-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(
+    180deg,
+    rgba(58, 169, 255, 0.18),
+    rgba(58, 169, 255, 0.04)
+  );
+  color: var(--hud-ink);
+  cursor: grab;
+  touch-action: none;
+}
+
+.game-shell .hud-window-bar:active {
+  cursor: grabbing;
+}
+
+.game-shell .hud-window-bar strong {
+  font-size: var(--fs-body);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.game-shell .hud-window-bar button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--hud-ink);
+  cursor: pointer;
+}
+
+.game-shell .hud-window-bar button:hover {
+  background: var(--hud-red);
+}
+
+.game-shell .hud-window-body {
+  min-height: 0;
+  padding: 14px;
+  overflow: auto;
+  scrollbar-color: rgba(58, 169, 255, 0.35) transparent;
+}
+
+/* Panels were written for a docked rail; inside a window they are the content. */
+.game-shell .hud-window-body .inspector,
+.game-shell .hud-window-body .panel-dock {
+  display: grid;
+  gap: 12px;
+  height: auto;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.game-shell .hud-window-body .panel-dock-nav {
+  flex-wrap: wrap;
+}
+
+/* ── narrow screens ─────────────────────────────────────────────────────── */
+
+@media (max-width: 1240px) {
+  /* Stats move up under the name plate so the bottom row holds only the
+     toolbar and the clock. */
+  .game-shell .hud-stats {
+    top: 78px;
+    bottom: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .game-shell .hud-clock {
+    bottom: 96px;
+  }
+
+  .game-shell .hud-tile {
+    width: 50px;
+    height: 50px;
+  }
+}

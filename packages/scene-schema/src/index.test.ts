@@ -234,3 +234,36 @@ describe("sceneSchema", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("entrance exits and counter servers (ADR-0008)", () => {
+  it("parses allowed exits on an entrance and a server count on a counter", () => {
+    const scene = parseScene({
+      ...validScene,
+      entrances: [
+        {
+          id: "in",
+          kind: "source",
+          position: { x: 1, y: 1 },
+          width: 2,
+          exitIds: ["out"],
+        },
+        { id: "out", kind: "sink", position: { x: 9, y: 1 }, width: 2 },
+      ],
+      servicePoints: [
+        { id: "till", kind: "counter", position: { x: 5, y: 5 }, servers: 3 },
+      ],
+    });
+
+    expect(scene.entrances[0].exitIds).toEqual(["out"]);
+    expect(scene.entrances[1].exitIds).toBeUndefined();
+    expect(scene.servicePoints[0].servers).toBe(3);
+    expect(
+      safeParseScene({
+        ...validScene,
+        servicePoints: [
+          { id: "till", kind: "counter", position: { x: 5, y: 5 }, servers: 0 },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+});

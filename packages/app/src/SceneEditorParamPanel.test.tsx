@@ -9,6 +9,51 @@ afterEach(() => {
 });
 
 describe("SceneEditorParamPanel", () => {
+  /**
+   * Entrances were the one drawable object with no parameter editor: selecting
+   * one showed "no object selected" and zero fields, so arrival rate — the most
+   * consequential input in a crowd model — could only be changed by editing
+   * JSON by hand.
+   */
+  it("edits the arrival rate and kind of a selected entrance", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const source = document.entrances.find((entrance) => entrance.kind === "source");
+    const onEntranceNumberChange = vi.fn();
+    const onEntranceKindChange = vi.fn();
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onEntranceKindChange={onEntranceKindChange}
+        onEntranceNumberChange={onEntranceNumberChange}
+        selectedEntrance={source}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("arrivalRate"), {
+      target: { value: "600" },
+    });
+    fireEvent.change(screen.getByLabelText("width"), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText("entranceKind"), {
+      target: { value: "bidirectional" },
+    });
+
+    expect(onEntranceNumberChange).toHaveBeenCalledWith("arrivalRatePerMinute", 600);
+    expect(onEntranceNumberChange).toHaveBeenCalledWith("width", 12);
+    expect(onEntranceKindChange).toHaveBeenCalledWith("bidirectional");
+  });
+
+  it("does not offer an arrival rate on an exit, which cannot spawn anyone", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const sink = document.entrances.find((entrance) => entrance.kind === "sink");
+    expect(sink, "demo scene must have an exit").toBeDefined();
+
+    render(<SceneEditorParamPanel {...baseProps()} selectedEntrance={sink} />);
+
+    expect(screen.queryByLabelText("arrivalRate")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("width")).toBeInTheDocument();
+  });
+
   it("renders and wires road BioCity controls", () => {
     const document = createEditorDocumentFromScene(bioCityDemoScene);
     const onRoadDirectionChange = vi.fn();
@@ -70,6 +115,8 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onBasemapNumberChange: vi.fn(),
     onBuildingKindChange: vi.fn(),
     onBuildingNumberChange: vi.fn(),
+    onEntranceKindChange: vi.fn(),
+    onEntranceNumberChange: vi.fn(),
     onHazardKindChange: vi.fn(),
     onHazardNumberChange: vi.fn(),
     onObstacleKindChange: vi.fn(),
@@ -94,6 +141,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     pointsToSvg: (points) => points.map((point) => `${point.x},${point.y}`).join(" "),
     selectedBuilding: undefined,
     selectedCountLine: undefined,
+    selectedEntrance: undefined,
     selectedHazard: undefined,
     selectedObstacle: undefined,
     selectedRoad: undefined,

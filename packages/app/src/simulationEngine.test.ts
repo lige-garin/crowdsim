@@ -4,8 +4,7 @@ import {
   createSimulationEngine,
   createSimulationEngineFromScene,
 } from "./simulationEngine";
-import { weidmannSpeedRatioAtDensity } from "./pedestrianFundamentalDiagram";
-import type { MovementBackend } from "./movementBackend";
+import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
 import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
 
 const source = {
@@ -35,25 +34,6 @@ describe("simulation engine", () => {
     expect(after.elapsedSeconds).toBe(before.elapsedSeconds);
     expect(after.agentCount).toBe(0);
     expect(after.spawnedCount).toBe(0);
-  });
-
-  it("does not advance async ticks while paused", async () => {
-    const backend = createOffsetMovementBackend(2, 0);
-    const engine = createSimulationEngine({
-      fixedDtSeconds: 1,
-      movementBackend: backend,
-      seed: 7,
-      sources: [source],
-      sinks: [sink],
-    });
-
-    const before = engine.snapshot();
-    const after = await engine.tickAsync(10);
-
-    expect(after.elapsedSeconds).toBe(before.elapsedSeconds);
-    expect(after.agentCount).toBe(0);
-    expect(after.spawnedCount).toBe(0);
-    expect(backend.calls).toBe(0);
   });
 
   it("runs fixed-step simulation with time scale", () => {
@@ -111,37 +91,7 @@ describe("simulation engine", () => {
     ).toBe(true);
   });
 
-  it("applies async decision backend output before async movement", async () => {
-    const movementBackend = createOffsetMovementBackend(1, 0);
-    const decisionBackend = createTargetDecisionBackend();
-    const engine = createSimulationEngine({
-      decisionBackend,
-      fixedDtSeconds: 1 / 60,
-      movementBackend,
-      seed: 11,
-      sources: [
-        {
-          ...source,
-          arrivalRatePerSecond: 6000,
-        },
-      ],
-      sinks: [sink],
-      speedMetersPerSecond: 0,
-    });
-
-    engine.start();
-    const snapshot = await engine.stepAsync(6);
-
-    expect(decisionBackend.calls).toBe(1);
-    expect(movementBackend.calls).toBe(6);
-    expect(snapshot.agents.length).toBeGreaterThan(0);
-    expect(
-      snapshot.agents.every((agent) => agent.lifecycleState === "enterStore"),
-    ).toBe(true);
-    expect(snapshot.agents.some((agent) => agent.x > 0)).toBe(true);
-  });
-
-  it("does not run the decision backend while paused", async () => {
+  it("does not run the decision backend while paused", () => {
     const decisionBackend = createTargetDecisionBackend();
     const engine = createSimulationEngine({
       decisionBackend,
@@ -151,51 +101,10 @@ describe("simulation engine", () => {
       sinks: [sink],
     });
 
-    await engine.tickAsync(1);
+    engine.tick(1);
 
     expect(decisionBackend.calls).toBe(0);
     expect(engine.snapshot().stepCount).toBe(0);
-  });
-
-  it("writes async movement backend output into live agents", async () => {
-    const backend = createOffsetMovementBackend(2, 0);
-    const engine = createSimulationEngine({
-      fixedDtSeconds: 1,
-      movementBackend: backend,
-      seed: 11,
-      sources: [source],
-      sinks: [sink],
-      speedMetersPerSecond: 1,
-    });
-
-    engine.start();
-    const snapshot = await engine.stepAsync(1);
-
-    expect(backend.calls).toBe(1);
-    expect(snapshot.spawnedCount).toBeGreaterThan(0);
-    expect(snapshot.agentCount).toBe(snapshot.spawnedCount);
-    expect(snapshot.agents.every((agent) => agent.x === 2)).toBe(true);
-    expect(snapshot.agents.every((agent) => agent.vx === 2)).toBe(true);
-  });
-
-  it("keeps async backend movement constrained by walls", async () => {
-    const backend = createOffsetMovementBackend(2, 0);
-    const engine = createSimulationEngine({
-      fixedDtSeconds: 1,
-      movementBackend: backend,
-      seed: 11,
-      sources: [source],
-      sinks: [sink],
-      walls: [{ x1: 1, y1: -10, x2: 1, y2: 10 }],
-      speedMetersPerSecond: 1,
-    });
-
-    engine.start();
-    const snapshot = await engine.stepAsync(1);
-
-    expect(backend.calls).toBe(1);
-    expect(snapshot.spawnedCount).toBeGreaterThan(0);
-    expect(Math.max(...snapshot.agents.map((agent) => agent.x))).toBeLessThan(1);
   });
 
   it("removes agents once they reach a sink", () => {
@@ -351,7 +260,11 @@ describe("simulation engine", () => {
     expect(secondHalf.exitedCount).toBeGreaterThan(firstHalf.exitedCount);
     expect(secondHalf.spawnedCount).toBeGreaterThan(firstHalf.spawnedCount);
     expect(secondHalf.agentCount).toBeLessThan(224);
-  });
+    // Density coupling makes this spec genuinely heavy: ~2-3s alone and
+    // several times that under a parallel full-suite run, so the 5s default
+    // made it a coin flip rather than a signal. Same treatment as the
+    // panel-dock data-source spec.
+  }, 30_000);
 
   it("keeps wall-constrained scene agents from crossing blocked geometry", () => {
     const scene = parseScene({
@@ -411,6 +324,85 @@ describe("simulation engine", () => {
   });
 });
 
+describe("where arrivals go (ADR-0008)", () => {
+  const corridor = (exitIds?: string[]) =>
+    parseScene({
+      schemaVersion: "1.0.0",
+      id: "od-corridor",
+      name: "OD corridor",
+      seed: 9,
+      world: { width: 60, height: 10 },
+      entrances: [
+        {
+          id: "west-in",
+          kind: "source",
+          position: { x: 2, y: 5 },
+          width: 3,
+          arrivalRatePerMinute: 60,
+          exitIds,
+        },
+        { id: "west-out", kind: "sink", position: { x: 4, y: 5 }, width: 2 },
+        { id: "east-out", kind: "sink", position: { x: 58, y: 5 }, width: 2 },
+      ],
+    });
+
+  it("sends arrivals to the exits their entrance allows, not the nearest", () => {
+    const engine = createSimulationEngineFromScene(corridor(["east-out"]));
+    engine.start();
+    const snapshot = engine.step(60 * 20);
+
+    expect(snapshot.agents.length).toBeGreaterThan(5);
+    for (const agent of snapshot.agents) expect(agent.targetSinkId).toBe("east-out");
+  });
+
+  it("still leaves by the nearest exit when no exits are named", () => {
+    const engine = createSimulationEngineFromScene(corridor());
+    engine.start();
+    const snapshot = engine.step(60 * 20);
+
+    expect(snapshot.exitedCount).toBeGreaterThan(5);
+  });
+
+  it("lets evacuees take the nearest exit whatever their entrance allows", () => {
+    const engine = createSimulationEngineFromScene(corridor(["east-out"]));
+    engine.start();
+    engine.step(60 * 5);
+    engine.setEvacuation(true);
+    const snapshot = engine.step(12);
+    const near = snapshot.agents.filter((agent) => agent.x < 20);
+
+    expect(near.length).toBeGreaterThan(0);
+    for (const agent of near) expect(agent.targetSinkId).toBe("west-out");
+  });
+});
+
+describe("entrance capacity", () => {
+  it("lets people in no faster than the entrance's width can pass them", () => {
+    const engine = createSimulationEngine({
+      seed: 3,
+      sinks: [{ id: "exit", position: { x: 60, y: 10 }, radius: 1 }],
+      sources: [
+        { arrivalRatePerSecond: 100, id: "gate", position: { x: 2, y: 10 }, width: 1 },
+      ],
+      world: { height: 20, width: 80 },
+    });
+
+    engine.start();
+    const snapshot = engine.step(60 * 10);
+
+    // 1 m × Weidmann's peak specific flow for 10 s, plus the one person who
+    // may always step through first.
+    expect(snapshot.spawnedCount).toBeLessThanOrEqual(
+      Math.floor(weidmannMaxSpecificFlow * 10) + 1,
+    );
+    expect(snapshot.spawnedCount).toBeGreaterThanOrEqual(
+      Math.floor(weidmannMaxSpecificFlow * 10) - 1,
+    );
+    expect(weidmannMaxSpecificFlow).toBeGreaterThan(1.1);
+    expect(weidmannMaxSpecificFlow).toBeLessThan(1.35);
+  });
+});
+
 describe("scene speed persistence", () => {
   /**
    * One second of straight-line walking, measured on a scene capped to a single
@@ -422,11 +414,14 @@ describe("scene speed persistence", () => {
     engine: ReturnType<typeof createSimulationEngineFromScene>,
   ) {
     engine.start();
-    engine.step(60);
+    // Walkers accelerate from rest over the relaxation time (0.5 s): measure
+    // once they are up to speed.
+    engine.step(240);
     const before = engine.snapshot().agents[0];
     const after = engine.step(60).agents[0];
 
-    return Math.hypot(after.x - before.x, after.y - before.y);
+    // Each walker's free speed is the scene speed times their own draw.
+    return Math.hypot(after.x - before.x, after.y - before.y) / after.speedFactor!;
   }
 
   it("simulates editor scenes at Weidmann free-flow speed, not the legacy 8 m/s", () => {
@@ -448,15 +443,6 @@ describe("scene speed persistence", () => {
 });
 
 describe("crowd coupling", () => {
-  it("slows walkers as local density rises, in Weidmann's shape", () => {
-    // The pure ratio the engine applies, against the published curve.
-    expect(weidmannSpeedRatioAtDensity(0)).toBeCloseTo(1, 5);
-    expect(weidmannSpeedRatioAtDensity(0.5)).toBeCloseTo(1.3 / 1.34, 2);
-    expect(weidmannSpeedRatioAtDensity(2)).toBeCloseTo(0.61 / 1.34, 2);
-    expect(weidmannSpeedRatioAtDensity(4)).toBeCloseTo(0.16 / 1.34, 2);
-    expect(weidmannSpeedRatioAtDensity(5.4)).toBe(0);
-  });
-
   it("keeps a jammed crowd slower than the same scene flowing freely", () => {
     // Same geometry, same seed, same target: only the arrival rate differs, so
     // anything that changes the average speed is the crowd, not the route.
@@ -503,7 +489,11 @@ describe("crowd coupling", () => {
 
     expect(sparse).toBeGreaterThan(0);
     expect(dense).toBeLessThan(sparse * 0.9);
-  });
+    // Density coupling makes this spec genuinely heavy: ~2-3s alone and
+    // several times that under a parallel full-suite run, so the 5s default
+    // made it a coin flip rather than a signal. Same treatment as the
+    // panel-dock data-source spec.
+  }, 30_000);
 
   it("pushes overlapping walkers apart instead of letting them share a point", () => {
     const engine = createSimulationEngineFromScene(
@@ -512,10 +502,12 @@ describe("crowd coupling", () => {
           {
             id: "gate",
             kind: "source",
-            // A narrow gate floods the same few squares, so without separation
-            // agents would stack on the spawn line.
+            // A flooded gate packs the same few squares, so without separation
+            // agents would stack on the spawn line. Entrances pass at most
+            // width × Weidmann's peak flow (~1.2 P/(m·s)), so the gate is 4 m
+            // wide to let enough people in to crowd.
             position: { x: 5, y: 40 },
-            width: 0.2,
+            width: 4,
             arrivalRatePerMinute: 6000,
           },
           ...mallExits,
@@ -545,7 +537,11 @@ describe("crowd coupling", () => {
 
     // Nobody should be standing inside anybody else.
     expect(closestPair).toBeGreaterThan(0.05);
-  });
+    // Density coupling makes this spec genuinely heavy: ~2-3s alone and
+    // several times that under a parallel full-suite run, so the 5s default
+    // made it a coin flip rather than a signal. Same treatment as the
+    // panel-dock data-source spec.
+  }, 30_000);
 });
 
 function wall(id: string, x: number) {
@@ -604,33 +600,6 @@ const mallExits = [
     arrivalRatePerMinute: 0,
   },
 ];
-
-function createOffsetMovementBackend(offsetX: number, offsetY: number) {
-  let calls = 0;
-  const backend: MovementBackend & { calls: number } = {
-    id: "webgpu-ready",
-    mode: "active",
-    get calls() {
-      return calls;
-    },
-    step: async ({ agents }) => {
-      calls++;
-      const positions = new Float32Array(agents.positions.length);
-      const velocities = new Float32Array(agents.velocities.length);
-
-      for (let index = 0; index < agents.count; index++) {
-        positions[index * 2] = agents.positions[index * 2] + offsetX;
-        positions[index * 2 + 1] = agents.positions[index * 2 + 1] + offsetY;
-        velocities[index * 2] = offsetX;
-        velocities[index * 2 + 1] = offsetY;
-      }
-
-      return { positions, velocities };
-    },
-  };
-
-  return backend;
-}
 
 function createTargetDecisionBackend() {
   let calls = 0;

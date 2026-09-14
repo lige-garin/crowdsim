@@ -28,6 +28,8 @@ export function shadowCameraFrustum(
     bottom: -span,
     near: 1,
     far: radius * 4 + worldHeight,
-    mapSize: 2048,
+    // 4096² over a ~500 m frustum is ~12 cm a texel: enough for a building,
+    // not for a person, which is why people also get contact shadows.
+    mapSize: 4096,
   };
 }

@@ -12,6 +12,9 @@ export default tseslint.config(
       "**/coverage/**",
       "**/src/wasm/**",
       "node_modules/**",
+      // Local-only e2e scratch (see .gitignore), not product code.
+      "e2e-fs-patch.cjs",
+      "output/**",
     ],
   },
   js.configs.recommended,

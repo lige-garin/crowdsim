@@ -18,6 +18,7 @@ import {
 } from "./simulationWorkerClient";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { SimulationController } from "./useSimulationController";
+import { useRunScene } from "./useRunScene";
 
 export type SimulationWorkerControllerState = {
   mode: "inline" | "worker";
@@ -37,6 +38,11 @@ export function useSimulationWorkerController(
   scene: CrowdSimScene,
 ): SimulationWorkerController {
   const sharedMemory = useMemo(() => createSimulationSharedMemory(), []);
+  const { reinit, runScene } = useRunScene(scene);
+  // The newest scene, and the one the engine is actually running. Written by
+  // effects declared ABOVE the init effect, so init reads the current values.
+  const latestSceneRef = useRef(scene);
+  const engineSceneRef = useRef<CrowdSimScene | undefined>(undefined);
   const clientRef = useRef<SimulationWorkerClient | undefined>(undefined);
   const sharedMemoryRef = useRef<SimulationWorkerSharedMemory | undefined>(
     sharedMemory,
@@ -94,7 +100,15 @@ export function useSimulationWorkerController(
   );
 
   useEffect(() => {
+    latestSceneRef.current = scene;
+  }, [scene]);
+
+  useEffect(() => {
     let cancelled = false;
+    // Init from the newest scene, not `runScene`: after a StrictMode remount,
+    // or when a re-init lands after hot edits, the run must include them.
+    const initScene = latestSceneRef.current;
+    engineSceneRef.current = initScene;
     // Create the worker client INSIDE the effect. React StrictMode runs effects
     // setup -> cleanup -> setup; the cleanup terminates the worker, so a single
     // reused client would be left with a dead worker and every request (start /
@@ -104,7 +118,7 @@ export function useSimulationWorkerController(
     clientRef.current = currentClient;
 
     currentClient
-      .init(scene, {
+      .init(initScene, {
         // Use the engine's default mall-crowd decision backend (enter -> shop ->
         // browse -> leave) instead of the generic wasm DES, so the crowd has a
         // reason to move.
@@ -149,7 +163,31 @@ export function useSimulationWorkerController(
 
       currentClient.dispose();
     };
-  }, [scene]);
+  }, [runScene]);
+
+  // Hot scene update (ADR-0007). Declared after the init effect: on a re-init
+  // that effect has already recorded the new scene, so this one does nothing.
+  useEffect(() => {
+    const client = clientRef.current;
+    if (!client || engineSceneRef.current === scene) {
+      return;
+    }
+    engineSceneRef.current = scene;
+    client.updateScene(scene).then(
+      (nextSnapshot) => {
+        if (clientRef.current === client) {
+          publish(nextSnapshot);
+        }
+      },
+      () => {
+        // Refused (or the client died): fall back to the full re-init, which is
+        // what every edit did before hot updates existed.
+        if (clientRef.current === client) {
+          reinit(scene);
+        }
+      },
+    );
+  }, [publish, reinit, scene]);
 
   useEffect(() => {
     if (snapshot.status !== "running" || typeof window === "undefined") {

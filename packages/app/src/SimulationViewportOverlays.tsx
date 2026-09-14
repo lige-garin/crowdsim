@@ -5,20 +5,21 @@ import {
   selectViewportAgentAnnotations,
   selectViewportOverlayAgents,
   type ViewportAgentAnnotation,
-  type ViewportAgentOverlayFrame,
 } from "./simulationViewportOverlay";
-import type { SimulationSnapshot } from "./simulationEngine";
+import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import type { ViewMode } from "./simulationViewportTypes";
 import { primitiveBounds } from "./simulationViewportGeometry";
 
 export function ViewportUnsupportedNotice({
   detail,
+  kind = "unsupported",
   language,
 }: {
   detail?: string;
+  kind?: "failed" | "unsupported";
   language: "zh" | "en";
 }) {
-  const copy = describeViewportUnsupported(language);
+  const copy = describeViewportUnsupported(language, kind);
 
   return (
     <div
@@ -44,17 +45,16 @@ export function ViewportUnsupportedNotice({
   );
 }
 
+/** Agent markers for the top-down view (the 3D view draws figures instead). */
 export function ViewportLiveAgentOverlay({
+  crowd,
   scene,
-  sharedAgentOverlay,
-  snapshot,
-  viewMode,
 }: {
+  crowd: LiveCrowd;
   scene?: CrowdSimScene;
-  sharedAgentOverlay?: ViewportAgentOverlayFrame;
-  snapshot?: SimulationSnapshot;
-  viewMode: ViewMode;
 }) {
+  const viewMode = "2d";
+  const { sharedAgentOverlay, snapshot } = useLiveCrowd(crowd);
   const overlayAgents = scene
     ? selectViewportAgentAnnotations({
         scene,
@@ -81,12 +81,7 @@ export function ViewportLiveAgentOverlay({
   }
 
   return (
-    <div
-      className={`render-agent-overlay ${
-        viewMode === "3d" ? "render-agent-overlay-3d" : "render-agent-overlay-2d"
-      }`}
-      aria-hidden="true"
-    >
+    <div className="render-agent-overlay render-agent-overlay-2d" aria-hidden="true">
       {agents.map((agent) => (
         <span
           key={agent.id}
@@ -164,7 +159,7 @@ function createAmbientAgentAnnotations(
     { icon: ">", intent: "goToExit" as const, label: "Going to exit" },
   ];
 
-  return Array.from({ length: viewMode === "3d" ? 42 : 64 }, (_, index) => {
+  return Array.from({ length: 64 }, (_, index) => {
     const point = points[index % points.length];
     const laneOffset = ((index % 7) - 3) * 1.8;
     const waveOffset = Math.sin(index * 1.7 + scene.seed) * 3.4;

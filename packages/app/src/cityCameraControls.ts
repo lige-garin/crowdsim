@@ -1,0 +1,199 @@
+import type { PerspectiveCamera } from "three";
+import { isClick } from "./agentPicking";
+import {
+  orbitByDrag,
+  orbitToPosition,
+  panByDrag,
+  panByKeys,
+  zoomByWheel,
+  type GroundPoint,
+  type OrbitState,
+} from "./orbitCamera";
+
+type Limit = { maxX: number; maxY: number; minX: number; minY: number };
+
+export type CityCameraRig = {
+  orbit: OrbitState;
+  target: GroundPoint;
+};
+
+/**
+ * City-builder camera controls on the viewport canvas.
+ *
+ *   left drag        pan the city
+ *   right drag       rotate / tilt   (also shift + left drag)
+ *   wheel            zoom
+ *   W A S D / arrows pan            Q / E rotate
+ *
+ * The old viewport only orbited around a fixed origin, so there was no way to
+ * go and look at a street: you could spin the model, not travel through the
+ * city. Rig state lives in a caller-owned object so it survives the renderer
+ * being rebuilt for a scene change.
+ */
+export function attachCityCameraControls(options: {
+  camera: PerspectiveCamera;
+  canvas: HTMLCanvasElement;
+  limit: Limit;
+  onClick: (clientX: number, clientY: number) => void;
+  rig: CityCameraRig;
+}) {
+  const { camera, canvas, limit, onClick, rig } = options;
+  const pressed = new Set<string>();
+  const drag = { button: -1, downX: 0, downY: 0, lastX: 0, lastY: 0 };
+  let lastTick = performance.now();
+  let frame = 0;
+
+  const apply = () => {
+    const position = orbitToPosition(rig.orbit, {
+      x: rig.target.x,
+      y: rig.target.y,
+      z: 0,
+    });
+    camera.position.set(position.x, position.y, position.z);
+    camera.lookAt(rig.target.x, rig.target.y, 0);
+  };
+
+  const onPointerDown = (event: PointerEvent) => {
+    drag.button = event.button === 0 && event.shiftKey ? 2 : event.button;
+    drag.downX = drag.lastX = event.clientX;
+    drag.downY = drag.lastY = event.clientY;
+    canvas.setPointerCapture(event.pointerId);
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (drag.button < 0) return;
+    const dx = event.clientX - drag.lastX;
+    const dy = event.clientY - drag.lastY;
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    if (drag.button === 0) {
+      rig.target = panByDrag(rig.target, rig.orbit, dx, dy, canvas.clientHeight, limit);
+    } else {
+      rig.orbit = orbitByDrag(rig.orbit, dx, dy);
+    }
+    apply();
+  };
+
+  const onPointerUp = (event: PointerEvent) => {
+    const wasLeftClick =
+      drag.button === 0 &&
+      isClick(event.clientX - drag.downX, event.clientY - drag.downY);
+    drag.button = -1;
+    if (canvas.hasPointerCapture(event.pointerId))
+      canvas.releasePointerCapture(event.pointerId);
+    if (wasLeftClick) onClick(event.clientX, event.clientY);
+  };
+
+  // A cancelled pointer (touch or pen gesture, the OS taking the pointer, focus
+  // lost mid-drag) never sends pointerup. Without this the drag stayed armed and
+  // the next hover panned or orbited the camera with no button held.
+  const onPointerCancel = (event: PointerEvent) => {
+    drag.button = -1;
+    if (canvas.hasPointerCapture(event.pointerId))
+      canvas.releasePointerCapture(event.pointerId);
+  };
+  const onLostPointerCapture = () => {
+    drag.button = -1;
+  };
+
+  const onWheel = (event: WheelEvent) => {
+    event.preventDefault();
+    rig.orbit = zoomByWheel(rig.orbit, event.deltaY);
+    apply();
+  };
+
+  const onContextMenu = (event: Event) => event.preventDefault();
+
+  const typing = () => {
+    const active = document.activeElement;
+    return (
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement ||
+      (active instanceof HTMLElement && active.isContentEditable)
+    );
+  };
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (typing()) return;
+    const key = event.key.toLowerCase();
+    if (
+      [
+        "w",
+        "a",
+        "s",
+        "d",
+        "q",
+        "e",
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
+      ].includes(key)
+    ) {
+      pressed.add(key);
+      // Arrows also scroll the nearest scrollable ancestor (the stage pane).
+      if (key.startsWith("arrow")) event.preventDefault();
+    }
+  };
+  const onKeyUp = (event: KeyboardEvent) => pressed.delete(event.key.toLowerCase());
+  const onBlur = () => pressed.clear();
+
+  const tick = (now: number) => {
+    const seconds = Math.min(0.05, (now - lastTick) / 1000);
+    lastTick = now;
+    if (pressed.size > 0) {
+      const keys = {
+        back: pressed.has("s") || pressed.has("arrowdown"),
+        forward: pressed.has("w") || pressed.has("arrowup"),
+        left: pressed.has("a") || pressed.has("arrowleft"),
+        right: pressed.has("d") || pressed.has("arrowright"),
+      };
+      rig.target = panByKeys(rig.target, rig.orbit, keys, seconds, limit);
+      const turn = (pressed.has("e") ? 1 : 0) - (pressed.has("q") ? 1 : 0);
+      if (turn !== 0)
+        rig.orbit = { ...rig.orbit, azimuth: rig.orbit.azimuth + turn * seconds * 1.4 };
+      apply();
+    }
+    frame = window.requestAnimationFrame(tick);
+  };
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerCancel);
+  canvas.addEventListener("lostpointercapture", onLostPointerCapture);
+  canvas.addEventListener("wheel", onWheel, { passive: false });
+  canvas.addEventListener("contextmenu", onContextMenu);
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  window.addEventListener("blur", onBlur);
+  frame = window.requestAnimationFrame(tick);
+  apply();
+
+  return () => {
+    window.cancelAnimationFrame(frame);
+    canvas.removeEventListener("pointerdown", onPointerDown);
+    canvas.removeEventListener("pointermove", onPointerMove);
+    canvas.removeEventListener("pointerup", onPointerUp);
+    canvas.removeEventListener("pointercancel", onPointerCancel);
+    canvas.removeEventListener("lostpointercapture", onLostPointerCapture);
+    canvas.removeEventListener("wheel", onWheel);
+    canvas.removeEventListener("contextmenu", onContextMenu);
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("blur", onBlur);
+  };
+}
+
+/** Where a fresh city camera starts: a three-quarter view over the district. */
+export function initialCityCameraRig(): CityCameraRig {
+  return {
+    // High enough (~150m) to look over an 80m downtown at the district.
+    orbit: {
+      azimuth: (-120 * Math.PI) / 180,
+      polar: (44 * Math.PI) / 180,
+      radius: 210,
+    },
+    target: { x: 0, y: 0 },
+  };
+}

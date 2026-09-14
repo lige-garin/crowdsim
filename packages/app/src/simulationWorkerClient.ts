@@ -1,8 +1,9 @@
-﻿import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { crowdBudget } from "./crowdBudget";
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
 import {
   createSimulationEngineFromScene,
-  type SimulationEngine,
+  type SceneSimulationEngine,
   type SimulationEngineConfig,
   type SimulationAgent,
   type SimulationSnapshot,
@@ -58,6 +59,12 @@ export type SimulationWorkerSetEvacuationRequest = {
   id: number;
   type: "set-evacuation";
 };
+/** Hot scene update (ADR-0007): swap geometry, keep the running crowd. */
+export type SimulationWorkerUpdateSceneRequest = {
+  id: number;
+  scene: CrowdSimScene;
+  type: "update-scene";
+};
 export type SimulationWorkerTickRequest = {
   id: number;
   realDeltaSeconds: number;
@@ -68,7 +75,8 @@ export type SimulationWorkerRequest =
   | SimulationWorkerInitRequest
   | SimulationWorkerSetEvacuationRequest
   | SimulationWorkerSetTimeScaleRequest
-  | SimulationWorkerTickRequest;
+  | SimulationWorkerTickRequest
+  | SimulationWorkerUpdateSceneRequest;
 export type SimulationWorkerResponse =
   | {
       id: number;
@@ -85,7 +93,8 @@ type SimulationWorkerRequestPayload =
   | Omit<SimulationWorkerInitRequest, "id">
   | Omit<SimulationWorkerSetEvacuationRequest, "id">
   | Omit<SimulationWorkerSetTimeScaleRequest, "id">
-  | Omit<SimulationWorkerTickRequest, "id">;
+  | Omit<SimulationWorkerTickRequest, "id">
+  | Omit<SimulationWorkerUpdateSceneRequest, "id">;
 export type SimulationWorkerLike = {
   onerror: ((event: ErrorEvent) => void) | null;
   onmessage: ((event: MessageEvent<SimulationWorkerResponse>) => void) | null;
@@ -109,6 +118,8 @@ export type SimulationWorkerClient = {
   snapshot: () => Promise<SimulationSnapshot>;
   start: () => Promise<SimulationSnapshot>;
   tick: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
+  /** Rejects when the engine refuses a hot update; the caller must re-init. */
+  updateScene: (scene: CrowdSimScene) => Promise<SimulationSnapshot>;
 };
 /** Rejection reason for requests cut short by `dispose()`. */
 export const simulationWorkerDisposedMessage = "Simulation worker disposed";
@@ -120,7 +131,7 @@ export function createSimulationWorker(): SimulationWorkerLike {
 }
 export function createSimulationSharedMemory(
   runtime: typeof globalThis = globalThis,
-  capacity = 2_000,
+  capacity: number = crowdBudget.sharedCapacity,
 ): SimulationWorkerSharedMemory | undefined {
   if (
     typeof runtime.SharedArrayBuffer !== "function" ||
@@ -406,10 +417,11 @@ export function createSimulationWorkerClient(
     snapshot: () => send({ type: "snapshot" }),
     start: () => send({ type: "start" }),
     tick: (realDeltaSeconds) => send({ realDeltaSeconds, type: "tick" }),
+    updateScene: (scene) => send({ scene, type: "update-scene" }),
   };
 }
 function createInlineSimulationWorkerClient(): SimulationWorkerClient {
-  let engine: SimulationEngine | undefined;
+  let engine: SceneSimulationEngine | undefined;
   let sharedMemory: SimulationWorkerSharedMemory | undefined;
   function requireEngine() {
     if (!engine) {
@@ -421,7 +433,7 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
     writeSimulationSharedMemory(sharedMemory, snapshot);
     return Promise.resolve(snapshot);
   }
-  function run(command: (current: SimulationEngine) => SimulationSnapshot) {
+  function run(command: (current: SceneSimulationEngine) => SimulationSnapshot) {
     try {
       return publish(command(requireEngine()));
     } catch (error) {
@@ -453,5 +465,6 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
     snapshot: () => run((current) => current.snapshot()),
     start: () => run((current) => current.start()),
     tick: (realDeltaSeconds) => run((current) => current.tick(realDeltaSeconds)),
+    updateScene: (scene) => run((current) => current.updateScene(scene)),
   };
 }

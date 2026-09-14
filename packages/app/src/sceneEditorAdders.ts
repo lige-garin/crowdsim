@@ -6,6 +6,7 @@ import {
   type EditorDocument,
   type EditorEntrance,
   type EditorServicePoint,
+  type EditorTool,
 } from "./sceneEditorTypes";
 
 export function addRoad(
@@ -277,4 +278,47 @@ export function addCountLine(
     ],
     nextId: document.nextId + 1,
   };
+}
+
+/**
+ * One click of a single-point tool, as a pure document edit.
+ *
+ * The 2D editor and the 3D world both place things with a click; sharing this
+ * keeps "what a road tool drops" identical in both. Returns null for tools that
+ * are not a single click: select picks, and a wall needs a run of points.
+ */
+export function placeEditorTool(
+  document: EditorDocument,
+  tool: EditorTool,
+  point: ScenePoint,
+): EditorDocument | null {
+  switch (tool) {
+    case "select":
+    case "wall":
+      return null;
+    case "zone":
+      return addZone(document, point);
+    case "road":
+      return addRoad(document, point);
+    case "building":
+      return addBuilding(document, point);
+    case "source":
+    case "sink":
+      return addEntrance(document, tool, point);
+    case "shop":
+      return addShop(document, point);
+    case "transitStop":
+      return addTransitStop(document, point);
+    case "counter":
+    case "gate":
+      return addServicePoint(document, tool, point);
+    case "obstacle":
+      return addObstacle(document, point);
+    case "hazard":
+      return addHazard(document, point);
+    case "countLine":
+      return addCountLine(document, point);
+    case "target":
+      return addTarget(document, point);
+  }
 }

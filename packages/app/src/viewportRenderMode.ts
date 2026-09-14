@@ -1,7 +1,15 @@
 // Which engine path the viewport committed to (ADR-0006): WebGPU drives the full
 // experience; without it we run a labeled, scale-limited CPU/WebGL compatibility
 // mode rather than degrading silently.
-export type ViewportRenderMode = "detecting" | "full-gpu" | "compat" | "unsupported";
+// `failed` is distinct from `unsupported`: the device had a renderer and it broke
+// (init or a frame threw). Telling that user their browser lacks WebGPU would be
+// false, and they could not act on it.
+export type ViewportRenderMode =
+  | "detecting"
+  | "full-gpu"
+  | "compat"
+  | "failed"
+  | "unsupported";
 
 // Pure, testable mapping from render mode to its HUD label. Returns null when no
 // badge should be shown (still detecting, or unsupported -- the status line covers
@@ -44,7 +52,28 @@ export type ViewportUnsupportedNotice = {
 // the worst state is the one that explains itself best rather than least.
 export function describeViewportUnsupported(
   language: "zh" | "en",
+  kind: "failed" | "unsupported" = "unsupported",
 ): ViewportUnsupportedNotice {
+  if (kind === "failed") {
+    return language === "zh"
+      ? {
+          title: "3D 视口渲染出错，已停止",
+          reason: "渲染器在初始化或绘制时出错。仿真本身仍在运行。",
+          stillWorks: "场景编辑、2D 平面视图与分析面板不受影响，仍可正常使用。",
+          requirement: "刷新页面可重试；若反复出现，请展开技术详情反馈。",
+          detailsLabel: "技术详情",
+        }
+      : {
+          title: "The 3D viewport hit a rendering error and stopped",
+          reason:
+            "The renderer failed while starting or drawing. The simulation itself keeps running.",
+          stillWorks:
+            "Scene editing, the 2D plan view and the analysis panels are unaffected.",
+          requirement:
+            "Reload the page to retry; if it keeps happening, report the technical details.",
+          detailsLabel: "Technical details",
+        };
+  }
   if (language === "zh") {
     return {
       title: "此设备无法渲染 3D 视口",

@@ -3,6 +3,7 @@ import type { BasemapNumberField, EditorBasemap } from "./sceneEditorBasemap";
 import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import type {
   BuildingNumberField,
+  EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
   RoadNumberField,
@@ -11,6 +12,7 @@ import type {
 } from "./sceneEditorMutations";
 import {
   BuildingParamGrid,
+  EntranceParamGrid,
   HazardParamGrid,
   ObstacleParamGrid,
   RoadParamGrid,
@@ -32,11 +34,14 @@ type Shop = EditorDocument["shops"][number];
 type ServicePoint = EditorDocument["servicePoints"][number];
 type CountLine = EditorDocument["countLines"][number];
 type Zone = EditorDocument["zones"][number];
+type Entrance = EditorDocument["entrances"][number];
 
 type SceneEditorParamPanelProps = {
   basemap: EditorBasemap | null;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: Building["kind"]) => void;
+  onEntranceKindChange: (kind: Entrance["kind"]) => void;
+  onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
   onHazardKindChange: (kind: Hazard["kind"]) => void;
   onHazardNumberChange: (field: HazardNumberField, value: number) => void;
@@ -68,6 +73,7 @@ type SceneEditorParamPanelProps = {
   pointsToSvg: (points: CountLine["points"]) => string;
   selectedBuilding: Building | undefined;
   selectedCountLine: CountLine | undefined;
+  selectedEntrance: Entrance | undefined;
   selectedHazard: Hazard | undefined;
   selectedObstacle: Obstacle | undefined;
   selectedRoad: Road | undefined;
@@ -83,6 +89,8 @@ export function SceneEditorParamPanel({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onEntranceKindChange,
+  onEntranceNumberChange,
   onHazardKindChange,
   onHazardNumberChange,
   onObstacleKindChange,
@@ -107,6 +115,7 @@ export function SceneEditorParamPanel({
   pointsToSvg,
   selectedBuilding,
   selectedCountLine,
+  selectedEntrance,
   selectedHazard,
   selectedObstacle,
   selectedRoad,
@@ -140,6 +149,13 @@ export function SceneEditorParamPanel({
           onKindChange={onBuildingKindChange}
           onNumberChange={onBuildingNumberChange}
           selectedBuilding={selectedBuilding}
+          t={t}
+        />
+      ) : selectedEntrance ? (
+        <EntranceParamGrid
+          onKindChange={onEntranceKindChange}
+          onNumberChange={onEntranceNumberChange}
+          selectedEntrance={selectedEntrance}
           t={t}
         />
       ) : selectedTransitStop ? (

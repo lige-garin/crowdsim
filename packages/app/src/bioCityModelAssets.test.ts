@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import {
   createBioCityAssetLoadPlans,
   createBioCityAssetWorldTransform,
+  prepareBioCityVisualAssetObject,
   summarizeBioCityAssetLoading,
 } from "./bioCityModelAssets";
 import { createBioCityRenderPlan } from "./bioCityRenderPlan";
@@ -167,5 +169,37 @@ describe("bioCityModelAssets", () => {
       rotation: { x: 0, y: 0, z: 0 },
       scale: 1,
     });
+  });
+
+  it("clones cached mesh resources so a placed copy can be disposed safely", () => {
+    const cached = new Group();
+    const building = new Group();
+    const geometry = new BoxGeometry(1, 1, 1);
+    const wall = new MeshStandardMaterial({ color: "#c9d4e3", roughness: 0.82 });
+    const roof = new MeshStandardMaterial({ color: "#2f3a48", roughness: 0.8 });
+    const window = new MeshStandardMaterial({
+      color: "#dbeafe",
+      emissive: "#ffd23a",
+      emissiveIntensity: 0.5,
+      roughness: 0.4,
+    });
+
+    building.add(new Mesh(geometry, wall), new Mesh(geometry, roof));
+    for (let index = 0; index < 10; index++) {
+      building.add(new Mesh(geometry, window));
+    }
+    building.position.set(4, 5, 6);
+    cached.add(building);
+
+    const prepared = prepareBioCityVisualAssetObject(cached.clone(true));
+    const meshes: Mesh[] = [];
+    prepared.traverse((child) => child instanceof Mesh && meshes.push(child));
+    const materials = meshes.map((mesh) => mesh.material as MeshStandardMaterial);
+
+    expect(new Set(meshes.map((mesh) => mesh.geometry)).size).toBe(meshes.length);
+    expect(new Set(materials).size).toBe(materials.length);
+    expect(meshes[0].geometry).not.toBe(geometry);
+    expect(materials[0]).not.toBe(wall);
+    expect(prepared.children[0].position.toArray()).toEqual([4, 5, 6]);
   });
 });

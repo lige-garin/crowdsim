@@ -1,12 +1,10 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  BoxGeometry,
   Color,
   DynamicDrawUsage,
   Group,
   InstancedMesh,
   MeshBasicMaterial,
-  MeshStandardMaterial,
   Object3D,
   OrthographicCamera,
   PerspectiveCamera,
@@ -17,22 +15,26 @@ import {
 } from "three";
 import type { WebGLRenderer } from "three";
 import type { WebGPURenderer } from "three/webgpu";
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { viewportAgentCapacity } from "./renderBenchmark";
 import {
   agentWorldPosition,
   selectCrowdAgents,
   visibleAgentCount,
 } from "./agentInstanceField";
-import { agentAppearance } from "./agentAppearance";
+import { crowdBudget } from "./crowdBudget";
+import { createCrowdFigures, type CrowdFigureAgent } from "./crowdFigures";
+import { screenToNdc } from "./agentPicking";
 import {
-  orbitByDrag,
-  zoomByWheel,
-  orbitToPosition,
-  positionToOrbit,
-  type OrbitState,
-} from "./orbitCamera";
-import { isClick, screenToNdc } from "./agentPicking";
+  attachCityCameraControls,
+  initialCityCameraRig,
+  type CityCameraRig,
+} from "./cityCameraControls";
+import { createCityObjects, type CityObjects } from "./cityMeshes";
+import { CITY_CAMERA_FOV_DEGREES } from "./orbitCamera";
+import { toRenderX, toRenderY } from "./simulationViewportGeometry";
+import { attachPlacementGhost } from "./placementGhost";
+import type { EditorTool } from "./sceneEditorState";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
 import { createBioCityRenderPlan } from "./bioCityRenderPlan";
@@ -45,10 +47,12 @@ import type { ViewportRenderMode } from "./viewportRenderMode";
 import { localizedStatus, rawStatus } from "./simulationViewportStatus";
 import { applyViewportLayers } from "./simulationViewportLayerVisibility";
 import {
-  bioCityBackgroundColor,
+  applyBioCityAtmosphere,
+  bioCityAtmosphere,
+  cityNightLevel,
   createBioCityDynamicObjects,
   createBioCityStaticObjects,
-  createDayNightLights,
+  createDayNightRig,
   createFloor,
   createWall,
   disposeRenderObject,
@@ -58,10 +62,13 @@ import {
   createFallbackViewportRenderer,
   createGpuViewportRenderer,
 } from "./simulationViewportRendererFactory";
+import { createViewportPostProcessing } from "./viewportPostProcessing";
 type RendererArgs = {
   crowdScene?: CrowdSimScene;
   heatmapCells: readonly HeatmapCell[];
   layers: ViewportLayers;
+  onPlace?: (tool: EditorTool, point: ScenePoint) => void;
+  placementTool?: EditorTool;
   sharedAgentOverlay?: ViewportAgentOverlayFrame;
   snapshot?: SimulationSnapshot;
   viewMode: ViewMode;
@@ -70,6 +77,8 @@ export function useSimulationViewportRenderer({
   crowdScene,
   heatmapCells,
   layers,
+  onPlace,
+  placementTool,
   sharedAgentOverlay,
   snapshot,
   viewMode,
@@ -79,21 +88,52 @@ export function useSimulationViewportRenderer({
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+  // Read through refs so picking a tool or a new callback never rebuilds the scene.
+  const placementToolRef = useRef(placementTool);
+  const onPlaceRef = useRef(onPlace);
+  const placementRef = useRef<ReturnType<typeof attachPlacementGhost> | null>(null);
+  useEffect(() => {
+    placementToolRef.current = placementTool;
+    onPlaceRef.current = onPlace;
+    // Dropping the tool (Escape) must clear the ghost now, not on the next
+    // mouse move — a click in between would pick an agent under a ghost that
+    // still promised a placement.
+    placementRef.current?.refresh();
+  }, [placementTool, onPlace]);
   const sharedOverlayRef = useRef(sharedAgentOverlay);
   useEffect(() => {
     sharedOverlayRef.current = sharedAgentOverlay;
   }, [sharedAgentOverlay]);
-  const orbitRef = useRef<OrbitState | null>(null);
-  const dragRef = useRef({ active: false, x: 0, y: 0, downX: 0, downY: 0 });
+  const crowdSceneRef = useRef(crowdScene);
+  useEffect(() => {
+    crowdSceneRef.current = crowdScene;
+  }, [crowdScene]);
+  // Camera rig outlives renderer rebuilds, so a scene edit keeps your view.
+  const rigRef = useRef<CityCameraRig>(initialCityCameraRig());
+  const cityRef = useRef<CityObjects | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const dynamicGroupRef = useRef<Group | null>(null);
-  const crowdMeshRef = useRef<InstancedMesh | null>(null);
+  const crowdMeshRef = useRef<Object3D | null>(null);
+  const lightRigRef = useRef<ReturnType<typeof createDayNightRig> | null>(null);
   const layersRef = useRef(layers);
   const [status, setStatus] = useState<RenderStatus>(() => localizedStatus("starting"));
   const [renderMode, setRenderMode] = useState<ViewportRenderMode>("detecting");
   const [fps, setFps] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
+  const hasScene = crowdScene !== undefined;
+  const worldWidth = crowdScene?.world.width ?? 80;
+  const worldHeight = crowdScene?.world.height ?? 48;
+  /*
+   * Renderer layer: GPU device, renderer, camera, crowd instances, controls,
+   * lights and the render loop. Keyed on the view mode and the world's size.
+   *
+   * It used to be keyed on the scene object, so every scene edit — and with
+   * in-world building, every click — destroyed the GPU device, requested a new
+   * adapter, re-ran the blocking benchmark and regenerated the city, while the
+   * simulation underneath (ADR-0007) carried straight on. Scene geometry now
+   * lives in the scene layer below and is swapped without touching the device.
+   */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -106,179 +146,82 @@ export function useSimulationViewportRenderer({
     let resizeObserver: ResizeObserver | undefined;
     let renderer: WebGLRenderer | WebGPURenderer | undefined;
     let gpuDevice: GPUDevice | undefined;
-    let loadedBioCityAssets: Object3D[] = [];
+    let postProcessing: ReturnType<typeof createViewportPostProcessing> | undefined;
     let renderHalted = false;
     const scene = new Scene();
     const camera =
       viewMode === "3d"
-        ? new PerspectiveCamera(46, 16 / 10, 0.1, 320)
+        ? new PerspectiveCamera(CITY_CAMERA_FOV_DEGREES, 16 / 10, 0.5, 2600)
         : new OrthographicCamera(-26, 26, 17, -17, 0.1, 100);
     const dummy = new Object3D();
     let frameCount = 0;
     let lastFpsUpdate = performance.now();
     let lastFrameAt = lastFpsUpdate;
-    const agentLook = agentAppearance(viewMode);
-    const agentGeometry =
-      viewMode === "3d"
-        ? new BoxGeometry(agentLook.size.x, agentLook.size.y, agentLook.size.z)
-        : new PlaneGeometry(agentLook.size.x, agentLook.size.y);
-    const agentMaterial =
-      viewMode === "3d"
-        ? new MeshStandardMaterial({
-            color: agentLook.color,
-            emissive: agentLook.emissive,
-            emissiveIntensity: agentLook.emissiveIntensity,
-            roughness: 0.5,
-            depthTest: false,
-          })
-        : new MeshBasicMaterial({ color: agentLook.color });
-    const agents = new InstancedMesh(
-      agentGeometry,
-      agentMaterial,
-      viewportAgentCapacity,
-    );
-    agents.frustumCulled = false;
-    agents.renderOrder = 10;
-    const floor = createFloor(crowdScene, viewMode);
-    const walls = [
-      createWall(-13, 4, 5, 9, 0.32, viewMode),
-      createWall(5, -8, 15, -2, 0.32, viewMode),
-    ];
-    const staticPlan = crowdScene ? createBioCityRenderPlan(crowdScene, 0) : undefined;
-    const staticCityObjects =
-      crowdScene && staticPlan
-        ? createBioCityStaticObjects(crowdScene, viewMode, staticPlan)
-        : [];
+    // 3D draws people (heads, limbs, five builds); 2D keeps flat top-down dots.
+    const figures =
+      viewMode === "3d" ? createCrowdFigures(crowdBudget.maxAgents) : undefined;
+    // 2D draws each person as a flat square dot.
+    const agents = figures
+      ? undefined
+      : new InstancedMesh(
+          new PlaneGeometry(1, 1),
+          new MeshBasicMaterial({ color: "#2f6f63" }),
+          viewportAgentCapacity,
+        );
+    if (agents) agents.frustumCulled = false;
     const dynamicGroup = new Group();
     dynamicGroup.name = "biocity-dynamic";
-    const worldWidth = crowdScene?.world.width ?? 80;
-    const worldHeight = crowdScene?.world.height ?? 48;
-    function applyOrbit() {
-      if (!orbitRef.current) {
-        return;
-      }
-      const p = orbitToPosition(orbitRef.current);
-      camera.position.set(p.x, p.y, p.z);
-      camera.lookAt(0, 0, 0);
-    }
+    const lightRig =
+      viewMode === "3d" && hasScene
+        ? createDayNightRig({ height: worldHeight, width: worldWidth })
+        : undefined;
     const raycaster = new Raycaster();
+    // Clicks only pick people in 3D, where the figures are drawn.
     function pickAgentAt(clientX: number, clientY: number) {
       const rect = canvasElement.getBoundingClientRect();
       const ndc = screenToNdc(clientX, clientY, rect);
       raycaster.setFromCamera(new Vector2(ndc.x, ndc.y), camera);
-      agents.computeBoundingSphere();
-      const hit = raycaster.intersectObject(agents)[0];
-      if (hit?.instanceId == null) {
-        setSelectedAgentId(null);
-        return;
-      }
-      const live = selectCrowdAgents(
-        snapshotRef.current?.agents,
-        sharedOverlayRef.current?.agents,
-      );
-      const picked = live[hit.instanceId];
-      setSelectedAgentId(picked ? picked.id : null);
+      setSelectedAgentId(figures!.pick(raycaster));
     }
-    function onPointerDown(event: PointerEvent) {
-      dragRef.current = {
-        active: true,
-        x: event.clientX,
-        y: event.clientY,
-        downX: event.clientX,
-        downY: event.clientY,
-      };
-      canvasElement.setPointerCapture(event.pointerId);
-    }
-    function onPointerMove(event: PointerEvent) {
-      if (!dragRef.current.active || !orbitRef.current) {
-        return;
-      }
-      orbitRef.current = orbitByDrag(
-        orbitRef.current,
-        event.clientX - dragRef.current.x,
-        event.clientY - dragRef.current.y,
-      );
-      dragRef.current.x = event.clientX;
-      dragRef.current.y = event.clientY;
-      applyOrbit();
-    }
-    function onPointerUp(event: PointerEvent) {
-      const wasClick = isClick(
-        event.clientX - dragRef.current.downX,
-        event.clientY - dragRef.current.downY,
-      );
-      dragRef.current.active = false;
-      canvasElement.releasePointerCapture(event.pointerId);
-      if (wasClick) {
-        pickAgentAt(event.clientX, event.clientY);
-      }
-    }
-    function onWheel(event: WheelEvent) {
-      if (!orbitRef.current) {
-        return;
-      }
-      event.preventDefault();
-      orbitRef.current = zoomByWheel(orbitRef.current, event.deltaY);
-      applyOrbit();
-    }
+    let detachCameraControls: (() => void) | undefined;
+    let placement: ReturnType<typeof attachPlacementGhost> | undefined;
     if (viewMode === "3d") {
+      placement = hasScene
+        ? attachPlacementGhost({
+            camera,
+            canvas: canvasElement,
+            getScene: () => crowdSceneRef.current,
+            getTool: () => placementToolRef.current,
+            onPlace: (tool, point) => onPlaceRef.current?.(tool, point),
+            parent: scene,
+          })
+        : undefined;
       camera.up.set(0, 0, 1);
-      if (!orbitRef.current) {
-        orbitRef.current = positionToOrbit({
-          x: worldWidth * 0.5,
-          y: -worldHeight * 0.92,
-          z: worldHeight * 0.8,
-        });
-      }
-      applyOrbit();
-      canvasElement.addEventListener("pointerdown", onPointerDown);
-      canvasElement.addEventListener("pointermove", onPointerMove);
-      canvasElement.addEventListener("pointerup", onPointerUp);
-      canvasElement.addEventListener("wheel", onWheel, { passive: false });
+      detachCameraControls = attachCityCameraControls({
+        camera: camera as PerspectiveCamera,
+        canvas: canvasElement,
+        limit: {
+          maxX: worldWidth / 2 + 150,
+          maxY: worldHeight / 2 + 150,
+          minX: -worldWidth / 2 - 150,
+          minY: -worldHeight / 2 - 150,
+        },
+        onClick: (clientX, clientY) => {
+          if (!placement?.handleClick(clientX, clientY)) pickAgentAt(clientX, clientY);
+        },
+        rig: rigRef.current,
+      });
+      placementRef.current = placement ?? null;
     } else {
       camera.up.set(0, 1, 0);
       camera.position.set(0, 0, 40);
       camera.lookAt(0, 0, 0);
     }
     scene.background = new Color("#f6f9fc");
-    agents.instanceMatrix.setUsage(DynamicDrawUsage);
-    scene.add(floor);
-    scene.add(agents);
+    agents?.instanceMatrix.setUsage(DynamicDrawUsage);
+    scene.add(figures?.group ?? agents!);
     scene.add(dynamicGroup);
-    walls.forEach((wall) => scene.add(wall));
-    staticCityObjects.forEach((object) => scene.add(object));
-    if (crowdScene && staticPlan && viewMode === "3d") {
-      void Promise.all(
-        staticPlan.assets.map(async (asset) => ({
-          asset,
-          object: await loadBioCityVisualAssetObject(asset, crowdScene),
-        })),
-      ).then((loadedAssets) => {
-        if (disposed) {
-          loadedAssets.forEach(({ object }) => object && disposeRenderObject(object));
-          return;
-        }
-        loadedBioCityAssets = loadedAssets.flatMap(({ asset, object }) => {
-          if (!object) {
-            return [];
-          }
-          scene.getObjectByName(asset.id)?.removeFromParent();
-          object.traverse((child) => {
-            child.castShadow = true;
-            child.receiveShadow = true;
-          });
-          scene.add(object);
-          return [object];
-        });
-        if (loadedBioCityAssets.length > 0) {
-          scene.children
-            .filter((child) => child.name === "inline-building")
-            .forEach((child) => {
-              child.visible = false;
-            });
-        }
-      });
-    }
+    lightRig?.attach(scene);
     function resize() {
       const parent = canvasElement.parentElement;
       if (!parent) {
@@ -289,7 +232,7 @@ export function useSimulationViewportRenderer({
       const safeHeight = Math.max(1, Math.floor(height));
       const aspect = safeWidth / safeHeight;
       if (camera instanceof OrthographicCamera) {
-        const verticalExtent = (crowdScene?.world.height ?? 48) * 0.62;
+        const verticalExtent = worldHeight * 0.62;
         camera.left = -verticalExtent * aspect;
         camera.right = verticalExtent * aspect;
         camera.top = verticalExtent;
@@ -307,6 +250,7 @@ export function useSimulationViewportRenderer({
     }
     let renderedAgentCount = 0;
     function seedAgents() {
+      if (!agents) return;
       for (let index = 0; index < viewportAgentCapacity; index++) {
         dummy.scale.setScalar(0);
         dummy.position.set(0, 0, -1000);
@@ -321,6 +265,16 @@ export function useSimulationViewportRenderer({
         snapshotRef.current?.agents,
         sharedOverlayRef.current?.agents,
       );
+      if (figures) {
+        figures.update(
+          live as readonly CrowdFigureAgent[],
+          { height: worldHeight, width: worldWidth },
+          crowdSceneRef.current?.seed ?? 1,
+          { camera: camera.position, colourByBehaviour: layersRef.current.behaviour },
+        );
+        return;
+      }
+      if (!agents) return;
       const visible = visibleAgentCount(live.length, viewportAgentCapacity);
       for (let index = 0; index < visible; index++) {
         const world = agentWorldPosition(
@@ -353,11 +307,29 @@ export function useSimulationViewportRenderer({
       const frameTime = Number.isFinite(time) ? time : performance.now();
       try {
         updateAgentInstances();
-        renderer.render(scene, camera);
+        // Per-frame animation for dynamic objects that want it (falling rain).
+        const frameSeconds = (frameTime - lastFrameAt) / 1000;
+        for (const child of dynamicGroup.children) {
+          (child.userData.tick as ((dt: number) => void) | undefined)?.(frameSeconds);
+        }
+        if (postProcessing) {
+          try {
+            postProcessing.render();
+          } catch (error) {
+            // The finishing pass is cosmetic: lose it, keep the city, say why.
+            console.warn("3D post-processing disabled:", error);
+            postProcessing.dispose();
+            postProcessing = undefined;
+            renderer.render(scene, camera);
+          }
+        } else {
+          renderer.render(scene, camera);
+        }
       } catch (error) {
         renderHalted = true;
         window.cancelAnimationFrame(animationFrameId);
         window.clearInterval(watchdogTimerId);
+        setRenderMode("failed");
         setStatus(
           error instanceof Error
             ? rawStatus(error.message)
@@ -420,16 +392,23 @@ export function useSimulationViewportRenderer({
           return;
         }
         const device = await adapter.requestDevice();
+        if (disposed) {
+          // Torn down while the device was being created: the cleanup has
+          // already run and could not see this device, so release it here.
+          device.destroy();
+          return;
+        }
         gpuDevice = device;
+        setRenderMode("full-gpu");
+        setStatus(localizedStatus("initializing"));
+        const gpuRenderer = createGpuViewportRenderer(canvasElement, device);
+        renderer = gpuRenderer;
+        await gpuRenderer.init();
         if (disposed) {
           return;
         }
-        setRenderMode("full-gpu");
-        setStatus(localizedStatus("initializing"));
-        renderer = createGpuViewportRenderer(canvasElement, device);
-        await renderer.init();
-        if (disposed) {
-          return;
+        if (viewMode === "3d") {
+          postProcessing = createViewportPostProcessing(gpuRenderer, scene, camera);
         }
         observeResize();
         seedAgents();
@@ -441,6 +420,9 @@ export function useSimulationViewportRenderer({
         setFps(Math.round(benchmarkFps));
         startRenderLoop();
       } catch (error) {
+        // Without this the 3D view stayed a black canvas: its status text is
+        // only drawn in 2D, and "detecting" shows no notice.
+        setRenderMode("failed");
         setStatus(
           error instanceof Error
             ? rawStatus(error.message)
@@ -450,7 +432,8 @@ export function useSimulationViewportRenderer({
     }
     sceneRef.current = scene;
     dynamicGroupRef.current = dynamicGroup;
-    crowdMeshRef.current = agents;
+    crowdMeshRef.current = figures?.group ?? agents ?? null;
+    lightRigRef.current = lightRig ?? null;
     start().catch((error: unknown) => {
       setStatus(
         error instanceof Error
@@ -463,26 +446,106 @@ export function useSimulationViewportRenderer({
       sceneRef.current = null;
       dynamicGroupRef.current = null;
       crowdMeshRef.current = null;
-      canvasElement.removeEventListener("pointerdown", onPointerDown);
-      canvasElement.removeEventListener("pointermove", onPointerMove);
-      canvasElement.removeEventListener("pointerup", onPointerUp);
-      canvasElement.removeEventListener("wheel", onWheel);
+      lightRigRef.current = null;
+      detachCameraControls?.();
+      if (placementRef.current === placement) placementRef.current = null;
+      placement?.dispose();
       window.cancelAnimationFrame(animationFrameId);
       window.clearInterval(watchdogTimerId);
       resizeObserver?.disconnect();
+      postProcessing?.dispose();
       renderer?.dispose();
       gpuDevice?.destroy();
-      agentGeometry.dispose();
-      agentMaterial.dispose();
-      floor.geometry.dispose();
-      floor.material.dispose();
-      walls.forEach((wall) => {
-        wall.geometry.dispose();
-        wall.material.dispose();
-      });
-      staticCityObjects.forEach(disposeRenderObject);
+      figures?.dispose();
+      agents?.geometry.dispose();
+      agents?.material.dispose();
+      lightRig?.dispose();
       dynamicGroup.children.slice().forEach(disposeRenderObject);
-      loadedBioCityAssets.forEach(disposeRenderObject);
+    };
+  }, [hasScene, viewMode, worldHeight, worldWidth]);
+  /*
+   * Scene layer: everything drawn from the scene's geometry. Rebuilt when the
+   * scene changes, inside the renderer layer's Three scene, without touching
+   * the GPU device, camera or render loop. Declared after the renderer layer so
+   * its Three scene exists when this runs.
+   */
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene || !crowdScene) {
+      return;
+    }
+    let disposed = false;
+    let loadedBioCityAssets: Object3D[] = [];
+    // The generated city brings its own ground in 3D.
+    const floor = viewMode === "3d" ? undefined : createFloor(crowdScene);
+    // The scene's walls. This used to be two hard-coded walls at fixed
+    // coordinates that belonged to no scene at all.
+    const walls = crowdScene.walls.flatMap((wall) => {
+      const points = wall.geometry.points;
+      return points
+        .slice(1)
+        .map((point, index) =>
+          createWall(
+            toRenderX(points[index].x, crowdScene),
+            toRenderY(points[index].y, crowdScene),
+            toRenderX(point.x, crowdScene),
+            toRenderY(point.y, crowdScene),
+            Math.max(0.2, wall.thickness),
+            viewMode,
+          ),
+        );
+    });
+    const city = viewMode === "3d" ? createCityObjects(crowdScene) : undefined;
+    const staticPlan = createBioCityRenderPlan(crowdScene, 0);
+    const staticCityObjects = createBioCityStaticObjects(
+      crowdScene,
+      viewMode,
+      staticPlan,
+    );
+    const owned: Object3D[] = [
+      ...(floor ? [floor] : []),
+      ...walls,
+      ...staticCityObjects,
+      ...(city?.objects ?? []),
+    ];
+    owned.forEach((object) => scene.add(object));
+    cityRef.current = city ?? null;
+    if (viewMode === "3d") {
+      void Promise.all(
+        // Baked streetscape scenes are superseded by the generated city; props
+        // (a bus shelter, a kiosk) still load onto it.
+        staticPlan.assets
+          .filter((asset) => asset.kind !== "gltf-scene")
+          .map(async (asset) => ({
+            asset,
+            object: await loadBioCityVisualAssetObject(asset, crowdScene),
+          })),
+      ).then((loadedAssets) => {
+        if (disposed) {
+          loadedAssets.forEach(({ object }) => object && disposeRenderObject(object));
+          return;
+        }
+        loadedBioCityAssets = loadedAssets.flatMap(({ asset, object }) => {
+          if (!object) {
+            return [];
+          }
+          scene.getObjectByName(asset.id)?.removeFromParent();
+          object.traverse((child) => {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          });
+          scene.add(object);
+          return [object];
+        });
+      });
+    }
+    return () => {
+      disposed = true;
+      if (cityRef.current === city) cityRef.current = null;
+      [...owned, ...loadedBioCityAssets].forEach((object) => {
+        object.removeFromParent();
+        disposeRenderObject(object);
+      });
     };
   }, [crowdScene, viewMode]);
   useEffect(() => {
@@ -507,11 +570,15 @@ export function useSimulationViewportRenderer({
       overlayPlan,
     );
     if (viewMode === "3d") {
-      objects.push(...createDayNightLights(crowdScene, bioCityVisualSecond));
+      lightRigRef.current?.setTime(
+        bioCityVisualSecond,
+        bioCityAtmosphere(plan, bioCityVisualSecond).overcast,
+      );
+      cityRef.current?.setNightLevel(cityNightLevel(bioCityVisualSecond));
     }
     objects.forEach((object) => dynamicGroup.add(object));
     applyViewportLayers(dynamicGroup, crowdMeshRef.current, layersRef.current);
-    scene.background = new Color(bioCityBackgroundColor(plan));
+    applyBioCityAtmosphere(scene, plan, bioCityVisualSecond, viewMode);
     return () => {
       objects.forEach((object) => {
         object.removeFromParent();

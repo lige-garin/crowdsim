@@ -14,5 +14,7 @@ describe("ScenarioComparisonPanel", () => {
     expect(screen.getByRole("heading", { name: "方案对比" })).toBeInTheDocument();
     expect(screen.getByText("基线")).toBeInTheDocument();
     expect(screen.getByText("出口加宽")).toBeInTheDocument();
-  });
+    // Renders by running two full scenario simulations synchronously: ~1.5 s
+    // alone, several times that when the whole suite shares the CPU.
+  }, 30_000);
 });

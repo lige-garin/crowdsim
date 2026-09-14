@@ -1,6 +1,6 @@
 import {
   createSimulationEngineFromScene,
-  type SimulationEngine,
+  type SceneSimulationEngine,
 } from "./simulationEngine";
 import type {
   SimulationWorkerRequest,
@@ -17,7 +17,7 @@ const workerScope = globalThis as unknown as {
   postMessage: (message: SimulationWorkerResponse) => void;
 };
 
-let engine: SimulationEngine | undefined;
+let engine: SceneSimulationEngine | undefined;
 let sharedMemory: SimulationWorkerSharedMemory | undefined;
 /**
  * Messages are handled one at a time. `init` awaits a dynamic import of the wasm
@@ -84,6 +84,11 @@ async function handleMessage(message: SimulationWorkerRequest) {
       return;
     }
 
+    if (message.type === "update-scene") {
+      postSnapshot(message.id, engine.updateScene(message.scene));
+      return;
+    }
+
     if (message.type === "tick") {
       postSnapshot(message.id, engine.tick(message.realDeltaSeconds));
       return;
@@ -99,7 +104,10 @@ async function handleMessage(message: SimulationWorkerRequest) {
   }
 }
 
-function postSnapshot(id: number, snapshot: ReturnType<SimulationEngine["snapshot"]>) {
+function postSnapshot(
+  id: number,
+  snapshot: ReturnType<SceneSimulationEngine["snapshot"]>,
+) {
   writeSimulationSharedMemory(sharedMemory, snapshot);
   workerScope.postMessage({
     id,

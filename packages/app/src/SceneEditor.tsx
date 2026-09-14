@@ -4,6 +4,7 @@
   useState,
   type ChangeEvent,
   type PointerEvent as ReactPointerEvent,
+  type SetStateAction,
 } from "react";
 import {
   parseScene,
@@ -25,18 +26,8 @@ import { useI18n, type LocalizedText } from "./i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
 import { addImportedBasemap, getActiveBasemap } from "./sceneEditorBasemap";
 import {
-  addBuilding,
-  addCountLine,
-  addEntrance,
-  addHazard,
-  addObstacle,
-  addRoad,
-  addServicePoint,
-  addShop,
-  addTarget,
-  addTransitStop,
   addWall,
-  addZone,
+  placeEditorTool,
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
   editorTools,
@@ -50,7 +41,7 @@ import { downloadSceneJson } from "./sceneFileExport";
 import { createSceneEditorParamActions } from "./SceneEditorParamActions";
 import { fileNameValues, makeStatus, sceneNameValues } from "./sceneEditorStatus";
 import { clamp, readFileAsDataUrl } from "./sceneEditorUtils";
-import type { SimulationSnapshot } from "./simulationEngine";
+import type { LiveCrowd } from "./liveCrowd";
 type DragState = {
   before: EditorDocument;
   id: string;
@@ -61,13 +52,16 @@ const gridSize = 2;
 const storageKey = "crowdsim.scene.v1";
 export function SceneEditor({
   heatmapCells = [],
+  hidden = false,
   onApplyScene,
   onToolChange,
   scene,
-  simulationSnapshot,
+  crowd,
   tool: controlledTool,
 }: {
   heatmapCells?: readonly HeatmapCell[];
+  /** Hidden while the stage shows another view; state is kept. */
+  hidden?: boolean;
   /**
    * Called with the editor's working scene when the user explicitly asks to
    * apply it. Deliberately NOT called on every edit: restarting the simulation
@@ -77,7 +71,8 @@ export function SceneEditor({
   /** Notified whenever the active tool changes, including internal resets. */
   onToolChange?: (tool: EditorTool) => void;
   scene: CrowdSimScene;
-  simulationSnapshot?: SimulationSnapshot;
+  /** The live crowd to draw over the plan (liveCrowd). */
+  crowd?: LiveCrowd;
   /** Optional controlled tool, so a shell toolbar can drive the editor. */
   tool?: EditorTool;
 }) {
@@ -92,6 +87,27 @@ export function SceneEditor({
   const [aiImageOverlay, setAiImageOverlay] = useState<SceneImageOverlay | null>(null);
   const [templatePrompt, setAiPrompt] = useState("");
   const [document, setDocument] = useState(() => createEditorDocumentFromScene(scene));
+  /*
+   * Keeping the editor in step with the live scene.
+   *
+   * The editor stays mounted while other views are shown, and the live scene
+   * can change meanwhile — a building placed in 3D, an undo there. `lift`
+   * records which live scene the document was taken from and the document as
+   * taken. When the live scene changes:
+   *  - to exactly what this editor applied: nothing to do;
+   *  - while the document is untouched: take the new scene silently;
+   *  - while it holds edits: keep them and warn, because "apply" would now
+   *    overwrite the outside change. The user can reload the live scene.
+   * Tracked in state and adjusted during render (React's pattern for deriving
+   * from a changed prop), so the stale document is never rendered.
+   */
+  const [lift, setLift] = useState(() => ({
+    document,
+    from: scene as CrowdSimScene | null,
+  }));
+  const [seenScene, setSeenScene] = useState(scene);
+  const [appliedScene, setAppliedScene] = useState<CrowdSimScene | null>(null);
+  const [liveSceneChanged, setLiveSceneChanged] = useState(false);
   const [draftWallPoints, setDraftWallPoints] = useState<ScenePoint[]>([]);
   const [redoStack, setRedoStack] = useState<EditorDocument[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -110,6 +126,54 @@ export function SceneEditor({
       ? false
       : localStorage.getItem(storageKey) !== null,
   );
+  if (scene !== seenScene) {
+    setSeenScene(scene);
+    if (scene === appliedScene) {
+      setLift({ document, from: scene });
+      setLiveSceneChanged(false);
+    } else if (
+      lift.from !== null &&
+      document === lift.document &&
+      draftWallPoints.length === 0
+    ) {
+      takeLiveScene();
+    } else {
+      setLiveSceneChanged(true);
+    }
+  }
+  /** Replace the working document with the live scene, forgetting its history. */
+  function takeLiveScene() {
+    const lifted = createEditorDocumentFromScene(scene);
+    setBaseScene(scene);
+    setDocument(lifted);
+    setLift({ document: lifted, from: scene });
+    setUndoStack([]);
+    setRedoStack([]);
+    setSelectedId(null);
+  }
+  function reloadLiveScene() {
+    takeLiveScene();
+    setLiveSceneChanged(false);
+    setAiImageOverlay(null);
+    setDraftWallPoints([]);
+    setParamEditTarget(null);
+  }
+  // The entity a run of parameter edits belongs to; consecutive edits of the
+  // same entity collapse into one undo step (typing "120" is one change, not
+  // three). Any other document change ends the run.
+  const [paramEditTarget, setParamEditTarget] = useState<string | null>(null);
+  function editParameters(update: SetStateAction<EditorDocument>) {
+    const next = typeof update === "function" ? update(document) : update;
+    if (next === document) {
+      return;
+    }
+    if (paramEditTarget !== (selectedId ?? "")) {
+      setUndoStack((stack) => [...stack, document]);
+      setParamEditTarget(selectedId ?? "");
+    }
+    setRedoStack([]);
+    setDocument(next);
+  }
   function setTool(nextTool: EditorTool) {
     setUncontrolledTool(nextTool);
     onToolChange?.(nextTool);
@@ -128,12 +192,14 @@ export function SceneEditor({
     return [baseScene, ...scenes];
   }, [baseScene, scene]);
   const visibleHeatmapCells = baseScene.id === scene.id ? heatmapCells : [];
-  const visibleLiveAgents =
-    baseScene.id === scene.id ? (simulationSnapshot?.agents ?? []) : [];
+  const visibleCrowd = baseScene.id === scene.id ? crowd : undefined;
   const selectedShop = document.shops.find((shop) => shop.id === selectedId);
   const selectedRoad = document.roads.find((road) => road.id === selectedId);
   const selectedBuilding = document.buildings.find(
     (building) => building.id === selectedId,
+  );
+  const selectedEntrance = document.entrances.find(
+    (entrance) => entrance.id === selectedId,
   );
   const selectedTransitStop = document.transitStops.find(
     (stop) => stop.id === selectedId,
@@ -148,8 +214,12 @@ export function SceneEditor({
   );
   const selectedCountLine = document.countLines.find((line) => line.id === selectedId);
   function replaceScene(nextScene: CrowdSimScene, status: LocalizedText) {
+    const replaced = createEditorDocumentFromScene(nextScene);
     setBaseScene(nextScene);
-    setDocument(createEditorDocumentFromScene(nextScene));
+    setDocument(replaced);
+    // Not lifted from the live scene: a later outside change must not replace it.
+    setLift({ document: replaced, from: null });
+    setParamEditTarget(null);
     // The overlay describes one specific image; it says nothing about the next
     // scene's basemap, so it does not survive a scene swap.
     setAiImageOverlay(null);
@@ -164,6 +234,8 @@ export function SceneEditor({
     // Hand the editor's working copy upward; the shell owns the live scene and
     // re-inits the simulation with it.
     onApplyScene?.(currentScene);
+    setAppliedScene(currentScene);
+    setLiveSceneChanged(false);
     setStorageStatus(makeStatus("sceneApplied"));
   }
   function switchTool(nextTool: EditorTool) {
@@ -171,6 +243,7 @@ export function SceneEditor({
     setDraftWallPoints([]);
   }
   function commit(nextDocument: EditorDocument) {
+    setParamEditTarget(null);
     setUndoStack((stack) => [...stack, document]);
     setRedoStack([]);
     setDocument(nextDocument);
@@ -180,6 +253,7 @@ export function SceneEditor({
     if (!previous) {
       return;
     }
+    setParamEditTarget(null);
     setRedoStack((stack) => [...stack, document]);
     setUndoStack((stack) => stack.slice(0, -1));
     setDocument(previous);
@@ -191,6 +265,7 @@ export function SceneEditor({
     if (!next) {
       return;
     }
+    setParamEditTarget(null);
     setUndoStack((stack) => [...stack, document]);
     setRedoStack((stack) => stack.slice(0, -1));
     setDocument(next);
@@ -236,47 +311,10 @@ export function SceneEditor({
       setDraftWallPoints((points) => [...points, point]);
       return;
     }
-    if (tool === "zone") {
-      commit(addZone(document, point));
-      return;
+    const placed = placeEditorTool(document, tool, point);
+    if (placed) {
+      commit(placed);
     }
-    if (tool === "road") {
-      commit(addRoad(document, point));
-      return;
-    }
-    if (tool === "building") {
-      commit(addBuilding(document, point));
-      return;
-    }
-    if (tool === "source" || tool === "sink") {
-      commit(addEntrance(document, tool, point));
-      return;
-    }
-    if (tool === "shop") {
-      commit(addShop(document, point));
-      return;
-    }
-    if (tool === "transitStop") {
-      commit(addTransitStop(document, point));
-      return;
-    }
-    if (tool === "counter" || tool === "gate") {
-      commit(addServicePoint(document, tool, point));
-      return;
-    }
-    if (tool === "obstacle") {
-      commit(addObstacle(document, point));
-      return;
-    }
-    if (tool === "hazard") {
-      commit(addHazard(document, point));
-      return;
-    }
-    if (tool === "countLine") {
-      commit(addCountLine(document, point));
-      return;
-    }
-    commit(addTarget(document, point));
   }
   function handleEntityPointerDown(event: ReactPointerEvent<SVGElement>, id: string) {
     if (tool !== "select") {
@@ -315,6 +353,7 @@ export function SceneEditor({
       return;
     }
     if (drag.moved) {
+      setParamEditTarget(null);
       setUndoStack((stack) => [...stack, drag.before]);
       setRedoStack([]);
     }
@@ -472,13 +511,17 @@ export function SceneEditor({
     selectedRoad,
     selectedServicePoint,
     selectedShop,
+    selectedEntrance,
     selectedTransitStop,
     selectedZone,
     setBaseScene,
-    setDocument,
+    // Parameter edits are real edits: undoable, one step per entity.
+    setDocument: editParameters,
   });
   return (
     <SceneEditorLayout
+      hidden={hidden}
+      onReloadLiveScene={liveSceneChanged ? reloadLiveScene : undefined}
       aiImageOverlay={aiImageOverlay}
       templatePrompt={templatePrompt}
       basemap={activeBasemap}
@@ -494,7 +537,7 @@ export function SceneEditor({
       geoJsonInputRef={geoJsonInputRef}
       gridSize={gridSize}
       language={language}
-      liveAgents={visibleLiveAgents}
+      crowd={visibleCrowd}
       onTemplateDraft={applyTemplateDraft}
       onTemplatePromptChange={setAiPrompt}
       onApplyScene={applySceneToSimulation}
@@ -538,6 +581,8 @@ export function SceneEditor({
       onToggleSnap={() => setSnapEnabled((value) => !value)}
       onToggleTransitStopActive={paramActions.toggleTransitStopActive}
       onToolChange={switchTool}
+      onEntranceKindChange={paramActions.updateEntranceKind}
+      onEntranceNumberChange={paramActions.updateEntranceNumber}
       onTransitStopKindChange={paramActions.updateTransitStopKind}
       onTransitStopNumberChange={paramActions.updateTransitStopNumber}
       onUndo={undo}
@@ -546,6 +591,7 @@ export function SceneEditor({
       selectableScenes={selectableScenes}
       selectedBuilding={selectedBuilding}
       selectedCountLine={selectedCountLine}
+      selectedEntrance={selectedEntrance}
       selectedHazard={selectedHazard}
       selectedId={selectedId}
       selectedLabel={selectedLabel}

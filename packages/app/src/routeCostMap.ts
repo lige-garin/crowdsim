@@ -104,7 +104,7 @@ function attractionForZone(scene: CrowdSimScene, zoneId: string) {
   );
 }
 
-function pointInPolygon(point: ScenePoint, polygon: readonly ScenePoint[]) {
+export function pointInPolygon(point: ScenePoint, polygon: readonly ScenePoint[]) {
   let inside = false;
 
   for (

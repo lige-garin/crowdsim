@@ -15,34 +15,113 @@ export type MovementConstraintResult = {
 const intersectionEpsilon = 1e-6;
 const contactEpsilonMeters = 1e-6;
 
+/**
+ * Doorway cut into a building footprint at each declared entrance. The scene
+ * schema has no door width, so this is a typical shopfront/arcade opening.
+ */
+export const buildingDoorwayWidthMeters = 3;
+
+/**
+ * An entrance this close to a footprint edge opens that edge. Shops in an
+ * arcade often mark their door a step or two out on the pavement rather than
+ * exactly on the facade line.
+ */
+export const doorwaySnapMeters = 2.5;
+
+/**
+ * Every line an agent cannot walk through: walls, obstacles that block
+ * movement, blocked areas, non-walkable zones, and building footprints.
+ *
+ * Only `scene.walls` used to count, so a construction barrier, a building or a
+ * closed-off area was drawn and analysed but walked straight through.
+ *
+ * Buildings are entered, not just walked around (shops sit inside arcades), so
+ * a footprint gets a doorway at the building's own entrance and at every shop
+ * entrance on its facade. A building with no entrance near its edge is solid.
+ */
 export function wallSegmentsFromScene(scene: CrowdSimScene): WallSegment[] {
-  return scene.walls.flatMap((wall) => {
-    const points = wall.geometry.points;
-    const segments: WallSegment[] = [];
+  const segments = scene.walls.flatMap((wall) =>
+    pathSegments(wall.geometry.points, wall.geometry.type === "polygon"),
+  );
 
-    for (let index = 1; index < points.length; index++) {
-      segments.push({
-        x1: points[index - 1].x,
-        y1: points[index - 1].y,
-        x2: points[index].x,
-        y2: points[index].y,
-      });
+  for (const obstacle of scene.obstacles) {
+    if (!obstacle.blocksMovement) continue;
+    const { points, type } = obstacle.geometry;
+    segments.push(...pathSegments(points, type === "polygon"));
+  }
+  for (const area of scene.areas) {
+    if (area.kind === "blocked")
+      segments.push(...pathSegments(area.geometry.points, true));
+  }
+  for (const zone of scene.zones) {
+    if (!zone.walkable) segments.push(...pathSegments(zone.geometry.points, true));
+  }
+
+  const doors = [
+    ...scene.buildings.flatMap((building) => building.entrancePosition ?? []),
+    ...scene.shops.flatMap((shop) => shop.entrancePosition ?? []),
+  ];
+  for (const building of scene.buildings) {
+    for (const edge of pathSegments(building.footprint.points, true)) {
+      segments.push(...cutDoorways(edge, doors));
     }
+  }
 
-    if (wall.geometry.type === "polygon") {
-      const first = points[0];
-      const last = points[points.length - 1];
+  return segments;
+}
 
-      segments.push({
-        x1: last.x,
-        y1: last.y,
-        x2: first.x,
-        y2: first.y,
-      });
-    }
+function pathSegments(points: readonly ScenePoint[], closed: boolean): WallSegment[] {
+  const segments: WallSegment[] = [];
 
-    return segments;
+  for (let index = 1; index < points.length; index++) {
+    segments.push({
+      x1: points[index - 1].x,
+      y1: points[index - 1].y,
+      x2: points[index].x,
+      y2: points[index].y,
+    });
+  }
+
+  if (closed && points.length > 2) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    segments.push({ x1: last.x, y1: last.y, x2: first.x, y2: first.y });
+  }
+
+  return segments;
+}
+
+/** What is left of `edge` once a doorway is cut at each door close to it. */
+function cutDoorways(edge: WallSegment, doors: readonly ScenePoint[]): WallSegment[] {
+  const dx = edge.x2 - edge.x1;
+  const dy = edge.y2 - edge.y1;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return [];
+
+  const half = buildingDoorwayWidthMeters / 2;
+  const gaps: [number, number][] = [];
+  for (const door of doors) {
+    const along = ((door.x - edge.x1) * dx + (door.y - edge.y1) * dy) / length;
+    const across = Math.abs((door.x - edge.x1) * dy - (door.y - edge.y1) * dx) / length;
+    if (along < 0 || along > length || across > doorwaySnapMeters) continue;
+    gaps.push([along - half, along + half]);
+  }
+  gaps.sort((a, b) => a[0] - b[0]);
+
+  const piece = (from: number, to: number): WallSegment => ({
+    x1: edge.x1 + (dx * from) / length,
+    y1: edge.y1 + (dy * from) / length,
+    x2: edge.x1 + (dx * to) / length,
+    y2: edge.y1 + (dy * to) / length,
   });
+  const pieces: WallSegment[] = [];
+  let from = 0;
+  for (const [gapStart, gapEnd] of gaps) {
+    if (gapStart > from) pieces.push(piece(from, gapStart));
+    from = Math.max(from, gapEnd);
+  }
+  if (from < length) pieces.push(piece(from, length));
+  return pieces;
 }
 
 export function constrainMovement(

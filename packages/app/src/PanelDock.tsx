@@ -23,13 +23,15 @@ export function PanelDock({
         className="panel-dock-nav"
       >
         <span className="panel-dock-hint">
-          {language === "zh" ? "分析面板" : "Panels"}
+          <strong>{language === "zh" ? "工具与实验" : "Tools & experiments"}</strong>
+          <small>{language === "zh" ? "次级工作区" : "Secondary workspace"}</small>
         </span>
         {panelRegistry.map((entry) => (
           <button
             key={entry.id}
             type="button"
             data-testid={`panel-chip-${entry.id}`}
+            data-source={entry.dataSource}
             aria-pressed={entry.id === activeId}
             onClick={() =>
               setActiveId((current) => (current === entry.id ? null : entry.id))

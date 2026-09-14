@@ -34,6 +34,8 @@ export type ValidationReport = {
   generatedAtIso: string;
   commercialValidation?: CommercialValidationBundle;
   residualProjectionValidation: ResidualProjectionValidationReport;
+  /** The user's scene the commercial section describes, when one was given. */
+  sceneName?: string;
   notes: string[];
   pedestrianPresetSummaries: ReturnType<typeof createPedestrianPresetSummary>[];
   referenceLinks: {
@@ -77,7 +79,15 @@ export function createValidationReport(
     residualProjectionValidation: createReportResidualProjectionValidation(
       benchmarkResults[0],
     ),
+    sceneName: options.commercialScene
+      ? (options.commercialScene.name ?? options.commercialScene.id)
+      : undefined,
     notes: [
+      ...(options.commercialScene
+        ? [
+            "Benchmark scenarios are engine regression fixtures and do not describe this scene; the commercial section does.",
+          ]
+        : []),
       "Current M5 fixtures are deterministic regression baselines for the browser engine.",
       "Wall-aware routing and empirical calibration should be tightened before these results are treated as certified RiMEA validation.",
       "The residual projection is fitted to the same trajectory target it is scored against, so its improvement is an in-sample fit, not held-out validation.",
@@ -115,6 +125,7 @@ export function renderValidationReportHtml(
           pass: "通过",
           presets: "人群参数",
           references: "参考来源",
+          scene: "场景",
           speed: "平均速度",
           speedDensity: "密度-速度对比",
           status: "状态",
@@ -130,6 +141,7 @@ export function renderValidationReportHtml(
           pass: "Pass",
           presets: "Pedestrian presets",
           references: "References",
+          scene: "Scene",
           speed: "Mean speed",
           speedDensity: "Density-speed comparison",
           status: "Status",
@@ -158,6 +170,7 @@ export function renderValidationReportHtml(
 </head>
 <body>
   <h1>${escapeHtml(labels.title)}</h1>
+  ${report.sceneName ? `<p>${escapeHtml(labels.scene)}: ${escapeHtml(report.sceneName)}</p>` : ""}
   <p>${escapeHtml(labels.generated)}: ${escapeHtml(report.generatedAtIso)}</p>
   <div class="summary">
     <span><strong>${report.benchmarkSummary.passCount}</strong>${escapeHtml(labels.pass)}</span>

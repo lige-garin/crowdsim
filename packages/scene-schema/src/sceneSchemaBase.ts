@@ -36,6 +36,11 @@ export const entranceSchema = z.object({
   position: pointSchema,
   width: z.number().positive(),
   arrivalRatePerMinute: z.number().nonnegative().default(0),
+  /**
+   * Exits that people arriving here may leave by (ADR-0008). Absent or empty:
+   * any exit. Evacuation ignores it.
+   */
+  exitIds: z.array(idSchema).optional(),
 });
 
 export const areaSchema = z.object({
@@ -335,6 +340,11 @@ export const servicePointSchema = z.object({
   width: z.number().positive().default(3),
   serviceMeanSeconds: z.number().positive().default(30),
   capacityPerMinute: z.number().nonnegative().default(60),
+  /**
+   * People served at once (ADR-0008). Absent: derived from the declared
+   * capacity, max(1, round(capacityPerMinute × serviceMeanSeconds / 60)).
+   */
+  servers: z.number().int().positive().optional(),
 });
 
 export const countLineSchema = z.object({

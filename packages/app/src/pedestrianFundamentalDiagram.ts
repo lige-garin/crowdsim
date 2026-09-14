@@ -59,18 +59,21 @@ export function weidmannSpeedAtDensity(densityPerSquareMeter: number): number {
 }
 
 /**
- * The same curve expressed as a fraction of free-flow speed. The engine uses
- * this form so an explicit speed (scene field, industry template, benchmark
- * override) still sets the absolute pace while the *shape* stays the
- * literature one: a walker at 2 P/m² keeps ~45% of its speed, at 4 P/m² ~12%,
- * and at the jam density none of it.
+ * The most people per second a metre of width lets through on Weidmann's curve:
+ * the peak of specific flow J = ρ·v(ρ), found numerically (≈1.22 P/(m·s) near
+ * 1.75 P/m²). Used as the capacity of a doorway or entrance.
  */
-export function weidmannSpeedRatioAtDensity(densityPerSquareMeter: number): number {
-  return (
-    weidmannSpeedAtDensity(densityPerSquareMeter) /
-    weidmannFundamentalDiagram.freeFlowSpeedMetersPerSecond
-  );
-}
+export const weidmannMaxSpecificFlow = (() => {
+  let best = 0;
+  for (
+    let density = 0.01;
+    density < weidmannFundamentalDiagram.jamDensityPerSquareMeter;
+    density += 0.01
+  ) {
+    best = Math.max(best, density * weidmannSpeedAtDensity(density));
+  }
+  return best;
+})();
 
 export type SpeedDensitySample = {
   densityPerSquareMeter: number;
@@ -111,4 +114,30 @@ export function maxAbsoluteWeidmannDeviation(
     (worst, entry) => Math.max(worst, Math.abs(entry.deltaMetersPerSecond)),
     0,
   );
+}
+
+/**
+ * The SFPE hydraulic model for level corridors: S = k(1 − a·D) with
+ * k = 1.40 m/s and a = 0.266 m², for densities D from 0.54 to 3.8 P/m². Below
+ * 0.54 people walk at 0.85k (1.19 m/s, where the line meets); above 3.8 the
+ * formula reaches zero and the flow stops.
+ *
+ * SOURCE NOTE: the constants are those of the hydraulic model in the SFPE
+ * Handbook of Fire Protection Engineering (egress chapter, after Nelson and
+ * Mowrer), as widely reproduced by egress tools. They are used here only as a
+ * second, independent reference curve — nothing is fitted to them. Check them
+ * against the handbook edition you cite before quoting results.
+ */
+export const sfpeCorridorModel = {
+  k: 1.4,
+  a: 0.266,
+  minDensity: 0.54,
+  maxDensity: 3.8,
+} as const;
+
+export function sfpeCorridorSpeedAtDensity(densityPerSquareMeter: number): number {
+  const { a, k, maxDensity, minDensity } = sfpeCorridorModel;
+  if (densityPerSquareMeter >= maxDensity) return 0;
+  const density = Math.max(minDensity, densityPerSquareMeter);
+  return Math.max(0, k * (1 - a * density));
 }

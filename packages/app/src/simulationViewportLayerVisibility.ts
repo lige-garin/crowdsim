@@ -1,9 +1,9 @@
-﻿import { Group, InstancedMesh } from "three";
+﻿import type { Group, Object3D } from "three";
 import { viewportLayerOfObjectName, type ViewportLayers } from "./viewportLayers";
 
 export function applyViewportLayers(
   dynamicGroup: Group | null,
-  crowdMesh: InstancedMesh | null,
+  crowdMesh: Object3D | null,
   layers: ViewportLayers,
 ) {
   if (crowdMesh) {

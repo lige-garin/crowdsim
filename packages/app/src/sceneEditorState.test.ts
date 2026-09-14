@@ -386,3 +386,34 @@ describe("scene editor state", () => {
     expect(exampleScenes.every((scene) => scene.entrances.length > 0)).toBe(true);
   });
 });
+
+describe("editor round-trip of ADR-0008 fields", () => {
+  it("keeps an entrance's allowed exits and a counter's servers and name", () => {
+    const scene = {
+      ...demoScene,
+      entrances: demoScene.entrances.map((entrance, index) =>
+        index === 0 ? { ...entrance, exitIds: ["somewhere"] } : entrance,
+      ),
+      servicePoints: [
+        {
+          capacityPerMinute: 60,
+          id: "till",
+          kind: "counter" as const,
+          name: "Main tills",
+          position: { x: 4, y: 4 },
+          serviceMeanSeconds: 30,
+          servers: 4,
+          width: 3,
+        },
+      ],
+    };
+
+    const back = createSceneFromEditorDocument(
+      scene,
+      createEditorDocumentFromScene(scene),
+    );
+
+    expect(back.entrances[0].exitIds).toEqual(["somewhere"]);
+    expect(back.servicePoints[0]).toMatchObject({ name: "Main tills", servers: 4 });
+  });
+});

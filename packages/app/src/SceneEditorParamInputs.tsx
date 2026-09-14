@@ -1,4 +1,6 @@
-﻿export function NumberInput({
+﻿import { useState } from "react";
+
+export function NumberInput({
   label,
   min,
   onChange,
@@ -11,6 +13,10 @@
   step: number;
   value: number;
 }) {
+  // What the user is typing, while they type. Reporting every keystroke as a
+  // number turned an emptied field into 0 (which mutations then clamp) and
+  // snapped the input back, so a value could not be cleared and retyped.
+  const [draft, setDraft] = useState<string | null>(null);
   return (
     <label>
       {label}
@@ -18,8 +24,16 @@
         type="number"
         min={min}
         step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        value={draft ?? String(value)}
+        onChange={(event) => {
+          const raw = event.target.value;
+          setDraft(raw);
+          const parsed = Number(raw);
+          if (raw.trim() !== "" && Number.isFinite(parsed)) {
+            onChange(parsed);
+          }
+        }}
+        onBlur={() => setDraft(null)}
       />
     </label>
   );

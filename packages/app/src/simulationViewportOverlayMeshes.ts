@@ -11,6 +11,7 @@ import { viewportLayerObjectPrefix } from "./viewportLayers";
 import type { ViewMode } from "./simulationViewportTypes";
 import { toRenderX, toRenderY } from "./simulationViewportGeometry";
 import { createLineLikeMesh } from "./simulationViewportPrimitiveMeshes";
+import { createRainField } from "./rainField";
 
 export function createBioCityOverlayObjects(
   scene: CrowdSimScene,
@@ -34,30 +35,38 @@ export function createBioCityWeatherObjects(
   viewMode: ViewMode,
   plan: BioCityRenderPlan,
 ) {
-  const rainObjects = plan.weather.rainStreaks.map((line) =>
-    createWeatherLineMesh(line, scene, "#2563eb", 0.22 + line.intensity * 0.38, 0.08),
-  );
-  const windObjects = plan.weather.windIndicators.map((line) =>
-    createWeatherLineMesh(line, scene, "#0f766e", 0.35 + line.intensity * 0.45, 0.18),
-  );
-
-  if (plan.weather.fogOpacity <= 0 || viewMode !== "3d") {
-    return [...rainObjects, ...windObjects];
+  if (viewMode === "3d") {
+    const intensity = plan.weather.precipitationIntensity;
+    if (intensity <= 0) return [];
+    const margin = 20;
+    const halfWidth = scene.world.width / 2 + margin;
+    const halfHeight = scene.world.height / 2 + margin;
+    return [
+      createRainField({
+        bounds: {
+          maxX: halfWidth,
+          maxY: halfHeight,
+          minX: -halfWidth,
+          minY: -halfHeight,
+        },
+        intensity,
+        name: `${viewportLayerObjectPrefix.weather}-rain`,
+        seed: scene.seed,
+        // The plan's wind is scene-space (y down) and scaled to 1 at 20 m/s;
+        // streaks drift at a fraction of that so the rain leans, not blows.
+        wind: { x: plan.weather.windVector.x * 6, y: -plan.weather.windVector.y * 6 },
+      }),
+    ];
   }
 
-  const fog = new Mesh(
-    new PlaneGeometry(scene.world.width, scene.world.height),
-    new MeshBasicMaterial({
-      color: "#dbe4df",
-      opacity: Math.min(0.38, plan.weather.fogOpacity),
-      transparent: true,
-    }),
-  );
-
-  fog.name = `${viewportLayerObjectPrefix.weather}-fog-veil`;
-  fog.position.set(0, 0, 2.2);
-
-  return [...rainObjects, ...windObjects, fog];
+  return [
+    ...plan.weather.rainStreaks.map((line) =>
+      createWeatherLineMesh(line, scene, "#2563eb", 0.22 + line.intensity * 0.38, 0.08),
+    ),
+    ...plan.weather.windIndicators.map((line) =>
+      createWeatherLineMesh(line, scene, "#0f766e", 0.35 + line.intensity * 0.45, 0.18),
+    ),
+  ];
 }
 
 function createHeatmapOverlayMesh(

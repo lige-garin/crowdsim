@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { demoScene } from "./demoScene";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
+import { createLiveCrowd } from "./liveCrowd";
 import { createEditorDocumentFromScene } from "./sceneEditorState";
 
 afterEach(() => {
@@ -20,17 +21,20 @@ describe("SceneEditorCanvas", () => {
         document={createEditorDocumentFromScene(demoScene)}
         draftWallPoints={[]}
         gridSize={2}
-        liveAgents={[
-          {
-            id: 7,
-            targetX: 76,
-            targetY: 24,
-            vx: 1.5,
-            vy: -0.5,
-            x: 8,
-            y: 44,
+        crowd={createLiveCrowd({
+          snapshot: {
+            agentCount: 1,
+            agents: [
+              { id: 7, targetX: 76, targetY: 24, vx: 1.5, vy: -0.5, x: 8, y: 44 },
+            ],
+            elapsedSeconds: 0,
+            exitedCount: 0,
+            spawnedCount: 1,
+            status: "running",
+            stepCount: 0,
+            timeScale: 1,
           },
-        ]}
+        })}
         onCanvasPointerDown={vi.fn()}
         onEntityPointerDown={vi.fn()}
         onPointerMove={vi.fn()}
@@ -56,7 +60,6 @@ describe("SceneEditorCanvas", () => {
         document={createEditorDocumentFromScene(bioCityDemoScene)}
         draftWallPoints={[]}
         gridSize={2}
-        liveAgents={[]}
         onCanvasPointerDown={vi.fn()}
         onEntityPointerDown={vi.fn()}
         onPointerMove={vi.fn()}

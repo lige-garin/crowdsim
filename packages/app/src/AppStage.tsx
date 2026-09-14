@@ -1,19 +1,13 @@
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { lazy, Suspense } from "react";
+import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { lazy, Suspense, useState } from "react";
 import { ContactNetworkView } from "./ContactNetworkView";
 import { buildCrowdContactNetwork } from "./crowdContactNetwork";
-import {
-  formatSimulationClock,
-  formatStageViewButton,
-  formatStageViewMode,
-} from "./appUi";
+import { formatSimulationClock } from "./appUi";
 import type { HeatmapCell } from "./heatmap";
 import type { Language, TranslationKey } from "./i18n";
 import { SceneEditor } from "./SceneEditor";
-import type { StageViewMode } from "./AppTypes";
-import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
-import type { SimulationSnapshot } from "./simulationEngine";
-import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
+import type { StageTab, StageViewMode } from "./AppTypes";
+import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import type { EditorTool } from "./sceneEditorState";
 import type { ViewportLayers } from "./viewportLayers";
 
@@ -23,6 +17,8 @@ const SimulationViewport = lazy(() =>
   })),
 );
 
+const noHeatmapCells: readonly HeatmapCell[] = [];
+
 type AppStageProps = {
   editorTool: EditorTool;
   heatmapCells: readonly HeatmapCell[];
@@ -30,86 +26,70 @@ type AppStageProps = {
   layers: ViewportLayers;
   onApplyScene: (scene: CrowdSimScene) => void;
   onEditorToolChange: (tool: EditorTool) => void;
-  onViewModeChange: (viewMode: StageViewMode) => void;
+  onPlaceInWorld: (tool: EditorTool, point: ScenePoint) => void;
+  /** The live crowd, read by subscription rather than passed down (liveCrowd). */
+  crowd: LiveCrowd;
   scene: CrowdSimScene;
-  sharedAgentOverlay?: ViewportAgentOverlayFrame;
-  simulationSnapshot: SimulationSnapshot;
-  runtime: SimulationRuntimeArtifact;
+  stageTab: StageTab;
   t: (key: TranslationKey) => string;
   viewMode: StageViewMode;
 };
 
 export function AppStage({
+  crowd,
   editorTool,
   heatmapCells,
   language,
   layers,
   onApplyScene,
   onEditorToolChange,
-  onViewModeChange,
+  onPlaceInWorld,
   scene,
-  sharedAgentOverlay,
-  simulationSnapshot,
-  runtime,
+  stageTab,
   t,
   viewMode,
 }: AppStageProps) {
-  const telemetry = [
-    {
-      label: language === "zh" ? "人数" : "Agents",
-      value: simulationSnapshot.agentCount.toLocaleString(),
-    },
-    {
-      label: language === "zh" ? "离场" : "Exited",
-      value: simulationSnapshot.exitedCount.toLocaleString(),
-    },
-    {
-      label: language === "zh" ? "时钟" : "Clock",
-      value: formatSimulationClock(simulationSnapshot.elapsedSeconds),
-    },
-    {
-      label: language === "zh" ? "内核" : "Kernel",
-      value: `${runtime.thread}/${runtime.sharedMemory}`,
-    },
-  ];
-
+  const { snapshot } = useLiveCrowd(crowd);
+  const elapsedSeconds = snapshot?.elapsedSeconds ?? 0;
   // The rail shows progress through a rolling hour rather than pretending to
   // know a wall-clock start time.
   const elapsedWindowSeconds = 3600;
   const elapsedFraction = Math.min(
     1,
-    Math.max(0, simulationSnapshot.elapsedSeconds / elapsedWindowSeconds),
+    Math.max(0, elapsedSeconds / elapsedWindowSeconds),
   );
 
+  const editing = stageTab === "edit";
+  // Mounted on first use and then kept, hidden, while another view shows: it
+  // holds unapplied work (drafted walls, its undo history, parameter edits)
+  // that unmounting threw away the moment the user glanced at the city.
+  const [editorOpened, setEditorOpened] = useState(editing);
+  if (editing && !editorOpened) {
+    setEditorOpened(true);
+  }
+
   return (
-    <section className="stage" aria-label={t("simulationViewport")}>
+    <section
+      className={`stage stage-${viewMode} stage-tab-${stageTab}`}
+      aria-label={t("simulationViewport")}
+    >
       <div className="stage-stack">
-        <div className="stage-toolbar" aria-label={t("viewMode")}>
-          <span>{formatStageViewMode(viewMode, language, t)}</span>
-          <div className="view-mode-toggle">
-            {(["2d", "3d", "network"] as const).map((mode) => (
-              <button
-                type="button"
-                key={mode}
-                aria-pressed={viewMode === mode}
-                onClick={() => onViewModeChange(mode)}
-              >
-                {formatStageViewButton(mode, language)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="stage-telemetry" aria-label="Live telemetry">
-          {telemetry.map((item) => (
-            <article key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
-          ))}
-        </div>
-        {viewMode === "network" ? (
+        {editorOpened ? (
+          <SceneEditor
+            // While hidden it gets no live crowd, so it does not redraw two
+            // thousand agents nobody can see.
+            heatmapCells={editing ? heatmapCells : noHeatmapCells}
+            hidden={!editing}
+            onApplyScene={onApplyScene}
+            onToolChange={onEditorToolChange}
+            scene={scene}
+            crowd={editing ? crowd : undefined}
+            tool={editorTool}
+          />
+        ) : null}
+        {editing ? null : viewMode === "network" ? (
           <ContactNetworkView
-            network={buildCrowdContactNetwork(simulationSnapshot.agents, {
+            network={buildCrowdContactNetwork(snapshot?.agents ?? [], {
               worldWidth: scene.world.width,
               worldHeight: scene.world.height,
             })}
@@ -128,9 +108,10 @@ export function AppStage({
               <SimulationViewport
                 heatmapCells={heatmapCells}
                 layers={layers}
+                onPlace={onPlaceInWorld}
+                placementTool={viewMode === "3d" ? editorTool : undefined}
                 scene={scene}
-                sharedAgentOverlay={sharedAgentOverlay}
-                snapshot={simulationSnapshot}
+                crowd={crowd}
                 viewMode={viewMode}
               />
             </Suspense>
@@ -155,22 +136,14 @@ export function AppStage({
                   aria-valuemax={elapsedWindowSeconds}
                   aria-valuenow={Math.min(
                     elapsedWindowSeconds,
-                    Math.floor(simulationSnapshot.elapsedSeconds),
+                    Math.floor(elapsedSeconds),
                   )}
                 >
                   <span style={{ width: `${elapsedFraction * 100}%` }} />
                 </div>
-                <span>{formatSimulationClock(simulationSnapshot.elapsedSeconds)}</span>
+                <span>{formatSimulationClock(elapsedSeconds)}</span>
               </div>
             </div>
-            <SceneEditor
-              heatmapCells={heatmapCells}
-              onApplyScene={onApplyScene}
-              onToolChange={onEditorToolChange}
-              scene={scene}
-              simulationSnapshot={simulationSnapshot}
-              tool={editorTool}
-            />
           </>
         )}
       </div>

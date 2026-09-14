@@ -15,6 +15,7 @@ function renderDock() {
       <PanelDock
         language="zh"
         context={{
+          scene: bioCityDemoScene,
           trajectoryRecording: createTrajectoryRecording({
             id: "test",
             runtime: createLiveSimulationRuntimeArtifact({
@@ -53,11 +54,21 @@ describe("panel dock data-source labelling", () => {
     // several seconds under a parallel full-suite run, so it needs headroom.
   }, 20_000);
 
-  it("keeps the majority of panels honest about being fixtures", () => {
-    // Guards against someone flipping the flags to silence the badge: the audit
-    // found 11 of 13 panels building their own scenario.
-    const fixtures = panelRegistry.filter((entry) => entry.dataSource === "fixture");
+  it("names every panel allowed to call itself live", () => {
+    // Guards against someone flipping a flag to silence the badge: the audit
+    // found 11 of 13 panels building their own scenario. Making a panel live
+    // means wiring it to the running scene, and then naming it here.
+    const live = panelRegistry
+      .filter((entry) => entry.dataSource === "live")
+      .map((entry) => entry.id)
+      .sort();
 
-    expect(fixtures.length).toBeGreaterThanOrEqual(10);
+    expect(live).toEqual([
+      "brand-intelligence",
+      "project-workspace",
+      "trajectory-replay",
+      // Reports on the open scene since the report panel was given it.
+      "validation-report",
+    ]);
   });
 });

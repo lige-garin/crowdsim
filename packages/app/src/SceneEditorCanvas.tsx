@@ -1,4 +1,5 @@
-﻿import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+﻿import { crowdOverlaySelection } from "./crowdBudget";
+import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
 import type { HeatmapCell } from "./heatmap";
 import type { TranslationKey } from "./i18n";
@@ -9,7 +10,7 @@ import type { EditorViewMode } from "./sceneEditorViewMode";
 import { EditorLines } from "./SceneEditorLines";
 import type { EditorDocument } from "./sceneEditorState";
 import { clamp } from "./sceneEditorUtils";
-import type { SimulationAgent } from "./simulationEngine";
+import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 
 type SceneEditorCanvasProps = {
   aiImageOverlay: SceneImageOverlay | null;
@@ -18,7 +19,8 @@ type SceneEditorCanvasProps = {
   document: EditorDocument;
   draftWallPoints: ScenePoint[];
   gridSize: number;
-  liveAgents: readonly SimulationAgent[];
+  /** The live crowd drawn over the plan, if any (liveCrowd). */
+  crowd?: LiveCrowd;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
   onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
@@ -37,7 +39,7 @@ export function SceneEditorCanvas({
   document,
   draftWallPoints,
   gridSize,
-  liveAgents,
+  crowd,
   onCanvasPointerDown,
   onEntityPointerDown,
   onPointerMove,
@@ -88,7 +90,7 @@ export function SceneEditorCanvas({
           selectedId={selectedId}
           t={t}
         />
-        <EditorLiveAgents agents={liveAgents} scene={baseScene} />
+        {crowd ? <EditorLiveAgents crowd={crowd} scene={baseScene} /> : null}
       </svg>
     </div>
   );
@@ -247,12 +249,13 @@ function EditorBioCityObjects({
 }
 
 function EditorLiveAgents({
-  agents,
+  crowd,
   scene,
 }: {
-  agents: readonly SimulationAgent[];
+  crowd: LiveCrowd;
   scene: CrowdSimScene;
 }) {
+  const agents = useLiveCrowd(crowd).snapshot?.agents ?? [];
   if (agents.length === 0) {
     return null;
   }
@@ -261,10 +264,26 @@ function EditorLiveAgents({
     0.34,
     Math.min(0.72, Math.min(scene.world.width, scene.world.height) * 0.012),
   );
+  // One SVG group per agent, so this samples instead of drawing the whole
+  // crowd — ten thousand groups re-rendered every frame is not something the
+  // DOM does. The cap is real, so it is stated on screen: a view that silently
+  // draws a fraction of the number printed beside it is the bug this project
+  // already fixed once in the 3D viewport.
+  const selection = crowdOverlaySelection(agents.length);
 
   return (
     <g className="editor-live-agents" aria-label="live simulation agents">
-      {agents.slice(0, 500).map((agent) => {
+      {selection.sampled ? (
+        <text
+          className="editor-live-agents-sample-note"
+          data-testid="overlay-sample-note"
+          x={1.5}
+          y={2.6}
+        >
+          {`${selection.drawn} / ${selection.total}`}
+        </text>
+      ) : null}
+      {agents.slice(0, selection.drawn).map((agent) => {
         const x = clamp(agent.x, 0, scene.world.width);
         const y = clamp(agent.y, 0, scene.world.height);
         const speed = Math.hypot(agent.vx, agent.vy);

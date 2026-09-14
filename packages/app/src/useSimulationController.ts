@@ -5,7 +5,7 @@ import {
   type SimulationSnapshot,
 } from "./simulationEngine";
 import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
-import type { MovementBackend } from "./movementBackend";
+import { useRunScene } from "./useRunScene";
 
 export type SimulationController = {
   pause: () => void;
@@ -18,21 +18,22 @@ export type SimulationController = {
 
 export type SimulationControllerOptions = {
   decisionBackend?: SimulationDecisionBackend;
-  movementBackend?: MovementBackend;
 };
 
 export function useSimulationController(
   scene: CrowdSimScene,
   options: SimulationControllerOptions = {},
 ): SimulationController {
-  const { decisionBackend, movementBackend } = options;
+  const { decisionBackend } = options;
+  const { reinit, runScene } = useRunScene(scene, decisionBackend);
   const engine = useMemo(
-    () => createSimulationEngineFromScene(scene, { decisionBackend, movementBackend }),
-    [decisionBackend, movementBackend, scene],
+    () => createSimulationEngineFromScene(runScene, { decisionBackend }),
+    [decisionBackend, runScene],
   );
+  // Which scene each engine is currently running, for hot updates (ADR-0007).
+  const engineSceneRef = useRef({ engine, scene: runScene });
   const frameRef = useRef(0);
   const watchdogRef = useRef(0);
-  const tickInFlightRef = useRef(false);
   const lastFrameAtRef = useRef<number | null>(null);
 
   const [snapshot, setSnapshot] = useState(() => engine.snapshot());
@@ -46,6 +47,32 @@ export function useSimulationController(
     setSnapshotEngine(engine);
     setSnapshot(engine.snapshot());
   }
+
+  useEffect(() => {
+    if (engineSceneRef.current.engine !== engine) {
+      engineSceneRef.current = { engine, scene: runScene };
+    }
+    if (engineSceneRef.current.scene === scene) {
+      return;
+    }
+    let next: SimulationSnapshot | undefined;
+    try {
+      next = engine.updateScene?.(scene);
+    } catch {
+      next = undefined;
+    }
+    engineSceneRef.current.scene = scene;
+    // The engine is an external system; publish its answer like the worker
+    // path does, asynchronously, rather than cascading a render from here.
+    // Not cancelled on cleanup: a StrictMode re-run finds the scene already
+    // applied and returns early, so this is the only publish. Only a newer
+    // engine makes the answer stale.
+    queueMicrotask(() => {
+      if (engineSceneRef.current.engine !== engine) return;
+      if (next) setSnapshot(next);
+      else reinit(scene);
+    });
+  }, [engine, reinit, runScene, scene]);
 
   useEffect(() => {
     if (snapshot.status !== "running" || typeof window === "undefined") {
@@ -63,29 +90,10 @@ export function useSimulationController(
         return;
       }
 
-      if (movementBackend && tickInFlightRef.current) {
-        return;
-      }
-
       const lastFrameAt = lastFrameAtRef.current ?? frameTime;
       const deltaSeconds = (frameTime - lastFrameAt) / 1000;
 
       lastFrameAtRef.current = frameTime;
-
-      if (movementBackend) {
-        tickInFlightRef.current = true;
-        void engine
-          .tickAsync(deltaSeconds)
-          .then((nextSnapshot) => {
-            if (!cancelled) {
-              setSnapshot(nextSnapshot);
-            }
-          })
-          .finally(() => {
-            tickInFlightRef.current = false;
-          });
-        return;
-      }
 
       setSnapshot(engine.tick(deltaSeconds));
     }
@@ -115,7 +123,7 @@ export function useSimulationController(
 
       window.clearInterval(watchdogRef.current);
     };
-  }, [engine, movementBackend, snapshot.status, snapshot.timeScale]);
+  }, [engine, snapshot.status, snapshot.timeScale]);
 
   const start = useCallback(() => {
     lastFrameAtRef.current = null;

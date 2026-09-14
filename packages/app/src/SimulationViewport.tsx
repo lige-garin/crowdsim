@@ -1,12 +1,9 @@
-﻿import type { CrowdSimScene } from "@crowdsim/scene-schema";
+﻿import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useI18n } from "./i18n";
 import { describeViewportRenderMode } from "./viewportRenderMode";
 import { selectCrowdAgents } from "./agentInstanceField";
-import {
-  selectAgentIntentOverlay,
-  type ViewportAgentOverlayFrame,
-} from "./simulationViewportOverlay";
-import type { SimulationSnapshot } from "./simulationEngine";
+import { selectAgentIntentOverlay } from "./simulationViewportOverlay";
+import { noLiveCrowd, useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import { defaultViewportLayers, type ViewportLayers } from "./viewportLayers";
 import type { HeatmapCell } from "./heatmap";
 import { useSimulationViewportRenderer } from "./useSimulationViewportRenderer";
@@ -16,30 +13,37 @@ import {
   ViewportUnsupportedNotice,
 } from "./SimulationViewportOverlays";
 import type { ViewMode } from "./simulationViewportTypes";
+import type { EditorTool } from "./sceneEditorState";
 
 export type { ViewMode } from "./simulationViewportTypes";
 
 export function SimulationViewport({
+  crowd = noLiveCrowd,
   heatmapCells = [],
   layers = defaultViewportLayers,
+  onPlace,
+  placementTool,
   scene: crowdScene,
-  sharedAgentOverlay,
-  snapshot,
   viewMode = "2d",
 }: {
+  /** The live crowd (liveCrowd); the view subscribes to it. */
+  crowd?: LiveCrowd;
   heatmapCells?: readonly HeatmapCell[];
   layers?: ViewportLayers;
+  onPlace?: (tool: EditorTool, point: ScenePoint) => void;
+  placementTool?: EditorTool;
   scene?: CrowdSimScene;
-  sharedAgentOverlay?: ViewportAgentOverlayFrame;
-  snapshot?: SimulationSnapshot;
   viewMode?: ViewMode;
 }) {
   const { t, language } = useI18n();
+  const { sharedAgentOverlay, snapshot } = useLiveCrowd(crowd);
   const { canvasRef, fps, renderMode, selectedAgentId, status } =
     useSimulationViewportRenderer({
       crowdScene,
       heatmapCells,
       layers,
+      onPlace,
+      placementTool,
       sharedAgentOverlay,
       snapshot,
       viewMode,
@@ -60,6 +64,7 @@ export function SimulationViewport({
           seed: crowdScene.seed,
         })
       : undefined;
+  const blocked = renderMode === "unsupported" || renderMode === "failed";
   return (
     <div
       className={`render-viewport ${
@@ -67,37 +72,50 @@ export function SimulationViewport({
       }`}
     >
       <canvas ref={canvasRef} data-testid="viewport-canvas" />
-      {renderMode === "unsupported" && (
+      {blocked && (
         <ViewportUnsupportedNotice
+          kind={renderMode === "failed" ? "failed" : "unsupported"}
           language={language}
           detail={status.type === "raw" ? status.message : undefined}
         />
       )}
-      <ViewportLiveAgentOverlay
-        scene={crowdScene}
-        sharedAgentOverlay={sharedAgentOverlay}
-        snapshot={snapshot}
-        viewMode={viewMode}
-      />
-      <ViewportCityLabelOverlay scene={crowdScene} viewMode={viewMode} />
-      <div className="render-hud" aria-label={t("renderStatus")}>
-        <span>{status.type === "localized" ? t(status.key) : status.message}</span>
-        {(() => {
-          const mode = describeViewportRenderMode(renderMode, language);
-          return mode ? (
-            <span className="render-mode-badge" title={mode.caveat}>
-              {mode.label}
-            </span>
-          ) : null;
-        })()}
-        <strong>
-          {(snapshot?.agentCount ?? 0).toLocaleString()} {t("visualAgents")}
-        </strong>
-        <span>{viewMode === "3d" ? t("view3d") : t("view2d")}</span>
-        <span>{t("renderBenchmark")}</span>
-        <span>{fps > 0 ? `${fps} fps` : "..."}</span>
-      </div>
-      {viewMode === "3d" && pickedAgent && (
+      {/*
+        The DOM label layers are placed at fixed percentages, not projected
+        through the camera, so once the 3d camera can pan and rotate they point
+        at the wrong buildings. And the city view carries no permanent text:
+        people are coloured by what they are doing, and details open on click.
+      */}
+      {!blocked && viewMode !== "3d" && (
+        <>
+          <ViewportLiveAgentOverlay crowd={crowd} scene={crowdScene} />
+          <ViewportCityLabelOverlay scene={crowdScene} viewMode={viewMode} />
+          <div className="render-hud" aria-label={t("renderStatus")}>
+            <span>{status.type === "localized" ? t(status.key) : status.message}</span>
+            {(() => {
+              const mode = describeViewportRenderMode(renderMode, language);
+              return mode ? (
+                <span className="render-mode-badge" title={mode.caveat}>
+                  {mode.label}
+                </span>
+              ) : null;
+            })()}
+            <strong>
+              {(snapshot?.agentCount ?? 0).toLocaleString()} {t("visualAgents")}
+            </strong>
+            <span>{t("view2d")}</span>
+            <span>{t("renderBenchmark")}</span>
+            <span>{fps > 0 ? `${fps} fps` : "..."}</span>
+          </div>
+        </>
+      )}
+      {/* ADR-0006: a compatibility renderer must say so on screen. Full GPU
+          rendering needs no badge, so the 3d view stays clean. */}
+      {!blocked && viewMode === "3d" && renderMode === "compat" && (
+        <div className="render-compat-badge" aria-label={t("renderStatus")}>
+          {describeViewportRenderMode(renderMode, language)?.label}
+        </div>
+      )}
+      {!blocked && viewMode === "3d" && pickedAgent && (
         <div className="render-selected-agent" aria-live="polite">
           <strong>Agent #{pickedAgent.id}</strong>
           {pickedIntent && (

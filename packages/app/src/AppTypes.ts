@@ -90,6 +90,15 @@ export type SharedArrayBufferProbeState = SharedArrayBufferProbeResult;
 
 export type StageViewMode = ViewMode | "network";
 
+/**
+ * The stage shows one thing at a time. It used to stack the render viewport,
+ * the clock and the whole scene editor in a single scrolling column, so the
+ * editor sat ~92% below the fold with no affordance that it existed and you
+ * could never see the run and the geometry you were editing in the same
+ * scroll position.
+ */
+export type StageTab = "run" | "edit";
+
 export type SystemSignal = {
   label: string;
   value: string;

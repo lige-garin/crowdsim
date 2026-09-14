@@ -1,3 +1,4 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
@@ -17,6 +18,8 @@ import { TilesBackdropPanel } from "./TilesBackdropPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 
 export type PanelDockContext = {
+  /** The scene the app is running, for panels that report on the user's own project. */
+  scene: CrowdSimScene;
   trajectoryRecording: TrajectoryRecording;
   brandInsight?: BrandDecisionInsight;
   // When provided, project-workspace lists live projects; otherwise it shows
@@ -68,11 +71,11 @@ export const panelRegistry: PanelRegistryEntry[] = [
     render: () => <ExperimentSummaryPanel />,
   },
   {
-    dataSource: "fixture",
+    dataSource: "live",
     id: "validation-report",
     labelZh: "校验报告",
     labelEn: "Validation report",
-    render: () => <ValidationReportPanel />,
+    render: ({ scene }) => <ValidationReportPanel scene={scene} />,
   },
   {
     dataSource: "live",

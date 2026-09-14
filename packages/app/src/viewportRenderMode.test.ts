@@ -53,4 +53,14 @@ describe("describeViewportUnsupported (blocking notice copy)", () => {
     expect(zh.title).not.toEqual(en.title);
     expect(zh.stillWorks).not.toEqual(en.stillWorks);
   });
+
+  it("does not blame the browser when a working renderer crashed", () => {
+    for (const language of ["zh", "en"] as const) {
+      const failed = describeViewportUnsupported(language, "failed");
+      const unsupported = describeViewportUnsupported(language);
+      expect(failed.title).not.toBe(unsupported.title);
+      expect(failed.reason).not.toMatch(/adapter|适配器/);
+    }
+    expect(describeViewportRenderMode("failed", "en")).toBeNull();
+  });
 });

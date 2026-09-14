@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import type { Object3D } from "three";
+import { Mesh, type Object3D } from "three";
 import type { BioCityRenderAssetPlacement } from "./bioCityRenderPlan";
 
 export type BioCityAssetLod = "high" | "low" | "medium";
@@ -152,13 +152,30 @@ export async function loadBioCityVisualAssetObject(
     return undefined;
   }
 
-  const object = cachedScene.clone(true);
+  const object = prepareBioCityVisualAssetObject(cachedScene.clone(true));
   const transform = createBioCityAssetWorldTransform(asset, scene);
 
   object.name = `${asset.id}-model`;
   object.position.set(transform.position.x, transform.position.y, transform.position.z);
   object.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
   object.scale.setScalar(transform.scale);
+
+  return object;
+}
+
+/**
+ * A placed copy that owns its geometry and materials, so disposing it never
+ * frees resources shared with the loader cache.
+ */
+export function prepareBioCityVisualAssetObject(object: Object3D) {
+  object.traverse((child) => {
+    if (!(child instanceof Mesh)) return;
+
+    child.geometry = child.geometry.clone();
+    child.material = Array.isArray(child.material)
+      ? child.material.map((material) => material.clone())
+      : child.material.clone();
+  });
 
   return object;
 }

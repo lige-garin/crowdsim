@@ -154,9 +154,9 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 
-    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
-    expect(screen.getByLabelText("仿真时钟")).toBeInTheDocument();
+    expect(screen.getByLabelText("状态栏")).toBeInTheDocument();
+    expect(screen.getByLabelText("建造工具")).toBeInTheDocument();
+    expect(screen.getByLabelText("信息视图")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "首页" }));
 
@@ -182,10 +182,12 @@ describe("App", () => {
   it("renders the compact BioCity studio shell", () => {
     renderWorkbench();
 
-    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity operating status")).toBeInTheDocument();
-    expect(screen.getByLabelText("绘制")).toBeInTheDocument();
-    expect(screen.getByLabelText("图层")).toBeInTheDocument();
+    // The shell is a status bar and two icon rails over a full-bleed scene.
+    // Nothing docked carries a written label, so these assert the rails by
+    // their accessible names rather than by any text on screen.
+    expect(screen.getByLabelText("状态栏")).toBeInTheDocument();
+    expect(screen.getByLabelText("建造工具")).toBeInTheDocument();
+    expect(screen.getByLabelText("信息视图")).toBeInTheDocument();
     expect(screen.getByLabelText("仿真时钟")).toBeInTheDocument();
     // The hardcoded milestone list (T0.1 scaffold / T0.2 wasm bridge / ...) was
     // frozen months ago and reported progress that no longer existed.
@@ -196,12 +198,26 @@ describe("App", () => {
     expect(screen.queryByText("WASM + SAB")).not.toBeInTheDocument();
     expect(screen.getByLabelText("仿真视口")).toBeInTheDocument();
     expect(screen.getAllByText("雨天商业街").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity analytics")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity scene objects")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity system status")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity signal dock")).toBeInTheDocument();
+    // "BioCity key metrics" was the inspector's copy of footfall / exited /
+    // density peak / trajectory frames — the fourth rendering of numbers the
+    // stage telemetry already owns. The rail leads with analysis now.
+    expect(screen.queryByLabelText("BioCity key metrics")).not.toBeInTheDocument();
+    // Analytics are opened on demand, not docked: the rail button exists, the
+    // panel does not until it is asked for.
+    expect(screen.queryByLabelText("场景分析")).not.toBeInTheDocument();
+    expect(screen.getByTestId("info-window-analytics")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("info-window-analytics"));
+    // Region names follow the interface language (they were English-only).
+    expect(screen.getByLabelText("场景分析")).toBeInTheDocument();
+    expect(screen.getByLabelText("场景对象")).toBeInTheDocument();
+    expect(screen.getByLabelText("系统与记录")).toBeInTheDocument();
+    expect(screen.getByLabelText("工程状态")).toBeInTheDocument();
     expect(screen.queryByText("Credibility loop")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("info-window-analytics"));
+    expect(screen.queryByLabelText("场景分析")).not.toBeInTheDocument();
+
+    // The editor opens from the HUD's edit button.
+    fireEvent.click(screen.getByTestId("stage-tab-edit"));
 
     // The scene-draft button used to double as the image-tracing trigger, which
     // put fixture geometry on screen for a scene nobody had traced. Tracing
@@ -216,37 +232,58 @@ describe("App", () => {
     expect(screen.getByLabelText("描图图层（示例）")).toBeInTheDocument();
     expect(screen.getAllByText(/复核/).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("button", { name: "EN" }));
+    fireEvent.click(screen.getByRole("button", { name: "English" }));
 
-    expect(screen.getByRole("heading", { name: "BioCity Studio" })).toBeInTheDocument();
+    // The shell translates through accessible names, because it has no visible
+    // ones: every docked control is an icon.
+    expect(screen.getByLabelText("Status bar")).toBeInTheDocument();
+    expect(screen.getByLabelText("Build tools")).toBeInTheDocument();
+    expect(screen.getByLabelText("Info views")).toBeInTheDocument();
+    expect(screen.getByTestId("sim-toggle")).toHaveAttribute(
+      "aria-label",
+      expect.stringMatching(/Start|Pause/),
+    );
+    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
     expect(screen.getByLabelText(/simulation viewport/i)).toBeInTheDocument();
-    const simulationControls = within(screen.getByLabelText("Simulation controls"));
-    expect(simulationControls.getByText("Run controls")).toBeInTheDocument();
-    expect(simulationControls.getByText("Evacuation")).toBeInTheDocument();
-    expect(simulationControls.getByText("Simulation speed")).toBeInTheDocument();
-    expect(simulationControls.getByText("Heatmap window")).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText("Live telemetry")).getByText("Kernel"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByLabelText("Live telemetry")).getByText("worker/fallback"),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity key metrics")).toBeInTheDocument();
-    expect(screen.getByLabelText("BioCity analytics")).toBeInTheDocument();
     expect(screen.queryByText("Movement backend")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Network" }));
+    fireEvent.click(screen.getByTestId("view-mode-network"));
 
     expect(
       screen.getByRole("heading", { name: "Crowd Contact Network" }),
     ).toBeInTheDocument();
   });
 
+  it("keeps modelled commercial estimates out of the status bar", () => {
+    renderWorkbench();
+
+    const statusBar = within(screen.getByLabelText("状态栏"));
+
+    // Live values only. The heuristic revenue and satisfaction figures are
+    // modelled, not measured, so they never appear in always-visible chrome.
+    expect(statusBar.getByTestId("hud-agent-count")).toBeInTheDocument();
+    expect(statusBar.queryByText(/销售/)).not.toBeInTheDocument();
+    expect(statusBar.queryByText(/满意度/)).not.toBeInTheDocument();
+
+    // Docked chrome carries no written labels at all — the rails are icons and
+    // the names live in aria-label/title.
+    for (const label of ["仿真", "客流", "运行控制", "仿真倍率", "绘制", "图层"]) {
+      expect(statusBar.queryByText(label)).not.toBeInTheDocument();
+    }
+
+    // Tools are opened from the info rail, not docked along the bottom.
+    expect(screen.queryByLabelText("工具面板")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("info-window-tools"));
+    expect(
+      within(screen.getByLabelText("工具面板")).getByText("工具与实验"),
+    ).toBeInTheDocument();
+  });
+
   it("switches the viewport between 2D and 3D modes", () => {
     renderWorkbench();
 
-    const twoDimensionalButton = screen.getByRole("button", { name: "2D" });
-    const threeDimensionalButton = screen.getByRole("button", { name: "3D" });
+    const twoDimensionalButton = screen.getByTestId("view-mode-2d");
+    const threeDimensionalButton = screen.getByTestId("view-mode-3d");
 
     expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "false");
     expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "true");
@@ -255,8 +292,5 @@ describe("App", () => {
 
     expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "true");
     expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "false");
-    expect(
-      within(screen.getByLabelText("视图模式")).getByText("2D 平面"),
-    ).toBeInTheDocument();
   });
 });

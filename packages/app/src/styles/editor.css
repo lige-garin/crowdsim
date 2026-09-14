@@ -1,0 +1,1042 @@
+.editor-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.editor-filebar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--lab-line);
+}
+
+.editor-filebar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.editor-toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.editor-draft-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.editor-basemap {
+  opacity: 0.36;
+  pointer-events: none;
+}
+
+.editor-heatmap {
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.editor-heatmap rect {
+  fill: rgba(0, 183, 255, 0.42);
+  stroke: rgba(0, 91, 255, 0.18);
+  stroke-width: 0.04;
+}
+
+.editor-live-agents {
+  pointer-events: none;
+}
+
+.editor-live-agent {
+  transition: transform 90ms linear;
+}
+
+.editor-live-agent-shadow {
+  fill: rgba(15, 23, 42, 0.18);
+}
+
+.editor-live-agent-body {
+  fill: #118672;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.18;
+}
+
+.editor-live-agent-heading {
+  stroke: #1d4ed8;
+  stroke-linecap: round;
+  stroke-width: 0.16;
+}
+
+.ai-image-overlay {
+  pointer-events: none;
+}
+
+.ai-image-overlay-title {
+  fill: var(--lab-blue);
+  font-size: 1.35px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 0.35;
+}
+
+.ai-image-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 0.38;
+}
+
+.ai-image-line-wall {
+  stroke: var(--lab-cyan);
+}
+
+.ai-image-line-count-line {
+  stroke: var(--lab-blue);
+  stroke-dasharray: 0.7 0.4;
+}
+
+.ai-image-entrance {
+  fill: rgba(0, 183, 255, 0.16);
+  stroke: var(--lab-cyan);
+  stroke-width: 0.25;
+}
+
+.ai-image-entrance-sink {
+  fill: rgba(255, 77, 61, 0.13);
+  stroke: var(--lab-red);
+}
+
+.ai-image-label {
+  fill: var(--lab-ink);
+  font-size: 1.1px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(8, 14, 28, 0.92);
+  stroke-width: 0.3;
+  text-anchor: middle;
+}
+
+.ai-image-item.needs-review .ai-image-line {
+  stroke: #89a800;
+  stroke-dasharray: 0.8 0.42;
+  stroke-width: 0.55;
+}
+
+.ai-image-item.needs-review .ai-image-entrance {
+  stroke: #89a800;
+  stroke-dasharray: 0.8 0.42;
+  stroke-width: 0.55;
+}
+
+.ai-image-item.needs-review .ai-image-label {
+  fill: #4b6100;
+}
+
+.editor-wall-hit {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.editor-road-hit {
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-biocity-objects {
+  cursor: grab;
+}
+
+.editor-road {
+  fill: none;
+  pointer-events: none;
+  stroke: rgba(147, 163, 189, 0.5);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.editor-road-label {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-building text {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-obstacle text {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-transit-stop text {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-hazard text {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
+.editor-building polygon {
+  fill: rgba(79, 70, 229, 0.13);
+  pointer-events: all;
+  stroke: rgba(79, 70, 229, 0.62);
+  stroke-width: 0.22;
+}
+
+.editor-obstacle polygon {
+  fill: rgba(100, 116, 139, 0.18);
+  pointer-events: all;
+  stroke: rgba(148, 163, 184, 0.74);
+  stroke-dasharray: 0.75 0.38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.38;
+}
+
+.editor-obstacle polyline {
+  fill: rgba(100, 116, 139, 0.18);
+  pointer-events: all;
+  stroke: rgba(148, 163, 184, 0.74);
+  stroke-dasharray: 0.75 0.38;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 0.38;
+}
+
+.editor-transit-stop circle {
+  fill: #38bdf8;
+  pointer-events: all;
+  stroke: rgba(12, 74, 110, 0.76);
+  stroke-width: 0.2;
+}
+
+.editor-hazard circle {
+  fill: rgba(255, 77, 61, 0.14);
+  pointer-events: all;
+  stroke: rgba(220, 38, 38, 0.72);
+  stroke-dasharray: 0.8 0.42;
+  stroke-width: 0.28;
+}
+
+.editor-zone {
+  cursor: grab;
+}
+
+.editor-zone polygon {
+  fill: rgba(0, 183, 255, 0.12);
+  pointer-events: all;
+  stroke: rgba(47, 208, 255, 0.45);
+  stroke-width: 0.2;
+}
+
+.editor-zone-jewelry polygon {
+  fill: rgba(201, 255, 45, 0.18);
+}
+
+.editor-zone-luxury polygon {
+  fill: rgba(201, 255, 45, 0.18);
+}
+
+.editor-zone-cosmetics polygon {
+  fill: rgba(255, 72, 173, 0.13);
+}
+
+.editor-zone-dining polygon {
+  fill: rgba(255, 161, 67, 0.16);
+}
+
+.editor-zone-restaurant polygon {
+  fill: rgba(255, 161, 67, 0.16);
+}
+
+.editor-zone-corridor polygon {
+  fill: rgba(148, 163, 184, 0.12);
+}
+
+.editor-zone-atrium polygon {
+  fill: rgba(148, 163, 184, 0.12);
+}
+
+.editor-zone text {
+  fill: var(--lab-ink);
+  font-size: 1.25px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-store-lots {
+  pointer-events: none;
+}
+
+.editor-store-lots polygon {
+  fill: rgba(255, 255, 255, 0.08);
+  stroke: rgba(147, 163, 189, 0.52);
+  stroke-dasharray: 0.6 0.35;
+  stroke-width: 0.18;
+}
+
+.editor-wall {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke: rgba(147, 163, 189, 0.9);
+  stroke-width: 0.4;
+}
+
+.editor-wall-draft {
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke: #7b9700;
+  stroke-dasharray: 1.2 0.8;
+  stroke-width: 0.35;
+}
+
+.editor-count-line {
+  fill: none;
+  pointer-events: none;
+  stroke: var(--lab-blue);
+  stroke-dasharray: 0.8 0.45;
+  stroke-linecap: round;
+  stroke-width: 0.35;
+}
+
+.editor-count-label {
+  fill: var(--lab-blue);
+  font-size: 1.35px;
+  font-weight: 850;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-shop {
+  cursor: grab;
+}
+
+.editor-service {
+  cursor: grab;
+}
+
+.editor-service rect {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+}
+
+.editor-shop rect {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+  fill: #c8ff2d;
+}
+
+.editor-shop-category-jewelry rect {
+  fill: #d6f76f;
+}
+
+.editor-shop-category-luxury rect {
+  fill: #d6f76f;
+}
+
+.editor-shop-category-cosmetics rect {
+  fill: #ffd0e8;
+}
+
+.editor-shop-category-dining rect {
+  fill: #ffd28a;
+}
+
+.editor-shop-category-restaurant rect {
+  fill: #ffd28a;
+}
+
+.editor-shop-category-fastFashion rect {
+  fill: #bdf4ff;
+}
+
+.editor-shop-extrusions {
+  pointer-events: none;
+}
+
+.editor-shop-volume polygon {
+  fill: rgba(200, 255, 45, 0.42);
+  stroke: rgba(17, 24, 39, 0.28);
+  stroke-width: 0.12;
+}
+
+.editor-shop-volume .editor-shop-side {
+  fill: rgba(37, 99, 235, 0.18);
+}
+
+.editor-shop-volume .editor-shop-front {
+  fill: rgba(255, 255, 255, 0.38);
+}
+
+.editor-shop-volume text {
+  fill: #132033;
+  font-size: 1.05px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.82);
+  stroke-width: 0.22;
+  text-anchor: middle;
+}
+
+.editor-shop-volume.editor-shop-category-jewelry polygon {
+  fill: rgba(214, 247, 111, 0.46);
+}
+
+.editor-shop-volume.editor-shop-category-luxury polygon {
+  fill: rgba(214, 247, 111, 0.46);
+}
+
+.editor-shop-volume.editor-shop-category-cosmetics polygon {
+  fill: rgba(255, 208, 232, 0.48);
+}
+
+.editor-shop-volume.editor-shop-category-dining polygon {
+  fill: rgba(255, 210, 138, 0.5);
+}
+
+.editor-shop-volume.editor-shop-category-restaurant polygon {
+  fill: rgba(255, 210, 138, 0.5);
+}
+
+.editor-service-counter {
+  fill: var(--lab-blue);
+}
+
+.editor-service-gate {
+  fill: #334155;
+}
+
+.editor-shop text {
+  fill: #111827;
+  font-size: 1.35px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-service text {
+  fill: #ffffff;
+  font-size: 1.35px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-source {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+  fill: var(--lab-cyan);
+}
+
+.editor-sink {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+  fill: var(--lab-red);
+}
+
+.editor-target {
+  pointer-events: all;
+  stroke: rgba(17, 24, 39, 0.68);
+  stroke-width: 0.18;
+  fill: var(--lab-acid);
+}
+
+.editor-node {
+  cursor: grab;
+}
+
+.editor-node text {
+  fill: #111827;
+  font-size: 1.5px;
+  font-weight: 850;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.editor-node.selected .editor-source {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-node.selected .editor-sink {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-node.selected .editor-target {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-building.selected polygon {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-hazard.selected circle {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-obstacle.selected polygon {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-obstacle.selected polyline {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-road.selected {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-transit-stop.selected circle {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-zone.selected polygon {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-wall.selected {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-shop.selected rect {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-service.selected rect {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-count-line.selected {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-param-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 8px;
+}
+
+.editor-param-grid > span {
+  display: grid;
+  gap: 4px;
+}
+
+.editor-param-grid label {
+  display: grid;
+  gap: 4px;
+}
+
+.editor-param-grid input {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--lab-line);
+  border-radius: 7px;
+  background: var(--lab-surface);
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-weight: 800;
+}
+
+.editor-param-grid select {
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--lab-line);
+  border-radius: 7px;
+  background: var(--lab-surface);
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-weight: 800;
+}
+
+.editor-param-grid button {
+  min-height: 32px;
+}
+
+.scene-editor .editor-filebar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scene-editor .editor-toolbar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.scene-editor .editor-status {
+  white-space: nowrap;
+}
+
+.editor-tool-glyph {
+  border-color: rgba(11, 99, 229, 0.16);
+  background: rgba(11, 99, 229, 0.08);
+  font-family: var(--lab-mono);
+  font-weight: 850;
+}
+
+/* These object-count chips were left behind by the light skin: a white pill
+ * with `--lab-ink` text, which under the dark palette is near-white on white.
+ * That row of blank white bars under the toolbar was this rule. */
+.editor-status span {
+  padding: 2px 7px;
+  border: 1px solid var(--lab-line);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--lab-muted);
+}
+
+.scene-editor .editor-canvas-wrap {
+  max-height: none;
+}
+
+.scene-editor .editor-param-panel {
+  max-height: none;
+  overflow-y: auto;
+}
+
+.editor-grid line {
+  stroke-width: 0.045;
+}
+
+.editor-filebar label span {
+  font-family: var(--lab-mono);
+}
+
+.editor-filebar > span {
+  font-family: var(--lab-mono);
+}
+
+.editor-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.05;
+  border-color: rgba(126, 176, 215, 0.18);
+  background: rgba(14, 31, 48, 0.86);
+  color: #dcefff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.scene-editor {
+  right: 18px;
+  bottom: 76px;
+  left: 18px;
+  border-color: rgba(204, 219, 232, 0.95);
+  color: var(--lab-ink);
+  top: auto;
+}
+
+.editor-param-panel {
+  display: grid;
+  gap: 8px;
+  font-size: var(--fs-body);
+  border-color: rgba(126, 176, 215, 0.16);
+}
+
+.editor-filebar {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  border-color: rgba(126, 176, 215, 0.16);
+}
+
+.editor-toolbar {
+  display: flex;
+  align-items: stretch;
+  border-color: rgba(126, 176, 215, 0.16);
+}
+
+.editor-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  font-family: var(--lab-mono);
+  border-color: rgba(126, 176, 215, 0.16);
+}
+
+.editor-canvas-wrap {
+  border-color: rgba(126, 176, 215, 0.16);
+  background-size:
+    32px 32px,
+    32px 32px,
+    auto;
+  color: #dcefff;
+}
+
+.editor-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  touch-action: none;
+}
+
+.workspace .scene-editor > * {
+  min-width: 0;
+}
+
+.workspace .scene-editor {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  display: grid;
+  width: 100%;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--lab-line);
+  border-radius: 12px;
+  background: #111512;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace .editor-draft-actions {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lab-muted);
+  box-shadow: none;
+}
+
+.workspace .editor-filebar {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lab-muted);
+  box-shadow: none;
+  flex-wrap: wrap;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--lab-line);
+}
+
+.workspace .editor-toolbar {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lab-muted);
+  box-shadow: none;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--lab-line);
+}
+
+.workspace .editor-filebar::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace .editor-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.workspace .editor-filebar label span {
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.workspace .editor-filebar > span {
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.workspace .editor-status {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lab-faint);
+  box-shadow: none;
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.workspace .editor-draft-actions button {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+}
+
+.workspace .editor-param-panel input {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+}
+
+.workspace .editor-param-panel select {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+}
+
+.workspace .editor-param-panel button {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+}
+
+.workspace .scene-editor input {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-ink);
+}
+
+.workspace .scene-editor textarea {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-ink);
+}
+
+.workspace .scene-editor select {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-ink);
+}
+
+.workspace .editor-toolbar button {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.workspace .editor-filebar select {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+  min-height: 30px;
+}
+
+.workspace .editor-filebar button {
+  border-color: var(--lab-line-strong);
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--lab-muted);
+  box-shadow: none;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 30px;
+}
+
+.workspace .editor-tool {
+  min-width: 44px;
+  min-height: 42px;
+  padding: 4px 6px;
+}
+
+.workspace .editor-tool-glyph {
+  color: var(--lab-faint);
+  font-size: var(--fs-body);
+}
+
+.workspace .editor-tool-text {
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+  font-weight: 580;
+}
+
+.workspace .editor-tool[aria-pressed="true"] {
+  border-color: rgba(220, 193, 139, 0.4);
+  background: rgba(200, 169, 107, 0.1);
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-toolbar button[aria-pressed="true"] {
+  border-color: rgba(220, 193, 139, 0.4);
+  background: rgba(200, 169, 107, 0.1);
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-tool-apply {
+  border-color: rgba(220, 193, 139, 0.4);
+  background: rgba(200, 169, 107, 0.1);
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-tool[aria-pressed="true"] .editor-tool-text {
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-tool[aria-pressed="true"] .editor-tool-glyph {
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-tool-apply .editor-tool-text {
+  color: var(--lab-blue-strong);
+}
+
+.workspace .editor-canvas-wrap {
+  max-height: none;
+  overflow: hidden;
+  border: 1px solid rgba(24, 29, 24, 0.2);
+  border-radius: 9px;
+  background: #e7e5dc;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
+}
+
+.workspace .editor-canvas {
+  max-height: none;
+  background: #e7e5dc;
+}
+
+.workspace .editor-floor {
+  fill: #e7e5dc;
+}
+
+.workspace .editor-grid line {
+  stroke: rgba(39, 47, 40, 0.14);
+}
+
+.workspace .editor-basemap line {
+  stroke: rgba(39, 47, 40, 0.14);
+}
+
+.workspace .editor-param-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--lab-muted);
+  box-shadow: none;
+  max-height: none;
+  padding: 9px 0 0;
+  border-top: 1px solid var(--lab-line);
+}
+
+.workspace .editor-param-grid > span {
+  color: var(--lab-muted);
+  font-size: var(--fs-micro);
+  font-weight: 560;
+}
+
+.workspace .editor-param-grid label {
+  color: var(--lab-muted);
+  font-size: var(--fs-micro);
+  font-weight: 560;
+}
+
+/* The overlay draws one SVG group per agent, so it samples. Saying so beats a
+ * view that quietly shows a fraction of the count printed next to it. */
+.editor-live-agents-sample-note {
+  fill: rgba(39, 47, 40, 0.62);
+  font-family: var(--lab-mono);
+  font-size: 2.1px;
+  font-weight: 700;
+  letter-spacing: 0.04px;
+}
+
+/* Kept mounted while another view is on stage; its own display rules must not
+   override the hidden attribute. */
+.scene-editor[hidden] {
+  display: none;
+}
+
+.editor-stale-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(240, 180, 60, 0.6);
+  border-radius: 8px;
+  background: rgba(240, 180, 60, 0.14);
+  color: #f5d38b;
+  font-size: var(--fs-body);
+}
+
+.editor-stale-banner button {
+  margin-left: auto;
+}
+
+/* The banner is one more row above the file bar; keep the canvas the row that
+   takes the remaining height. */
+.workspace .stage-tab-edit .scene-editor:has(> .editor-stale-banner) {
+  grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+}

@@ -18,6 +18,13 @@ export type TransitStopNumberField =
   | "capacity"
   | "delayFactor";
 export type ObstacleNumberField = "routeCostMultiplier";
+/**
+ * Entrances were the one drawable object with no parameter editor at all: you
+ * could place a door and then had no way to say how many people come through
+ * it. Arrival rate is the single most consequential input in a crowd model, so
+ * it was the one number a user could not change without hand-editing JSON.
+ */
+export type EntranceNumberField = "arrivalRatePerMinute" | "width";
 export type HazardNumberField =
   | "radiusMeters"
   | "riskScore"
@@ -325,6 +332,48 @@ export function toggleDocumentZoneWalkable(document: EditorDocument, zoneId: str
     ...document,
     zones: document.zones.map((zone) =>
       zone.id === zoneId ? { ...zone, walkable: !zone.walkable } : zone,
+    ),
+  };
+}
+
+export function updateDocumentEntranceNumber(
+  document: EditorDocument,
+  entranceId: string,
+  field: EntranceNumberField,
+  value: number,
+) {
+  // A sink has no arrival rate, and a door narrower than half a metre is not a
+  // door; both are clamped rather than rejected so dragging a field stays live.
+  const minValue = field === "arrivalRatePerMinute" ? 0 : 0.5;
+
+  return {
+    ...document,
+    entrances: document.entrances.map((entrance) =>
+      entrance.id === entranceId
+        ? { ...entrance, [field]: Math.max(minValue, value) }
+        : entrance,
+    ),
+  };
+}
+
+export function updateDocumentEntranceKind(
+  document: EditorDocument,
+  entranceId: string,
+  kind: EditorDocument["entrances"][number]["kind"],
+) {
+  return {
+    ...document,
+    entrances: document.entrances.map((entrance) =>
+      entrance.id === entranceId
+        ? {
+            ...entrance,
+            kind,
+            // A pure exit cannot spawn anyone; keep the document honest rather
+            // than carrying a rate that silently does nothing.
+            arrivalRatePerMinute:
+              kind === "sink" ? 0 : Math.max(1, entrance.arrivalRatePerMinute),
+          }
+        : entrance,
     ),
   };
 }

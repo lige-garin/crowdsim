@@ -1,24 +1,7 @@
 import type { TranslationKey } from "./i18n";
-import type { EvacuationCurvePoint, StageViewMode } from "./AppTypes";
+import type { StageViewMode } from "./AppTypes";
 
 export const heatmapWindows = [10, 30, 60] as const;
-
-export function curvePointsToSvg(points: EvacuationCurvePoint[]) {
-  if (points.length === 0) {
-    return "";
-  }
-
-  const maxRemaining = Math.max(1, ...points.map((point) => point.remaining));
-
-  return points
-    .map((point, index) => {
-      const x = points.length === 1 ? 0 : (index / (points.length - 1)) * 120;
-      const y = 44 - (point.remaining / maxRemaining) * 40;
-
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-}
 
 export function formatSimulationClock(totalSeconds: number) {
   const wholeSeconds = Math.floor(totalSeconds);
@@ -38,12 +21,4 @@ export function formatStageViewMode(
   }
 
   return viewMode === "3d" ? t("view3dPerspective") : t("view2dPlan");
-}
-
-export function formatStageViewButton(viewMode: StageViewMode, language: "en" | "zh") {
-  if (viewMode === "network") {
-    return language === "zh" ? "网络" : "Network";
-  }
-
-  return viewMode === "3d" ? "3D" : "2D";
 }

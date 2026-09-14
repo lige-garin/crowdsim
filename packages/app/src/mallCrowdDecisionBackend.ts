@@ -1,25 +1,17 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
-import type {
-  SimulationAgentDecision,
-  SimulationDecisionBackend,
-  SimulationServicePoint,
-  SimulationShop,
+import {
+  nearestAllowedSink,
+  type SimulationAgentDecision,
+  type SimulationDecisionBackend,
+  type SimulationShop,
 } from "./simulationDecisionBackend";
-import type { SimulationAgent, SimulationSink } from "./simulationEngine";
+import type { SimulationAgent } from "./simulationEngine";
 import { chooseBrandStore, type BrandStoreCandidate } from "./brandAttraction";
-import { createAgentMindset } from "./agentPersona";
+import { clamp01, createAgentMindset } from "./agentPersona";
 import { gravityWeight } from "./odEntryModel";
-
-/** Deterministic PRNG so shop choice is reproducible for a given seed. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { hashUnit, sampleDwellSeconds } from "./behaviorDistributions";
+import { byLineOrder, createCounterTick, queueSpacingMeters } from "./checkoutCounters";
+import { mulberry32 } from "./simulationEngineRandom";
 
 function pickShopByAttraction(
   shops: readonly SimulationShop[],
@@ -78,6 +70,30 @@ function pickShopByGravity(
  * ever leaves the world.
  */
 const queueSlotsPerCapacity = 2;
+
+/** Where the person `index` places back from the head of the line stands. */
+export function queueSlotPosition(shop: SimulationShop, index: number): ScenePoint {
+  const direction = shop.queueDirection ?? { x: 0, y: 1 };
+  return {
+    x: shop.queuePosition.x + direction.x * queueSpacingMeters * index,
+    y: shop.queuePosition.y + direction.y * queueSpacingMeters * index,
+  };
+}
+
+/** The spot on the shop floor this shopper browses at: stable per shopper and shop. */
+export function browseSpot(
+  shop: SimulationShop,
+  seed: number,
+  agentId: number,
+): ScenePoint {
+  const area = shop.browseArea;
+  if (!area) return shop.position;
+  return {
+    x: area.x + (hashUnit(seed, agentId, shop.id, "browse-x") * 2 - 1) * area.halfWidth,
+    y:
+      area.y + (hashUnit(seed, agentId, shop.id, "browse-y") * 2 - 1) * area.halfHeight,
+  };
+}
 /** Patience window (seconds) spanned by the persona `patience` trait 0..1. */
 const queuePatienceMinSeconds = 30;
 const queuePatienceRangeSeconds = 120;
@@ -90,42 +106,6 @@ const walkStallDecisionTicks = 50;
 
 function distanceBetween(from: ScenePoint, to: ScenePoint) {
   return Math.hypot(to.x - from.x, to.y - from.y);
-}
-
-function nearestSink(
-  point: ScenePoint,
-  sinks: readonly SimulationSink[],
-): SimulationSink {
-  let best = sinks[0];
-  let bestSq = Number.POSITIVE_INFINITY;
-  for (const sink of sinks) {
-    const dx = sink.position.x - point.x;
-    const dy = sink.position.y - point.y;
-    const sq = dx * dx + dy * dy;
-    if (sq < bestSq) {
-      best = sink;
-      bestSq = sq;
-    }
-  }
-  return best;
-}
-
-function nearestServicePoint(
-  point: ScenePoint,
-  servicePoints: readonly SimulationServicePoint[],
-): SimulationServicePoint {
-  let best = servicePoints[0];
-  let bestSq = Number.POSITIVE_INFINITY;
-  for (const servicePoint of servicePoints) {
-    const dx = servicePoint.position.x - point.x;
-    const dy = servicePoint.position.y - point.y;
-    const sq = dx * dx + dy * dy;
-    if (sq < bestSq) {
-      best = servicePoint;
-      bestSq = sq;
-    }
-  }
-  return best;
 }
 
 /**
@@ -145,8 +125,14 @@ export function createMallCrowdDecisionBackend(options: {
    * nearer shops via pickShopByGravity; 0/undefined keeps attraction-only choice.
    */
   distanceDecay?: number;
+  /**
+   * Random stream for shop choice. Defaults to a fresh stream from `seed`; a
+   * hot scene update passes the stream the previous backend was using, so an
+   * edit continues the sequence instead of replaying it (ADR-0007).
+   */
+  random?: () => number;
 }): SimulationDecisionBackend {
-  const random = mulberry32(options.seed ?? 1);
+  const random = options.random ?? mulberry32(options.seed ?? 1);
   const mindsetSeed = options.seed ?? 1;
 
   return {
@@ -160,6 +146,7 @@ export function createMallCrowdDecisionBackend(options: {
       shops,
       servicePoints,
       evacuationActive,
+      routeDistance,
     }) {
       const activeShops = shops ?? options.shops;
       const activeServicePoints = servicePoints ?? [];
@@ -196,6 +183,32 @@ export function createMallCrowdDecisionBackend(options: {
           : false;
       };
       const enter = (shopId: string) => bump(occupancy, shopId, 1);
+
+      // Each line in order of arrival. The head is let in first: shoppers used
+      // to be admitted in array order, so whoever spawned first jumped the line,
+      // and everyone waited on the same point.
+      const lines = new Map<string, SimulationAgent[]>();
+      for (const agent of agents) {
+        if (agent.lifecycleState !== "queue" || !agent.selectedStoreId) continue;
+        const line = lines.get(agent.selectedStoreId);
+        if (line) line.push(agent);
+        else lines.set(agent.selectedStoreId, [agent]);
+      }
+      const admitted = new Set<number>();
+      const placeInLine = new Map<number, number>();
+      for (const [shopId, line] of lines) {
+        line.sort(byLineOrder);
+        let place = 0;
+        for (const agent of line) {
+          if (!evacuationActive && place === 0 && hasRoom(shopId)) {
+            admitted.add(agent.id);
+            bump(queueLength, shopId, -1);
+            enter(shopId);
+            continue;
+          }
+          placeInLine.set(agent.id, place++);
+        }
+      }
       const joinQueue = (shopId: string) => bump(queueLength, shopId, 1);
       const leaveQueue = (shopId: string) => bump(queueLength, shopId, -1);
       const browseDecision = (
@@ -205,13 +218,18 @@ export function createMallCrowdDecisionBackend(options: {
         agentId,
         nextState: "browse",
         selectedStoreId: shop.id,
-        target: shop.position,
-        browseUntilSeconds: elapsedSeconds + shop.dwellSeconds,
+        target: browseSpot(shop, mindsetSeed, agentId),
+        queueJoinedSeconds: null,
+        // Each shopper draws their own dwell around the shop's mean: a fixed
+        // dwell made every browser in a shop leave in lockstep.
+        browseUntilSeconds:
+          elapsedSeconds +
+          sampleDwellSeconds(shop.dwellSeconds, mindsetSeed, agentId, shop.id),
         queueUntilSeconds: null,
         walkProgress: null,
       });
       const leaveDecision = (agent: SimulationAgent): SimulationAgentDecision => {
-        const sink = nearestSink(agent, sinks);
+        const sink = nearestAllowedSink(agent, sinks, agent.exitIds);
         return {
           agentId: agent.id,
           nextState: "leave",
@@ -220,9 +238,28 @@ export function createMallCrowdDecisionBackend(options: {
           selectedStoreId: undefined,
           browseUntilSeconds: null,
           queueUntilSeconds: null,
+          queueJoinedSeconds: null,
+          servicePointId: null,
           walkProgress: null,
         };
       };
+      // Patience comes from the persona traits, which are a pure hash of
+      // (agentId, seed): the renege deadline stays reproducible per run.
+      const patienceDeadline = (agent: SimulationAgent) =>
+        elapsedSeconds +
+        queuePatienceMinSeconds +
+        createAgentMindset({ agentId: agent.id, seed: mindsetSeed }).traits.patience *
+          queuePatienceRangeSeconds;
+      const counters = createCounterTick({
+        agents,
+        elapsedSeconds,
+        evacuationActive,
+        leave: leaveDecision,
+        patienceDeadline,
+        seed: mindsetSeed,
+        servicePoints: activeServicePoints,
+        shops: activeShops,
+      });
       const walkDecision = (
         agent: SimulationAgent,
         shop: SimulationShop,
@@ -232,23 +269,21 @@ export function createMallCrowdDecisionBackend(options: {
         selectedStoreId: shop.id,
         target: shop.position,
         queueUntilSeconds: null,
+        // A shopper diverted from one line starts at the back of the next.
+        queueJoinedSeconds: null,
         walkProgress: null,
       });
       const queueDecision = (
         agent: SimulationAgent,
         shop: SimulationShop,
+        place: number,
       ): SimulationAgentDecision => ({
         agentId: agent.id,
         nextState: "queue",
         selectedStoreId: shop.id,
-        target: shop.queuePosition,
-        // Patience comes from the persona traits, which are a pure hash of
-        // (agentId, seed): the renege deadline stays reproducible per run.
-        queueUntilSeconds:
-          elapsedSeconds +
-          queuePatienceMinSeconds +
-          createAgentMindset({ agentId: agent.id, seed: mindsetSeed }).traits.patience *
-            queuePatienceRangeSeconds,
+        target: queueSlotPosition(shop, place),
+        queueJoinedSeconds: agent.queueJoinedSeconds ?? elapsedSeconds,
+        queueUntilSeconds: patienceDeadline(agent),
         walkProgress: null,
       });
       /**
@@ -297,7 +332,7 @@ export function createMallCrowdDecisionBackend(options: {
         // Evacuation overrides shopping: abandon the shop, head for the exit.
         if (evacuationActive) {
           if (state !== "evacuate") {
-            const sink = nearestSink(agent, sinks);
+            const sink = nearestAllowedSink(agent, sinks);
             decisions.push({
               agentId: agent.id,
               nextState: "evacuate",
@@ -317,14 +352,7 @@ export function createMallCrowdDecisionBackend(options: {
         }
 
         if (activeShops.length === 0) {
-          const sink = nearestSink(agent, sinks);
-          decisions.push({
-            agentId: agent.id,
-            nextState: "leave",
-            target: sink.position,
-            targetSinkId: sink.id,
-            walkProgress: null,
-          });
+          decisions.push(leaveDecision(agent));
           continue;
         }
 
@@ -342,11 +370,12 @@ export function createMallCrowdDecisionBackend(options: {
               activeServicePoints.length > 0 &&
               shop !== undefined &&
               random() < shop.conversionRate;
-            if (buys) {
-              const counter = nearestServicePoint(agent, activeServicePoints);
+            const counter = buys ? counters.chooseCounter(agent) : undefined;
+            if (counter) {
               decisions.push({
                 agentId: agent.id,
                 nextState: "checkout",
+                servicePointId: counter.id,
                 target: counter.position,
                 selectedStoreId: undefined,
                 browseUntilSeconds: null,
@@ -359,21 +388,10 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
-        // Walking to a checkout: start the service once at the counter.
+        // Walking to, or waiting in line at, a checkout (checkoutCounters).
         if (state === "checkout") {
-          if (activeServicePoints.length > 0) {
-            const counter = nearestServicePoint(agent, activeServicePoints);
-            const dx = counter.position.x - agent.x;
-            const dy = counter.position.y - agent.y;
-            if (Math.hypot(dx, dy) <= counter.radius) {
-              decisions.push({
-                agentId: agent.id,
-                nextState: "enterStore",
-                target: counter.position,
-                browseUntilSeconds: elapsedSeconds + counter.serviceSeconds,
-              });
-            }
-          }
+          const decision = counters.decideCheckout(agent);
+          if (decision) decisions.push(decision);
           continue;
         }
 
@@ -395,15 +413,14 @@ export function createMallCrowdDecisionBackend(options: {
             continue;
           }
 
-          if (hasRoom(shop.id)) {
-            leaveQueue(shop.id);
-            enter(shop.id);
+          if (admitted.has(agent.id)) {
             decisions.push(browseDecision(agent.id, shop));
             continue;
           }
+          const place = placeInLine.get(agent.id) ?? 0;
 
           if (agent.queueUntilSeconds === undefined) {
-            decisions.push(queueDecision(agent, shop));
+            decisions.push(queueDecision(agent, shop, place));
             continue;
           }
 
@@ -411,6 +428,18 @@ export function createMallCrowdDecisionBackend(options: {
           if (elapsedSeconds >= agent.queueUntilSeconds) {
             leaveQueue(shop.id);
             divertOrLeave(agent, shop.id);
+            continue;
+          }
+
+          // Shuffle forward as the line moves.
+          const slot = queueSlotPosition(shop, place);
+          if (Math.hypot(slot.x - agent.targetX, slot.y - agent.targetY) > 0.05) {
+            decisions.push({
+              agentId: agent.id,
+              nextState: "queue",
+              selectedStoreId: shop.id,
+              target: slot,
+            });
           }
           continue;
         }
@@ -431,24 +460,35 @@ export function createMallCrowdDecisionBackend(options: {
               decisions.push(browseDecision(agent.id, shop));
             } else if (hasQueueRoom(shop.id)) {
               joinQueue(shop.id);
-              decisions.push(queueDecision(agent, shop));
+              // Joins at the back: everyone already in line, bar those let in.
+              decisions.push(
+                queueDecision(agent, shop, (queueLength.get(shop.id) ?? 1) - 1),
+              );
             } else {
               divertOrLeave(agent, shop.id);
             }
             continue;
           }
 
-          // Blocked route detection: walls make sliding movement stall dead, and
-          // `walk` only ends inside the arrival radius, so a shopper cut off from
-          // its shop used to occupy an agent slot forever.
+          // Blocked route detection: `walk` only ends inside the arrival
+          // radius, so a shopper cut off from its shop used to occupy an agent
+          // slot forever. Progress is walking distance, so a detour round a
+          // building counts; a shop walls cut off entirely never progresses.
           const progress = agent.walkProgress;
+          const remaining = routeDistance
+            ? routeDistance(agent, shop.position)
+            : distance;
 
-          if (!progress || distance <= progress.distance - walkProgressEpsilonMeters) {
+          if (
+            !progress ||
+            (Number.isFinite(remaining) &&
+              remaining <= progress.distance - walkProgressEpsilonMeters)
+          ) {
             decisions.push({
               agentId: agent.id,
               nextState: "walk",
               selectedStoreId: shop.id,
-              walkProgress: { distance, tick: decisionTick },
+              walkProgress: { distance: remaining, tick: decisionTick },
             });
           } else if (decisionTick - progress.tick >= walkStallDecisionTicks) {
             // Head for an exit rather than another shop: the shopper has proven
@@ -465,7 +505,19 @@ export function createMallCrowdDecisionBackend(options: {
         let chosen: SimulationShop | undefined;
         if (options.brandStores && options.brandStores.length > 0) {
           const mindset = createAgentMindset({ agentId: agent.id, seed: mindsetSeed });
-          const choice = chooseBrandStore(mindset, options.brandStores, {
+          // The crowd and queue this shopper would face right now, so a packed
+          // store with a long line actually loses custom.
+          const liveStores = options.brandStores.map((store) => {
+            const shop = shopById.get(store.id);
+            return {
+              ...store,
+              crowdLevel: shop
+                ? clamp01((occupancy.get(store.id) ?? 0) / Math.max(1, shop.capacity))
+                : 0,
+              queueLength: queueLength.get(store.id) ?? 0,
+            };
+          });
+          const choice = chooseBrandStore(mindset, liveStores, {
             agentPosition: { x: agent.x, y: agent.y },
             randomUnit: random(),
           });

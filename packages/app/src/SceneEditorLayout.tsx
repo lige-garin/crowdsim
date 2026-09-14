@@ -13,6 +13,7 @@ import type {
 } from "./sceneEditorState";
 import type {
   BuildingNumberField,
+  EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
   RoadNumberField,
@@ -21,9 +22,13 @@ import type {
 } from "./sceneEditorMutations";
 import type { SceneImageOverlay } from "./sceneEditorImageOverlay";
 import { pointsToSvg } from "./sceneEditorUtils";
-import type { SimulationAgent } from "./simulationEngine";
+import type { LiveCrowd } from "./liveCrowd";
 
 type SceneEditorLayoutProps = {
+  /** Kept mounted while the stage shows another view, so work is not lost. */
+  hidden?: boolean;
+  /** Set when the live scene changed underneath unapplied edits. */
+  onReloadLiveScene?: () => void;
   aiImageOverlay: SceneImageOverlay | null;
   templatePrompt: string;
   baseScene: CrowdSimScene;
@@ -39,7 +44,7 @@ type SceneEditorLayoutProps = {
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   gridSize: number;
   language: Language;
-  liveAgents: readonly SimulationAgent[];
+  crowd?: LiveCrowd;
   onTemplateDraft: () => void;
   onTemplatePromptChange: (value: string) => void;
   onApplyScene: () => void;
@@ -47,6 +52,8 @@ type SceneEditorLayoutProps = {
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
+  onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onDeleteSelected: () => void;
   onDxfImport: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -101,6 +108,7 @@ type SceneEditorLayoutProps = {
   selectableScenes: readonly CrowdSimScene[];
   selectedBuilding: EditorDocument["buildings"][number] | undefined;
   selectedCountLine: EditorDocument["countLines"][number] | undefined;
+  selectedEntrance: EditorDocument["entrances"][number] | undefined;
   selectedHazard: EditorDocument["hazards"][number] | undefined;
   selectedId: string | null;
   selectedLabel: string;
@@ -122,6 +130,8 @@ type SceneEditorLayoutProps = {
 };
 
 export function SceneEditorLayout({
+  hidden = false,
+  onReloadLiveScene,
   aiImageOverlay,
   templatePrompt,
   baseScene,
@@ -137,7 +147,7 @@ export function SceneEditorLayout({
   geoJsonInputRef,
   gridSize,
   language,
-  liveAgents,
+  crowd,
   onTemplateDraft,
   onTemplatePromptChange,
   onApplyScene,
@@ -145,6 +155,8 @@ export function SceneEditorLayout({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onEntranceKindChange,
+  onEntranceNumberChange,
   onCanvasPointerDown,
   onDeleteSelected,
   onDxfImport,
@@ -189,6 +201,7 @@ export function SceneEditorLayout({
   selectableScenes,
   selectedBuilding,
   selectedCountLine,
+  selectedEntrance,
   selectedHazard,
   selectedId,
   selectedLabel,
@@ -209,7 +222,23 @@ export function SceneEditorLayout({
   viewMode,
 }: SceneEditorLayoutProps) {
   return (
-    <section className="scene-editor" aria-label={t("sceneEditor")}>
+    <section className="scene-editor" aria-label={t("sceneEditor")} hidden={hidden}>
+      {onReloadLiveScene ? (
+        <div
+          className="editor-stale-banner"
+          role="alert"
+          data-testid="editor-stale-banner"
+        >
+          <span>{t("sceneChangedElsewhere")}</span>
+          <button
+            type="button"
+            data-testid="editor-reload-live-scene"
+            onClick={onReloadLiveScene}
+          >
+            {t("reloadLiveScene")}
+          </button>
+        </div>
+      ) : null}
       <SceneEditorControls
         baseSceneId={baseScene.id}
         basemapInputRef={basemapInputRef}
@@ -259,7 +288,7 @@ export function SceneEditorLayout({
         document={document}
         draftWallPoints={draftWallPoints}
         gridSize={gridSize}
-        liveAgents={liveAgents}
+        crowd={crowd}
         onCanvasPointerDown={onCanvasPointerDown}
         onEntityPointerDown={onEntityPointerDown}
         onPointerMove={onPointerMove}
@@ -276,6 +305,8 @@ export function SceneEditorLayout({
         onBasemapNumberChange={onBasemapNumberChange}
         onBuildingKindChange={onBuildingKindChange}
         onBuildingNumberChange={onBuildingNumberChange}
+        onEntranceKindChange={onEntranceKindChange}
+        onEntranceNumberChange={onEntranceNumberChange}
         onHazardKindChange={onHazardKindChange}
         onHazardNumberChange={onHazardNumberChange}
         onObstacleKindChange={onObstacleKindChange}
@@ -300,6 +331,7 @@ export function SceneEditorLayout({
         pointsToSvg={pointsToSvg}
         selectedBuilding={selectedBuilding}
         selectedCountLine={selectedCountLine}
+        selectedEntrance={selectedEntrance}
         selectedHazard={selectedHazard}
         selectedObstacle={selectedObstacle}
         selectedRoad={selectedRoad}

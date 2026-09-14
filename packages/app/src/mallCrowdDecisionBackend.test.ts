@@ -1,5 +1,11 @@
 ﻿import { describe, expect, it } from "vitest";
-import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
+import {
+  browseSpot,
+  createMallCrowdDecisionBackend,
+  queueSlotPosition,
+} from "./mallCrowdDecisionBackend";
+import { queueSpacingMeters } from "./checkoutCounters";
+import { sampleDwellSeconds, sampleServiceSeconds } from "./behaviorDistributions";
 import type {
   SimulationServicePoint,
   SimulationShop,
@@ -84,7 +90,9 @@ describe("createMallCrowdDecisionBackend", () => {
       0,
     );
     expect(d[0].nextState).toBe("browse");
-    expect(d[0].browseUntilSeconds).toBe(5); // 0 + dwell 5
+    // 0 + this shopper's own draw around the shop's 5 s mean dwell.
+    expect(d[0].browseUntilSeconds).toBe(sampleDwellSeconds(5, 1, 1, "a"));
+    expect(d[0].browseUntilSeconds).not.toBe(5);
     expect(d[0].selectedStoreId).toBe("a");
   });
   it("keeps browsing until the dwell elapses (no decision emitted)", () => {
@@ -215,7 +223,7 @@ describe("createMallCrowdDecisionBackend", () => {
     ];
     const decided = decide(agents, 1).find((x) => x.agentId === 2);
     expect(decided?.nextState).toBe("browse");
-    expect(decided?.browseUntilSeconds).toBe(6); // elapsed 1 + dwell 5
+    expect(decided?.browseUntilSeconds).toBe(1 + sampleDwellSeconds(5, 1, 2, "a"));
   });
 
   it("gives a queued shopper a patience deadline it can run out of", () => {
@@ -359,7 +367,12 @@ describe("createMallCrowdDecisionBackend", () => {
 
   it("starts the checkout service when the buyer reaches the counter", () => {
     const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
-    const atCounter = agent({ lifecycleState: "checkout", x: 5, y: 5 });
+    const atCounter = agent({
+      lifecycleState: "checkout",
+      servicePointId: "checkout1",
+      x: 5,
+      y: 5,
+    });
     const d = backend.decideAgents({
       agents: [atCounter],
       decisionTick: 0,
@@ -369,7 +382,8 @@ describe("createMallCrowdDecisionBackend", () => {
       servicePoints,
     });
     expect(d[0].nextState).toBe("enterStore");
-    expect(d[0].browseUntilSeconds).toBe(3); // 0 + serviceSeconds 3
+    // 0 + this buyer's Erlang draw around the counter's 3 s mean.
+    expect(d[0].browseUntilSeconds).toBe(sampleServiceSeconds(3, 1, 1, "checkout1"));
   });
 
   it("leaves after the checkout service completes", () => {
@@ -494,5 +508,116 @@ describe("createMallCrowdDecisionBackend", () => {
       expect(d.nextState).toBe("walk");
       expect(["a", "b"]).toContain(d.selectedStoreId);
     }
+  });
+});
+
+describe("brand store choice reads the live crowd", () => {
+  const roomyShops: SimulationShop[] = shops.map((shop) => ({ ...shop, capacity: 20 }));
+  const sameBrand = (id: string): BrandStoreCandidate => ({
+    id,
+    position: roomyShops.find((shop) => shop.id === id)!.position,
+    crowdLevel: 0,
+    queueLength: 0,
+    brand: {
+      id: `brand-${id}`,
+      name: id,
+      category: "coffee",
+      brandPower: 0.6,
+      capacity: 20,
+      dwellMeanSeconds: 5,
+      novelty: 0.3,
+      priceTier: 2,
+      promotion: 0,
+      visibility: 0.5,
+      queueToleranceImpact: 0.4,
+      personaAffinity: {},
+    },
+  });
+
+  it("steers fresh shoppers away from a packed store with a long line", () => {
+    // Two identical coffee shops, equally far from the shoppers. Shop "a" is
+    // listed first; the old made-up load favoured it for that reason alone.
+    const load = [...browsersAt("a", 18, 1000), ...queuersAt("a", 30, 2000)];
+    const picks = { a: 0, b: 0 };
+
+    for (let id = 1; id <= 400; id++) {
+      const backend = createMallCrowdDecisionBackend({
+        shops: roomyShops,
+        seed: id,
+        brandStores: [sameBrand("a"), sameBrand("b")],
+      });
+      const decision = backend
+        .decideAgents({
+          agents: [...load, agent({ id, x: 30, y: 30 })],
+          decisionTick: 0,
+          elapsedSeconds: 0,
+          sinks,
+          shops: roomyShops,
+        })
+        .find((candidate) => candidate.agentId === id);
+      if (decision?.selectedStoreId === "a" || decision?.selectedStoreId === "b") {
+        picks[decision.selectedStoreId] += 1;
+      }
+    }
+
+    expect(picks.a + picks.b).toBe(400);
+    expect(picks.b).toBeGreaterThan(picks.a * 1.3);
+  });
+});
+
+describe("lines and shop floors", () => {
+  const lineShop: SimulationShop = {
+    ...shops[0],
+    capacity: 1,
+    queuePosition: { x: 10, y: 14 },
+    queueDirection: { x: 0, y: 1 },
+    browseArea: { x: 10, y: 6, halfWidth: 3, halfHeight: 2 },
+  };
+
+  it("stands a line in order of arrival, one spacing apart, and lets the head in first", () => {
+    const backend = createMallCrowdDecisionBackend({ shops: [lineShop], seed: 3 });
+    // Array order is the reverse of arrival order: the old rule let agent 30 in.
+    const queuers = [30, 20, 10].map((id) =>
+      agent({
+        id,
+        lifecycleState: "queue",
+        selectedStoreId: "a",
+        queueJoinedSeconds: id,
+        queueUntilSeconds: 10_000,
+        targetX: 0,
+        targetY: 0,
+      }),
+    );
+    const decisions = backend.decideAgents({
+      agents: queuers,
+      decisionTick: 0,
+      elapsedSeconds: 50,
+      sinks,
+      shops: [lineShop],
+    });
+    const byId = new Map(decisions.map((decision) => [decision.agentId, decision]));
+
+    expect(byId.get(10)?.nextState).toBe("browse");
+    expect(byId.get(20)?.target).toEqual(queueSlotPosition(lineShop, 0));
+    expect(byId.get(30)?.target).toEqual(queueSlotPosition(lineShop, 1));
+    expect(
+      queueSlotPosition(lineShop, 1).y - queueSlotPosition(lineShop, 0).y,
+    ).toBeCloseTo(queueSpacingMeters);
+  });
+
+  it("spreads browsers over the shop floor instead of one point", () => {
+    const spots = Array.from({ length: 30 }, (_, index) =>
+      browseSpot(lineShop, 3, index + 1),
+    );
+    const distinct = new Set(
+      spots.map((spot) => `${spot.x.toFixed(2)},${spot.y.toFixed(2)}`),
+    );
+
+    expect(distinct.size).toBe(30);
+    for (const spot of spots) {
+      expect(Math.abs(spot.x - 10)).toBeLessThanOrEqual(3);
+      expect(Math.abs(spot.y - 6)).toBeLessThanOrEqual(2);
+    }
+    expect(browseSpot(lineShop, 3, 7)).toEqual(browseSpot(lineShop, 3, 7));
   });
 });

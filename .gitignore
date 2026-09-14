@@ -14,3 +14,7 @@ packages/app/src/wasm/core-behavior/
 .workbuddy/
 .pnpm-store/
 .vite-5184.log
+# Local-only e2e scratch: sandbox fs patch, screenshot scripts, dev logs
+e2e-fs-patch.cjs
+output/
+dev-server.log

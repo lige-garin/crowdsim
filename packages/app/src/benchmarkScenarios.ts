@@ -2,21 +2,22 @@
 //
 // These scenarios are named after RiMEA test cases but they are NOT the RiMEA
 // geometry, and every expectation below is `source: "self-authored"` -- the
-// ranges were chosen to bracket what this engine currently produces, so they
-// are regression guards, not evidence of correctness.
+// ranges bracket what this engine produces, so they are regression guards, not
+// evidence of correctness.
 //
-// The clearest example: the engine walks every agent at a constant 1.34 m/s
-// and the corridor expectation is 1.25-1.38 m/s. 1.34 is Weidmann's free-flow
-// mean, so the engine cannot miss as long as it keeps moving -- the range was
-// fitted to the engine, not to the world.
+// 2026-09-14: re-baselined for the social-force movement model
+// (`crowdMovement.ts`). The ranges had been fitted to the old kinematic model,
+// which walked everyone at exactly the scene speed; the corridor range
+// (1.25-1.38 m/s around a 1.34 m/s engine) could not be missed. Walkers now
+// accelerate from rest, have their own free speeds and push each other, so
+// mean speeds fall below the scene speed. The one physical bound kept on every
+// speed range is its maximum: the scene's mean free speed, which a crowd with
+// no outside push cannot average above. Old -> new values are in the ledger.
 //
-// What the engine does not do is slow anyone down as density rises. Weidmann's
-// published curve (`weidmannSpeedAtDensity`) puts the corridor at 0.61 m/s at
-// 2 P/m^2; this engine still reports 1.34. RiMEA test 4 asks whether a model
-// reproduces the shape of that curve, and this model currently does not have
-// one to reproduce. `pedestrianFundamentalDiagram.ts` holds the published
-// numbers; closing the gap means giving the engine a density-speed coupling,
-// not widening these ranges.
+// "counterflow" names each source's exit (ADR-0008). Before that, every walker
+// left by the nearest exit, which for both sources was the one 4 m beside it,
+// so the scenario had no counterflow in it (206 of 211 walkers exited after a
+// 4 m walk). Now both flows cross the whole corridor.
 import { parseScene } from "@crowdsim/scene-schema";
 import type { BenchmarkScenario } from "./benchmarkTypes";
 
@@ -35,7 +36,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       { metric: "exitedCount", range: { min: 40, max: 220 }, source: "self-authored" },
       {
         metric: "meanSpeedMetersPerSecond",
-        range: { min: 1.25, max: 1.38 },
+        range: { min: 1.15, max: 1.34 },
         source: "self-authored",
       },
       {
@@ -85,7 +86,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       { metric: "exitedCount", range: { min: 70, max: 300 }, source: "self-authored" },
       {
         metric: "densityPeak",
-        range: { min: 0.01, max: 1.5 },
+        range: { min: 0.01, max: 2.5 },
         source: "self-authored",
       },
       {
@@ -156,7 +157,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       { metric: "exitedCount", range: { min: 35, max: 230 }, source: "self-authored" },
       {
         metric: "meanSpeedMetersPerSecond",
-        range: { min: 1.05, max: 1.35 },
+        range: { min: 0.9, max: 1.18 },
         source: "self-authored",
       },
     ],
@@ -206,7 +207,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
   },
   {
     description:
-      "Two opposing flows with balanced source rates for deterministic counterflow regression.",
+      "Two opposing flows with balanced rates, each sent to the exit at the far end of the corridor.",
     durationSeconds: 90,
     expectations: [
       {
@@ -217,7 +218,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
       { metric: "exitedCount", range: { min: 60, max: 320 }, source: "self-authored" },
       {
         metric: "meanSpeedMetersPerSecond",
-        range: { min: 1.0, max: 1.32 },
+        range: { min: 0.95, max: 1.16 },
         source: "self-authored",
       },
       {
@@ -241,6 +242,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 2, y: 4 },
           width: 4,
           arrivalRatePerMinute: 75,
+          exitIds: ["east-sink"],
         },
         {
           id: "east-source",
@@ -248,6 +250,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 54, y: 8 },
           width: 4,
           arrivalRatePerMinute: 75,
+          exitIds: ["west-sink"],
         },
         {
           id: "west-sink",

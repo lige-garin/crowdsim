@@ -8,6 +8,7 @@
  */
 export const viewportLayerIds = [
   "crowd",
+  "behaviour",
   "heatmap",
   "flow",
   "risk",
@@ -18,11 +19,20 @@ export type ViewportLayerId = (typeof viewportLayerIds)[number];
 
 export type ViewportLayers = Record<ViewportLayerId, boolean>;
 
+/**
+ * The city opens clean: people and weather, nothing else. Heatmap, flow lines
+ * and risk are analysis layers — they paint over the scene, so they are
+ * switched on from the info rail when someone wants to read them, not drawn
+ * over the city by default.
+ */
 export const defaultViewportLayers: ViewportLayers = {
+  // People wear their own clothes; colouring them by what they are doing is an
+  // analysis view, switched on like the others.
+  behaviour: false,
   crowd: true,
-  flow: true,
-  heatmap: true,
-  risk: true,
+  flow: false,
+  heatmap: false,
+  risk: false,
   weather: true,
 };
 
@@ -34,6 +44,7 @@ export function toggleViewportLayer(
 }
 
 export const viewportLayerText: Record<ViewportLayerId, { en: string; zh: string }> = {
+  behaviour: { en: "Behaviour colours", zh: "行为着色" },
   crowd: { en: "Crowd", zh: "人群" },
   flow: { en: "Flow lines", zh: "流线" },
   heatmap: { en: "Heatmap", zh: "热力" },
@@ -48,6 +59,8 @@ export const viewportLayerText: Record<ViewportLayerId, { en: string; zh: string
  * "every layer is backed by real geometry" claim checkable in a test.
  */
 export const viewportLayerObjectPrefix: Record<ViewportLayerId, string> = {
+  // Not separate geometry: it recolours the crowd's clothing in place.
+  behaviour: "layer-behaviour",
   crowd: "layer-crowd",
   flow: "layer-flow",
   heatmap: "layer-heatmap",

@@ -1,6 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { AgentIntent, AgentMindset, AgentPersona } from "./agentPersona";
-import { clamp01, intentWeight } from "./agentPersona";
+import { intentWeight } from "./agentPersona";
 
 export type BrandCategory =
   | "anchor"
@@ -82,12 +82,22 @@ const categoryIntentMap: Record<BrandCategory, AgentIntent[]> = {
   service: ["seekService"],
 };
 
+/**
+ * Store-choice candidates for every branded shop, with no crowd and no queue.
+ *
+ * `crowdLevel` and `queueLength` used to be `0.22 + index·0.08` and
+ * `(index + 1)·2.2` — made up from the shop's position in `scene.shops`. The
+ * crowd and queue penalties then pushed every shopper toward shops listed
+ * earlier, and nobody ever avoided a store that was actually packed. A scene
+ * that is not running has no crowd, so these start at zero; the decision
+ * backend fills them from the live run each time a shopper chooses.
+ */
 export function createBrandStoresFromScene(
   scene: CrowdSimScene,
 ): BrandStoreCandidate[] {
   return scene.shops
     .filter((shop) => Boolean(shop.brand))
-    .map((shop, index) => {
+    .map((shop) => {
       const brand = shop.brand!;
 
       return {
@@ -105,10 +115,10 @@ export function createBrandStoresFromScene(
           queueToleranceImpact: 0.35 + shop.capacity / 90,
           visibility: brand.visibility,
         },
-        crowdLevel: clamp01(0.22 + index * 0.08),
+        crowdLevel: 0,
         id: shop.id,
         position: shop.position,
-        queueLength: Math.round((index + 1) * 2.2),
+        queueLength: 0,
       };
     });
 }

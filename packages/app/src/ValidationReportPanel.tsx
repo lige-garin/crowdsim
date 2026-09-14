@@ -1,13 +1,24 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useMemo, useState } from "react";
 import { createAiValidationReportSummary } from "./aiReport";
 import { createReportBlob, createValidationReportExportBundle } from "./reportExport";
 import { createValidationReport } from "./validationReport";
 import { useI18n } from "./i18n";
 
-export function ValidationReportPanel() {
+/**
+ * The printable report for the scene the user has open. It used to be built with
+ * no scene at all, so the exported PDF described the built-in RiMEA fixtures and
+ * nothing of the user's project. The benchmark section still runs those fixtures:
+ * it checks the engine, and the report says so.
+ */
+export function ValidationReportPanel({ scene }: { scene: CrowdSimScene }) {
   const { language } = useI18n();
   const [opened, setOpened] = useState(false);
-  const report = useMemo(() => createValidationReport(), []);
+  const report = useMemo(
+    () => createValidationReport({ commercialScene: scene }),
+    [scene],
+  );
+  const sceneName = report.sceneName;
   const aiSummary = useMemo(
     () => createAiValidationReportSummary(report, language),
     [language, report],
@@ -22,8 +33,8 @@ export function ValidationReportPanel() {
   const printLabel = language === "zh" ? "打印 / 导出 PDF" : "Print / export PDF";
   const note =
     language === "zh"
-      ? "包含 RiMEA 回归基准、Weidmann 密度-速度对比和 IMO 人群参数来源。"
-      : "Includes RiMEA regression fixtures, Weidmann density-speed comparison, and IMO pedestrian preset sources.";
+      ? `场景「${sceneName}」的商业参数校验；另附引擎回归基准（RiMEA 命名的自拟场景，与本场景无关）、Weidmann 密度-速度对比和 IMO 人群参数来源。`
+      : `Commercial checks for "${sceneName}", plus engine regression fixtures (self-authored, RiMEA-named, independent of this scene), the Weidmann density-speed comparison, and IMO pedestrian preset sources.`;
 
   function openPrintableReport() {
     const blob = createReportBlob(exportBundle);

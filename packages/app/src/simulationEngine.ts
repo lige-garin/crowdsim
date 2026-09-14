@@ -1,15 +1,15 @@
 ﻿import type { WallSegment } from "@crowdsim/core-gpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import {
-  clampPointToWorld,
-  constrainMovement,
-  wallSegmentsFromScene,
-  type SceneWorldBounds,
-} from "./sceneGeometry";
-import { calculateEnvironmentImpact } from "./environmentEffects";
-import type { MovementBackend } from "./movementBackend";
+import { clampPointToWorld, type SceneWorldBounds } from "./sceneGeometry";
+import { sampleBodyRadius, sampleSpeedFactor } from "./behaviorDistributions";
+import { createRouter } from "./crowdNavigation";
+import { stepCrowd } from "./crowdMovement";
+import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
+import { createWallIndex } from "./wallIndex";
+import { crowdBudget } from "./crowdBudget";
 import {
   applySimulationAgentDecisions,
+  nearestAllowedSink,
   calculateSimulationDecisionTick,
   shouldRunDecisionTick,
   type SimulationAgentDecisionState,
@@ -18,13 +18,13 @@ import {
   type SimulationServicePoint,
   type SimulationShop,
 } from "./simulationDecisionBackend";
-import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
-import { weatherCrowdImpact } from "./weatherCrowdImpact";
-import { createBrandStoresFromScene } from "./brandAttraction";
-import { stepAgentsWithMovementBackend } from "./simulationMovementBridge";
-import { buildNavigationFields, pointToCellId } from "./simulationEngineNavigation";
-import { createSeededRng, samplePoisson } from "./simulationEngineRandom";
-import { weidmannSpeedRatioAtDensity } from "./pedestrianFundamentalDiagram";
+import { mulberry32, samplePoisson } from "./simulationEngineRandom";
+import {
+  defaultSpeedMetersPerSecond,
+  deriveSceneGeometry,
+  type SceneGeometry,
+} from "./simulationSceneConfig";
+import { reconcileAgentsWithScene } from "./simulationSceneReconcile";
 export type SimulationStatus = "paused" | "running";
 export type SimulationAgent = {
   decisionTick?: number;
@@ -35,6 +35,8 @@ export type SimulationAgent = {
   browseUntilSeconds?: number;
   /** While queuing, the sim time at which the shopper runs out of patience. */
   queueUntilSeconds?: number;
+  /** While queuing, when the shopper joined the line: sets their place in it. */
+  queueJoinedSeconds?: number;
   /** Closest approach to the current walk target, used to detect a blocked route. */
   walkProgress?: SimulationAgentWalkProgress;
   x: number;
@@ -44,12 +46,22 @@ export type SimulationAgent = {
   targetX: number;
   targetY: number;
   targetSinkId?: string;
+  /** Exits this agent may leave by, copied from its entrance (ADR-0008). */
+  exitIds?: readonly string[];
+  /** The checkout counter a buyer is walking to, waiting at or served by. */
+  servicePointId?: string;
+  /** Body radius in metres, drawn at spawn (`behaviorDistributions`). */
+  radius?: number;
+  /** Free walking speed relative to the scene's mean, drawn at spawn. */
+  speedFactor?: number;
 };
 export type SimulationSource = {
   id: string;
   position: ScenePoint;
   width: number;
   arrivalRatePerSecond: number;
+  /** Exits arrivals here may leave by; absent or empty means any. */
+  exitIds?: readonly string[];
 };
 export type SimulationSink = {
   id: string;
@@ -60,7 +72,6 @@ export type SimulationEngineConfig = {
   decisionBackend?: SimulationDecisionBackend;
   fixedDtSeconds?: number;
   maxAgents?: number;
-  movementBackend?: MovementBackend;
   seed?: number;
   speedMetersPerSecond?: number;
   shops?: readonly SimulationShop[];
@@ -88,32 +99,23 @@ export type SimulationEngine = {
   snapshot: () => SimulationSnapshot;
   start: () => SimulationSnapshot;
   step: (steps?: number) => SimulationSnapshot;
-  stepAsync: (steps?: number) => Promise<SimulationSnapshot>;
   tick: (realDeltaSeconds: number) => SimulationSnapshot;
-  tickAsync: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
+  /** Swap scene-derived geometry in place; agents, clock and counters carry on. */
+  replaceGeometry: (geometry: SceneGeometry) => SimulationSnapshot;
+};
+/** An engine built from a scene, which can take a hot scene update (ADR-0007). */
+export type SceneSimulationEngine = SimulationEngine & {
+  /** Throws when `hotUpdateBlocker` refuses; the caller must then re-init. */
+  updateScene: (scene: CrowdSimScene) => SimulationSnapshot;
 };
 const defaultFixedDtSeconds = 1 / 60;
-const defaultMaxAgents = 2_000;
-// Weidmann free-flow speed. Was 8 m/s (~29 km/h, 6x a walking human): every UI
-// path simulates at this default because neither the controller nor the worker
-// passes an explicit speed, so editor-built scenes ran at sprint pace. Must
-// match the scene-schema default (sceneSchema speedMetersPerSecond).
-const defaultSpeedMetersPerSecond = 1.34;
-/**
- * Local crowd interaction on the CPU path — the three constants below are the
- * whole thing. Before this existed, `advanceAgentsCpu` moved every walker at a
- * fixed speed with no awareness of anybody else: density never slowed anyone
- * (RiMEA test 4 failed by +0.73 m/s at 2 P/m²) and agents walked straight
- * through each other, so jams, queues and arches could not form.
- *
- * The GPU core (`gpuSimCore`) already had this physics; this is the CPU
- * equivalent so the default, backend-less path behaves the same.
- */
-const densityCellSizeMeters = 2;
-/** Shoulder width: two walkers closer than this are overlapping, not walking. */
-const agentSeparationMeters = 0.5;
-/** Per-step cap on the separation push, so nobody is teleported out of a crowd. */
-const maxSeparationStepMeters = 0.2;
+// Measured 2026-09-14 in Node on the rainy high street with the social-force
+// model (`crowdMovement`): 2,000 agents = 4.2 ms/step (the kinematic model it
+// replaced measured 8.64 ms at 2k on 2026-09-12). Cost grows with local density,
+// since every neighbour within 2 m is a pair to evaluate; entrance capacity keeps
+// spawns from piling hundreds onto one point. 2,000 stays the CPU path's
+// ceiling — ten thousand needs the resident GPU core.
+const defaultMaxAgents = crowdBudget.maxAgents;
 const maxRealDeltaSeconds = 0.25;
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
@@ -125,86 +127,74 @@ export const simulationRuntimeProfile = {
 export function createSimulationEngineFromScene(
   scene: CrowdSimScene,
   overrides: Partial<SimulationEngineConfig> = {},
-): SimulationEngine {
-  const environmentImpact = calculateEnvironmentImpact(scene, 0);
-  // Precedence: explicit override > scene-persisted field > engine default
-  // (which equals the schema default, so both fall in line at 1.34).
-  const baseSpeed =
-    overrides.speedMetersPerSecond ??
-    scene.speedMetersPerSecond ??
-    defaultSpeedMetersPerSecond;
-  const sources = scene.entrances
-    .filter((entrance) => entrance.kind !== "sink" && entrance.arrivalRatePerMinute > 0)
-    .map((entrance) => ({
-      id: entrance.id,
-      position: entrance.position,
-      width: entrance.width,
-      arrivalRatePerSecond: entrance.arrivalRatePerMinute / 60,
-    }));
-  const sinks = scene.entrances
-    .filter((entrance) => entrance.kind !== "source")
-    .map((entrance) => ({
-      id: entrance.id,
-      position: entrance.position,
-      radius: Math.max(1, entrance.width / 2),
-    }));
-  const weather = weatherCrowdImpact(environmentImpact);
-  const shops: SimulationShop[] = scene.shops.map((shop) => ({
-    id: shop.id,
-    position: shop.entrancePosition ?? shop.position,
-    radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
-    attraction: shop.attraction,
-    dwellSeconds: shop.dwellMeanSeconds * weather.dwellMultiplier,
-    capacity: shop.capacity,
-    queuePosition: shop.queueAnchor ?? shop.entrancePosition ?? shop.position,
-    conversionRate: shop.conversionRate,
-  }));
-  const servicePoints: SimulationServicePoint[] = scene.servicePoints.map(
-    (servicePoint) => ({
-      id: servicePoint.id,
-      position: servicePoint.position,
-      radius: Math.max(2, servicePoint.width / 2),
-      serviceSeconds: servicePoint.serviceMeanSeconds,
-    }),
-  );
-  const decisionBackend =
-    overrides.decisionBackend ??
-    createMallCrowdDecisionBackend({
-      shops,
-      seed: scene.seed,
-      brandStores: createBrandStoresFromScene(scene),
-    });
-  return createSimulationEngine({
+): SceneSimulationEngine {
+  // One stream for the default behaviour backend for the life of the engine,
+  // so rebuilding that backend on a hot update does not restart it.
+  const random = mulberry32(scene.seed);
+  const engine = createSimulationEngine({
     seed: scene.seed,
-    sources,
-    sinks,
-    walls: wallSegmentsFromScene(scene),
-    world: scene.world,
     ...overrides,
-    shops,
-    servicePoints,
-    decisionBackend,
-    speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
+    ...deriveSceneGeometry(scene, overrides, random),
   });
+  const runtimeBackend = overrides.decisionBackend;
+  let currentScene = scene;
+  return {
+    ...engine,
+    updateScene(nextScene: CrowdSimScene) {
+      const problem = hotUpdateBlocker(currentScene, nextScene, runtimeBackend);
+      if (problem) {
+        throw new Error(`hot scene update refused: ${problem}`);
+      }
+      currentScene = nextScene;
+      return engine.replaceGeometry(deriveSceneGeometry(nextScene, overrides, random));
+    },
+  };
+}
+
+/**
+ * Why a scene cannot be swapped into a running engine, or null if it can
+ * (ADR-0007 rule 3). A caller that gets a reason must re-init instead.
+ */
+export function hotUpdateBlocker(
+  current: CrowdSimScene,
+  next: CrowdSimScene,
+  injectedBackend?: SimulationDecisionBackend,
+): string | null {
+  // A different scene (loaded, imported, a template) is a different run, even
+  // when it happens to share the seed and world size of the one on screen.
+  if (current.id !== next.id) return "different scene";
+  if (current.seed !== next.seed) return "seed changed";
+  if (
+    current.world.width !== next.world.width ||
+    current.world.height !== next.world.height
+  ) {
+    return "world size changed";
+  }
+  // With no exit nobody can finish; the run is not a continuation of this one.
+  if (!next.entrances.some((entrance) => entrance.kind !== "source")) {
+    return "no exit left";
+  }
+  // An injected backend (the WASM model) bakes the shop list in at creation.
+  if (injectedBackend) return "decision backend holds scene state";
+  return null;
 }
 export function createSimulationEngine(
   config: SimulationEngineConfig,
 ): SimulationEngine {
   const fixedDtSeconds = config.fixedDtSeconds ?? defaultFixedDtSeconds;
-  const decisionBackend = config.decisionBackend;
+  let decisionBackend = config.decisionBackend;
   const maxAgents = config.maxAgents ?? defaultMaxAgents;
-  const speedMetersPerSecond =
-    config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
-  const sources = config.sources;
-  const sinks = config.sinks;
-  const shops = config.shops ?? [];
-  const servicePoints = config.servicePoints ?? [];
-  const movementBackend = config.movementBackend;
+  // Scene-derived: replaced as a set by replaceGeometry (ADR-0007).
+  let speedMetersPerSecond = config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
+  let sources = config.sources;
+  let sinks = config.sinks;
+  let shops = config.shops ?? [];
+  let servicePoints = config.servicePoints ?? [];
   const seed = config.seed ?? 1;
-  const walls = config.walls ?? [];
-  const world = config.world;
-  const navigationFields = buildNavigationFields(world, walls, sinks);
-  let rng = createSeededRng(seed);
+  let world = config.world;
+  let router = createRouter(world, config.walls ?? []);
+  let wallIndex = createWallIndex(config.walls ?? []);
+  let rng = mulberry32(seed);
   let status: SimulationStatus = "paused";
   let elapsedSeconds = 0;
   let accumulatorSeconds = 0;
@@ -241,9 +231,15 @@ export function createSimulationEngine(
     );
     const x = spawnPoint.x;
     const y = spawnPoint.y;
-    const sink = nearestSink({ x, y });
+    const sink = nearestAllowedSink({ x, y }, sinks, source.exitIds);
+    const id = nextAgentId++;
     agents.push({
-      id: nextAgentId++,
+      ...(source.exitIds && source.exitIds.length > 0
+        ? { exitIds: source.exitIds }
+        : {}),
+      id,
+      radius: sampleBodyRadius(seed, id),
+      speedFactor: sampleSpeedFactor(seed, id),
       x,
       y,
       vx: 0,
@@ -254,46 +250,10 @@ export function createSimulationEngine(
     });
     spawnedCount++;
   }
-  function nearestSink(point: ScenePoint): SimulationSink {
-    let best = sinks[0];
-    let bestDistanceSq = Number.POSITIVE_INFINITY;
-    for (const sink of sinks) {
-      const dx = sink.position.x - point.x;
-      const dy = sink.position.y - point.y;
-      const distanceSq = dx * dx + dy * dy;
-      if (distanceSq < bestDistanceSq) {
-        best = sink;
-        bestDistanceSq = distanceSq;
-      }
-    }
-    return best;
-  }
   function runFixedStep() {
     spawnArrivals();
     runDecisionTickIfNeeded();
     advanceAgentsCpu();
-    elapsedSeconds += fixedDtSeconds;
-    stepCount++;
-  }
-  async function runFixedStepAsync() {
-    if (!movementBackend) {
-      runFixedStep();
-      return;
-    }
-    spawnArrivals();
-    runDecisionTickIfNeeded();
-    const result = await stepAgentsWithMovementBackend({
-      agents,
-      backend: movementBackend,
-      canExit: isExitBound,
-      fixedDtSeconds,
-      sinks,
-      speedMetersPerSecond,
-      walls,
-      world,
-    });
-    agents = result.agents;
-    exitedCount += result.exitedCount;
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
   }
@@ -326,74 +286,54 @@ export function createSimulationEngine(
         shops,
         servicePoints,
         evacuationActive,
+        routeDistance: router.distance,
       }),
       decisionTick,
     );
   }
+  /**
+   * Arrivals enter through their entrance no faster than it can pass people:
+   * its width times Weidmann's peak specific flow. The rest wait outside and
+   * come in as room allows. Without this, a high arrival rate stacked hundreds
+   * of people on one point of a narrow gate.
+   */
+  const waitingOutside = new Map<string, { admit: number; waiting: number }>();
   function spawnArrivals() {
     for (const source of sources) {
-      const arrivals = samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
-      for (let index = 0; index < arrivals; index++) {
+      const gate = waitingOutside.get(source.id) ?? { admit: 1, waiting: 0 };
+      gate.waiting += samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
+      const perSecond = source.width * weidmannMaxSpecificFlow;
+      // One person can always step through; the allowance never banks more
+      // than a second's flow, so a long quiet spell does not release a crowd.
+      gate.admit = Math.min(
+        Math.max(1, perSecond),
+        gate.admit + perSecond * fixedDtSeconds,
+      );
+      while (gate.waiting > 0 && gate.admit >= 1) {
         spawnAgent(source);
+        gate.waiting--;
+        gate.admit--;
       }
+      waitingOutside.set(source.id, gate);
     }
   }
   function advanceAgentsCpu() {
-    const grid = buildAgentGrid(agents);
-    const nextAgents: SimulationAgent[] = [];
-    for (const agent of agents) {
-      if (agent.lifecycleState === "browse" || agent.lifecycleState === "enterStore") {
-        // Standing still, but they still take up space and still act as
-        // obstacles: separate them too, otherwise a browsing crowd or a shop
-        // queue collapses onto one anchor point and occupies no area.
-        const settled = constrainMovement(
-          agent,
-          separateFromNeighbours(grid, agent, agent),
-          walls,
-          world,
-        );
-
-        nextAgents.push({
-          ...agent,
-          vx: (settled.x - agent.x) / fixedDtSeconds,
-          vy: (settled.y - agent.y) / fixedDtSeconds,
-          x: settled.x,
-          y: settled.y,
-        });
-        continue;
-      }
-      const dx = agent.targetX - agent.x;
-      const dy = agent.targetY - agent.y;
-      const distance = Math.hypot(dx, dy);
-      if (isExitBound(agent) && distance <= nearestSink(agent).radius) {
-        exitedCount++;
-        continue;
-      }
-      const direction = movementDirection(agent, dx, dy, distance);
-      const density = localDensityPerSquareMeter(grid, agent.x, agent.y);
-      const crowdSpeed = speedMetersPerSecond * weidmannSpeedRatioAtDensity(density);
-      const travelDistance = Math.min(distance, crowdSpeed * fixedDtSeconds);
-      const proposed = {
-        x: agent.x + direction.x * travelDistance,
-        y: agent.y + direction.y * travelDistance,
-      };
-      const separated = separateFromNeighbours(
-        grid,
-        agent,
-        constrainMovement(agent, proposed, walls, world),
-      );
-      const resolved = constrainMovement(agent, separated, walls, world);
-      const vx = (resolved.x - agent.x) / fixedDtSeconds;
-      const vy = (resolved.y - agent.y) / fixedDtSeconds;
-      nextAgents.push({
-        ...agent,
-        vx,
-        vy,
-        x: resolved.x,
-        y: resolved.y,
-      });
-    }
-    agents = nextAgents;
+    const result = stepCrowd({
+      agents,
+      dtSeconds: fixedDtSeconds,
+      // Every agent is spawned with an exit, and reconciliation re-points it
+      // whenever that exit is removed.
+      exitRadius: (agent) =>
+        sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
+      isExitBound,
+      meanSpeedMetersPerSecond: speedMetersPerSecond,
+      router,
+      seed,
+      walls: wallIndex,
+      world,
+    });
+    agents = result.agents;
+    exitedCount += result.exitedCount;
   }
   /**
    * Only an agent that a decision sent to an exit may leave the world. The old
@@ -412,51 +352,28 @@ export function createSimulationEngine(
     }
     return !decisionBackend && agent.lifecycleState === undefined;
   }
-  function movementDirection(
-    agent: SimulationAgent,
-    dx: number,
-    dy: number,
-    distance: number,
-  ) {
-    if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
-      const fieldDirection = sampleNavigationDirection(agent);
-      if (fieldDirection) {
-        return fieldDirection;
-      }
-    }
-    const invDistance = distance > 0 ? 1 / distance : 0;
-    return {
-      x: dx * invDistance,
-      y: dy * invDistance,
-    };
-  }
-  function sampleNavigationDirection(agent: SimulationAgent) {
-    if (!world || navigationFields.length === 0) {
-      return undefined;
-    }
-    const field =
-      navigationFields.find((candidate) => candidate.sinkId === agent.targetSinkId) ??
-      navigationFields.find(
-        (candidate) =>
-          candidate.sinkId === nearestSink({ x: agent.targetX, y: agent.targetY }).id,
-      );
-    if (!field) {
-      return undefined;
-    }
-    const cell = pointToCellId(agent, field.layout);
-    const direction = {
-      x: field.flowField.directions[cell * 2],
-      y: field.flowField.directions[cell * 2 + 1],
-    };
-    return Math.hypot(direction.x, direction.y) > 0 ? direction : undefined;
-  }
   return {
     pause() {
       status = "paused";
       return makeSnapshot();
     },
+    replaceGeometry(geometry: SceneGeometry) {
+      decisionBackend = geometry.decisionBackend;
+      servicePoints = geometry.servicePoints;
+      shops = geometry.shops;
+      sinks = geometry.sinks;
+      sources = geometry.sources;
+      speedMetersPerSecond = geometry.speedMetersPerSecond;
+      world = geometry.world;
+      router = createRouter(world, geometry.walls);
+      wallIndex = createWallIndex(geometry.walls);
+      // Stranded agents (no exit left anywhere) leave the run but are not
+      // exits: counting them would report an evacuation that never happened.
+      agents = reconcileAgentsWithScene(agents, geometry);
+      return makeSnapshot();
+    },
     reset() {
-      rng = createSeededRng(seed);
+      rng = mulberry32(seed);
       status = "paused";
       elapsedSeconds = 0;
       accumulatorSeconds = 0;
@@ -465,6 +382,7 @@ export function createSimulationEngine(
       nextAgentId = 1;
       spawnedCount = 0;
       exitedCount = 0;
+      waitingOutside.clear();
       agents = [];
       evacuationActive = false;
       return makeSnapshot();
@@ -488,12 +406,6 @@ export function createSimulationEngine(
       }
       return makeSnapshot();
     },
-    async stepAsync(steps = 1) {
-      for (let index = 0; index < steps; index++) {
-        await runFixedStepAsync();
-      }
-      return makeSnapshot();
-    },
     tick(realDeltaSeconds: number) {
       if (status !== "running") {
         return makeSnapshot();
@@ -506,150 +418,5 @@ export function createSimulationEngine(
       }
       return makeSnapshot();
     },
-    async tickAsync(realDeltaSeconds: number) {
-      if (status !== "running") {
-        return makeSnapshot();
-      }
-      accumulatorSeconds +=
-        Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
-      while (accumulatorSeconds >= fixedDtSeconds) {
-        await runFixedStepAsync();
-        accumulatorSeconds -= fixedDtSeconds;
-      }
-      return makeSnapshot();
-    },
   };
-}
-
-/**
- * Local crowd interaction for the CPU path.
- *
- * HONESTY NOTE: the density here is a 3x3-cell sample of agent positions, not a
- * measurement of a real crowd, and the separation push is a positional
- * correction rather than a force. What this buys is the two properties that
- * were missing entirely: speed falls as local density rises (in Weidmann's
- * shape, see `pedestrianFundamentalDiagram`) and walkers no longer occupy the
- * same point. It is not a validated social-force model; `gpuSimCore` is.
- */
-type AgentGrid = {
-  agents: readonly SimulationAgent[];
-  cellIds: Map<number, number[]>;
-};
-
-function buildAgentGrid(agents: readonly SimulationAgent[]): AgentGrid {
-  const cellIds = new Map<number, number[]>();
-
-  agents.forEach((agent, index) => {
-    const cellId = gridCellId(agent.x, agent.y);
-    const bucket = cellIds.get(cellId);
-
-    if (bucket) {
-      bucket.push(index);
-    } else {
-      cellIds.set(cellId, [index]);
-    }
-  });
-
-  return { agents, cellIds };
-}
-
-function gridCellId(x: number, y: number) {
-  const cx = Math.floor(x / densityCellSizeMeters) + 32768;
-  const cy = Math.floor(y / densityCellSizeMeters) + 32768;
-
-  return cx * 65536 + cy;
-}
-
-/**
- * Agents per square metre in the 3x3 neighbourhood around a point. The 3x3
- * window is the measurement area, so a lone walker reads as ~0.03 P/m² rather
- * than 1/36th of nothing: density has to be an area measurement to mean
- * anything against the literature curve.
- */
-function localDensityPerSquareMeter(grid: AgentGrid, x: number, y: number) {
-  let count = 0;
-
-  forEachNeighbour(grid, x, y, () => count++);
-
-  return count / (9 * densityCellSizeMeters * densityCellSizeMeters);
-}
-
-function forEachNeighbour(
-  grid: AgentGrid,
-  x: number,
-  y: number,
-  visit: (agent: SimulationAgent) => void,
-) {
-  const cx = Math.floor(x / densityCellSizeMeters);
-  const cy = Math.floor(y / densityCellSizeMeters);
-
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
-      const bucket = grid.cellIds.get(
-        gridCellId(
-          (cx + dx) * densityCellSizeMeters,
-          (cy + dy) * densityCellSizeMeters,
-        ),
-      );
-
-      if (!bucket) {
-        continue;
-      }
-
-      for (const index of bucket) {
-        visit(grid.agents[index]);
-      }
-    }
-  }
-}
-
-/**
- * Push a walker out of anyone it overlaps. Neighbours are read at their
- * step-start positions (the grid is built once per step), so the result does
- * not depend on processing order and stays reproducible from a seed.
- */
-function separateFromNeighbours(
-  grid: AgentGrid,
-  agent: SimulationAgent,
-  position: ScenePoint,
-): ScenePoint {
-  let x = position.x;
-  let y = position.y;
-
-  forEachNeighbour(grid, x, y, (other) => {
-    if (other.id === agent.id) {
-      return;
-    }
-
-    const dx = x - other.x;
-    const dy = y - other.y;
-    const distanceSq = dx * dx + dy * dy;
-
-    if (distanceSq >= agentSeparationMeters * agentSeparationMeters) {
-      return;
-    }
-
-    const distance = Math.sqrt(distanceSq);
-
-    // Exactly coincident walkers (a narrow gate can stack spawns on one point)
-    // have no axis to separate along. Nudge them by a deterministic,
-    // id-derived angle so the stack always breaks up instead of freezing.
-    if (distance < 1e-6) {
-      const angle = (agent.id * 2.399963) % (Math.PI * 2);
-
-      x += Math.cos(angle) * maxSeparationStepMeters;
-      y += Math.sin(angle) * maxSeparationStepMeters;
-      return;
-    }
-
-    const push = Math.min(
-      (agentSeparationMeters - distance) / 2,
-      maxSeparationStepMeters,
-    );
-
-    x += (dx / distance) * push;
-    y += (dy / distance) * push;
-  });
-
-  return { x, y };
 }

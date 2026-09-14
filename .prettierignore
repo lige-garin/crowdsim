@@ -11,3 +11,6 @@ packages/app/src/wasm/
 .workbuddy
 .pnpm-store
 _to_delete
+e2e-fs-patch.cjs
+output
+dev-server.log

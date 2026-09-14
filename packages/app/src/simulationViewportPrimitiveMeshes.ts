@@ -4,11 +4,13 @@
   Group,
   Mesh,
   MeshBasicMaterial,
+  MeshPhysicalMaterial,
   MeshStandardMaterial,
   type Object3D,
 } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { facadeWindows } from "./buildingFacade";
+import { groundTextures, groundTileMeters, repeatFor } from "./groundTextures";
 import { streetDressingPlacements } from "./streetDressing";
 import type {
   BioCityRenderAssetPlacement,
@@ -164,6 +166,45 @@ export function createBioCityPrimitiveMesh(
 
   if (primitive.kind === "road") {
     const group = new Group();
+    if (viewMode === "3d") {
+      // A street, not a neon trace: asphalt, kerb-white edge lines and a dashed
+      // centre line. The glowing cyan strips it used to carry looked like a
+      // debug overlay drawn over the city.
+      group.add(createWetRoadMesh(x1, y1, x2, y2, primitive.widthMeters));
+      const length = Math.hypot(x2 - x1, y2 - y1);
+      const ux = (x2 - x1) / (length || 1);
+      const uy = (y2 - y1) / (length || 1);
+      const nx = -uy;
+      const ny = ux;
+      const edge = primitive.widthMeters / 2 - 0.45;
+      for (const side of [-1, 1]) {
+        group.add(
+          createLineLikeMesh(
+            x1 + nx * edge * side,
+            y1 + ny * edge * side,
+            x2 + nx * edge * side,
+            y2 + ny * edge * side,
+            0.2,
+            "#ece9dc",
+            0.1,
+          ),
+        );
+      }
+      for (let along = 1.5; along < length - 3; along += 7) {
+        group.add(
+          createLineLikeMesh(
+            x1 + ux * along,
+            y1 + uy * along,
+            x1 + ux * (along + 3.2),
+            y1 + uy * (along + 3.2),
+            0.24,
+            "#ece9dc",
+            0.1,
+          ),
+        );
+      }
+      return group;
+    }
     group.add(
       createLineLikeMesh(x1, y1, x2, y2, primitive.widthMeters, "#2d3b40", 0.09),
     );
@@ -203,6 +244,39 @@ export function createBioCityPrimitiveMesh(
     primitive.color,
     0.12,
   );
+}
+
+function createWetRoadMesh(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  width: number,
+) {
+  const length = Math.hypot(x2 - x1, y2 - y1);
+  const roadWidth = Math.max(0.2, width);
+  // Aggregate under the wet sheen, tiled per metre along the road; a flat
+  // colour read as a black strip once the sky started reflecting in it.
+  const asphalt = groundTextures()?.asphalt;
+  const mesh = new Mesh(
+    new BoxGeometry(length, roadWidth, 0.09),
+    new MeshPhysicalMaterial({
+      clearcoat: 0.48,
+      clearcoatRoughness: 0.22,
+      color: asphalt ? "#8f969a" : "#333b3e",
+      map: asphalt
+        ? repeatFor(asphalt, length, roadWidth, groundTileMeters.asphalt)
+        : null,
+      metalness: 0.05,
+      roughness: 0.3,
+    }),
+  );
+
+  mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, 0.09 / 2);
+  mesh.rotation.z = Math.atan2(y2 - y1, x2 - x1);
+  mesh.receiveShadow = true;
+
+  return mesh;
 }
 
 export function createBioCitySceneDressingObjects(

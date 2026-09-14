@@ -28,6 +28,8 @@ import {
   updateDocumentServiceNumber,
   updateDocumentShopNumber,
   updateDocumentShopSize,
+  updateDocumentEntranceKind,
+  updateDocumentEntranceNumber,
   updateDocumentTransitStopKind,
   updateDocumentTransitStopNumber,
   updateDocumentZoneCategory,
@@ -39,6 +41,7 @@ import {
   type ServiceNumberField,
   type ShopNumberField,
   type ShopSizeField,
+  type EntranceNumberField,
   type TransitStopNumberField,
   type ZoneNumberField,
 } from "./sceneEditorMutations";
@@ -57,6 +60,7 @@ type SceneEditorParamActionInput = {
   selectedRoad?: EditorDocument["roads"][number];
   selectedServicePoint?: EditorDocument["servicePoints"][number];
   selectedShop?: EditorDocument["shops"][number];
+  selectedEntrance?: EditorDocument["entrances"][number];
   selectedTransitStop?: EditorDocument["transitStops"][number];
   selectedZone?: EditorDocument["zones"][number];
   setBaseScene: Dispatch<SetStateAction<CrowdSimScene>>;
@@ -75,6 +79,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
     selectedRoad,
     selectedServicePoint,
     selectedShop,
+    selectedEntrance,
     selectedTransitStop,
     selectedZone,
     setBaseScene,
@@ -192,6 +197,18 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedShop || !Number.isFinite(value)) return;
       setDocument((current) =>
         updateDocumentShopSize(current, selectedShop.id, field, value),
+      );
+    },
+    updateEntranceKind(kind: EditorDocument["entrances"][number]["kind"]) {
+      if (!selectedEntrance) return;
+      setDocument((current) =>
+        updateDocumentEntranceKind(current, selectedEntrance.id, kind),
+      );
+    },
+    updateEntranceNumber(field: EntranceNumberField, value: number) {
+      if (!selectedEntrance || !Number.isFinite(value)) return;
+      setDocument((current) =>
+        updateDocumentEntranceNumber(current, selectedEntrance.id, field, value),
       );
     },
     updateTransitStopKind(kind: EditorDocument["transitStops"][number]["kind"]) {

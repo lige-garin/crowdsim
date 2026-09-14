@@ -2,6 +2,37 @@ import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 
 import type { EditorDocument, EditorShopBrand } from "./sceneEditorTypes";
 
+/**
+ * First id number no existing `<kind>-<n>` id uses. Adders name new entities
+ * `shop-${nextId}` etc.; starting at 1 on a scene that already holds `shop-1`
+ * (any scene the editor once applied) produced a duplicate id, which the
+ * schema rejects — so the second edit of a scene crashed on apply.
+ */
+function nextFreeIdNumber(scene: CrowdSimScene) {
+  const groups = [
+    scene.buildings,
+    scene.countLines,
+    scene.entrances,
+    scene.hazards,
+    scene.obstacles,
+    scene.roads,
+    scene.servicePoints,
+    scene.shops,
+    scene.targets,
+    scene.transitStops,
+    scene.walls,
+    scene.zones,
+  ];
+  let max = 0;
+  for (const group of groups) {
+    for (const { id } of group) {
+      const match = /-(\d+)$/.exec(id);
+      if (match) max = Math.max(max, Number(match[1]));
+    }
+  }
+  return max + 1;
+}
+
 export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocument {
   return {
     buildings: scene.buildings.map((building) => ({
@@ -28,6 +59,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       position: { ...entrance.position },
       width: entrance.width,
       arrivalRatePerMinute: entrance.arrivalRatePerMinute,
+      exitIds: entrance.exitIds ? [...entrance.exitIds] : undefined,
     })),
     hazards: scene.hazards.map((hazard) => ({
       id: hazard.id,
@@ -45,7 +77,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       routeCostMultiplier: hazard.routeCostMultiplier,
       riskScore: hazard.riskScore,
     })),
-    nextId: 1,
+    nextId: nextFreeIdNumber(scene),
     obstacles: scene.obstacles.map((obstacle) => ({
       id: obstacle.id,
       name: obstacle.name,
@@ -68,6 +100,8 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     servicePoints: scene.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
+      name: servicePoint.name,
+      servers: servicePoint.servers,
       kind: servicePoint.kind,
       position: { ...servicePoint.position },
       width: servicePoint.width,
@@ -152,6 +186,7 @@ export function createSceneFromEditorDocument(
       position: { ...entrance.position },
       width: entrance.width,
       arrivalRatePerMinute: entrance.arrivalRatePerMinute,
+      exitIds: entrance.exitIds,
     })),
     targets: document.targets.map((target) => ({
       id: target.id,
@@ -199,6 +234,8 @@ export function createSceneFromEditorDocument(
     })),
     servicePoints: document.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
+      name: servicePoint.name,
+      servers: servicePoint.servers,
       kind: servicePoint.kind,
       position: { ...servicePoint.position },
       width: servicePoint.width,
