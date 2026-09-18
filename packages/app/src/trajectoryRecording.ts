@@ -40,33 +40,6 @@ export type TrajectoryRecordingInput = {
   startedAtIso?: string;
 };
 
-export type PackedAgentDelta = [
-  id: number,
-  dx: number,
-  dy: number,
-  dvx: number,
-  dvy: number,
-  state: number,
-];
-
-export type PackedTrajectoryFrame = {
-  a: PackedAgentDelta[];
-  e: number;
-  t: number;
-};
-
-export type PackedTrajectoryRecording = {
-  durationSeconds: number;
-  frames: PackedTrajectoryFrame[];
-  id: string;
-  q: number;
-  runtime: SimulationRuntimeArtifact;
-  sceneId: string;
-  seed: number;
-  startedAtIso: string;
-  version: 2;
-};
-
 /**
  * About 42 MB of samples (21 bytes each). At one frame a simulated second that
  * is half an hour of a 1,100-person crowd, or longer for smaller ones; past it
@@ -208,88 +181,6 @@ export function trajectoryCsv(recording: TrajectoryRecording): string {
     });
   }
   return `${lines.join("\r\n")}\r\n`;
-}
-
-export function packTrajectoryRecording(
-  recording: TrajectoryRecording,
-  quantization = 100,
-): PackedTrajectoryRecording {
-  const previousById = new Map<number, number[]>();
-  const q = (value: number) => Math.round(value * quantization);
-
-  return {
-    durationSeconds: recording.durationSeconds,
-    frames: recording.frames.map((frame) => ({
-      a: Array.from(frame.ids, (id, index): PackedAgentDelta => {
-        const m = index * 4;
-        const current = [0, 1, 2, 3].map((lane) => q(frame.motion[m + lane]));
-        const previous = previousById.get(id) ?? [0, 0, 0, 0];
-        previousById.set(id, current);
-        return [
-          id,
-          current[0] - previous[0],
-          current[1] - previous[1],
-          current[2] - previous[2],
-          current[3] - previous[3],
-          frame.states[index],
-        ];
-      }),
-      e: frame.exitedCount,
-      t: q(frame.elapsedSeconds),
-    })),
-    id: recording.id,
-    q: quantization,
-    runtime: recording.runtime,
-    sceneId: recording.sceneId,
-    seed: recording.seed,
-    startedAtIso: recording.startedAtIso,
-    version: 2,
-  };
-}
-
-export function unpackTrajectoryRecording(
-  packed: PackedTrajectoryRecording,
-): TrajectoryRecording {
-  const previousById = new Map<number, number[]>();
-  let sampleCount = 0;
-
-  const frames = packed.frames.map((frame): TrajectoryFrame => {
-    const count = frame.a.length;
-    const ids = new Int32Array(count);
-    const motion = new Float32Array(count * 4);
-    const states = new Uint8Array(count);
-    frame.a.forEach(([id, ...rest], index) => {
-      const previous = previousById.get(id) ?? [0, 0, 0, 0];
-      const current = previous.map((value, lane) => value + rest[lane]);
-      previousById.set(id, current);
-      ids[index] = id;
-      current.forEach((value, lane) => (motion[index * 4 + lane] = value / packed.q));
-      states[index] = rest[4];
-    });
-    sampleCount += count;
-    return {
-      elapsedSeconds: frame.t / packed.q,
-      exitedCount: frame.e,
-      ids,
-      motion,
-      states,
-    };
-  });
-
-  return {
-    durationSeconds: packed.durationSeconds,
-    frames,
-    id: packed.id,
-    runtime: packed.runtime,
-    sampleCount,
-    sceneId: packed.sceneId,
-    seed: packed.seed,
-    startedAtIso: packed.startedAtIso,
-  };
-}
-
-export function estimatePackedTrajectoryBytes(packed: PackedTrajectoryRecording) {
-  return JSON.stringify(packed).length;
 }
 
 function createFrame(snapshot: SimulationSnapshot): TrajectoryFrame {

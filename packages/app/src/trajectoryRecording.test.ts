@@ -2,12 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   appendTrajectoryFrame,
   createTrajectoryRecording,
-  estimatePackedTrajectoryBytes,
-  packTrajectoryRecording,
   replayTrajectoryAt,
   summarizeTrajectoryRecording,
   trajectoryCsv,
-  unpackTrajectoryRecording,
 } from "./trajectoryRecording";
 import type { SimulationSnapshot } from "./simulationEngine";
 
@@ -70,28 +67,6 @@ describe("trajectory recording", () => {
     });
   });
 
-  it("packs trajectory frames as quantized deltas and restores replay data", () => {
-    const recording = [snapshot(0, 1), snapshot(1, 1), snapshot(2, 1)].reduce(
-      (current, item) => appendTrajectoryFrame(current, item),
-      createTrajectoryRecording({
-        id: "recording-4",
-        sceneId: "demo",
-        seed: 42,
-        startedAtIso: "2026-06-12T00:00:00.000Z",
-      }),
-    );
-    const packed = packTrajectoryRecording(recording);
-    const unpacked = unpackTrajectoryRecording(packed);
-
-    expect(packed.frames[1].a[0]).toEqual([1, 200, 100, 0, 0, 1]);
-    expect(estimatePackedTrajectoryBytes(packed)).toBeGreaterThan(0);
-    expect(unpacked.frames).toEqual(recording.frames);
-    expect(replayTrajectoryAt(unpacked, 1.5).agents[0]).toMatchObject({
-      x: 3,
-      y: 1.5,
-    });
-  });
-
   it("replays arrivals and state, and exports one CSV row per sample", () => {
     const recording = [snapshot(0, 1), snapshot(2, 2)].reduce(
       (current, item) => appendTrajectoryFrame(current, item),
@@ -115,29 +90,6 @@ describe("trajectory recording", () => {
       "2,2.00,4.000,2.000,1.000,0.000,walk",
       "",
     ]);
-  });
-
-  it("preserves the runtime profile through packed replay export", () => {
-    const recording = createTrajectoryRecording({
-      id: "recording-runtime",
-      runtime: {
-        decisionBackend: "wasm-ready",
-        sharedMemory: "sab",
-        thread: "worker",
-      },
-      sceneId: "demo",
-      seed: 42,
-      startedAtIso: "2026-06-12T00:00:00.000Z",
-    });
-    const packed = packTrajectoryRecording(recording);
-    const unpacked = unpackTrajectoryRecording(packed);
-
-    expect(packed.runtime).toMatchObject({
-      decisionBackend: "wasm-ready",
-      sharedMemory: "sab",
-      thread: "worker",
-    });
-    expect(unpacked.runtime).toEqual(packed.runtime);
   });
 });
 
