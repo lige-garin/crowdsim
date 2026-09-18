@@ -5,17 +5,13 @@ import { AppWorkbench } from "./AppWorkbench";
 import type { EvacuationState, StageTab, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
 import { createHudReadouts } from "./appTopbarMetrics";
-import { createDashboardStats, type DashboardSample } from "./dashboardStats";
+import { createDashboardStats } from "./dashboardStats";
 import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
-import { createHeatmapCellsFromSamples, type HeatmapSample } from "./heatmap";
+import { createHeatmapCellsFromSamples } from "./heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
-import {
-  appendTrajectoryFrame,
-  createTrajectoryRecording,
-} from "./trajectoryRecording";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
@@ -26,6 +22,10 @@ import { placesInWorld } from "./worldPlacement";
 import { useWorldBuilding } from "./useWorldBuilding";
 import { hotUpdateBlocker } from "./simulationEngine";
 import { createLiveCrowd } from "./liveCrowd";
+import { downloadCsv } from "./runAnalytics";
+import { useRunSeries } from "./useRunSeries";
+import { trajectoryCsv } from "./trajectoryRecording";
+import type { RunAnalyticsExport } from "./RunAnalyticsPanel";
 import {
   defaultViewportLayers,
   toggleViewportLayer,
@@ -36,17 +36,6 @@ export function App() {
     <I18nProvider>
       <AppContent />
     </I18nProvider>
-  );
-}
-type RuntimeArtifact = ReturnType<typeof createLiveSimulationRuntimeArtifact>;
-function sameRuntime(left: RuntimeArtifact, right: RuntimeArtifact) {
-  return (
-    left.decisionBackend === right.decisionBackend &&
-    left.decisionHz === right.decisionHz &&
-    left.movementBackend === right.movementBackend &&
-    left.movementHz === right.movementHz &&
-    left.sharedMemory === right.sharedMemory &&
-    left.thread === right.thread
   );
 }
 function AppContent() {
@@ -84,9 +73,12 @@ function AppContent() {
   const [liveCrowd] = useState(() =>
     createLiveCrowd({ snapshot: simulation.snapshot }),
   );
+  // While replaying, the replay bar feeds the store from the recording instead.
+  const [replaying, setReplaying] = useState(false);
   useEffect(() => {
-    liveCrowd.set({ sharedAgentOverlay, snapshot: simulation.snapshot });
-  }, [liveCrowd, sharedAgentOverlay, simulation.snapshot]);
+    if (!replaying)
+      liveCrowd.set({ sharedAgentOverlay, snapshot: simulation.snapshot });
+  }, [liveCrowd, replaying, sharedAgentOverlay, simulation.snapshot]);
   const currentRuntime = useMemo(
     () =>
       createLiveSimulationRuntimeArtifact({
@@ -98,30 +90,13 @@ function AppContent() {
   );
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
-  const [dashboardSamples, setDashboardSamples] = useState<DashboardSample[]>([
-    {
-      agentCount: simulation.snapshot.agentCount,
-      elapsedSeconds: simulation.snapshot.elapsedSeconds,
-      exitedCount: simulation.snapshot.exitedCount,
-    },
-  ]);
-  const [heatmapSamples, setHeatmapSamples] = useState<HeatmapSample[]>([]);
-  const newRecording = (forScene: CrowdSimScene) =>
-    createTrajectoryRecording({
-      id: "live-recording",
-      runtime: currentRuntime,
-      sceneId: forScene.id,
-      seed: forScene.seed,
-    });
-  const [trajectoryRecording, setTrajectoryRecording] = useState(() =>
-    newRecording(scene),
-  );
-  /** Start the charts and the recording over: they describe a new run. */
-  function clearRunSeries(forScene: CrowdSimScene) {
-    setDashboardSamples([{ agentCount: 0, elapsedSeconds: 0, exitedCount: 0 }]);
-    setHeatmapSamples([]);
-    setTrajectoryRecording(newRecording(forScene));
-  }
+  const runSeries = useRunSeries({
+    runtime: currentRuntime,
+    scene,
+    snapshot: simulation.snapshot,
+  });
+  const { dashboardSamples, heatmapSamples, runSummary, trajectoryRecording } =
+    runSeries;
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
   const [editorTool, setEditorTool] = useState<EditorTool>("select");
   const [stageTab, setStageTab] = useState<StageTab>("run");
@@ -159,8 +134,9 @@ function AppContent() {
   });
   const heatmapCells = useMemo(
     () =>
+      // 2 m cells: the grid Fruin level of service is read on (runAnalytics).
       createHeatmapCellsFromSamples(scene, heatmapSamples, {
-        cellSize: 4,
+        cellSize: 2,
         windowSeconds: heatmapWindowSeconds,
       }),
     [heatmapSamples, heatmapWindowSeconds, scene],
@@ -234,6 +210,7 @@ function AppContent() {
   }
   function startSimulationFromControls() {
     userPausedRef.current = false;
+    setReplaying(false);
     simulation.start();
   }
   useEffect(() => {
@@ -266,60 +243,6 @@ function AppContent() {
     }, 1000);
     return () => window.clearInterval(intervalId);
   }, [evacuation.active]);
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      const snapshot = simulationSnapshotRef.current;
-      if (snapshot.status !== "running") {
-        return;
-      }
-      setHeatmapSamples((samples) => {
-        const lastSample = samples.at(-1);
-        if (
-          lastSample &&
-          Math.floor(lastSample.elapsedSeconds) === Math.floor(snapshot.elapsedSeconds)
-        ) {
-          return samples;
-        }
-        return [
-          ...samples,
-          {
-            agents: snapshot.agents.map((agent) => ({
-              id: agent.id,
-              x: agent.x,
-              y: agent.y,
-            })),
-            elapsedSeconds: snapshot.elapsedSeconds,
-          },
-        ].slice(-120);
-      });
-      setDashboardSamples((samples) => {
-        const lastSample = samples.at(-1);
-        if (
-          lastSample &&
-          Math.floor(lastSample.elapsedSeconds) === Math.floor(snapshot.elapsedSeconds)
-        ) {
-          return samples;
-        }
-        return [
-          ...samples,
-          {
-            agentCount: snapshot.agentCount,
-            elapsedSeconds: snapshot.elapsedSeconds,
-            exitedCount: snapshot.exitedCount,
-          },
-        ].slice(-120);
-      });
-      setTrajectoryRecording((recording) =>
-        appendTrajectoryFrame(
-          sameRuntime(recording.runtime, currentRuntime)
-            ? recording
-            : newRecording(scene),
-          snapshot,
-        ),
-      );
-    }, 1000);
-    return () => window.clearInterval(intervalId);
-  }, [currentRuntime, scene.id, scene.seed]);
   function applyScene(nextScene: CrowdSimScene) {
     setScene(nextScene);
     // Same world and seed: the controllers swap the geometry into the running
@@ -329,7 +252,8 @@ function AppContent() {
     // Otherwise the run is rebuilt from scratch. Clear the series that describe
     // the OLD run so charts never mix two geometries.
     autoStartedRef.current = false;
-    clearRunSeries(nextScene);
+    setReplaying(false);
+    runSeries.clear(nextScene);
   }
   const worldBuilding = useWorldBuilding({
     applyScene,
@@ -353,7 +277,8 @@ function AppContent() {
         startedAtSeconds: 0,
       }),
     );
-    clearRunSeries(scene);
+    setReplaying(false);
+    runSeries.clear(scene);
   }
   async function triggerEvacuation() {
     const behaviorMode = await wasmDecisionRuntime.triggerEvacuation();
@@ -472,7 +397,15 @@ function AppContent() {
             onEvacuate: () => void triggerEvacuation(),
             onHeatmapWindowChange: setHeatmapWindowSeconds,
             onPause: pauseSimulation,
+            onReplay:
+              trajectoryRecording.frames.length > 1
+                ? () => {
+                    pauseSimulation();
+                    setReplaying(!replaying);
+                  }
+                : undefined,
             onReset: resetSimulation,
+            replaying,
             onSetLanguage: setLanguage,
             onSetTimeScale: simulation.setTimeScale,
             onStart: startSimulationFromControls,
@@ -485,6 +418,12 @@ function AppContent() {
           inspectorProps={{
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
+            onExportRunAnalytics: (kind: RunAnalyticsExport) =>
+              downloadCsv(
+                `${scene.id}-${kind}-${Math.floor(simulation.snapshot.elapsedSeconds)}s.csv`,
+                runSeries.exportAnalyticsCsv(kind),
+              ),
+            runSummary,
             heatmapCells,
             scene: scene,
             signals,
@@ -525,6 +464,21 @@ function AppContent() {
           stageTab={stageTab}
           t={t}
           readouts={hudReadouts}
+          replay={
+            replaying
+              ? {
+                  crowd: liveCrowd,
+                  language,
+                  onClose: () => setReplaying(false),
+                  onExport: () =>
+                    downloadCsv(
+                      `${scene.id}-trajectories.csv`,
+                      trajectoryCsv(trajectoryRecording),
+                    ),
+                  recording: trajectoryRecording,
+                }
+              : undefined
+          }
           viewMode={viewMode}
         />
       </div>

@@ -24,7 +24,7 @@ export type ObstacleNumberField = "routeCostMultiplier";
  * it. Arrival rate is the single most consequential input in a crowd model, so
  * it was the one number a user could not change without hand-editing JSON.
  */
-export type EntranceNumberField = "arrivalRatePerMinute" | "width";
+export type EntranceNumberField = "arrivalRatePerMinute" | "groupShare" | "width";
 export type HazardNumberField =
   | "radiusMeters"
   | "riskScore"
@@ -344,13 +344,48 @@ export function updateDocumentEntranceNumber(
 ) {
   // A sink has no arrival rate, and a door narrower than half a metre is not a
   // door; both are clamped rather than rejected so dragging a field stays live.
-  const minValue = field === "arrivalRatePerMinute" ? 0 : 0.5;
+  const minValue = field === "width" ? 0.5 : 0;
+  const maxValue = field === "groupShare" ? 1 : Infinity;
 
   return {
     ...document,
     entrances: document.entrances.map((entrance) =>
       entrance.id === entranceId
-        ? { ...entrance, [field]: Math.max(minValue, value) }
+        ? { ...entrance, [field]: Math.min(maxValue, Math.max(minValue, value)) }
+        : entrance,
+    ),
+  };
+}
+
+/**
+ * Set an entrance's demand profile from comma-separated people-a-minute
+ * values, one per slot. Blank clears it (a constant rate again); entries that
+ * are not non-negative numbers are dropped.
+ */
+export function updateDocumentEntranceProfile(
+  document: EditorDocument,
+  entranceId: string,
+  text: string,
+) {
+  const ratesPerMinute = text
+    .split(/[,，\s]+/)
+    .filter((part) => part !== "")
+    .map(Number)
+    .filter((rate) => Number.isFinite(rate) && rate >= 0);
+  return {
+    ...document,
+    entrances: document.entrances.map((entrance) =>
+      entrance.id === entranceId
+        ? {
+            ...entrance,
+            arrivalProfile:
+              ratesPerMinute.length > 0
+                ? {
+                    intervalMinutes: entrance.arrivalProfile?.intervalMinutes ?? 15,
+                    ratesPerMinute,
+                  }
+                : undefined,
+          }
         : entrance,
     ),
   };

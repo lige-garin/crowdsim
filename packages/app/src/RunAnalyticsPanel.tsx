@@ -1,0 +1,212 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { fruinColours, fruinLevels } from "./fruinLevelOfService";
+import type { Language } from "./i18n";
+import type { RunAnalytics, RunAnalyticsSummary, StayKind } from "./runAnalytics";
+
+export type RunAnalyticsExport = keyof RunAnalytics["csv"];
+
+const exportsInOrder: readonly RunAnalyticsExport[] = [
+  "flows",
+  "journeys",
+  "stays",
+  "levelOfService",
+  "densityCells",
+];
+
+const copy = {
+  en: {
+    backward: "←",
+    empty: "Nothing measured yet: the run records once a simulated second.",
+    export: "Export CSV",
+    exports: {
+      densityCells: "Density grid",
+      flows: "Line flows",
+      journeys: "Journeys",
+      levelOfService: "LOS over time",
+      stays: "Stays & waits",
+    },
+    forward: "→",
+    journeys: "Journey time",
+    kinds: {
+      browse: "Browse",
+      counterQueue: "Till queue",
+      service: "At till",
+      shopQueue: "Shop queue",
+    } satisfies Record<StayKind, string>,
+    lines: "Count lines",
+    los: "Level of service (Fruin, walkway)",
+    noLines: "No count lines in this scene. Add one from the Flow tools.",
+    peak: "Peak",
+    peakLine: "peak/min",
+    places: "Stays and waits",
+    region: "Measured results",
+    share: "D or worse, whole run",
+    title: "Measured",
+    visits: "visits",
+  },
+  zh: {
+    backward: "←",
+    empty: "尚无数据：运行中每个仿真秒记录一次。",
+    export: "导出 CSV",
+    exports: {
+      densityCells: "密度网格",
+      flows: "计数线流量",
+      journeys: "行程",
+      levelOfService: "服务水平时序",
+      stays: "停留与等待",
+    },
+    forward: "→",
+    journeys: "行程时间",
+    kinds: {
+      browse: "浏览",
+      counterQueue: "收银排队",
+      service: "结账中",
+      shopQueue: "店外排队",
+    } satisfies Record<StayKind, string>,
+    lines: "计数线",
+    los: "服务水平（Fruin，通道）",
+    noLines: "场景里没有计数线，可在建造栏「人流」类中添加。",
+    peak: "峰值",
+    peakLine: "峰值/分",
+    places: "停留与等待",
+    region: "实测指标",
+    share: "D 级及更差（全程）",
+    title: "实测",
+    visits: "人次",
+  },
+};
+
+/**
+ * What this run actually measured, as opposed to the scenario estimates in the
+ * operations panel: Fruin level of service, count-line flows, journey times and
+ * waits, each exportable as CSV for a report or a spreadsheet.
+ */
+export function RunAnalyticsPanel({
+  language,
+  onExport,
+  scene,
+  summary,
+}: {
+  language: Language;
+  onExport: (kind: RunAnalyticsExport) => void;
+  scene: CrowdSimScene;
+  summary: RunAnalyticsSummary;
+}) {
+  const text = copy[language];
+  const seconds = (value: number) => `${Math.round(value)} s`;
+  const { levelOfService: los } = summary;
+  const occupied = fruinLevels.reduce((total, level) => total + los.current[level], 0);
+  const placeName = (id: string) =>
+    scene.shops.find((shop) => shop.id === id)?.name ??
+    scene.servicePoints.find((point) => point.id === id)?.name ??
+    id;
+  const places = [...summary.places].sort((a, b) => b.visits - a.visits).slice(0, 8);
+
+  return (
+    <section className="biocity-compact-panel run-analytics" aria-label={text.region}>
+      <header>
+        <span>{text.title}</span>
+        <strong>{seconds(summary.elapsedSeconds)}</strong>
+      </header>
+
+      {summary.samples === 0 ? (
+        <p className="run-analytics-empty">{text.empty}</p>
+      ) : (
+        <>
+          <h4>{text.los}</h4>
+          <div className="los-bar" role="img" aria-label={text.los}>
+            {fruinLevels.map((level) =>
+              los.current[level] > 0 ? (
+                <span
+                  key={level}
+                  style={{
+                    background: fruinColours[level],
+                    flexGrow: los.current[level],
+                  }}
+                  title={`${level}: ${los.current[level]}`}
+                >
+                  {level}
+                </span>
+              ) : null,
+            )}
+            {occupied === 0 ? <span className="los-bar-empty">–</span> : null}
+          </div>
+          <div className="biocity-status-list">
+            <div>
+              <span>{text.peak}</span>
+              <strong>
+                {los.peakDensity.toFixed(2)} P/m² · {los.peakLevel}
+              </strong>
+            </div>
+            <div>
+              <span>{text.share}</span>
+              <strong>{Math.round(los.shareDOrWorse * 100)}%</strong>
+            </div>
+          </div>
+
+          <h4>{text.lines}</h4>
+          {summary.flows.length === 0 ? (
+            <p className="run-analytics-empty">{text.noLines}</p>
+          ) : (
+            <div className="biocity-status-list">
+              {summary.flows.map((flow) => (
+                <div key={flow.id} data-testid={`count-line-${flow.id}`}>
+                  <span>{flow.name}</span>
+                  <strong>
+                    {text.forward} {flow.forward} · {text.backward} {flow.backward} ·{" "}
+                    {flow.peakPerMinute} {text.peakLine}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <h4>{text.journeys}</h4>
+          <div className="biocity-status-list">
+            <div>
+              <span>n = {summary.journeys.count}</span>
+              <strong>
+                P50 {seconds(summary.journeys.p50Seconds)} · P90{" "}
+                {seconds(summary.journeys.p90Seconds)}
+              </strong>
+            </div>
+          </div>
+
+          {places.length > 0 ? (
+            <>
+              <h4>{text.places}</h4>
+              <div className="biocity-status-list">
+                {places.map((place) => (
+                  <div key={`${place.kind}:${place.placeId}`}>
+                    <span>
+                      {text.kinds[place.kind]} · {placeName(place.placeId)}
+                    </span>
+                    <strong>
+                      {place.visits} {text.visits} · P50 {seconds(place.p50Seconds)} ·
+                      P90 {seconds(place.p90Seconds)} · max {place.peakConcurrent}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </>
+      )}
+
+      <h4>{text.export}</h4>
+      <div className="run-analytics-exports">
+        {exportsInOrder.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            data-testid={`export-${kind}`}
+            disabled={summary.samples === 0}
+            onClick={() => onExport(kind)}
+          >
+            {text.exports[kind]}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}

@@ -394,6 +394,45 @@ test("applying an edit does not override a deliberate pause", async ({ page }) =
 });
 
 /**
+ * Replay: the run is recorded as it goes; opening replay pauses it, scrubbing
+ * puts that moment's crowd in the views, and play resumes the live run.
+ */
+test("replay pauses the run, scrubs the recording, and hands back to live", async ({
+  page,
+}) => {
+  const errors = captureRuntimeErrors(page);
+  await page.goto("/");
+  await enterWorkbench(page);
+
+  const simToggle = page.getByTestId("sim-toggle");
+  const replayToggle = page.getByTestId("replay-toggle");
+  await expect(replayToggle).toBeEnabled({ timeout: 20_000 });
+  await page.waitForTimeout(4_000);
+
+  await replayToggle.click();
+  const replay = page.getByTestId("trajectory-replay");
+  await expect(replay).toBeVisible();
+  await expect(simToggle).toHaveAttribute("aria-label", /Start|开始/);
+
+  const slider = replay.getByRole("slider");
+  const endCount = Number.parseInt(
+    (await page.getByTestId("replay-agent-count").textContent()) ?? "",
+    10,
+  );
+  await slider.press("Home");
+  const startCount = Number.parseInt(
+    (await page.getByTestId("replay-agent-count").textContent()) ?? "",
+    10,
+  );
+  expect(endCount).toBeGreaterThan(startCount);
+
+  await simToggle.click();
+  await expect(replay).toBeHidden();
+  await expect(simToggle).toHaveAttribute("aria-label", /Pause|暂停/);
+  expect(errors.messages).toEqual([]);
+});
+
+/**
  * Building in the city itself: hold a tool, click the ground, and the scene
  * gains it — no trip to the 2D editor. Undo walks it back. The run keeps going
  * on the new geometry.

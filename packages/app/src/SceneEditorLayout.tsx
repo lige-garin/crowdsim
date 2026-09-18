@@ -53,6 +53,7 @@ type SceneEditorLayoutProps = {
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
+  onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onDeleteSelected: () => void;
@@ -156,6 +157,7 @@ export function SceneEditorLayout({
   onBuildingKindChange,
   onBuildingNumberChange,
   onEntranceKindChange,
+  onEntranceProfileChange,
   onEntranceNumberChange,
   onCanvasPointerDown,
   onDeleteSelected,
@@ -306,6 +308,7 @@ export function SceneEditorLayout({
         onBuildingKindChange={onBuildingKindChange}
         onBuildingNumberChange={onBuildingNumberChange}
         onEntranceKindChange={onEntranceKindChange}
+        onEntranceProfileChange={onEntranceProfileChange}
         onEntranceNumberChange={onEntranceNumberChange}
         onHazardKindChange={onHazardKindChange}
         onHazardNumberChange={onHazardNumberChange}

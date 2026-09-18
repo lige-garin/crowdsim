@@ -3,7 +3,7 @@ import { agentStateColor, agentStateKey } from "./agentStateColors";
 
 describe("agent state colours", () => {
   it("decodes the worker's integer lifecycle codes", () => {
-    // Must stay in step with lifecycleStateCode in simulationWorkerClient.
+    // Must stay in step with agentStateCode.
     expect(agentStateKey({ behaviorState: 1 })).toBe("walk");
     expect(agentStateKey({ behaviorState: 2 })).toBe("browse");
     expect(agentStateKey({ behaviorState: 3 })).toBe("queue");

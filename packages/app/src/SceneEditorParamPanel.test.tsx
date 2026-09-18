@@ -20,12 +20,14 @@ describe("SceneEditorParamPanel", () => {
     const source = document.entrances.find((entrance) => entrance.kind === "source");
     const onEntranceNumberChange = vi.fn();
     const onEntranceKindChange = vi.fn();
+    const onEntranceProfileChange = vi.fn();
 
     render(
       <SceneEditorParamPanel
         {...baseProps()}
         onEntranceKindChange={onEntranceKindChange}
         onEntranceNumberChange={onEntranceNumberChange}
+        onEntranceProfileChange={onEntranceProfileChange}
         selectedEntrance={source}
       />,
     );
@@ -34,12 +36,20 @@ describe("SceneEditorParamPanel", () => {
       target: { value: "600" },
     });
     fireEvent.change(screen.getByLabelText("width"), { target: { value: "12" } });
+    fireEvent.change(screen.getByLabelText("groupShare"), { target: { value: "0.5" } });
+    const profile = screen.getByLabelText("arrivalProfile");
+    fireEvent.change(profile, { target: { value: "60, 120" } });
+    // Committed when the field is left, not on every keystroke.
+    expect(onEntranceProfileChange).not.toHaveBeenCalled();
+    fireEvent.blur(profile);
+    expect(onEntranceProfileChange).toHaveBeenCalledWith("60, 120");
     fireEvent.change(screen.getByLabelText("entranceKind"), {
       target: { value: "bidirectional" },
     });
 
     expect(onEntranceNumberChange).toHaveBeenCalledWith("arrivalRatePerMinute", 600);
     expect(onEntranceNumberChange).toHaveBeenCalledWith("width", 12);
+    expect(onEntranceNumberChange).toHaveBeenCalledWith("groupShare", 0.5);
     expect(onEntranceKindChange).toHaveBeenCalledWith("bidirectional");
   });
 
@@ -116,6 +126,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onBuildingKindChange: vi.fn(),
     onBuildingNumberChange: vi.fn(),
     onEntranceKindChange: vi.fn(),
+    onEntranceProfileChange: vi.fn(),
     onEntranceNumberChange: vi.fn(),
     onHazardKindChange: vi.fn(),
     onHazardNumberChange: vi.fn(),

@@ -18,3 +18,4 @@ packages/app/src/wasm/core-behavior/
 e2e-fs-patch.cjs
 output/
 dev-server.log
+.claude/

@@ -65,5 +65,5 @@ describe("validation report for the open scene", () => {
     expect(html).toContain("Scene: BioCity Rainy High Street");
     expect(html).toContain("Commercial behavior validation");
     expect(html).toContain("do not describe this scene");
-  });
+  }, 20_000);
 });

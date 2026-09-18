@@ -1,5 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
+import type { RunAnalyticsSummary } from "./runAnalytics";
 import type { EvacuationState, SystemSignal } from "./AppTypes";
 import type { HeatmapCell } from "./heatmap";
 import { formatSceneName, useI18n } from "./i18n";
@@ -11,6 +13,8 @@ type AppInspectorProps = {
   elapsedSeconds: number;
   evacuation: EvacuationState;
   heatmapCells: readonly HeatmapCell[];
+  onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
+  runSummary: RunAnalyticsSummary;
   scene: CrowdSimScene;
   signals: readonly SystemSignal[];
   simulationCredibility: SimulationCredibilityReport;
@@ -22,6 +26,8 @@ export function AppInspector({
   elapsedSeconds,
   evacuation,
   heatmapCells,
+  onExportRunAnalytics,
+  runSummary,
   scene,
   signals,
   simulationCredibility,
@@ -49,6 +55,13 @@ export function AppInspector({
         under "system & recording". This rail is analysis, not a fourth copy of
         the same four numbers.
       */}
+
+      <RunAnalyticsPanel
+        language={language}
+        onExport={onExportRunAnalytics}
+        scene={scene}
+        summary={runSummary}
+      />
 
       <BioCityAnalyticsPanel
         elapsedSeconds={elapsedSeconds}

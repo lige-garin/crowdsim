@@ -682,3 +682,48 @@
     height: 50px;
   }
 }
+
+/* Replay of the recorded run (TrajectoryReplayBar), above the transport. */
+.game-shell .hud-replay {
+  right: 14px;
+  bottom: 104px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 28px);
+  padding-left: 14px;
+}
+
+.game-shell .hud-replay-title {
+  color: var(--hud-ink);
+  font-weight: 750;
+}
+
+.game-shell .hud-replay input[type="range"] {
+  width: min(260px, 40vw);
+  accent-color: #4fdc8e;
+}
+
+.game-shell .hud-replay-time {
+  min-width: 96px;
+  color: var(--hud-ink);
+  font-family: var(--lab-mono);
+}
+
+.game-shell .hud-replay-count {
+  min-width: 56px;
+  color: var(--hud-muted);
+}
+
+.game-shell .hud-replay .hud-speed {
+  font-size: var(--fs-body);
+}
+
+.game-shell .hud-replay .hud-key-text {
+  width: auto;
+  padding: 0 10px;
+}
+
+@media (max-width: 900px) {
+  .game-shell .hud-replay {
+    bottom: 174px;
+  }
+}

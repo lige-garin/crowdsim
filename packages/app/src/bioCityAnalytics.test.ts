@@ -8,6 +8,8 @@ describe("bioCityAnalytics", () => {
     const heatmapCells: HeatmapCell[] = [
       {
         count: 32,
+        densityPerSquareMeter: 2.0,
+        level: "E",
         height: 4,
         id: "peak",
         intensity: 1,
@@ -17,6 +19,8 @@ describe("bioCityAnalytics", () => {
       },
       {
         count: 12,
+        densityPerSquareMeter: 0.75,
+        level: "D",
         height: 4,
         id: "secondary",
         intensity: 0.38,

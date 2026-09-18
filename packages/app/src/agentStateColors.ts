@@ -7,8 +7,8 @@
  * whole output of a behaviour simulation. Colour by lifecycle state makes the
  * behaviour visible at a glance, the way a city builder colours citizens.
  *
- * The worker path streams state as an integer code (see `lifecycleStateCode`
- * in simulationWorkerClient); the main-thread path carries the string. Both map
+ * The worker path streams state as an integer code (see `agentStateCode`
+ * below); the main-thread path carries the string. Both map
  * to the same palette.
  */
 export const agentStateColor = {
@@ -32,6 +32,11 @@ const byCode: readonly AgentStateKey[] = [
   "leave",
   "evacuate",
 ];
+
+/** The integer a state travels as through shared memory and recordings. */
+export function agentStateCode(state: string | undefined): number {
+  return Math.max(0, byCode.indexOf(state as AgentStateKey));
+}
 
 export function agentStateKey(agent: {
   behaviorState?: number;

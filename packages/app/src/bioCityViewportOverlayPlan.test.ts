@@ -8,6 +8,8 @@ describe("bioCityViewportOverlayPlan", () => {
     const heatmapCells: HeatmapCell[] = [
       {
         count: 4,
+        densityPerSquareMeter: 0.25,
+        level: "A",
         height: 4,
         id: "low",
         intensity: 0.2,
@@ -17,6 +19,8 @@ describe("bioCityViewportOverlayPlan", () => {
       },
       {
         count: 20,
+        densityPerSquareMeter: 1.25,
+        level: "E",
         height: 4,
         id: "peak",
         intensity: 1,
@@ -33,10 +37,11 @@ describe("bioCityViewportOverlayPlan", () => {
 
     expect(plan.heatmap).toEqual([
       expect.objectContaining({
-        color: "#ef4444",
+        // 1.25 P/m² is Fruin level E.
+        color: "#fc8d59",
         id: "viewport-peak",
         intensity: 1,
-        opacity: 0.64,
+        opacity: 0.66,
       }),
     ]);
     expect(plan.summary.heatmapCellCount).toBe(1);

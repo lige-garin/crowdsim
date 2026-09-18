@@ -5,6 +5,7 @@ import {
   setAgentPosition,
 } from "@crowdsim/core-gpu";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { fruinLevel, type FruinLevel } from "./fruinLevelOfService";
 
 export type HeatmapAgent = {
   id?: number;
@@ -25,6 +26,10 @@ export type HeatmapCell = {
   height: number;
   count: number;
   intensity: number;
+  /** Mean people per square metre over the samples in the window. */
+  densityPerSquareMeter: number;
+  /** Fruin walkway level of service for that density. */
+  level: FruinLevel;
 };
 
 export function createHeatmapCellsFromSamples(
@@ -51,9 +56,14 @@ export function createHeatmapCellsFromSamples(
   });
   const cumulativeCounts = new Uint32Array(layout.cellCount);
   let maxCount = 0;
+  let samplesInWindow = 0;
 
   for (const sample of samples) {
-    if (sample.elapsedSeconds < windowStartSeconds || sample.agents.length === 0) {
+    if (sample.elapsedSeconds < windowStartSeconds) {
+      continue;
+    }
+    samplesInWindow++;
+    if (sample.agents.length === 0) {
       continue;
     }
 
@@ -88,6 +98,8 @@ export function createHeatmapCellsFromSamples(
     const row = Math.floor(cell / layout.columns);
     const x = column * layout.cellSize;
     const y = row * layout.cellSize;
+    const densityPerSquareMeter =
+      count / Math.max(1, samplesInWindow) / (layout.cellSize * layout.cellSize);
 
     cells.push({
       id: `heatmap-${cell}`,
@@ -96,7 +108,9 @@ export function createHeatmapCellsFromSamples(
       width: Math.min(layout.cellSize, scene.world.width - x),
       height: Math.min(layout.cellSize, scene.world.height - y),
       count,
+      densityPerSquareMeter,
       intensity: count / maxCount,
+      level: fruinLevel(densityPerSquareMeter),
     });
   }
 

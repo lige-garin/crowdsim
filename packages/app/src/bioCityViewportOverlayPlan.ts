@@ -1,5 +1,6 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import type { HeatmapCell } from "./heatmap";
+import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import { createBioCityWeatherRuntimeState } from "./bioCityWeatherSystem";
 
 export type BioCityViewportHeatmapOverlay = {
@@ -83,15 +84,17 @@ function createHeatmapOverlay(
   heatmapCells: readonly HeatmapCell[],
   maxHeatmapCells: number,
 ): BioCityViewportHeatmapOverlay[] {
+  // Coloured by Fruin level of service on its absolute density, not scaled to
+  // the busiest cell: a quiet plaza stays green however empty the rest is.
   return [...heatmapCells]
-    .sort((left, right) => right.intensity - left.intensity)
+    .sort((left, right) => right.densityPerSquareMeter - left.densityPerSquareMeter)
     .slice(0, Math.max(0, maxHeatmapCells))
     .map((cell) => ({
-      color: heatmapColor(cell.intensity),
+      color: fruinColours[cell.level],
       height: cell.height,
       id: `viewport-${cell.id}`,
       intensity: round(cell.intensity),
-      opacity: round(0.18 + Math.min(1, cell.intensity) * 0.46),
+      opacity: round(0.3 + fruinLevels.indexOf(cell.level) * 0.09),
       width: cell.width,
       x: cell.x,
       y: cell.y,
@@ -145,14 +148,6 @@ function createRiskOverlay(
       severity,
     };
   });
-}
-
-function heatmapColor(intensity: number) {
-  if (intensity >= 0.78) return "#ef4444";
-  if (intensity >= 0.52) return "#f59e0b";
-  if (intensity >= 0.28) return "#84cc16";
-
-  return "#22d3ee";
 }
 
 function copyPoint(point: ScenePoint): ScenePoint {

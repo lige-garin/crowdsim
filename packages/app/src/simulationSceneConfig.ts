@@ -1,3 +1,4 @@
+import { walkingGroupParameters } from "./walkingGroups";
 import type { WallSegment } from "@crowdsim/core-gpu";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createBrandStoresFromScene } from "./brandAttraction";
@@ -132,13 +133,25 @@ export function deriveSceneGeometry(
       overrides.sources ??
       scene.entrances
         .filter(
-          (entrance) => entrance.kind !== "sink" && entrance.arrivalRatePerMinute > 0,
+          (entrance) =>
+            entrance.kind !== "sink" &&
+            (entrance.arrivalRatePerMinute > 0 ||
+              (entrance.arrivalProfile?.ratesPerMinute.some((rate) => rate > 0) ??
+                false)),
         )
         .map((entrance) => ({
           id: entrance.id,
           position: entrance.position,
           width: entrance.width,
           arrivalRatePerSecond: entrance.arrivalRatePerMinute / 60,
+          arrivalProfile: entrance.arrivalProfile && {
+            intervalSeconds: entrance.arrivalProfile.intervalMinutes * 60,
+            ratesPerSecond: entrance.arrivalProfile.ratesPerMinute.map(
+              (rate) => rate / 60,
+            ),
+          },
+          groupShare:
+            entrance.groupShare ?? walkingGroupParameters.shareOfPeopleInGroups,
           exitIds: entrance.exitIds,
         })),
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,

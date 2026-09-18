@@ -1,12 +1,11 @@
-import { useMemo } from "react";
 import { useI18n } from "./i18n";
 import {
-  estimatePackedTrajectoryBytes,
-  packTrajectoryRecording,
-  replayTrajectoryAt,
   summarizeTrajectoryRecording,
   type TrajectoryRecording,
 } from "./trajectoryRecording";
+
+/** Bytes a recorded sample takes: an id, four motion floats and a state byte. */
+const bytesPerSample = 4 + 4 * 4 + 1;
 
 type TrajectoryReplayPanelProps = {
   recording: TrajectoryRecording;
@@ -14,22 +13,8 @@ type TrajectoryReplayPanelProps = {
 
 export function TrajectoryReplayPanel({ recording }: TrajectoryReplayPanelProps) {
   const { language } = useI18n();
-  const summary = useMemo(() => {
-    const replayAtSeconds =
-      recording.frames.length > 0
-        ? recording.frames[Math.floor((recording.frames.length - 1) / 2)].elapsedSeconds
-        : 0;
-    const replay = replayTrajectoryAt(recording, replayAtSeconds);
-    const packed = packTrajectoryRecording(recording);
-
-    return {
-      packedBytes: estimatePackedTrajectoryBytes(packed),
-      replayAgentCount: replay.agents.length,
-      replayAtSeconds: replay.elapsedSeconds,
-      runtime: `${recording.runtime.thread}/${recording.runtime.sharedMemory}`,
-      ...summarizeTrajectoryRecording(recording),
-    };
-  }, [recording]);
+  const summary = summarizeTrajectoryRecording(recording);
+  const megabytes = ((recording.sampleCount * bytesPerSample) / 1e6).toFixed(1);
   const title = language === "zh" ? "记录 / 回放" : "Record / replay";
 
   return (
@@ -37,13 +22,13 @@ export function TrajectoryReplayPanel({ recording }: TrajectoryReplayPanelProps)
       <h3>{title}</h3>
       <p>
         {language === "zh"
-          ? "实时轨迹记录、插值回放和导出摘要已绑定当前仿真运行。"
-          : "Live trajectory recording, interpolated replay, and export summary are bound to the current simulation run."}
+          ? "运行中每个仿真秒记录一帧全体人员的位置、速度与状态。点底部运行控制里的回放按钮拖动时间轴查看，并可导出轨迹 CSV。"
+          : "Every simulated second the run records each person's position, velocity and state. Open replay from the transport controls to scrub it and export trajectories as CSV."}
       </p>
       <code>
-        frames {summary.frameCount} | agents {summary.uniqueAgentCount} | replay{" "}
-        {summary.replayAtSeconds}s/{summary.replayAgentCount} | packed{" "}
-        {summary.packedBytes}b | runtime {summary.runtime}
+        frames {summary.frameCount} | agents {summary.uniqueAgentCount} | span{" "}
+        {summary.durationSeconds}s | samples {recording.sampleCount} ({megabytes} MB) |
+        runtime {recording.runtime.thread}/{recording.runtime.sharedMemory}
       </code>
     </section>
   );

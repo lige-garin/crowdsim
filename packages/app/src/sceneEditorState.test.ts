@@ -26,6 +26,8 @@ import {
   toggleDocumentZoneWalkable,
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
+  updateDocumentEntranceNumber,
+  updateDocumentEntranceProfile,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
   updateDocumentObstacleKind,
@@ -415,5 +417,31 @@ describe("editor round-trip of ADR-0008 fields", () => {
 
     expect(back.entrances[0].exitIds).toEqual(["somewhere"]);
     expect(back.servicePoints[0]).toMatchObject({ name: "Main tills", servers: 4 });
+  });
+
+  it("edits an entrance's demand profile and group share and keeps them through apply", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    const gate = document.entrances.find((entrance) => entrance.kind !== "sink")!;
+    document = updateDocumentEntranceProfile(document, gate.id, "60, 120，x 0  90");
+    document = updateDocumentEntranceNumber(document, gate.id, "groupShare", 1.4);
+
+    const scene = createSceneFromEditorDocument(demoScene, document);
+    const entrance = scene.entrances.find((candidate) => candidate.id === gate.id)!;
+    expect(entrance.arrivalProfile).toEqual({
+      intervalMinutes: 15,
+      ratesPerMinute: [60, 120, 0, 90],
+    });
+    expect(entrance.groupShare).toBe(1);
+    expect(createEditorDocumentFromScene(scene).entrances).toContainEqual(
+      expect.objectContaining({
+        arrivalProfile: entrance.arrivalProfile,
+        groupShare: 1,
+      }),
+    );
+
+    document = updateDocumentEntranceProfile(document, gate.id, "  ");
+    expect(
+      document.entrances.find((candidate) => candidate.id === gate.id)!.arrivalProfile,
+    ).toBeUndefined();
   });
 });

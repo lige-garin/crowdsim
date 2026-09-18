@@ -29,6 +29,7 @@ import {
   updateDocumentShopNumber,
   updateDocumentShopSize,
   updateDocumentEntranceKind,
+  updateDocumentEntranceProfile,
   updateDocumentEntranceNumber,
   updateDocumentTransitStopKind,
   updateDocumentTransitStopNumber,
@@ -203,6 +204,12 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedEntrance) return;
       setDocument((current) =>
         updateDocumentEntranceKind(current, selectedEntrance.id, kind),
+      );
+    },
+    updateEntranceProfile(text: string) {
+      if (!selectedEntrance) return;
+      setDocument((current) =>
+        updateDocumentEntranceProfile(current, selectedEntrance.id, text),
       );
     },
     updateEntranceNumber(field: EntranceNumberField, value: number) {

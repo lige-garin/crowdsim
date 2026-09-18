@@ -59,6 +59,11 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       position: { ...entrance.position },
       width: entrance.width,
       arrivalRatePerMinute: entrance.arrivalRatePerMinute,
+      arrivalProfile: entrance.arrivalProfile && {
+        intervalMinutes: entrance.arrivalProfile.intervalMinutes,
+        ratesPerMinute: [...entrance.arrivalProfile.ratesPerMinute],
+      },
+      groupShare: entrance.groupShare,
       exitIds: entrance.exitIds ? [...entrance.exitIds] : undefined,
     })),
     hazards: scene.hazards.map((hazard) => ({
@@ -186,6 +191,8 @@ export function createSceneFromEditorDocument(
       position: { ...entrance.position },
       width: entrance.width,
       arrivalRatePerMinute: entrance.arrivalRatePerMinute,
+      arrivalProfile: entrance.arrivalProfile,
+      groupShare: entrance.groupShare,
       exitIds: entrance.exitIds,
     })),
     targets: document.targets.map((target) => ({

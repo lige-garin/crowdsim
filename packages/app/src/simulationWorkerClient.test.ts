@@ -116,14 +116,17 @@ describe("simulation worker client", () => {
       simulation: { fixedDtSeconds: 0.25 },
     });
     await client.start();
-    const snapshot = await client.tick(0.25);
+    // Arrivals are random: run a few simulated seconds so someone has come.
+    let snapshot = await client.tick(0.25);
+    while (snapshot.spawnedCount === 0 && snapshot.stepCount < 40) {
+      snapshot = await client.tick(0.25);
+    }
 
-    expect(snapshot.stepCount).toBe(1);
     expect(snapshot.spawnedCount).toBeGreaterThan(0);
     expect(readSimulationSharedMemory(sharedMemory!)).toMatchObject({
       agentCount: snapshot.agentCount,
       status: "running",
-      stepCount: 1,
+      stepCount: snapshot.stepCount,
     });
     expect(readSimulationSharedAgents(sharedMemory!).agents.length).toBe(
       snapshot.agentCount,

@@ -14,6 +14,9 @@ type AppHudTopProps = {
   onHome: () => void;
   onPause: () => void;
   onReset: () => void;
+  /** Opens replay of the recorded run; absent while nothing is recorded. */
+  onReplay?: () => void;
+  replaying: boolean;
   onSetLanguage: (language: Language) => void;
   onSetTimeScale: (speed: number) => void;
   onStageTabChange: (tab: StageTab) => void;
@@ -57,6 +60,8 @@ export function AppHudTop({
   onHome,
   onPause,
   onReset,
+  onReplay,
+  replaying,
   onSetLanguage,
   onSetTimeScale,
   onStageTabChange,
@@ -218,6 +223,18 @@ export function AppHudTop({
           onClick={onReset}
         >
           <HudIcon name="reset" />
+        </button>
+        <button
+          type="button"
+          className="hud-key"
+          data-testid="replay-toggle"
+          aria-label={zh ? "回放" : "Replay"}
+          title={zh ? "回放" : "Replay"}
+          aria-pressed={replaying}
+          disabled={!onReplay}
+          onClick={onReplay}
+        >
+          <HudIcon name="replay" />
         </button>
         <button
           type="button"

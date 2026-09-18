@@ -1,5 +1,7 @@
-﻿import type { TranslationKey } from "./i18n";
+import { useState } from "react";
+import type { TranslationKey } from "./i18n";
 import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
+import { walkingGroupParameters } from "./walkingGroups";
 import type {
   BuildingNumberField,
   EntranceNumberField,
@@ -428,10 +430,12 @@ export function ZoneParamGrid({
 export function EntranceParamGrid({
   onKindChange,
   onNumberChange,
+  onProfileChange,
   selectedEntrance,
   t,
 }: {
   onKindChange: (kind: Entrance["kind"]) => void;
+  onProfileChange: (text: string) => void;
   onNumberChange: (field: EntranceNumberField, value: number) => void;
   selectedEntrance: Entrance;
   t: (key: TranslationKey) => string;
@@ -447,13 +451,30 @@ export function EntranceParamGrid({
       />
       {/* A pure exit spawns nobody, so the rate is not offered for one. */}
       {selectedEntrance.kind === "sink" ? null : (
-        <NumberInput
-          label={t("arrivalRate")}
-          min={0}
-          step={10}
-          value={selectedEntrance.arrivalRatePerMinute}
-          onChange={(value) => onNumberChange("arrivalRatePerMinute", value)}
-        />
+        <>
+          <NumberInput
+            label={t("arrivalRate")}
+            min={0}
+            step={10}
+            value={selectedEntrance.arrivalRatePerMinute}
+            onChange={(value) => onNumberChange("arrivalRatePerMinute", value)}
+          />
+          <ProfileInput
+            label={t("arrivalProfile")}
+            rates={selectedEntrance.arrivalProfile?.ratesPerMinute}
+            onChange={onProfileChange}
+          />
+          <NumberInput
+            label={t("groupShare")}
+            min={0}
+            step={0.1}
+            value={
+              selectedEntrance.groupShare ??
+              walkingGroupParameters.shareOfPeopleInGroups
+            }
+            onChange={(value) => onNumberChange("groupShare", value)}
+          />
+        </>
       )}
       <NumberInput
         label={t("width")}
@@ -463,5 +484,37 @@ export function EntranceParamGrid({
         onChange={(value) => onNumberChange("width", value)}
       />
     </div>
+  );
+}
+
+/**
+ * A list typed as text: kept as typed while focused, so "60, " is not reformatted
+ * under the cursor, and committed on blur.
+ */
+function ProfileInput({
+  label,
+  onChange,
+  rates,
+}: {
+  label: string;
+  onChange: (text: string) => void;
+  rates?: readonly number[];
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="editor-param-wide">
+      {label}
+      <input
+        type="text"
+        inputMode="decimal"
+        placeholder="60, 120, 90"
+        value={draft ?? (rates ?? []).join(", ")}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          if (draft !== null) onChange(draft);
+          setDraft(null);
+        }}
+      />
+    </label>
   );
 }

@@ -6,6 +6,7 @@ import { AppInfoRail } from "./AppInfoRail";
 import { AppInspector } from "./AppInspector";
 import { AppStage } from "./AppStage";
 import { PanelDock } from "./PanelDock";
+import { TrajectoryReplayBar } from "./TrajectoryReplayBar";
 import { infoWindows, type InfoWindowId } from "./hudCatalog";
 import type { Language, TranslationKey } from "./i18n";
 import type { StageTab, StageViewMode } from "./AppTypes";
@@ -31,6 +32,8 @@ type WorkbenchControls = {
   onHeatmapWindowChange: (seconds: number) => void;
   onPause: () => void;
   onReset: () => void;
+  onReplay?: () => void;
+  replaying: boolean;
   onSetLanguage: (language: Language) => void;
   onSetTimeScale: (speed: number) => void;
   onStart: () => void;
@@ -53,6 +56,8 @@ type AppWorkbenchProps = {
   stageTab: StageTab;
   t: (key: TranslationKey) => string;
   readouts: { clock: HudReadout; weather: HudReadout };
+  /** Present while the recorded run is being replayed. */
+  replay?: ComponentProps<typeof TrajectoryReplayBar>;
   viewMode: StageViewMode;
 };
 
@@ -78,6 +83,7 @@ export function AppWorkbench({
   stageTab,
   t,
   readouts,
+  replay,
   viewMode,
 }: AppWorkbenchProps) {
   const [openWindows, setOpenWindows] = useState<InfoWindowId[]>([]);
@@ -112,6 +118,8 @@ export function AppWorkbench({
         t={t}
         viewMode={viewMode}
       />
+
+      {replay ? <TrajectoryReplayBar {...replay} /> : null}
 
       <AppBuildRail
         canUndo={controls.canUndoBuild}

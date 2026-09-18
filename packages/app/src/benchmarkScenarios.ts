@@ -27,6 +27,8 @@ const sharedSimulation = {
   speedMetersPerSecond: 1.34,
 };
 
+// Every scenario sets groupShare: 0. These are corridor and bottleneck tests of
+// individual walkers (RiMEA-style); groups would be a different experiment.
 export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
   {
     description: "Single-direction corridor flow with one source and one sink.",
@@ -60,6 +62,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 2, y: 5 },
           width: 4,
           arrivalRatePerMinute: 90,
+          groupShare: 0,
         },
         {
           id: "east-sink",
@@ -132,6 +135,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 2, y: 6 },
           width: 8,
           arrivalRatePerMinute: 150,
+          groupShare: 0,
         },
         {
           id: "east-sink",
@@ -189,6 +193,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 8, y: 40 },
           width: 5,
           arrivalRatePerMinute: 85,
+          groupShare: 0,
         },
         {
           id: "east-sink",
@@ -242,6 +247,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 2, y: 4 },
           width: 4,
           arrivalRatePerMinute: 75,
+          groupShare: 0,
           exitIds: ["east-sink"],
         },
         {
@@ -250,6 +256,7 @@ export const rimeaCoreScenarios: readonly BenchmarkScenario[] = [
           position: { x: 54, y: 8 },
           width: 4,
           arrivalRatePerMinute: 75,
+          groupShare: 0,
           exitIds: ["west-sink"],
         },
         {

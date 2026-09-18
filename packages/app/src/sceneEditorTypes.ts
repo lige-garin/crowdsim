@@ -48,6 +48,8 @@ export type EditorEntrance = {
   position: ScenePoint;
   width: number;
   arrivalRatePerMinute: number;
+  arrivalProfile?: { intervalMinutes: number; ratesPerMinute: number[] };
+  groupShare?: number;
   exitIds?: string[];
 };
 

@@ -83,6 +83,28 @@ describe("stepCrowd", () => {
     expect(tightest).toBeGreaterThan(0.35);
   });
 
+  it("starts giving way metres ahead, not at arm's length (anticipation)", () => {
+    let startedAt = -1;
+    let tightest = Infinity;
+    run(
+      [
+        walker({ id: 1, x: 5, y: 10.05, vx: 1.3, targetX: 35, targetY: 10.05 }),
+        walker({ id: 2, x: 25, y: 9.95, vx: -1.3, targetX: -5, targetY: 9.95 }),
+      ],
+      15,
+      [],
+      ([a, b]) => {
+        tightest = Math.min(tightest, closestGap([a, b]));
+        if (startedAt < 0 && Math.abs(a.vy) > 0.1 && b.x > a.x) startedAt = b.x - a.x;
+      },
+    );
+
+    // Without the time-to-collision term they turned away only 0.5 m apart
+    // and their bodies overlapped (0.43 m between centres).
+    expect(startedAt).toBeGreaterThan(2);
+    expect(tightest).toBeGreaterThan(0.5);
+  });
+
   it("lets a faster walker overtake a slower one", () => {
     const end = run(
       [

@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - city-sim-engine
 
 jobs:
   lint-and-test:

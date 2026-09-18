@@ -37,6 +37,22 @@ export const entranceSchema = z.object({
   width: z.number().positive(),
   arrivalRatePerMinute: z.number().nonnegative().default(0),
   /**
+   * Arrivals by time slot from the start of the run, people a minute in each
+   * slot (a demand profile, as entry schedules in pedestrian tools). Replaces
+   * `arrivalRatePerMinute` while it lasts; nobody arrives after the last slot.
+   */
+  arrivalProfile: z
+    .object({
+      intervalMinutes: z.number().positive().default(15),
+      ratesPerMinute: z.array(z.number().nonnegative()).min(1),
+    })
+    .optional(),
+  /**
+   * Share of arriving people who come in groups of two to four. Absent: 0.7,
+   * observed on a busy commercial walkway (Moussaïd et al. 2010).
+   */
+  groupShare: z.number().min(0).max(1).optional(),
+  /**
    * Exits that people arriving here may leave by (ADR-0008). Absent or empty:
    * any exit. Evacuation ignores it.
    */

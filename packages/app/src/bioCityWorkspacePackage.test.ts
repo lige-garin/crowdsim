@@ -89,6 +89,8 @@ describe("bioCityWorkspacePackage", () => {
 const heatmapCells: HeatmapCell[] = [
   {
     count: 32,
+    densityPerSquareMeter: 2.0,
+    level: "E",
     height: 4,
     id: "workspace-peak",
     intensity: 1,

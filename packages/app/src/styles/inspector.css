@@ -896,3 +896,51 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Measured results (RunAnalyticsPanel) */
+.run-analytics h4 {
+  margin: 12px 0 6px;
+  color: var(--lab-muted);
+  font-size: var(--fs-micro);
+  font-weight: 600;
+}
+
+.run-analytics-empty {
+  margin: 4px 0;
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+}
+
+.los-bar {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.los-bar span {
+  display: grid;
+  min-width: 14px;
+  place-items: center;
+  color: #10201a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.los-bar .los-bar-empty {
+  flex-grow: 1;
+  color: var(--lab-faint);
+}
+
+.run-analytics-exports {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.run-analytics-exports button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: var(--fs-micro);
+}

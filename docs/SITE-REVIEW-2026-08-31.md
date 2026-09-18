@@ -11,23 +11,24 @@
 
 ## 一、闸门实测（全部今日真机跑）
 
-| 闸门 | 结果 | 备注 |
-| --- | --- | --- |
-| app vitest | **129 文件 / 451 测试全过**（37.4s） | 进程测试后未退出被 timeout 杀（exit 124）——见 P2-4 |
-| backend vitest | **6 文件 / 33 测试全过**，exit 0 | |
-| ESLint | **PASS**（0 错误 0 警告） | |
-| Prettier `--check` | FAIL → **修复后 PASS** | 昨日 5 个 commit 漏跑 prettier，10 文件漂移 |
-| 生产构建 | **PASS**（304 模块，wasm 63.7 kB + 2 worker + chunks） | `vite build --outDir dist-verify` |
-| Playwright e2e | **4/4 冒烟通过**（1600×900） | 修复 2 处测试基建缺陷后；另发现 720p 真实布局 bug（P2-2） |
-| 真机 WebGPU 100k 基准 | **0.131–0.211 ms/step**（3 轮） | NVIDIA Lovelace / Chrome 149，页面内实测 `benchmark100k.webgpu.ts` 同参数复刻 |
-| pnpm audit | **不可用** | npmmirror registry 无 audit endpoint（依赖漏洞盲区，P3-6） |
-| cargo test（Rust DES） | 昨日全绿，本次未重跑 | 上次会话 gate9 实测通过 |
+| 闸门                   | 结果                                                   | 备注                                                                          |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| app vitest             | **129 文件 / 451 测试全过**（37.4s）                   | 进程测试后未退出被 timeout 杀（exit 124）——见 P2-4                            |
+| backend vitest         | **6 文件 / 33 测试全过**，exit 0                       |                                                                               |
+| ESLint                 | **PASS**（0 错误 0 警告）                              |                                                                               |
+| Prettier `--check`     | FAIL → **修复后 PASS**                                 | 昨日 5 个 commit 漏跑 prettier，10 文件漂移                                   |
+| 生产构建               | **PASS**（304 模块，wasm 63.7 kB + 2 worker + chunks） | `vite build --outDir dist-verify`                                             |
+| Playwright e2e         | **4/4 冒烟通过**（1600×900）                           | 修复 2 处测试基建缺陷后；另发现 720p 真实布局 bug（P2-2）                     |
+| 真机 WebGPU 100k 基准  | **0.131–0.211 ms/step**（3 轮）                        | NVIDIA Lovelace / Chrome 149，页面内实测 `benchmark100k.webgpu.ts` 同参数复刻 |
+| pnpm audit             | **不可用**                                             | npmmirror registry 无 audit endpoint（依赖漏洞盲区，P3-6）                    |
+| cargo test（Rust DES） | 昨日全绿，本次未重跑                                   | 上次会话 gate9 实测通过                                                       |
 
 ## 二、P1 — 仿真正确性（上线 blocker，共 3 项，全在物理层）
 
 ### P1-1【本次新发现】默认仿真速度 8 m/s，UI 实时仿真跑 6 倍速
 
 证据链：
+
 - `packages/app/src/simulationEngine.ts:96` — `defaultSpeedMetersPerSecond = 8`
 - `packages/app/src/useSimulationController.ts:30` — 主线程路径只传 `{decisionBackend, movementBackend}`，**不传速度**
 - `packages/app/src/useSimulationWorkerController.ts:107` — worker 路径同样不传
@@ -44,6 +45,7 @@
 ### P1-3 CPU 引擎无 agent-agent 交互，行人互相穿透（GPU 核心已有社会力！）
 
 证据链：
+
 - `simulationEngine.ts:316-348`（`advanceAgentsCpu`）— 直线走向目标，仅墙/边界约束，**无 agent 间排斥/避让**
 - **关键发现**：`packages/core-gpu/src/gpuSimCore.ts` 的 GPU 核心已实现完整社会力参数（`SocialForceParams`：desiredSpeed 1.3、relaxationTime 0.5、agent/wall repulsion、maxSpeed）——即 **P1-2/P1-3 的正确物理已在 GPU 核心写好并通过 100k 基准实测，只是从未接入 UI 仿真主链路**（`useWebGpuMovementBackend` 走的是渲染路径，非 `gpuSimCore` 步进）
 - 密度网格（`cpuGrid.ts`）是只读回传，不反馈到 CPU 运动
@@ -52,18 +54,19 @@
 
 ## 三、P2 — 上线前应解决
 
-| # | 发现 | 证据 / 状态 |
-| --- | --- | --- |
-| P2-1 | ~~10 万 GPU 宣称未验证~~ → **今日已实测** | 100k @ 0.13–0.21 ms/step（Lovelace/Chrome149）≈ 80× 余量；已记入 `packages/core-gpu/BENCHMARKS.md` 与 CLAIMS_LEDGER。剩余范围：仅测了 GPU 步进核（不含决策/回传/渲染全管线）；parity/determinism 规格仍无真机执行 |
-| P2-2 | **720p 视口下编辑器工具条被面板坞遮挡**【本次新发现】 | 1280×720 下点击 `editor-tool-shop`，命中测试被 `panel-dock-collapsed` 拦截 30s（playwright hit-test 与真实点击等价）；1600×900 下同一测试 1.3s 通过。真实用户在 720p 笔记本会遇到"点工具没反应" |
-| P2-3 | e2e 基建已破但无人跑（本次修复两处） | ① 落地页上线后 4 个冒烟测试全部直接失败（没人跑过 e2e gate）；② `canvasHasContent` 对 WebGPU 画布读黑帧（drawImage 读不到 WebGPU 内容，`toDataURL` 可以）——注释声称兼容两者，实际不兼容。两处均已修复 |
-| P2-4 | **测试进程退出挂起（两类）** | vitest：测试全过但 jsdom worker 保活 → exit 124；playwright：worker 300s 不退出强杀。CI 会 flake。修法：teardown 显式 `worker.terminate()` / 强制退出 |
-| P2-5 | benchmark 场景几何是"自称 RiMEA 的自作近似"，非官方几何（CLAIMS_LEDGER 已声明） | 对外避免"RiMEA 认证"措辞 |
-| P2-6 | e2e 仅 Chromium/Chrome；`reuseExistingServer` + 固定 5173 有端口劫持风险（本机 5173 被另一产品占用，playwright 盲目复用） | 建议 `strictPort` + 启动后校验页面标记 |
+| #    | 发现                                                                                                                      | 证据 / 状态                                                                                                                                                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P2-1 | ~~10 万 GPU 宣称未验证~~ → **今日已实测**                                                                                 | 100k @ 0.13–0.21 ms/step（Lovelace/Chrome149）≈ 80× 余量；已记入 `packages/core-gpu/BENCHMARKS.md` 与 CLAIMS_LEDGER。剩余范围：仅测了 GPU 步进核（不含决策/回传/渲染全管线）；parity/determinism 规格仍无真机执行 |
+| P2-2 | **720p 视口下编辑器工具条被面板坞遮挡**【本次新发现】                                                                     | 1280×720 下点击 `editor-tool-shop`，命中测试被 `panel-dock-collapsed` 拦截 30s（playwright hit-test 与真实点击等价）；1600×900 下同一测试 1.3s 通过。真实用户在 720p 笔记本会遇到"点工具没反应"                   |
+| P2-3 | e2e 基建已破但无人跑（本次修复两处）                                                                                      | ① 落地页上线后 4 个冒烟测试全部直接失败（没人跑过 e2e gate）；② `canvasHasContent` 对 WebGPU 画布读黑帧（drawImage 读不到 WebGPU 内容，`toDataURL` 可以）——注释声称兼容两者，实际不兼容。两处均已修复             |
+| P2-4 | **测试进程退出挂起（两类）**                                                                                              | vitest：测试全过但 jsdom worker 保活 → exit 124；playwright：worker 300s 不退出强杀。CI 会 flake。修法：teardown 显式 `worker.terminate()` / 强制退出                                                             |
+| P2-5 | benchmark 场景几何是"自称 RiMEA 的自作近似"，非官方几何（CLAIMS_LEDGER 已声明）                                           | 对外避免"RiMEA 认证"措辞                                                                                                                                                                                          |
+| P2-6 | e2e 仅 Chromium/Chrome；`reuseExistingServer` + 固定 5173 有端口劫持风险（本机 5173 被另一产品占用，playwright 盲目复用） | 建议 `strictPort` + 启动后校验页面标记                                                                                                                                                                            |
 
 ## 四、P3 — 卫生/运维
 
 **本次已修（随本报告提交）**：
+
 1. ✅ Prettier 10 文件漂移 → `--write` 修复，闸门恢复绿
 2. ✅ `simulationEngine.ts:352` 注释乱码 `鈥?` → `—`（全仓 Python 字节扫描唯一残留）
 3. ✅ `.gitignore`/`.prettierignore` 补 `.workbuddy/`、`.pnpm-store/`、`.vite-5184.log`、`_to_delete`
@@ -72,14 +75,7 @@
 6. ✅ `BENCHMARKS.md`/`CLAIMS_LEDGER.md` 记录 100k 实测数
 7. ✅ e2e 实测通道打通（隔离端口 + strictPort 临时配置）
 
-**未修（低风险，记录在案）**：
-8. `backendRequestUtils.ts:19` `readJson` 无请求体大小上限（DoS 面）
-9. `pnpm audit` 在 npmmirror 下不可用 → 依赖 CVE 盲区
-10. `auth.ts:30` 会话存内存 Map：重启全员登出、多实例不共享
-11. login 无速率限制/锁定
-12. `_to_delete/` 残留 2 个无引用死文件（`agentLifecycle.*`）
-13. 后端 `/api/ai/:provider` 完整实现（fail-closed、配额、密钥拦截、aiPolicy）但 app 端无真实调用（`AiWorkflowPanel` 只构造请求展示 URL）——后端先行管线
-14. e2e 临时配置/补丁文件未入库（沙箱专用，方法已记入文档）
+**未修（低风险，记录在案）**：8. `backendRequestUtils.ts:19` `readJson` 无请求体大小上限（DoS 面）9. `pnpm audit` 在 npmmirror 下不可用 → 依赖 CVE 盲区 10. `auth.ts:30` 会话存内存 Map：重启全员登出、多实例不共享11. login 无速率限制/锁定12. `_to_delete/` 残留 2 个无引用死文件（`agentLifecycle.*`）13. 后端 `/api/ai/:provider` 完整实现（fail-closed、配额、密钥拦截、aiPolicy）但 app 端无真实调用（`AiWorkflowPanel` 只构造请求展示 URL）——后端先行管线14. e2e 临时配置/补丁文件未入库（沙箱专用，方法已记入文档）
 
 ## 五、正面清单（值得保持的强项）
 

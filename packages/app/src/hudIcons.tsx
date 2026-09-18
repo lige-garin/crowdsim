@@ -43,6 +43,7 @@ export type HudIconName =
   | "layers"
   | "scene"
   | "home"
+  | "replay"
   | "close";
 
 const PATHS: Record<HudIconName, ReactNode> = {
@@ -248,6 +249,13 @@ const PATHS: Record<HudIconName, ReactNode> = {
   ),
   home: <path d="M4 11l8-7 8 7v9H4z" />,
   close: <path d="M6 6l12 12M18 6L6 18" />,
+  replay: (
+    <>
+      <path d="M4 12a8 8 0 1 0 2.3-5.7" />
+      <path d="M4 3v4h4" />
+      <path d="M10 9l5 3-5 3z" fill="currentColor" />
+    </>
+  ),
 };
 
 export function HudIcon({ name, size = 20 }: { name: HudIconName; size?: number }) {

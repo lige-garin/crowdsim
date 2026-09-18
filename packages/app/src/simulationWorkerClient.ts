@@ -1,3 +1,4 @@
+import { agentStateCode } from "./agentStateColors";
 import { crowdBudget } from "./crowdBudget";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
@@ -273,7 +274,7 @@ function writeSimulationSharedAgents(
     Atomics.store(
       sharedMemory.view,
       intLaneOffset("behaviorState", index, sharedMemory.capacity),
-      lifecycleStateCode(agent.lifecycleState),
+      agentStateCode(agent.lifecycleState),
     );
     Atomics.store(
       sharedMemory.view,
@@ -322,24 +323,6 @@ function floatLaneOffset(lane: FloatLane, agentIndex: number, capacity: number) 
 }
 function lanesPerAgent() {
   return sharedIntLaneCount + sharedFloatLaneCount;
-}
-function lifecycleStateCode(state: SimulationAgent["lifecycleState"]) {
-  switch (state) {
-    case "walk":
-      return 1;
-    case "browse":
-      return 2;
-    case "queue":
-      return 3;
-    case "enterStore":
-      return 4;
-    case "leave":
-      return 5;
-    case "evacuate":
-      return 6;
-    default:
-      return 0;
-  }
 }
 export function createSimulationWorkerClient(
   options: {

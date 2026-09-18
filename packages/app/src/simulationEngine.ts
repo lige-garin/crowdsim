@@ -25,6 +25,14 @@ import {
   type SceneGeometry,
 } from "./simulationSceneConfig";
 import { reconcileAgentsWithScene } from "./simulationSceneReconcile";
+import {
+  followLeaders,
+  groupSpeedRatio,
+  meanArrivalSize,
+  sampleArrivalSize,
+  splitGroups,
+  walkingGroupParameters,
+} from "./walkingGroups";
 export type SimulationStatus = "paused" | "running";
 export type SimulationAgent = {
   decisionTick?: number;
@@ -50,6 +58,10 @@ export type SimulationAgent = {
   exitIds?: readonly string[];
   /** The checkout counter a buyer is walking to, waiting at or served by. */
   servicePointId?: string;
+  /** The anticipatory push last planned for this person, m/s² (crowdMovement). */
+  avoidance?: readonly [number, number];
+  /** People who arrived together share this: the id of the first of them. */
+  groupId?: number;
   /** Body radius in metres, drawn at spawn (`behaviorDistributions`). */
   radius?: number;
   /** Free walking speed relative to the scene's mean, drawn at spawn. */
@@ -60,6 +72,13 @@ export type SimulationSource = {
   position: ScenePoint;
   width: number;
   arrivalRatePerSecond: number;
+  /**
+   * People a second in consecutive slots from the start of the run; replaces
+   * `arrivalRatePerSecond` while it lasts, and nobody arrives after it ends.
+   */
+  arrivalProfile?: { intervalSeconds: number; ratesPerSecond: readonly number[] };
+  /** Share of arriving people who come in groups (walkingGroups). Default 0. */
+  groupShare?: number;
   /** Exits arrivals here may leave by; absent or empty means any. */
   exitIds?: readonly string[];
 };
@@ -117,6 +136,8 @@ const defaultFixedDtSeconds = 1 / 60;
 // ceiling — ten thousand needs the resident GPU core.
 const defaultMaxAgents = crowdBudget.maxAgents;
 const maxRealDeltaSeconds = 0.25;
+/** Steps between anticipation replans: 20 Hz at the 60 Hz default step. */
+const anticipationReplanSteps = 3;
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
   decisionHz: 10,
@@ -124,6 +145,13 @@ export const simulationRuntimeProfile = {
   movementBackend: "cpu-compat",
   movementHz: 60,
 } as const;
+/** People a second arriving at a source at a time in the run. */
+export function arrivalRateAt(source: SimulationSource, elapsedSeconds: number) {
+  const profile = source.arrivalProfile;
+  if (!profile) return source.arrivalRatePerSecond;
+  const slot = Math.floor(elapsedSeconds / profile.intervalSeconds);
+  return profile.ratesPerSecond[slot] ?? 0;
+}
 export function createSimulationEngineFromScene(
   scene: CrowdSimScene,
   overrides: Partial<SimulationEngineConfig> = {},
@@ -217,11 +245,31 @@ export function createSimulationEngine(
       agents: agents.map((agent) => ({ ...agent })),
     };
   }
-  function spawnAgent(source: SimulationSource) {
-    if (agents.length >= maxAgents || sinks.length === 0) {
+  function spawnArrival(source: SimulationSource, size: number) {
+    if (agents.length + size > maxAgents || sinks.length === 0) {
       return;
     }
     const jitter = (rng() - 0.5) * source.width;
+    const firstId = nextAgentId;
+    const ids = Array.from({ length: size }, (_, index) => firstId + index);
+    const speedFactor =
+      size > 1
+        ? Math.min(...ids.map((id) => sampleSpeedFactor(seed, id))) *
+          groupSpeedRatio(size)
+        : undefined;
+    ids.forEach((_, index) =>
+      spawnAgent(
+        source,
+        jitter + (index - (size - 1) / 2) * walkingGroupParameters.spacingMeters,
+        size > 1 ? { groupId: firstId, speedFactor } : {},
+      ),
+    );
+  }
+  function spawnAgent(
+    source: SimulationSource,
+    jitter: number,
+    group: { groupId?: number; speedFactor?: number },
+  ) {
     const spawnPoint = clampPointToWorld(
       {
         x: source.position.x,
@@ -238,8 +286,9 @@ export function createSimulationEngine(
         ? { exitIds: source.exitIds }
         : {}),
       id,
+      ...(group.groupId === undefined ? {} : { groupId: group.groupId }),
       radius: sampleBodyRadius(seed, id),
-      speedFactor: sampleSpeedFactor(seed, id),
+      speedFactor: group.speedFactor ?? sampleSpeedFactor(seed, id),
       x,
       y,
       vx: 0,
@@ -276,10 +325,14 @@ export function createSimulationEngine(
       movementHz: simulationRuntimeProfile.movementHz,
       stepCount: nextStepCount,
     });
+    // Leaders decide for their groups; companions are not shoppers of their
+    // own, so the behaviour model never puts them in a line or at a till.
+    const groups = splitGroups(agents);
+    const deciding = agents.filter((agent) => !groups.isCompanion(agent));
     agents = applySimulationAgentDecisions(
       agents,
       decisionBackend.decideAgents({
-        agents,
+        agents: deciding,
         decisionTick,
         elapsedSeconds,
         sinks,
@@ -290,6 +343,7 @@ export function createSimulationEngine(
       }),
       decisionTick,
     );
+    agents = followLeaders(agents, splitGroups(agents).leaders);
   }
   /**
    * Arrivals enter through their entrance no faster than it can pass people:
@@ -297,11 +351,19 @@ export function createSimulationEngine(
    * come in as room allows. Without this, a high arrival rate stacked hundreds
    * of people on one point of a narrow gate.
    */
-  const waitingOutside = new Map<string, { admit: number; waiting: number }>();
+  const waitingOutside = new Map<string, { admit: number; waiting: number[] }>();
   function spawnArrivals() {
     for (const source of sources) {
-      const gate = waitingOutside.get(source.id) ?? { admit: 1, waiting: 0 };
-      gate.waiting += samplePoisson(source.arrivalRatePerSecond * fixedDtSeconds, rng);
+      const gate = waitingOutside.get(source.id) ?? { admit: 1, waiting: [] };
+      const share = source.groupShare ?? 0;
+      const arrivals = samplePoisson(
+        (arrivalRateAt(source, elapsedSeconds) / meanArrivalSize(share)) *
+          fixedDtSeconds,
+        rng,
+      );
+      for (let index = 0; index < arrivals; index++) {
+        gate.waiting.push(sampleArrivalSize(rng, share));
+      }
       const perSecond = source.width * weidmannMaxSpecificFlow;
       // One person can always step through; the allowance never banks more
       // than a second's flow, so a long quiet spell does not release a crowd.
@@ -309,10 +371,11 @@ export function createSimulationEngine(
         Math.max(1, perSecond),
         gate.admit + perSecond * fixedDtSeconds,
       );
-      while (gate.waiting > 0 && gate.admit >= 1) {
-        spawnAgent(source);
-        gate.waiting--;
-        gate.admit--;
+      // A group goes through together; the allowance pays it back afterwards.
+      while (gate.waiting.length > 0 && gate.admit >= 1) {
+        const size = gate.waiting.shift()!;
+        spawnArrival(source, size);
+        gate.admit -= size;
       }
       waitingOutside.set(source.id, gate);
     }
@@ -321,6 +384,7 @@ export function createSimulationEngine(
     const result = stepCrowd({
       agents,
       dtSeconds: fixedDtSeconds,
+      replanAnticipation: stepCount % anticipationReplanSteps === 0,
       // Every agent is spawned with an exit, and reconciliation re-points it
       // whenever that exit is removed.
       exitRadius: (agent) =>

@@ -3,6 +3,7 @@ import { sampleBodyRadius, sampleSpeedFactor } from "./behaviorDistributions";
 import type { Router } from "./crowdNavigation";
 import { constrainMovement, type SceneWorldBounds } from "./sceneGeometry";
 import type { SimulationAgent } from "./simulationEngine";
+import { walkingGroupParameters, groupFormation } from "./walkingGroups";
 import { closestPointOnSegment, type WallIndex } from "./wallIndex";
 
 /**
@@ -60,9 +61,29 @@ export const socialForceParameters = {
   sidestepCone: 0.7,
   /** Someone holding a spot eases toward it over this distance. */
   holdEaseMeters: 1,
+  /**
+   * Anticipation: Karamouzas, Skinner & Guy (2014), "Universal power law
+   * governing pedestrian interactions", Phys. Rev. Lett. 113, 238701. People
+   * react to how soon they would collide at current velocities, not only to how
+   * close others are: interaction energy k·τ⁻²·e^(−τ/τ₀). k and τ₀ are the
+   * paper's values fitted to crowd data; 0 turns anticipation off.
+   */
+  anticipationStrength: 1.5,
+  /** τ₀, s: collisions further away in time than a few of these are ignored. */
+  anticipationHorizonSeconds: 3,
+  /**
+   * Only people this close are considered, m. Self-chosen, for cost: two people
+   * walking at each other start adjusting about 2.9 m apart with the values above.
+   */
+  anticipationRangeMeters: 3,
+  /** Cap on the anticipatory push, m/s². Self-chosen. */
+  anticipationMaxAcceleration: 5,
 };
 
 export type SocialForceParameters = typeof socialForceParameters;
+
+/** Closer than this, a wall or two strangers leave no room to walk abreast, m. Self-chosen. */
+const formationRoomMeters = 1;
 
 /** States in which a person stands at a spot rather than walking somewhere. */
 const holdingStates = new Set(["browse", "enterStore", "queue"]);
@@ -82,6 +103,13 @@ export type CrowdStepInput = {
   isExitBound: (agent: SimulationAgent) => boolean;
   /** Arrival radius of the exit this agent is walking to. */
   exitRadius: (agent: SimulationAgent) => number;
+  /**
+   * Recompute the anticipatory push this step (default). When false, each
+   * person keeps the push last computed for them: the engine replans it 20
+   * times a simulated second, because scanning everyone within 3 m sixty times
+   * a second more than doubled the cost of a step.
+   */
+  replanAnticipation?: boolean;
 };
 
 export function stepCrowd(input: CrowdStepInput): {
@@ -94,6 +122,8 @@ export function stepCrowd(input: CrowdStepInput): {
   const dt = input.dtSeconds;
   const agents = input.agents;
   const grid = bucketAgents(agents, p.interactionRangeMeters);
+  const formation = groupFormation(agents);
+  const anticipating = p.anticipationStrength > 0;
   const next: SimulationAgent[] = [];
   let exitedCount = 0;
 
@@ -121,12 +151,15 @@ export function stepCrowd(input: CrowdStepInput): {
 
     let ax = 0;
     let ay = 0;
+    let strangersClose = 0;
     forEachNearby(grid, agent.x, agent.y, (other) => {
       if (other.id === agent.id) return;
       let ox = agent.x - other.x;
       let oy = agent.y - other.y;
       let gap = Math.hypot(ox, oy);
       if (gap >= p.interactionRangeMeters) return;
+      if (gap < formationRoomMeters && other.groupId !== agent.groupId)
+        strangersClose++;
       if (gap < 1e-6) {
         // Exactly stacked (a narrow gate can spawn two on one point): push
         // apart along an id-derived angle so the pair always separates.
@@ -142,12 +175,16 @@ export function stepCrowd(input: CrowdStepInput): {
       // cos φ between my heading and the direction to the other person.
       const facing = -(heading.x * ox + heading.y * oy);
       const weight = p.anisotropy + (1 - p.anisotropy) * ((1 + facing) / 2);
-      let push =
-        p.agentStrength * Math.exp((bodies - gap) / p.agentRangeMeters) * weight;
+      // Companions keep only body contact: people walking together stand
+      // closer than strangers are comfortable with (walkingGroups).
+      const together = agent.groupId !== undefined && agent.groupId === other.groupId;
+      let push = together
+        ? 0
+        : p.agentStrength * Math.exp((bodies - gap) / p.agentRangeMeters) * weight;
       if (gap < bodies) push += p.contactStiffness * (bodies - gap);
       ax += push * ox;
       ay += push * oy;
-      if (facing > p.sidestepCone) {
+      if (!together && facing > p.sidestepCone) {
         // Step to whichever side the other person is not on; dead ahead, always
         // the same side, so oncoming streams settle into lanes.
         const side = ox * heading.y - oy * heading.x;
@@ -157,17 +194,39 @@ export function stepCrowd(input: CrowdStepInput): {
       }
     });
 
+    let avoidance: readonly [number, number] | undefined;
+    if (anticipating && !holding) {
+      avoidance =
+        input.replanAnticipation === false && agent.avoidance
+          ? agent.avoidance
+          : anticipation(agent, radius, grid, p, input.seed);
+      ax += avoidance[0];
+      ay += avoidance[1];
+    }
+
     const nearbyWalls = input.walls.near(agent.x, agent.y, 1);
+    let wallClose = false;
     for (const wall of nearbyWalls) {
       const closest = closestPointOnSegment(agent.x, agent.y, wall);
       const wx = agent.x - closest.x;
       const wy = agent.y - closest.y;
       const gap = Math.hypot(wx, wy);
       if (gap < 1e-9 || gap > 1) continue;
+      if (gap < formationRoomMeters) wallClose = true;
       let push = p.wallStrength * Math.exp((radius - gap) / p.wallRangeMeters);
       if (gap < radius) push += p.contactStiffness * (radius - gap);
       ax += (push * wx) / gap;
       ay += (push * wy) / gap;
+    }
+
+    // Walking with others: drift toward one's place beside them, and catch up
+    // or wait when that place is ahead or behind. Only with room for it: in a
+    // doorway or a crowd groups fall into file (Moussaïd et al. saw the line
+    // bend as density rose); holding the line there jammed the demo's exit.
+    const slot = formation.slots.get(agent.id);
+    if (slot && !wallClose && strangersClose < 2) {
+      ax += walkingGroupParameters.formationGain * (slot.x - agent.x);
+      ay += walkingGroupParameters.formationGain * (slot.y - agent.y);
     }
 
     // People ease off as they arrive instead of overshooting the spot.
@@ -224,7 +283,16 @@ export function stepCrowd(input: CrowdStepInput): {
       vy = (resolved.y - agent.y) / dt;
     }
 
-    next.push({ ...agent, radius, speedFactor, vx, vy, x: resolved.x, y: resolved.y });
+    next.push({
+      ...agent,
+      avoidance,
+      radius,
+      speedFactor,
+      vx,
+      vy,
+      x: resolved.x,
+      y: resolved.y,
+    });
   }
 
   return { agents: next, exitedCount };
@@ -261,14 +329,67 @@ function forEachNearby(
   x: number,
   y: number,
   visit: (agent: SimulationAgent) => void,
+  reachMeters = buckets.size,
 ) {
   const column = Math.floor(x / buckets.size);
   const row = Math.floor(y / buckets.size);
-  for (let dc = -1; dc <= 1; dc++) {
-    for (let dr = -1; dr <= 1; dr++) {
+  const cells = Math.ceil(reachMeters / buckets.size);
+  for (let dc = -cells; dc <= cells; dc++) {
+    for (let dr = -cells; dr <= cells; dr++) {
       const bucket = buckets.cells.get(bucketKey(column + dc, row + dr));
       if (!bucket) continue;
       for (const index of bucket) visit(buckets.agents[index]);
     }
   }
+}
+
+/**
+ * The time-to-collision push (Karamouzas, Skinner & Guy 2014): for each person
+ * on a collision course, τ is when the two bodies would touch if both kept
+ * their velocities, and the push is minus the gradient of k·τ⁻²·e^(−τ/τ₀) with
+ * respect to one's own velocity, as in the authors' reference implementation.
+ * People already touching are left to the contact force.
+ */
+function anticipation(
+  agent: SimulationAgent,
+  radius: number,
+  buckets: AgentBuckets,
+  p: SocialForceParameters,
+  seed: number,
+): [number, number] {
+  let fx = 0;
+  let fy = 0;
+  const k = p.anticipationStrength;
+  const t0 = p.anticipationHorizonSeconds;
+  const rangeSq = p.anticipationRangeMeters ** 2;
+  const visit = (other: SimulationAgent) => {
+    const wx = other.x - agent.x;
+    const wy = other.y - agent.y;
+    const distanceSq = wx * wx + wy * wy;
+    if (distanceSq > rangeSq || other === agent) return;
+    const vx = agent.vx - other.vx;
+    const vy = agent.vy - other.vy;
+    // Not closing in: no collision ahead.
+    const b = wx * vx + wy * vy;
+    if (b <= 0) return;
+    const bodies = radius + (other.radius ?? sampleBodyRadius(seed, other.id));
+    const c = distanceSq - bodies * bodies;
+    if (c <= 0) return;
+    const a = vx * vx + vy * vy;
+    const discriminant = b * b - a * c;
+    if (a < 1e-6 || discriminant <= 0) return;
+    const root = Math.sqrt(discriminant);
+    const tau = (b - root) / a;
+    if (tau <= 0) return;
+    const scale = (-k * Math.exp(-tau / t0) * (2 / tau + 1 / t0)) / (a * tau * tau);
+    fx += scale * (vx - (b * vx - a * wx) / root);
+    fy += scale * (vy - (b * vy - a * wy) / root);
+  };
+  forEachNearby(buckets, agent.x, agent.y, visit, p.anticipationRangeMeters);
+  const magnitude = Math.hypot(fx, fy);
+  if (magnitude > p.anticipationMaxAcceleration) {
+    fx *= p.anticipationMaxAcceleration / magnitude;
+    fy *= p.anticipationMaxAcceleration / magnitude;
+  }
+  return [fx, fy];
 }
