@@ -448,6 +448,18 @@ test("build straight into the 3D city and undo it", async ({ page }) => {
     timeout: 20_000,
   });
 
+  // ubuntu-latest has no GPU. Chromium there still exposes navigator.gpu, but
+  // requestAdapter() returns null, so the viewport takes its fail-loud branch
+  // (ADR-0006) and the unsupported card covers the canvas: nothing in the city
+  // can be clicked. Giving the runner a software adapter was tried and made
+  // things worse — with SwiftShader flags five cases failed instead of one —
+  // so until a runner has a real GPU this path is covered by local runs only,
+  // and skipped here with the reason on the record rather than failing red.
+  test.skip(
+    await page.getByTestId("viewport-unsupported").isVisible(),
+    "needs a GPU: without one the viewport shows its unsupported card over the canvas",
+  );
+
   // An entrance: a marker, never refused for what it lands on, so the click at
   // the viewport centre is a placement whatever the camera happens to frame.
   await page.getByTestId("build-category-flow").click();
