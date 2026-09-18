@@ -13,12 +13,34 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         ...(isCi ? {} : { channel: "chrome" }),
+        // ubuntu-latest has no GPU. Chromium still exposes navigator.gpu there,
+        // but requestAdapter() returns null, so the viewport takes its
+        // fail-loud branch (ADR-0006) and the unsupported card covers the
+        // canvas — every test that clicks the 3D city is blocked by it. These
+        // flags give the runner a software adapter through SwiftShader.
+        // Local runs keep the real GPU and no extra flags.
+        launchOptions: isCi
+          ? {
+              args: [
+                "--enable-unsafe-webgpu",
+                "--enable-features=Vulkan",
+                "--use-angle=swiftshader",
+                "--use-gl=angle",
+                "--enable-unsafe-swiftshader",
+              ],
+            }
+          : {},
       },
     },
   ],
   reporter: isCi ? [["list"], ["html", { open: "never" }]] : "list",
   testDir: "./e2e",
-  timeout: 30_000,
+  // Software rendering on the runner is several times slower than the local
+  // GPU, and one case waits for the simulated clock to reach three seconds
+  // before it clicks. The CI-only figure is an environment allowance, not a
+  // tolerance for the app getting slower: if a case starts needing it locally,
+  // the app regressed.
+  timeout: isCi ? 90_000 : 30_000,
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",
