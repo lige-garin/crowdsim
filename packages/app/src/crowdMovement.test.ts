@@ -28,6 +28,12 @@ function run(
   seconds: number,
   walls: WallSegment[] = [],
   onStep?: (agents: SimulationAgent[]) => void,
+  /**
+   * Recompute the anticipatory push every Nth step. The engine runs at 3
+   * (20 Hz); dropping it to 6 (10 Hz) is the obvious way to buy back step
+   * time, and this is where that trade gets tested rather than assumed.
+   */
+  replanEvery = 1,
 ) {
   const router = createRouter(world, walls);
   const index = createWallIndex(walls);
@@ -39,6 +45,7 @@ function run(
       exitRadius: () => 0,
       isExitBound: () => false,
       meanSpeedMetersPerSecond: 1.34,
+      replanAnticipation: replanEvery === 1 ? true : step % replanEvery === 0,
       router,
       seed: 1,
       walls: index,
@@ -47,6 +54,26 @@ function run(
     onStep?.(agents);
   }
   return agents;
+}
+
+/** Give-way distance and passing gap for a pair walking at each other. */
+function headOnPassing(replanEvery = 1) {
+  let startedAt = -1;
+  let tightest = Infinity;
+  run(
+    [
+      walker({ id: 1, x: 5, y: 10.05, vx: 1.3, targetX: 35, targetY: 10.05 }),
+      walker({ id: 2, x: 25, y: 9.95, vx: -1.3, targetX: -5, targetY: 9.95 }),
+    ],
+    15,
+    [],
+    ([a, b]) => {
+      tightest = Math.min(tightest, Math.hypot(a.x - b.x, a.y - b.y));
+      if (startedAt < 0 && Math.abs(a.vy) > 0.1 && b.x > a.x) startedAt = b.x - a.x;
+    },
+    replanEvery,
+  );
+  return { startedAt, tightest };
 }
 
 const closestGap = (agents: SimulationAgent[]) => {
@@ -84,25 +111,31 @@ describe("stepCrowd", () => {
   });
 
   it("starts giving way metres ahead, not at arm's length (anticipation)", () => {
-    let startedAt = -1;
-    let tightest = Infinity;
-    run(
-      [
-        walker({ id: 1, x: 5, y: 10.05, vx: 1.3, targetX: 35, targetY: 10.05 }),
-        walker({ id: 2, x: 25, y: 9.95, vx: -1.3, targetX: -5, targetY: 9.95 }),
-      ],
-      15,
-      [],
-      ([a, b]) => {
-        tightest = Math.min(tightest, closestGap([a, b]));
-        if (startedAt < 0 && Math.abs(a.vy) > 0.1 && b.x > a.x) startedAt = b.x - a.x;
-      },
-    );
+    const { startedAt, tightest } = headOnPassing();
 
-    // Without the time-to-collision term they turned away only 0.5 m apart
-    // and their bodies overlapped (0.43 m between centres).
-    expect(startedAt).toBeGreaterThan(2);
-    expect(tightest).toBeGreaterThan(0.5);
+    // Measured 2026-09-19 with this setup: gives way 2.46 m out and passes
+    // 0.53 m apart. The ledger quotes 2.85 m / 0.57 m; neither reproduces
+    // here, and the give-way distance turns out to hinge on the starting
+    // lateral offset — 1.38 m head-on, 2.46 m at 0.1 m, 2.65 m at 0.2 m —
+    // because the trigger is a sideways speed, which a symmetric pair
+    // barely produces until late. So only the passing gap is pinned tight:
+    // it moves 0.534-0.568 across those same setups. Without the
+    // time-to-collision term they turned away 0.5 m apart and their bodies
+    // overlapped (0.43 m between centres).
+    expect(startedAt).toBeGreaterThan(2.2);
+    expect(tightest).toBeGreaterThan(0.51);
+  });
+
+  it("passes as safely when anticipation is replanned at 10 Hz as at 60 Hz", () => {
+    // The engine replans at 20 Hz. Whether 10 Hz is affordable is the open
+    // question behind the last of the step-time gap, so it is measured here
+    // rather than argued: if a slower replan made people pass closer, this is
+    // where it would show.
+    const fast = headOnPassing(1);
+    const slow = headOnPassing(6);
+
+    expect(slow.tightest).toBeGreaterThan(fast.tightest - 0.05);
+    expect(slow.tightest).toBeGreaterThan(0.51);
   });
 
   it("lets a faster walker overtake a slower one", () => {
