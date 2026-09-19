@@ -54,7 +54,7 @@ describe("hot scene update (ADR-0007)", () => {
     expect(moved.lifecycleState).toBe("leave");
     const sinkIds = scene.entrances.filter((e) => e.kind !== "source").map((e) => e.id);
     expect(sinkIds).toContain(moved.targetSinkId);
-  }, 20_000);
+  }, 10_000);
 
   it("replays exactly: same seed, same edits at the same steps, same state", () => {
     const edited = placeInScene(scene, "shop", { x: 40, y: 86 })!;
@@ -109,7 +109,7 @@ describe("hot scene update (ADR-0007)", () => {
     expect(scene.entrances.map((entrance) => entrance.id)).toContain(
       moved.targetSinkId,
     );
-  }, 20_000);
+  }, 10_000);
 });
 
 describe("reconcileAgentsWithScene", () => {

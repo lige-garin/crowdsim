@@ -21,7 +21,7 @@ describe("benchmark reproducibility contract", () => {
       match: true,
       mismatches: [],
     });
-  }, 20_000);
+  }, 10_000);
 
   it("reports scenario-level hash drift", () => {
     const baseline = createBenchmarkReproducibilityContract(

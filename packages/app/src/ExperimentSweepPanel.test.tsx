@@ -21,5 +21,5 @@ describe("ExperimentSweepPanel", () => {
     expect(screen.getByText(/p95/)).toBeInTheDocument();
     expect(screen.getByText(/worker headless-no-render/)).toBeInTheDocument();
     expect(screen.getByText(/serial/)).toBeInTheDocument();
-  }, 20_000);
+  }, 10_000);
 });

@@ -37,7 +37,7 @@ describe("validation report export bundle", () => {
       mismatches: [],
       status: "compared",
     });
-  }, 20_000);
+  }, 10_000);
 
   it("flags every scenario whose hash drifted from the baseline", () => {
     const report = createReport();

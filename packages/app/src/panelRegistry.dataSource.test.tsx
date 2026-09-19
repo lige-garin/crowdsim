@@ -50,8 +50,10 @@ describe("panel dock data-source labelling", () => {
         ).toBeNull();
       }
     }
-    // Mounts and unmounts every registered panel in one pass; ~1.2s alone but
-    // several seconds under a parallel full-suite run, so it needs headroom.
+    // Mounts and unmounts every registered panel in one pass. Measured 2026-09-19:
+    // about 12s on its own even after the movement step got a quarter cheaper,
+    // because the cost is mounting ~13 panels, not stepping the crowd. The 20s
+    // allowance is for a loaded or slower machine, not for the app being slow.
   }, 20_000);
 
   it("names every panel allowed to call itself live", () => {
