@@ -130,7 +130,7 @@ export function stepCrowd(input: CrowdStepInput): {
   for (const agent of agents) {
     const dx = agent.targetX - agent.x;
     const dy = agent.targetY - agent.y;
-    const distance = Math.hypot(dx, dy);
+    const distance = Math.sqrt(dx * dx + dy * dy);
     if (input.isExitBound(agent) && distance <= input.exitRadius(agent)) {
       exitedCount++;
       continue;
@@ -152,48 +152,63 @@ export function stepCrowd(input: CrowdStepInput): {
     let ax = 0;
     let ay = 0;
     let strangersClose = 0;
-    forEachNearby(grid, agent.x, agent.y, (other) => {
-      if (other.id === agent.id) return;
-      let ox = agent.x - other.x;
-      let oy = agent.y - other.y;
-      let gap = Math.hypot(ox, oy);
-      if (gap >= p.interactionRangeMeters) return;
-      if (gap < formationRoomMeters && other.groupId !== agent.groupId)
-        strangersClose++;
-      if (gap < 1e-6) {
-        // Exactly stacked (a narrow gate can spawn two on one point): push
-        // apart along an id-derived angle so the pair always separates.
-        const angle = (agent.id * 2.399963) % (Math.PI * 2);
-        ox = Math.cos(angle);
-        oy = Math.sin(angle);
-        gap = 0;
-      } else {
-        ox /= gap;
-        oy /= gap;
+    // Neighbour loop written out rather than going through forEachNearby:
+    // this runs for every walker against everyone within reach, and passing a
+    // closure meant a fresh function object per walker per step plus context
+    // lookups for every field it reads. Inlining it measured 8% off a whole
+    // engine step at a thousand people. The reader pays for that: the body
+    // below is the social force, not a helper.
+    {
+      const gsize = grid.size;
+      const gcol = Math.floor(agent.x / gsize);
+      const grow = Math.floor(agent.y / gsize);
+      const gcells = Math.ceil(p.interactionRangeMeters / gsize);
+      for (let dc = -gcells; dc <= gcells; dc++) {
+        for (let dr = -gcells; dr <= gcells; dr++) {
+          const bucket = grid.cells.get(bucketKey(gcol + dc, grow + dr));
+          if (!bucket) continue;
+          for (let bi = 0; bi < bucket.length; bi++) {
+            const other = grid.agents[bucket[bi]];
+            if (other.id === agent.id) continue;
+            let ox = agent.x - other.x;
+            let oy = agent.y - other.y;
+            let gap = Math.sqrt(ox * ox + oy * oy);
+            if (gap >= p.interactionRangeMeters) continue;
+            if (gap < formationRoomMeters && other.groupId !== agent.groupId)
+              strangersClose++;
+            if (gap < 1e-6) {
+              const angle = (agent.id * 2.399963) % (Math.PI * 2);
+              ox = Math.cos(angle);
+              oy = Math.sin(angle);
+              gap = 0;
+            } else {
+              ox /= gap;
+              oy /= gap;
+            }
+            const bodies =
+              radius + (other.radius ?? sampleBodyRadius(input.seed, other.id));
+            const facing = -(heading.x * ox + heading.y * oy);
+            const weight = p.anisotropy + (1 - p.anisotropy) * ((1 + facing) / 2);
+            const together =
+              agent.groupId !== undefined && agent.groupId === other.groupId;
+            let push = together
+              ? 0
+              : p.agentStrength *
+                Math.exp((bodies - gap) / p.agentRangeMeters) *
+                weight;
+            if (gap < bodies) push += p.contactStiffness * (bodies - gap);
+            ax += push * ox;
+            ay += push * oy;
+            if (!together && facing > p.sidestepCone) {
+              const side = ox * heading.y - oy * heading.x;
+              const away = side > 0.05 ? -1 : 1;
+              ax += push * p.sidestep * away * -heading.y;
+              ay += push * p.sidestep * away * heading.x;
+            }
+          }
+        }
       }
-      const bodies = radius + (other.radius ?? sampleBodyRadius(input.seed, other.id));
-      // cos φ between my heading and the direction to the other person.
-      const facing = -(heading.x * ox + heading.y * oy);
-      const weight = p.anisotropy + (1 - p.anisotropy) * ((1 + facing) / 2);
-      // Companions keep only body contact: people walking together stand
-      // closer than strangers are comfortable with (walkingGroups).
-      const together = agent.groupId !== undefined && agent.groupId === other.groupId;
-      let push = together
-        ? 0
-        : p.agentStrength * Math.exp((bodies - gap) / p.agentRangeMeters) * weight;
-      if (gap < bodies) push += p.contactStiffness * (bodies - gap);
-      ax += push * ox;
-      ay += push * oy;
-      if (!together && facing > p.sidestepCone) {
-        // Step to whichever side the other person is not on; dead ahead, always
-        // the same side, so oncoming streams settle into lanes.
-        const side = ox * heading.y - oy * heading.x;
-        const away = side > 0.05 ? -1 : 1;
-        ax += push * p.sidestep * away * -heading.y;
-        ay += push * p.sidestep * away * heading.x;
-      }
-    });
-
+    }
     let avoidance: readonly [number, number] | undefined;
     if (anticipating && !holding) {
       avoidance =
@@ -210,7 +225,7 @@ export function stepCrowd(input: CrowdStepInput): {
       const closest = closestPointOnSegment(agent.x, agent.y, wall);
       const wx = agent.x - closest.x;
       const wy = agent.y - closest.y;
-      const gap = Math.hypot(wx, wy);
+      const gap = Math.sqrt(wx * wx + wy * wy);
       if (gap < 1e-9 || gap > 1) continue;
       if (gap < formationRoomMeters) wallClose = true;
       let push = p.wallStrength * Math.exp((radius - gap) / p.wallRangeMeters);
@@ -255,7 +270,7 @@ export function stepCrowd(input: CrowdStepInput): {
         vy -= along * heading.y;
       }
     }
-    let speed = Math.hypot(vx, vy);
+    let speed = Math.sqrt(vx * vx + vy * vy);
     const maxSpeed = freeSpeed * p.maxSpeedRatio;
     if (speed > maxSpeed) {
       vx *= maxSpeed / speed;
@@ -271,7 +286,7 @@ export function stepCrowd(input: CrowdStepInput): {
     const proposed = { x: agent.x + vx * dt, y: agent.y + vy * dt };
     // The hard wall check must see every wall the step could reach, not just
     // those close enough to push: a long step can jump past the push radius.
-    const stepLength = Math.hypot(vx, vy) * dt;
+    const stepLength = Math.sqrt(vx * vx + vy * vy) * dt;
     const reachable =
       stepLength < 0.5
         ? nearbyWalls
@@ -386,7 +401,7 @@ function anticipation(
     fy += scale * (vy - (b * vy - a * wy) / root);
   };
   forEachNearby(buckets, agent.x, agent.y, visit, p.anticipationRangeMeters);
-  const magnitude = Math.hypot(fx, fy);
+  const magnitude = Math.sqrt(fx * fx + fy * fy);
   if (magnitude > p.anticipationMaxAcceleration) {
     fx *= p.anticipationMaxAcceleration / magnitude;
     fy *= p.anticipationMaxAcceleration / magnitude;
