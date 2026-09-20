@@ -110,6 +110,13 @@ export type CrowdStepInput = {
    * a second more than doubled the cost of a step.
    */
   replanAnticipation?: boolean;
+  /**
+   * Filled with the exit each departing person was heading for, and **only
+   * when supplied**. The engine passes a buffer during an evacuation and
+   * nothing the rest of the time, so a normal step pays nothing for a figure
+   * nobody looks at.
+   */
+  exitedSinkIds?: string[];
 };
 
 export function stepCrowd(input: CrowdStepInput): {
@@ -133,6 +140,9 @@ export function stepCrowd(input: CrowdStepInput): {
     const distance = Math.sqrt(dx * dx + dy * dy);
     if (input.isExitBound(agent) && distance <= input.exitRadius(agent)) {
       exitedCount++;
+      if (input.exitedSinkIds && agent.targetSinkId) {
+        input.exitedSinkIds.push(agent.targetSinkId);
+      }
       continue;
     }
 

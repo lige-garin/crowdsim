@@ -382,6 +382,33 @@ describe("where arrivals go (ADR-0008)", () => {
     // exits can be laid out so the answer is unambiguous.
     expect(snapshot.exitedCount).toBeGreaterThan(0);
   });
+
+  it("reports how long the building took to clear, and which doors did it", () => {
+    const engine = createSimulationEngineFromScene(corridor());
+    engine.start();
+    engine.step(60 * 5);
+    engine.setEvacuation(true);
+    const snapshot = engine.step(60 * 90);
+
+    // Someone left, so there is a clear time, measured from the alarm rather
+    // than from the start of the run.
+    expect(snapshot.evacuationClearSeconds ?? 0).toBeGreaterThan(0);
+    expect(snapshot.evacuationClearSeconds ?? 0).toBeLessThan(90);
+
+    const byExit = Object.values(snapshot.evacuationExits ?? {});
+    expect(byExit.length).toBeGreaterThan(0);
+    expect(byExit.reduce((sum, count) => sum + count, 0)).toBeGreaterThan(0);
+  });
+
+  it("keeps no clear time when nobody has left since the alarm", () => {
+    const engine = createSimulationEngineFromScene(corridor());
+    engine.start();
+    engine.setEvacuation(true);
+    // Far short of anyone's pre-movement time.
+    const snapshot = engine.step(12);
+
+    expect(snapshot.evacuationClearSeconds ?? 0).toBe(0);
+  });
 });
 
 describe("entrance capacity", () => {

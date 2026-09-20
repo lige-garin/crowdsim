@@ -109,6 +109,17 @@ export type SimulationSnapshot = {
   spawnedCount: number;
   exitedCount: number;
   agents: SimulationAgent[];
+  /**
+   * Seconds from the alarm to the last person to leave during it, so a report
+   * can say how long the building took to clear. 0 until someone leaves. It is
+   * a clear time, not a safe time: it says nothing about anyone still inside.
+   *
+   * Optional only so the many callers that build a snapshot for a run with no
+   * evacuation in it need not invent one; the engine always sets it.
+   */
+  evacuationClearSeconds?: number;
+  /** How many left by each exit during this evacuation. */
+  evacuationExits?: Record<string, number>;
 };
 export type SimulationEngine = {
   pause: () => SimulationSnapshot;
@@ -235,6 +246,10 @@ export function createSimulationEngine(
   let evacuationActive = false;
   /** When the alarm went off, so reactions are not timed from the run's start. */
   let evacuationStartedSeconds = 0;
+  /** From the alarm to the last person out of it. */
+  let evacuationClearSeconds = 0;
+  /** Departures per exit since the alarm, for "which doors did the work". */
+  const evacuationExits = new Map<string, number>();
   function makeSnapshot(): SimulationSnapshot {
     return {
       status,
@@ -245,6 +260,8 @@ export function createSimulationEngine(
       spawnedCount,
       exitedCount,
       agents: agents.map((agent) => ({ ...agent })),
+      evacuationClearSeconds,
+      evacuationExits: Object.fromEntries(evacuationExits),
     };
   }
   function spawnArrival(source: SimulationSource, size: number) {
@@ -384,6 +401,9 @@ export function createSimulationEngine(
     }
   }
   function advanceAgentsCpu() {
+    // Only handed over during an evacuation, so a normal step allocates
+    // nothing for the per-exit tally.
+    const exitedSinkIds: string[] = [];
     const result = stepCrowd({
       agents,
       dtSeconds: fixedDtSeconds,
@@ -392,6 +412,7 @@ export function createSimulationEngine(
       // whenever that exit is removed.
       exitRadius: (agent) =>
         sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
+      exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
       isExitBound,
       meanSpeedMetersPerSecond: speedMetersPerSecond,
       router,
@@ -401,6 +422,14 @@ export function createSimulationEngine(
     });
     agents = result.agents;
     exitedCount += result.exitedCount;
+    if (evacuationActive && exitedSinkIds.length > 0) {
+      for (const sinkId of exitedSinkIds) {
+        evacuationExits.set(sinkId, (evacuationExits.get(sinkId) ?? 0) + 1);
+      }
+      // Moved on by every departure: the last one to leave is what clears the
+      // building, so the figure ends up being the last departure of the run.
+      evacuationClearSeconds = elapsedSeconds - evacuationStartedSeconds;
+    }
   }
   /**
    * Only an agent that a decision sent to an exit may leave the world. The old
@@ -460,6 +489,8 @@ export function createSimulationEngine(
       // to the alarm they can hear now, not to one from ten minutes ago.
       if (active && !evacuationActive) {
         evacuationStartedSeconds = elapsedSeconds;
+        evacuationClearSeconds = 0;
+        evacuationExits.clear();
       }
       evacuationActive = active;
       return makeSnapshot();
