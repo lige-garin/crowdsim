@@ -257,6 +257,29 @@ export function addHazard(
   };
 }
 
+/**
+ * A count line between two chosen points: what the 2D editor produces when a
+ * line is dragged out. `addCountLine` below stays for the 3D world, where a
+ * single click has no second point to wait for.
+ */
+export function addCountLineBetween(
+  document: EditorDocument,
+  start: ScenePoint,
+  end: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    countLines: [
+      ...document.countLines,
+      {
+        id: `count-line-${document.nextId}`,
+        points: [{ ...start }, { ...end }],
+      },
+    ],
+    nextId: document.nextId + 1,
+  };
+}
+
 export function addCountLine(
   document: EditorDocument,
   position: ScenePoint,

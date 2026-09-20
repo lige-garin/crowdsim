@@ -125,6 +125,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onBasemapNumberChange: vi.fn(),
     onBuildingKindChange: vi.fn(),
     onBuildingNumberChange: vi.fn(),
+    onCountLineNameChange: vi.fn(),
     onEntranceKindChange: vi.fn(),
     onEntranceProfileChange: vi.fn(),
     onEntranceNumberChange: vi.fn(),

@@ -44,6 +44,7 @@ type SceneEditorParamPanelProps = {
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onCountLineNameChange: (name: string) => void;
   onHazardKindChange: (kind: Hazard["kind"]) => void;
   onHazardNumberChange: (field: HazardNumberField, value: number) => void;
   onObstacleKindChange: (kind: Obstacle["kind"]) => void;
@@ -90,6 +91,7 @@ export function SceneEditorParamPanel({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onCountLineNameChange,
   onEntranceKindChange,
   onEntranceProfileChange,
   onEntranceNumberChange,
@@ -192,7 +194,17 @@ export function SceneEditorParamPanel({
         />
       ) : selectedCountLine ? (
         <div className="editor-param-grid">
+          <label>{t("countLineName")}</label>
+          <input
+            type="text"
+            data-testid="count-line-name"
+            placeholder={t("countLine")}
+            value={selectedCountLine.name ?? ""}
+            onChange={(event) => onCountLineNameChange(event.target.value)}
+          />
+          <span>{t("countLineIdentifier")}</span>
           <span>{selectedCountLine.id}</span>
+          <span>{t("countLineEndpoints")}</span>
           <span>{pointsToSvg(selectedCountLine.points)}</span>
         </div>
       ) : selectedZone ? (

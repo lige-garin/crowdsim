@@ -350,6 +350,28 @@
   stroke-width: 0.35;
 }
 
+.editor-count-line.draft {
+  stroke-dasharray: 1.2 0.8;
+  stroke-width: 0.3;
+}
+
+/*
+ * The two ends of a selected count line. Wider than the line is thick, and
+ * with a filled core, because they are grabbed with a mouse on a plan that is
+ * often zoomed out: a target the width of the line itself cannot be hit.
+ */
+.editor-count-end {
+  cursor: grab;
+  fill: var(--lab-blue);
+  fill-opacity: 0.14;
+  stroke: var(--lab-blue);
+  stroke-width: 0.22;
+}
+
+.editor-count-end:hover {
+  fill-opacity: 0.32;
+}
+
 .editor-count-label {
   fill: var(--lab-blue);
   font-size: 1.35px;

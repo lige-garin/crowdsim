@@ -18,10 +18,17 @@ type SceneEditorCanvasProps = {
   basemap: EditorBasemap | null;
   document: EditorDocument;
   draftWallPoints: ScenePoint[];
+  /** A count line being dragged out, or null when none is. */
+  draftCountLine: { end: ScenePoint; start: ScenePoint } | null;
   gridSize: number;
   /** The live crowd drawn over the plan, if any (liveCrowd). */
   crowd?: LiveCrowd;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onCountLineEndpointPointerDown: (
+    event: ReactPointerEvent<SVGElement>,
+    id: string,
+    end: 0 | 1,
+  ) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
   onPointerMove: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onPointerUp: () => void;
@@ -38,9 +45,11 @@ export function SceneEditorCanvas({
   basemap,
   document,
   draftWallPoints,
+  draftCountLine,
   gridSize,
   crowd,
   onCanvasPointerDown,
+  onCountLineEndpointPointerDown,
   onEntityPointerDown,
   onPointerMove,
   onPointerUp,
@@ -86,6 +95,8 @@ export function SceneEditorCanvas({
         <EditorLines
           document={document}
           draftWallPoints={draftWallPoints}
+          draftCountLine={draftCountLine}
+          onCountLineEndpointPointerDown={onCountLineEndpointPointerDown}
           onEntityPointerDown={onEntityPointerDown}
           selectedId={selectedId}
           t={t}

@@ -99,6 +99,8 @@ export type EditorServicePoint = {
 
 export type EditorCountLine = {
   id: string;
+  /** Absent is fine: a line is useful unnamed, and the label falls back. */
+  name?: string;
   points: [ScenePoint, ScenePoint];
 };
 

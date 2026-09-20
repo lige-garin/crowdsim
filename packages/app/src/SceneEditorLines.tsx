@@ -6,12 +6,21 @@ import type { EditorDocument } from "./sceneEditorState";
 export function EditorLines({
   document,
   draftWallPoints,
+  draftCountLine,
+  onCountLineEndpointPointerDown,
   onEntityPointerDown,
   selectedId,
   t,
 }: {
   document: EditorDocument;
   draftWallPoints: ScenePoint[];
+  /** A count line being dragged out; drawn as a preview, not yet a line. */
+  draftCountLine: { end: ScenePoint; start: ScenePoint } | null;
+  onCountLineEndpointPointerDown: (
+    event: ReactPointerEvent<SVGElement>,
+    id: string,
+    end: 0 | 1,
+  ) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
   selectedId: string | null;
   t: (key: TranslationKey) => string;
@@ -69,10 +78,31 @@ export function EditorLines({
             x={(line.points[0].x + line.points[1].x) / 2}
             y={(line.points[0].y + line.points[1].y) / 2 - 0.7}
           >
-            {t("countLineShort")}
+            {line.name ?? t("countLineShort")}
           </text>
+          {line.id === selectedId
+            ? ([0, 1] as const).map((end) => (
+                <circle
+                  key={end}
+                  className="editor-count-end"
+                  cx={line.points[end].x}
+                  cy={line.points[end].y}
+                  data-testid={`count-line-end-${end}`}
+                  r={1}
+                  onPointerDown={(event) =>
+                    onCountLineEndpointPointerDown(event, line.id, end)
+                  }
+                />
+              ))
+            : null}
         </g>
       ))}
+      {draftCountLine ? (
+        <polyline
+          className="editor-count-line draft"
+          points={pointsToSvg([draftCountLine.start, draftCountLine.end])}
+        />
+      ) : null}
       {document.shops.map((shop) => (
         <g
           key={shop.id}

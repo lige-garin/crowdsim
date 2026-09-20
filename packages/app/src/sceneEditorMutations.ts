@@ -99,6 +99,26 @@ export function updateDocumentBuildingKind(
   };
 }
 
+/**
+ * Name a count line. Empty clears it, so a line can go back to being labelled
+ * COUNT rather than carrying a name someone typed by accident.
+ */
+export function updateDocumentCountLineName(
+  document: EditorDocument,
+  lineId: string,
+  name: string,
+) {
+  const trimmed = name.trim();
+  return {
+    ...document,
+    countLines: document.countLines.map((line) =>
+      line.id === lineId
+        ? { ...line, name: trimmed === "" ? undefined : trimmed }
+        : line,
+    ),
+  };
+}
+
 export function updateDocumentBuildingNumber(
   document: EditorDocument,
   buildingId: string,

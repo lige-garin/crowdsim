@@ -115,6 +115,31 @@ export function moveEntity(
   };
 }
 
+/**
+ * Move one end of a count line. The whole line can already be dragged by its
+ * body, but a line is only useful across the flow you want to count, and that
+ * is a matter of where its two ends sit — which is why the ends get their own
+ * handles rather than only a translate.
+ */
+export function moveCountLineEndpoint(
+  document: EditorDocument,
+  id: string,
+  endpoint: 0 | 1,
+  point: ScenePoint,
+): EditorDocument {
+  return {
+    ...document,
+    countLines: document.countLines.map((line) =>
+      line.id === id
+        ? {
+            ...line,
+            points: endpoint === 0 ? [point, line.points[1]] : [line.points[0], point],
+          }
+        : line,
+    ),
+  };
+}
+
 export function removeEntity(document: EditorDocument, id: string): EditorDocument {
   return {
     ...document,

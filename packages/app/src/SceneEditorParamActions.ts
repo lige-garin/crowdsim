@@ -19,6 +19,7 @@ import {
   toggleDocumentZoneWalkable,
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
+  updateDocumentCountLineName,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
   updateDocumentObstacleKind,
@@ -56,6 +57,7 @@ type SceneEditorParamActionInput = {
   document: EditorDocument;
   replaceScene: (nextScene: CrowdSimScene, status: LocalizedText) => void;
   selectedBuilding?: EditorDocument["buildings"][number];
+  selectedCountLine?: EditorDocument["countLines"][number];
   selectedHazard?: EditorDocument["hazards"][number];
   selectedObstacle?: EditorDocument["obstacles"][number];
   selectedRoad?: EditorDocument["roads"][number];
@@ -75,6 +77,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
     document,
     replaceScene,
     selectedBuilding,
+    selectedCountLine,
     selectedHazard,
     selectedObstacle,
     selectedRoad,
@@ -105,6 +108,12 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedBuilding) return;
       setDocument((current) =>
         updateDocumentBuildingKind(current, selectedBuilding.id, kind),
+      );
+    },
+    updateCountLineName(name: string) {
+      if (!selectedCountLine) return;
+      setDocument((current) =>
+        updateDocumentCountLineName(current, selectedCountLine.id, name),
       );
     },
     toggleObstacleBlocksMovement() {

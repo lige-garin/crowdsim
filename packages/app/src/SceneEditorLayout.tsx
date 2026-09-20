@@ -39,6 +39,8 @@ type SceneEditorLayoutProps = {
   canUndo: boolean;
   document: EditorDocument;
   draftWallPoints: ScenePoint[];
+  /** A count line being dragged out, or null when none is. */
+  draftCountLine: { end: ScenePoint; start: ScenePoint } | null;
   dxfInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
@@ -52,10 +54,16 @@ type SceneEditorLayoutProps = {
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onCountLineNameChange: (name: string) => void;
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
+  onCountLineEndpointPointerDown: (
+    event: ReactPointerEvent<SVGElement>,
+    id: string,
+    end: 0 | 1,
+  ) => void;
   onDeleteSelected: () => void;
   onDxfImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
@@ -143,6 +151,7 @@ export function SceneEditorLayout({
   canUndo,
   document,
   draftWallPoints,
+  draftCountLine,
   dxfInputRef,
   fileInputRef,
   geoJsonInputRef,
@@ -156,10 +165,12 @@ export function SceneEditorLayout({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onCountLineNameChange,
   onEntranceKindChange,
   onEntranceProfileChange,
   onEntranceNumberChange,
   onCanvasPointerDown,
+  onCountLineEndpointPointerDown,
   onDeleteSelected,
   onDxfImport,
   onEntityPointerDown,
@@ -289,9 +300,11 @@ export function SceneEditorLayout({
         basemap={basemap}
         document={document}
         draftWallPoints={draftWallPoints}
+        draftCountLine={draftCountLine}
         gridSize={gridSize}
         crowd={crowd}
         onCanvasPointerDown={onCanvasPointerDown}
+        onCountLineEndpointPointerDown={onCountLineEndpointPointerDown}
         onEntityPointerDown={onEntityPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -307,6 +320,7 @@ export function SceneEditorLayout({
         onBasemapNumberChange={onBasemapNumberChange}
         onBuildingKindChange={onBuildingKindChange}
         onBuildingNumberChange={onBuildingNumberChange}
+        onCountLineNameChange={onCountLineNameChange}
         onEntranceKindChange={onEntranceKindChange}
         onEntranceProfileChange={onEntranceProfileChange}
         onEntranceNumberChange={onEntranceNumberChange}

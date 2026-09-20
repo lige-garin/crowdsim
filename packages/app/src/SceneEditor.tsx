@@ -26,11 +26,13 @@ import { useI18n, type LocalizedText } from "./i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
 import { addImportedBasemap, getActiveBasemap } from "./sceneEditorBasemap";
 import {
+  addCountLineBetween,
   addWall,
   placeEditorTool,
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
   editorTools,
+  moveCountLineEndpoint,
   moveEntity,
   removeEntity,
   snapPoint,
@@ -83,6 +85,18 @@ export function SceneEditor({
   const basemapInputRef = useRef<HTMLInputElement | null>(null);
   const dxfInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
+  /** A count line being dragged out: where it started, and where it is now. */
+  const [draftCountLine, setDraftCountLine] = useState<{
+    start: ScenePoint;
+    end: ScenePoint;
+  } | null>(null);
+  /** One end of a selected count line being dragged, as { id, end, before }. */
+  const endpointDrag = useRef<{
+    before: EditorDocument;
+    end: 0 | 1;
+    id: string;
+    moved: boolean;
+  } | null>(null);
   const [baseScene, setBaseScene] = useState(scene);
   const [aiImageOverlay, setAiImageOverlay] = useState<SceneImageOverlay | null>(null);
   const [templatePrompt, setAiPrompt] = useState("");
@@ -311,6 +325,12 @@ export function SceneEditor({
       setDraftWallPoints((points) => [...points, point]);
       return;
     }
+    if (tool === "countLine") {
+      // Dragged out like a wall is drawn point to point, so the line can cross
+      // the flow at any angle instead of always lying east-west.
+      setDraftCountLine({ end: point, start: point });
+      return;
+    }
     const placed = placeEditorTool(document, tool, point);
     if (placed) {
       commit(placed);
@@ -331,11 +351,23 @@ export function SceneEditor({
     };
   }
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const nextPoint = pointFromEvent(event);
+    if (draftCountLine) {
+      setDraftCountLine((draft) => (draft ? { ...draft, end: nextPoint } : draft));
+      return;
+    }
+    const endpoint = endpointDrag.current;
+    if (endpoint) {
+      endpoint.moved = true;
+      setDocument((current) =>
+        moveCountLineEndpoint(current, endpoint.id, endpoint.end, nextPoint),
+      );
+      return;
+    }
     const drag = dragState.current;
     if (!drag) {
       return;
     }
-    const nextPoint = pointFromEvent(event);
     const delta = {
       x: nextPoint.x - drag.lastPoint.x,
       y: nextPoint.y - drag.lastPoint.y,
@@ -347,7 +379,50 @@ export function SceneEditor({
     drag.moved = true;
     setDocument((current) => moveEntity(current, drag.id, delta));
   }
+  function handleCountLineEndpointPointerDown(
+    event: ReactPointerEvent<SVGElement>,
+    id: string,
+    end: 0 | 1,
+  ) {
+    if (tool !== "select") {
+      return;
+    }
+    event.stopPropagation();
+    setSelectedId(id);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    endpointDrag.current = { before: document, end, id, moved: false };
+  }
   function handlePointerUp() {
+    const draft = draftCountLine;
+    if (draft) {
+      setDraftCountLine(null);
+      const length = Math.hypot(
+        draft.end.x - draft.start.x,
+        draft.end.y - draft.start.y,
+      );
+      // Released without a drag, fall back to the fixed line a single click
+      // drops in the 3D world, so the tool never leaves someone with nothing.
+      const placed =
+        length < 1
+          ? placeEditorTool(document, "countLine", draft.start)
+          : addCountLineBetween(document, draft.start, draft.end);
+      if (placed) {
+        commit(placed);
+        setSelectedId(`count-line-${document.nextId}`);
+        setTool("select");
+      }
+      return;
+    }
+    const endpoint = endpointDrag.current;
+    if (endpoint) {
+      if (endpoint.moved) {
+        setParamEditTarget(null);
+        setUndoStack((stack) => [...stack, endpoint.before]);
+        setRedoStack([]);
+      }
+      endpointDrag.current = null;
+      return;
+    }
     const drag = dragState.current;
     if (!drag) {
       return;
@@ -506,6 +581,7 @@ export function SceneEditor({
     document,
     replaceScene,
     selectedBuilding,
+    selectedCountLine,
     selectedHazard,
     selectedObstacle,
     selectedRoad,
@@ -532,6 +608,7 @@ export function SceneEditor({
       canUndo={undoStack.length > 0}
       document={document}
       draftWallPoints={draftWallPoints}
+      draftCountLine={draftCountLine}
       dxfInputRef={dxfInputRef}
       fileInputRef={fileInputRef}
       geoJsonInputRef={geoJsonInputRef}
@@ -545,7 +622,9 @@ export function SceneEditor({
       onBasemapNumberChange={paramActions.updateBasemap}
       onBuildingKindChange={paramActions.updateBuildingKind}
       onBuildingNumberChange={paramActions.updateBuildingNumber}
+      onCountLineNameChange={paramActions.updateCountLineName}
       onCanvasPointerDown={handleCanvasPointerDown}
+      onCountLineEndpointPointerDown={handleCountLineEndpointPointerDown}
       onDeleteSelected={deleteSelected}
       onEntityPointerDown={handleEntityPointerDown}
       onExportScene={exportScene}

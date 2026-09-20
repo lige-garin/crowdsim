@@ -1,10 +1,44 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { demoScene } from "./demoScene";
 import { I18nProvider } from "./i18n";
 import { templateScenes } from "./industryTemplates";
 import { SceneEditor } from "./SceneEditor";
+
+/*
+ * jsdom has no SVG geometry, and the editor turns a pointer position into
+ * scene metres with it. Nothing else in this suite touches the canvas pointer
+ * path, so it had never come up. With getScreenCTM returning null the editor
+ * takes its documented fallback and reads the client coordinates as metres,
+ * which is what these tests want anyway.
+ */
+beforeAll(() => {
+  const proto = (globalThis as { SVGElement?: { prototype: unknown } }).SVGElement
+    ?.prototype as Record<string, unknown> | undefined;
+  if (!proto) return;
+  proto.createSVGPoint ??= function () {
+    return {
+      matrixTransform() {
+        return { x: this.x, y: this.y };
+      },
+      x: 0,
+      y: 0,
+    };
+  };
+  proto.getScreenCTM ??= function () {
+    return null;
+  };
+  // jsdom declares the pointer-capture methods but does not implement them, and
+  // the editor captures the pointer when a drag starts. Left alone they throw
+  // and the drag handler never gets as far as recording what is being dragged.
+  const elements = (globalThis as { Element?: { prototype: unknown } }).Element
+    ?.prototype as Record<string, unknown> | undefined;
+  if (elements) {
+    elements.setPointerCapture = function () {};
+    elements.releasePointerCapture = function () {};
+  }
+});
 
 afterEach(() => {
   cleanup();
@@ -248,5 +282,74 @@ describe("SceneEditor DXF import wiring", () => {
     });
 
     expect(await screen.findByText("DXF 无效")).toBeInTheDocument();
+  });
+});
+
+describe("count lines in the 2D editor", () => {
+  function canvas() {
+    return screen.getByTestId("editor-canvas");
+  }
+
+  function dragOnCanvas(from: [number, number], to: [number, number]) {
+    fireEvent.pointerDown(canvas(), { clientX: from[0], clientY: from[1] });
+    fireEvent.pointerMove(canvas(), { clientX: to[0], clientY: to[1] });
+    fireEvent.pointerUp(canvas(), { clientX: to[0], clientY: to[1] });
+  }
+
+  function linePoints() {
+    const line = document.querySelector(".editor-count-line");
+    return line?.getAttribute("points") ?? null;
+  }
+
+  function pickCountLineTool() {
+    fireEvent.click(screen.getByTestId("editor-tool-countLine"));
+  }
+
+  it("draws a line where it is dragged, at any angle, not a fixed east-west one", () => {
+    renderEditor();
+    expect(linePoints()).toBeNull();
+
+    pickCountLineTool();
+    // 20 m straight down: an east-west default would come out horizontal.
+    dragOnCanvas([10, 10], [10, 30]);
+
+    expect(linePoints()).toBe("10,10 10,30");
+  });
+
+  it("lets one end be dragged without moving the other", () => {
+    renderEditor();
+    pickCountLineTool();
+    dragOnCanvas([10, 10], [10, 30]);
+
+    // After placing, the new line is selected, so its ends have handles.
+    const start = screen.getByTestId("count-line-end-0");
+    fireEvent.pointerDown(start, { clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(canvas(), { clientX: 20, clientY: 10 });
+    fireEvent.pointerUp(canvas(), { clientX: 20, clientY: 10 });
+
+    expect(linePoints()).toBe("20,10 10,30");
+  });
+
+  it("names a line, and the plan shows that name instead of COUNT", () => {
+    renderEditor();
+    pickCountLineTool();
+    dragOnCanvas([10, 10], [10, 30]);
+
+    fireEvent.change(screen.getByTestId("count-line-name"), {
+      target: { value: "North gate" },
+    });
+
+    expect(document.querySelector(".editor-count-label")?.textContent).toBe(
+      "North gate",
+    );
+  });
+
+  it("still drops a line when the tool is clicked without a drag", () => {
+    renderEditor();
+    pickCountLineTool();
+    dragOnCanvas([10, 10], [10, 10]);
+
+    // The single-click form, so the tool never leaves you with nothing.
+    expect(linePoints()).toBe("10,10 18,10");
   });
 });

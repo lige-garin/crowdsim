@@ -3,6 +3,7 @@ import { parseScene } from "@crowdsim/scene-schema";
 import {
   addBuilding,
   addCountLine,
+  addCountLineBetween,
   addEntrance,
   addHazard,
   addObstacle,
@@ -15,6 +16,7 @@ import {
   addZone,
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
+  moveCountLineEndpoint,
   moveEntity,
   removeEntity,
   snapPoint,
@@ -26,6 +28,7 @@ import {
   toggleDocumentZoneWalkable,
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
+  updateDocumentCountLineName,
   updateDocumentEntranceNumber,
   updateDocumentEntranceProfile,
   updateDocumentHazardKind,
@@ -190,6 +193,57 @@ describe("scene editor state", () => {
 
     document = removeEntity(document, targetId);
     expect(document.targets.some((target) => target.id === targetId)).toBe(false);
+  });
+
+  it("carries a count line's name into the scene and back", () => {
+    let document = addCountLineBetween(
+      createEditorDocumentFromScene(demoScene),
+      {
+        x: 4,
+        y: 6,
+      },
+      { x: 4, y: 20 },
+    );
+    const lineId = document.countLines.at(-1)!.id;
+
+    document = updateDocumentCountLineName(document, lineId, "West gate");
+    const exported = createSceneFromEditorDocument(demoScene, document);
+    expect(exported.countLines.at(-1)?.name).toBe("West gate");
+    expect(parseScene(exported).countLines.at(-1)?.name).toBe("West gate");
+    expect(createEditorDocumentFromScene(exported).countLines.at(-1)?.name).toBe(
+      "West gate",
+    );
+
+    // Clearing it drops the field rather than storing an empty name, which the
+    // schema would reject.
+    document = updateDocumentCountLineName(document, lineId, "   ");
+    expect(
+      createSceneFromEditorDocument(demoScene, document).countLines.at(-1)?.name,
+    ).toBeUndefined();
+  });
+
+  it("moves one end of a count line and leaves the other where it was", () => {
+    let document = addCountLineBetween(
+      createEditorDocumentFromScene(demoScene),
+      {
+        x: 10,
+        y: 10,
+      },
+      { x: 10, y: 30 },
+    );
+    const lineId = document.countLines.at(-1)!.id;
+
+    document = moveCountLineEndpoint(document, lineId, 0, { x: 20, y: 10 });
+    expect(document.countLines.at(-1)?.points).toEqual([
+      { x: 20, y: 10 },
+      { x: 10, y: 30 },
+    ]);
+
+    document = moveCountLineEndpoint(document, lineId, 1, { x: 20, y: 30 });
+    expect(document.countLines.at(-1)?.points).toEqual([
+      { x: 20, y: 10 },
+      { x: 20, y: 30 },
+    ]);
   });
 
   it("moves and removes BioCity entities", () => {

@@ -20,6 +20,8 @@ describe("SceneEditorCanvas", () => {
         basemap={null}
         document={createEditorDocumentFromScene(demoScene)}
         draftWallPoints={[]}
+        draftCountLine={null}
+        onCountLineEndpointPointerDown={vi.fn()}
         gridSize={2}
         crowd={createLiveCrowd({
           snapshot: {
@@ -59,6 +61,8 @@ describe("SceneEditorCanvas", () => {
         basemap={null}
         document={createEditorDocumentFromScene(bioCityDemoScene)}
         draftWallPoints={[]}
+        draftCountLine={null}
+        onCountLineEndpointPointerDown={vi.fn()}
         gridSize={2}
         onCanvasPointerDown={vi.fn()}
         onEntityPointerDown={vi.fn()}

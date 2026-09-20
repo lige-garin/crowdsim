@@ -51,6 +51,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     countLines: scene.countLines.map((line) => ({
       id: line.id,
+      name: line.name,
       points: [{ ...line.geometry.points[0] }, { ...line.geometry.points[1] }],
     })),
     entrances: scene.entrances.map((entrance) => ({
@@ -291,6 +292,7 @@ export function createSceneFromEditorDocument(
     })),
     countLines: document.countLines.map((line) => ({
       id: line.id,
+      name: line.name,
       geometry: {
         type: "polyline",
         points: line.points.map((point) => ({ ...point })),
