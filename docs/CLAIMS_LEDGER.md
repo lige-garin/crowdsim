@@ -374,3 +374,29 @@ passing with the anticipatory push replanned every step against every sixth
 step: the gap is within 0.05 m. That was the one lever left for buying step
 time, and it turns out to be cheap - but there is no longer a gap to buy, so the
 engine stays at 20 Hz.
+
+## 2026-09-20: evacuation pre-movement time and exit choice
+
+Evacuation used to start every person on the same decision tick and send all
+of them to whichever door was nearest. Neither is true of a real evacuation,
+and both flatter the result — an instant, evenly spread start, and a crowd
+that never competes for a door.
+
+Changed:
+
+- **Pre-movement time.** Each person now waits their own drawn time before
+  starting to move. Lognormal, because observed pre-movement times are
+  strongly right-skewed: most move within seconds, a few take several times
+  the mean.
+- **Exit choice.** Distance plus a penalty for everyone already committed to
+  that door, so the flow spreads over the exits a building has. Which door
+  someone came in by no longer constrains which they leave by — that is a
+  routing rule for a normal day.
+
+**Every new number here is self-chosen and uncalibrated**: the pre-movement
+mean (16 s), its spread (CV 0.75), and the crowding penalty (4 m per person).
+This project has no observed evacuation to fit them to. The claim is narrow
+and testable — people no longer all start on one tick, and they no longer all
+queue at one door — and the tests assert exactly that and nothing more.
+**None of this predicts any real building's evacuation time**, and no number
+produced by it should be quoted as one.
