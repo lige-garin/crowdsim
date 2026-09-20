@@ -233,6 +233,8 @@ export function createSimulationEngine(
   let exitedCount = 0;
   let agents: SimulationAgent[] = [];
   let evacuationActive = false;
+  /** When the alarm went off, so reactions are not timed from the run's start. */
+  let evacuationStartedSeconds = 0;
   function makeSnapshot(): SimulationSnapshot {
     return {
       status,
@@ -339,6 +341,7 @@ export function createSimulationEngine(
         shops,
         servicePoints,
         evacuationActive,
+        evacuationStartedSeconds,
         routeDistance: router.distance,
       }),
       decisionTick,
@@ -449,9 +452,15 @@ export function createSimulationEngine(
       waitingOutside.clear();
       agents = [];
       evacuationActive = false;
+      evacuationStartedSeconds = 0;
       return makeSnapshot();
     },
     setEvacuation(active: boolean) {
+      // Raised again after being stood down, the clock restarts: people react
+      // to the alarm they can hear now, not to one from ten minutes ago.
+      if (active && !evacuationActive) {
+        evacuationStartedSeconds = elapsedSeconds;
+      }
       evacuationActive = active;
       return makeSnapshot();
     },

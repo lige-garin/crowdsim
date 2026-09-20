@@ -79,8 +79,14 @@ export type SimulationDecisionTickInput = {
   sinks: readonly SimulationSink[];
   shops?: readonly SimulationShop[];
   servicePoints?: readonly SimulationServicePoint[];
-  /** When true, all agents abandon shopping and head for the nearest exit. */
+  /** When true, all agents abandon shopping and head for an exit. */
   evacuationActive?: boolean;
+  /**
+   * Elapsed time at which evacuation was raised. Pre-movement times are
+   * measured from here: someone who has been shopping for ten minutes does
+   * not react from the moment the run began.
+   */
+  evacuationStartedSeconds?: number;
   /**
    * Walking distance around walls. Progress toward a target is measured with
    * it, so a shopper detouring round a building is not mistaken for one stuck

@@ -5,13 +5,58 @@ import {
   type SimulationDecisionBackend,
   type SimulationShop,
 } from "./simulationDecisionBackend";
-import type { SimulationAgent } from "./simulationEngine";
+import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import { chooseBrandStore, type BrandStoreCandidate } from "./brandAttraction";
 import { clamp01, createAgentMindset } from "./agentPersona";
 import { gravityWeight } from "./odEntryModel";
-import { hashUnit, sampleDwellSeconds } from "./behaviorDistributions";
+import {
+  hashUnit,
+  sampleDwellSeconds,
+  sampleEvacuationReactionSeconds,
+} from "./behaviorDistributions";
 import { byLineOrder, createCounterTick, queueSpacingMeters } from "./checkoutCounters";
 import { mulberry32 } from "./simulationEngineRandom";
+
+/**
+ * How much extra walking one person already committed to a door is worth, in
+ * metres, when choosing an exit during an evacuation.
+ *
+ * SELF-CHOSEN AND NOT CALIBRATED: this project has no observed evacuation to
+ * fit a number to. The claim is only that "nearest exit" is wrong — it sends
+ * everyone to one door and jams it while another stands empty — and that
+ * spreading the choice over the exits a building has is closer to what people
+ * do. The size of the spread is a guess.
+ */
+const evacuationExitCrowdingMeters = 4;
+
+/**
+ * The exit to head for in an evacuation: the nearest, penalised by how many
+ * people are already committed to it. Falls back to a straight-line distance
+ * where no router is supplied, the same way the rest of the backend does.
+ */
+function chooseEvacuationSink(
+  agent: SimulationAgent,
+  sinks: readonly SimulationSink[],
+  loads: ReadonlyMap<string, number>,
+  routeDistance?: (from: ScenePoint, to: ScenePoint) => number,
+): SimulationSink {
+  // Every exit, not only the ones the agent's entrance names. Which door you
+  // came in by tells you nothing in a fire, and a building's own evacuation
+  // plan does not reserve exits per entrance.
+  let best = sinks[0];
+  let bestCost = Number.POSITIVE_INFINITY;
+  for (const sink of sinks) {
+    const distance = routeDistance
+      ? routeDistance(agent, sink.position)
+      : Math.hypot(sink.position.x - agent.x, sink.position.y - agent.y);
+    const cost = distance + evacuationExitCrowdingMeters * (loads.get(sink.id) ?? 0);
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = sink;
+    }
+  }
+  return best;
+}
 
 function pickShopByAttraction(
   shops: readonly SimulationShop[],
@@ -146,12 +191,27 @@ export function createMallCrowdDecisionBackend(options: {
       shops,
       servicePoints,
       evacuationActive,
+      evacuationStartedSeconds,
       routeDistance,
     }) {
       const activeShops = shops ?? options.shops;
       const activeServicePoints = servicePoints ?? [];
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
+
+      // Who is already committed to which exit. Without it "nearest exit" sends
+      // everyone at one door and jams it while another stands empty.
+      const exitLoad = new Map<string, number>();
+      for (const agent of agents) {
+        if (agent.lifecycleState === "evacuate" && agent.targetSinkId) {
+          exitLoad.set(agent.targetSinkId, (exitLoad.get(agent.targetSinkId) ?? 0) + 1);
+        }
+      }
+      // Time since the alarm. Reactions are measured from there, not from the
+      // start of the run, and the first tick of an evacuation is zero.
+      const secondsSinceAlarm = evacuationActive
+        ? elapsedSeconds - (evacuationStartedSeconds ?? elapsedSeconds)
+        : 0;
 
       // Live occupancy (current browsers) and line length per shop; enter() and
       // joinQueue() reserve a slot so concurrent arrivals in one tick cannot
@@ -329,10 +389,18 @@ export function createMallCrowdDecisionBackend(options: {
       for (const agent of agents) {
         const state = agent.lifecycleState;
 
-        // Evacuation overrides shopping: abandon the shop, head for the exit.
+        // Evacuation overrides shopping: abandon the shop, head for an exit.
         if (evacuationActive) {
-          if (state !== "evacuate") {
-            const sink = nearestAllowedSink(agent, sinks);
+          // Not everyone on the same tick. Each person has a pre-movement time
+          // (right-skewed, behaviorDistributions); until theirs has passed they
+          // carry on with what they were doing, which is what the notice-and-
+          // confirm delay looks like from outside.
+          if (
+            state !== "evacuate" &&
+            secondsSinceAlarm >= sampleEvacuationReactionSeconds(mindsetSeed, agent.id)
+          ) {
+            const sink = chooseEvacuationSink(agent, sinks, exitLoad, routeDistance);
+            exitLoad.set(sink.id, (exitLoad.get(sink.id) ?? 0) + 1);
             decisions.push({
               agentId: agent.id,
               nextState: "evacuate",

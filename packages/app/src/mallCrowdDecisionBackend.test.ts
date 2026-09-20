@@ -437,7 +437,10 @@ describe("createMallCrowdDecisionBackend", () => {
     const decisions = backend.decideAgents({
       agents,
       decisionTick: 0,
-      elapsedSeconds: 0,
+      // A minute past the alarm, so every pre-movement time has run out.
+      // Nobody starts on the alarm's own tick — see the reaction cases below.
+      elapsedSeconds: 60,
+      evacuationStartedSeconds: 0,
       sinks,
       shops,
       evacuationActive: true,
@@ -448,6 +451,103 @@ describe("createMallCrowdDecisionBackend", () => {
       expect(d.targetSinkId).toBe("exit");
       expect(d.target).toEqual({ x: 0, y: 0 });
     }
+  });
+
+  it("does not start anyone moving on the alarm's own tick", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const agents = [agent({ id: 1, lifecycleState: "browse", x: 10, y: 10 })];
+    const decisions = backend.decideAgents({
+      agents,
+      decisionTick: 0,
+      elapsedSeconds: 10,
+      evacuationStartedSeconds: 10,
+      sinks,
+      shops,
+      evacuationActive: true,
+    });
+
+    // Everyone starting at once is what evacuation models stopped doing
+    // decades ago: pre-movement time is the largest single term in most
+    // recorded evacuations.
+    expect(decisions).toHaveLength(0);
+  });
+
+  it("starts people at different times rather than all at once", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const agents = Array.from({ length: 40 }, (_, index) =>
+      agent({ id: index + 1, lifecycleState: "browse", x: 10, y: 10 }),
+    );
+    const movedBy = (elapsed: number) =>
+      backend
+        .decideAgents({
+          agents,
+          decisionTick: 0,
+          elapsedSeconds: elapsed,
+          evacuationStartedSeconds: 0,
+          sinks,
+          shops,
+          evacuationActive: true,
+        })
+        .filter((decision) => decision.nextState === "evacuate").length;
+
+    // Spread, not a step: some have gone by 5 s, most by 30 s, and it is
+    // never everyone on one tick.
+    const at5 = movedBy(5);
+    const at15 = movedBy(15);
+    const at30 = movedBy(30);
+    expect(at5).toBeLessThan(at15);
+    expect(at15).toBeLessThan(at30);
+    expect(at5).toBeGreaterThan(0);
+    expect(at30).toBeLessThan(agents.length);
+    expect(at30).toBeGreaterThan(agents.length / 2);
+  });
+
+  it("sends evacuees to the nearest exit whatever their entrance allows", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const decisions = backend.decideAgents({
+      agents: [
+        agent({ id: 1, lifecycleState: "browse", x: 10, y: 5, exitIds: ["far"] }),
+      ],
+      decisionTick: 0,
+      elapsedSeconds: 60,
+      evacuationStartedSeconds: 0,
+      sinks: [
+        { id: "near", position: { x: 6, y: 5 }, radius: 2 },
+        { id: "far", position: { x: 90, y: 5 }, radius: 2 },
+      ],
+      shops,
+      evacuationActive: true,
+    });
+
+    // Which door you came in by is a routing rule for a normal day, not a
+    // constraint on getting out.
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].targetSinkId).toBe("near");
+  });
+
+  it("spreads evacuees over the exits rather than all at the nearest", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    // Everyone at the west end, so the west door is nearest to all twenty.
+    const crowd = Array.from({ length: 20 }, (_, index) =>
+      agent({ id: index + 1, lifecycleState: "browse", x: 2, y: 5 }),
+    );
+    const decisions = backend.decideAgents({
+      agents: crowd,
+      decisionTick: 0,
+      elapsedSeconds: 90,
+      evacuationStartedSeconds: 0,
+      sinks: [
+        { id: "west", position: { x: 0, y: 5 }, radius: 2 },
+        { id: "east", position: { x: 60, y: 5 }, radius: 2 },
+      ],
+      shops,
+      evacuationActive: true,
+    });
+
+    // "Nearest exit" for everyone jams one door while the other stands empty.
+    const chosen = new Set(decisions.map((decision) => decision.targetSinkId));
+    expect(chosen.size).toBe(2);
+    expect(chosen.has("east")).toBe(true);
   });
 
   it("does not re-issue evacuation for an already-evacuating agent", () => {
