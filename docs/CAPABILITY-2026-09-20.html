@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CrowdSim Web · 能力地图与差距分析 · 2026-09-20</title>
+    <style>
+      :root {
+        --ink: #1c1d21;
+        --ink-soft: #55575f;
+        --ink-faint: #8a8c94;
+        --line: #e3e4e8;
+        --line-soft: #eff0f3;
+        --bg: #fbfbfc;
+        --card: #ffffff;
+        --done: #1f7a4d;
+        --done-bg: #eaf5ef;
+        --part: #9a6b00;
+        --part-bg: #fdf5e3;
+        --miss: #a8302b;
+        --miss-bg: #fceded;
+        --idle: #5a5f6b;
+        --idle-bg: #f0f1f4;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 48px 28px 80px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.7 -apple-system,
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        letter-spacing: -0.3px;
+      }
+      .sub {
+        color: var(--ink-faint);
+        font-size: 14px;
+        margin-bottom: 40px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 52px 0 6px;
+        letter-spacing: -0.2px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+      }
+      h2:first-of-type {
+        border-top: none;
+        padding-top: 0;
+      }
+      h2 .num {
+        color: var(--ink-faint);
+        font-weight: 500;
+        margin-right: 10px;
+      }
+      h3 {
+        font-size: 16px;
+        margin: 30px 0 8px;
+      }
+      p {
+        margin: 10px 0;
+      }
+      .lede {
+        font-size: 16px;
+        color: var(--ink-soft);
+      }
+      code {
+        font:
+          13px/1.5 "SFMono-Regular",
+          Consolas,
+          monospace;
+        background: var(--line-soft);
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin: 24px 0 8px;
+      }
+      .kpi {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .kpi .v {
+        font-size: 22px;
+        font-weight: 640;
+        letter-spacing: -0.4px;
+      }
+      .kpi .k {
+        color: var(--ink-faint);
+        font-size: 12.5px;
+        margin-top: 2px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+      }
+      th {
+        color: var(--ink-faint);
+        font-weight: 560;
+        font-size: 12.5px;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--line);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      .tag {
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 8px;
+        border-radius: 20px;
+        font-weight: 560;
+        white-space: nowrap;
+      }
+      .t-done {
+        background: var(--done-bg);
+        color: var(--done);
+      }
+      .t-part {
+        background: var(--part-bg);
+        color: var(--part);
+      }
+      .t-miss {
+        background: var(--miss-bg);
+        color: var(--miss);
+      }
+      .t-idle {
+        background: var(--idle-bg);
+        color: var(--idle);
+      }
+      .chain {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 20px 22px;
+        margin: 18px 0;
+      }
+      .chain-title {
+        font-size: 13px;
+        font-weight: 620;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-bottom: 14px;
+      }
+      .row {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        flex-wrap: wrap;
+      }
+      .step {
+        flex: 1 1 150px;
+        min-width: 132px;
+        padding: 11px 13px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        margin: 4px 0;
+      }
+      .step .n {
+        font-size: 12px;
+        color: var(--ink-faint);
+      }
+      .step .t {
+        font-size: 13.5px;
+        font-weight: 580;
+        margin: 2px 0 3px;
+      }
+      .step .d {
+        font-size: 12.5px;
+        color: var(--ink-soft);
+        line-height: 1.5;
+      }
+      .step.gpu {
+        border-color: #cfe0f5;
+        background: #f7fbff;
+      }
+      .step.wasm {
+        border-color: #e2d8f2;
+        background: #faf8ff;
+      }
+      .step.off {
+        border-style: dashed;
+        background: #fcfcfd;
+        opacity: 0.82;
+      }
+      .arrow {
+        align-self: center;
+        color: var(--ink-faint);
+        padding: 0 5px;
+        font-size: 15px;
+      }
+      ul,
+      ol {
+        margin: 10px 0;
+        padding-left: 22px;
+      }
+      li {
+        margin: 5px 0;
+      }
+      .note {
+        background: var(--card);
+        border-left: 3px solid var(--line);
+        padding: 12px 16px;
+        margin: 16px 0;
+        color: var(--ink-soft);
+        font-size: 14px;
+        border-radius: 0 8px 8px 0;
+      }
+      .note.warn {
+        border-left-color: var(--miss);
+      }
+      .note.key {
+        border-left-color: #2f5fa8;
+      }
+      .note b {
+        color: var(--ink);
+      }
+      .legend {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-size: 13px;
+        color: var(--ink-soft);
+        margin: 6px 0 20px;
+      }
+      footer {
+        margin-top: 60px;
+        padding-top: 20px;
+        border-top: 1px solid var(--line);
+        color: var(--ink-faint);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>CrowdSim Web · 能力地图与差距分析</h1>
+      <div class="sub">2026-09-20 · 基于仓库当前状态与 CI 实测，非规划文档</div>
+
+      <p class="lede">
+        一句话：<b>仿真引擎这条链路是完整且可验证的，界面外壳已经是游戏化形态，真正缺的不是功能，是三处「写好了但没接上」的地方</b>——多楼层、GPU
+        后端、实验 worker。另有两条能力受制于外部数据（真实轨迹、真实
+        OD），不是代码问题。
+      </p>
+
+      <div class="kpis">
+        <div class="kpi">
+          <div class="v">6</div>
+          <div class="k">
+            包（app / core-gpu / core-behavior / scene-schema / backend / collab）
+          </div>
+        </div>
+        <div class="kpi">
+          <div class="v">293</div>
+          <div class="k">源文件（不含测试）</div>
+        </div>
+        <div class="kpi">
+          <div class="v">2.42<span style="font-size: 15px"> ms</span></div>
+          <div class="k">1000 人整步（4× 倍速下约 100fps）</div>
+        </div>
+        <div class="kpi">
+          <div class="v">613</div>
+          <div class="k">测试通过 · CI 12 步全绿</div>
+        </div>
+      </div>
+
+      <h2><span class="num">01</span>物理仿真引擎：完整链路</h2>
+
+      <p>
+        这条链路是项目最扎实的部分。<b>每一步都有测试钉着，关键物理量对着文献验证过</b>（Weidmann
+        基本图、Karamouzas 预判、Moussaïd 结伴率）。
+      </p>
+
+      <div class="chain">
+        <div class="chain-title">场景 → 仿真 → 指标（全部在生产路径上）</div>
+        <div class="row">
+          <div class="step">
+            <div class="n">输入</div>
+            <div class="t">场景 schema</div>
+            <div class="d">
+              <code>.csim.json</code> /
+              zod：墙、入口、店铺、分区、计数线、楼层、环境扰动
+            </div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">路径</div>
+            <div class="t">路由</div>
+            <div class="d">
+              1 m 八邻域 Dijkstra + 通视直走，逐目标一张距离场；墙体绕行
+            </div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step gpu">
+            <div class="n">60 Hz 移动</div>
+            <div class="t">社会力步进</div>
+            <div class="d">
+              力 / 预判让行 / 贴墙约束 / 密度降速 / 结伴编队 / 出口离场
+            </div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step wasm">
+            <div class="n">10 Hz 决策</div>
+            <div class="t">行为后端</div>
+            <div class="d">选店 → 浏览 → 排队 → 收银 → 离场；疏散接管一切</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">编排</div>
+            <div class="t">固定步长引擎</div>
+            <div class="d">可复现（定种子）、热更新场景、worker 隔离执行</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">产出</div>
+            <div class="t">实测 + 回放</div>
+            <div class="d">
+              计数线流量 / 行程时间 P50-P90 / Fruin 等级 / 逐人轨迹 CSV / 疏散清空时间
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 26%">能力</th>
+            <th style="width: 14%">状态</th>
+            <th>依据 / 边界</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>社会力移动 + 避障</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>
+              参数按周期走廊对 Weidmann 基本图拟合，留出误差 0.08 m/s。边界：<b
+                >拟合非轨迹标定，参数不唯一</b
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>碰撞时间预判让行</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>
+              Karamouzas (2014)；迎面行人 <b>2.46 m</b> 外开始让行、以
+              <b>0.53 m</b> 间距通过（实测，非台账旧值）
+            </td>
+          </tr>
+          <tr>
+            <td>结伴到达（70%）</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>Moussaïd (2010)；领队决策、按最慢者同行、宽敞并排 0.49 m</td>
+          </tr>
+          <tr>
+            <td>排队 / 收银 / 服务员数</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>Erlang-2 服务时间；已修 renege/balk 死锁</td>
+          </tr>
+          <tr>
+            <td>密度—速度耦合</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>Weidmann 公式缩放；默认关闭。边界：<b>用位置采样算密度，非实测</b></td>
+          </tr>
+          <tr>
+            <td>疏散（反应时间 + 出口选择）</td>
+            <td><span class="tag t-part">可用，参数自拟</span></td>
+            <td>
+              对数正态预动作时间；出口拥堵惩罚。边界：<b>三个参数全未标定</b>，不可用于预测真实疏散
+            </td>
+          </tr>
+          <tr>
+            <td>100k GPU 步进核</td>
+            <td><span class="tag t-idle">未接线</span></td>
+            <td>
+              0.446–0.465 ms/step 真机实测（~36× 余量），但<b>只在 test-webgpu 里跑</b
+              >，app 零引用
+            </td>
+          </tr>
+          <tr>
+            <td>WebGPU 全应用 60fps</td>
+            <td><span class="tag t-miss">未验证</span></td>
+            <td>步进核数字<b>不得外推</b>；全管线（决策+readback+渲染）未测</td>
+          </tr>
+          <tr>
+            <td>多楼层 / 垂直交通</td>
+            <td><span class="tag t-miss">执行层缺失</span></td>
+            <td>见第 04 节</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2><span class="num">02</span>游戏化界面：完整链路</h2>
+
+      <p>
+        8 月 31 日拍板的方向（<b>暗色 + 暖琥珀、2.5D、都市天际线感</b>）已经落地：3/4
+        透视 3D 城市为主屏，2D 编辑器降为按需浮窗。
+      </p>
+
+      <div class="chain">
+        <div class="chain-title">界面链路（从进入到达成分析）</div>
+        <div class="row">
+          <div class="step">
+            <div class="n">入口</div>
+            <div class="t">着陆页</div>
+            <div class="d">暗色 + 琥珀，接触网络预览</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">外壳</div>
+            <div class="t">游戏化 chrome</div>
+            <div class="d">浮岛工具栏 / 右侧面板栏 / 左下状态 / 右下时间控制</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step gpu">
+            <div class="n">主屏</div>
+            <div class="t">3D 城市视口</div>
+            <div class="d">
+              WebGPU 渲染 + 后期（GTAO/泛光/FXAA）；实时人群 InstancedMesh
+            </div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">F2D</div>
+            <div class="t">场景编辑器</div>
+            <div class="d">2D 平面 + 2.5D 切换；底图导入 / DXF / 计数线 / 分区造船</div>
+          </div>
+          <div class="arrow">→</div>
+          <div class="step">
+            <div class="n">面板</div>
+            <div class="t">13 个浮窗</div>
+            <div class="d">品牌情报 / 实验扫描 / 校验报告 / 轨迹回放 / 场景对比 …</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="note key">
+        <b>可达性是真做到了：</b>13 个面板全部经
+        <code>PanelDock</code>
+        挂载且各有渲染冒烟测试，孤儿面板为零。<b>但「可达」不等于「有深度」</b>——13
+        个里有 11 个是自包含的展示型面板，只有品牌情报与轨迹回放接了真实数据流。
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 26%">界面能力</th>
+            <th style="width: 14%">状态</th>
+            <th>说明</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2.5D 游戏化外壳</td>
+            <td><span class="tag t-done">已完成</span></td>
+            <td>暗色 + 琥珀；浮岛工具栏、状态条、倍速链</td>
+          </tr>
+          <tr>
+            <td>3D 城市主屏 + 实时人群</td>
+            <td><span class="tag t-done">已完成</span></td>
+            <td>人群由仿真快照每帧驱动；容量 8,192（分配数，非规模宣称）</td>
+          </tr>
+          <tr>
+            <td>2D 编辑器</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>含本轮：计数线拖拽绘制 / 端点独立拖动 / 命名</td>
+          </tr>
+          <tr>
+            <td>热力图（Fruin A–F）</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>2 m 格、人/m²</td>
+          </tr>
+          <tr>
+            <td>实测指标 + CSV 导出</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>五类 CSV；计数线分方向流量、行程时间 P50/P90</td>
+          </tr>
+          <tr>
+            <td>轨迹录制与回放</td>
+            <td><span class="tag t-done">可用</span></td>
+            <td>1×/4×/16× 拖动回放，逐人轨迹导出</td>
+          </tr>
+          <tr>
+            <td>楼层切换 UI</td>
+            <td><span class="tag t-miss">没有</span></td>
+            <td><code>activeFloorId</code> 在 <code>.tsx</code> 里零引用</td>
+          </tr>
+          <tr>
+            <td>AI 场景生成</td>
+            <td><span class="tag t-idle">已冻结改名</span></td>
+            <td>实为关键词模板，已改称「模板」；真模型接入属 SP-5b</td>
+          </tr>
+          <tr>
+            <td>实验后台 worker</td>
+            <td><span class="tag t-idle">未接线</span></td>
+            <td>面板同步跑在主线程，只把 worker 请求描述符当文字渲染</td>
+          </tr>
+          <tr>
+            <td>多浏览器 e2e 矩阵</td>
+            <td><span class="tag t-miss">不存在</span></td>
+            <td>曾有「跨浏览器复现哈希」是伪造的，已删；真矩阵未建</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2><span class="num">03</span>还差什么</h2>
+
+      <div class="legend">
+        <span><span class="tag t-miss">P1</span> 有明确价值缺口</span>
+        <span><span class="tag t-part">P2</span> 结构性 / 需决策</span>
+        <span><span class="tag t-idle">P2</span> 接回来或删掉</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 8%">级</th>
+            <th style="width: 28%">缺口</th>
+            <th>具体是什么 / 为什么</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag t-idle">接/删</span></td>
+            <td><b>多楼层执行层</b></td>
+            <td>
+              schema 与连接件类型都已存在，缺 agent 层号、跨层路由、切层 UI。见第 04 节
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-idle">接/删</span></td>
+            <td><b>100k GPU 核接回主链路</b></td>
+            <td>
+              已真机实测 0.446 ms/step，但只有 test-webgpu
+              用。要么接线，要么按孤儿规则删掉——<b>留着最坏</b>，读者会以为规模能力已上线
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-idle">接/删</span></td>
+            <td><b>实验后台 worker</b></td>
+            <td>同样「写好了、测过了、没人用」；面板在主线程同步跑</td>
+          </tr>
+          <tr>
+            <td><span class="tag t-part">P2</span></td>
+            <td><b>单文件超 500 行</b></td>
+            <td>
+              14 个文件超标，最大 <code>SimulationViewport.tsx</code> 1703
+              行。<b>且在变差不是变好</b>，SP-6 计划中
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-part">P2</span></td>
+            <td><b>同伴等待挡道</b></td>
+            <td>同伴原地等待时会站在通道里（已知小限制）</td>
+          </tr>
+          <tr>
+            <td><span class="tag t-part">P2</span></td>
+            <td><b>分时段到达时段长度写死</b></td>
+            <td>固定 15 分钟，UI 改不了</td>
+          </tr>
+          <tr>
+            <td><span class="tag t-part">P2</span></td>
+            <td><b>采样分辨率 1 仿真秒</b></td>
+            <td>更细的流量峰值观测不到</td>
+          </tr>
+          <tr>
+            <td><span class="tag t-miss">P1</span></td>
+            <td><b>真实轨迹标定</b></td>
+            <td>
+              参数不唯一是硬伤。<b>卡在没数据</b>，不是没代码——需要真实轨迹才能反推
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-miss">P1</span></td>
+            <td><b>真实 OD 数据</b></td>
+            <td>
+              OD 三件套（标定/敏感度/流分析）已删，因为仓库无 POS / RTSP / WiFi
+              探针入口，只能跑合成数据
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-miss">P1</span></td>
+            <td><b>部署凭据校验</b></td>
+            <td>
+              已 fail-closed（无 verifier
+              拒绝登录），但生产部署前必须注入真实校验。你已决定暂不做
+            </td>
+          </tr>
+          <tr>
+            <td><span class="tag t-part">P2</span></td>
+            <td><b>SP-5b：面板深度</b></td>
+            <td>
+              13 个面板只有 2 个接真实数据流，其余为自包含展示；把 SP-0
+              冻结的假功能做成真的属这一档
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2><span class="num">04</span>本轮最重要的发现：多楼层的真相</h2>
+
+      <div class="note warn">
+        <b>我上一轮写的 ADR 是错的，已重写。</b
+        >初版说「没有任何图元知道自己在哪层」，据此提议给 schema 加楼层——那次搜索只看了
+        <code>world</code> 和 <code>crowdMovement.ts</code> 就停了。第二次搜索发现
+        schema 早就支持了。
+      </div>
+
+      <p>实际是三层状态，弄清楚之后，工作量比原先判断的<b>小得多</b>：</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 22%">层次</th>
+            <th style="width: 14%">状态</th>
+            <th>证据</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>场景 schema <span style="color: var(--ink-faint)">· 已提交</span></td>
+            <td><span class="tag t-done">基础已就位</span></td>
+            <td>
+              <code>scene.floors[]</code> + <code>floorSchema</code>（每层自带
+              <code>id / name / level / elevationMeters</code>
+              <b>和自己的 world</b>）已存在； 4 个 schema 带裸
+              <code>floorId</code
+              >——<b>底图、分区、地块、店铺，都是零售方向的图元</b>，不是为楼层而加
+            </td>
+          </tr>
+          <tr>
+            <td>
+              楼层 stage 1 <span style="color: var(--ink-faint)">· 进行中未提交</span>
+            </td>
+            <td><span class="tag t-part">正在写</span></td>
+            <td>
+              <code>sceneFloors.ts</code> +
+              <code>sceneEditorFloors.ts</code>（23:13–23:15，注释标注 "ADR-0010, stage
+              1"）：<code>floorId</code> 统一到 10 类图元，编辑器获得
+              <code>activeFloorId</code> 与
+              <code>addFloor</code>/<code>setActiveFloor</code>，一次画一层。
+              两模块都写明自己<b>不是</b>什么——「连接件是 stage
+              2，尚不存在；这里的一层是可以画、可以看的东西，不是人能去的地方」
+            </td>
+          </tr>
+          <tr>
+            <td>多楼层运行时</td>
+            <td><span class="tag t-idle">孤儿</span></td>
+            <td>
+              <code>multifloorScene.ts</code> 已有
+              <code>MultiFloorScene{floors, connectors}</code>、<code
+                >VerticalConnector.kind: "elevator"|"escalator"|"stairs"</code
+              >、<code>flattenMultiFloorScene</code>。只被自己的测试引用
+            </td>
+          </tr>
+          <tr>
+            <td>仿真引擎</td>
+            <td><span class="tag t-miss">单层</span></td>
+            <td>
+              router 只建一张二维场；<code>SimulationAgent</code>
+              无层号——不同楼层同一平面坐标的两者在社会力看来肩并肩；38 个文件读
+              <code>world.width/height</code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <b>结论：这不是「设计多楼层」，是「把已有的数据模型接上运行路径」。</b>
+        五个具体缺口：① agent 加 <code>floorId</code>；② 逐层路由 + 连接件成边；③ 把
+        <code>VerticalConnector</code> 放进运行路径（它现在活在孤儿模块里）；④
+        编辑器切层 UI；⑤ 逐层渲染。 <br /><br />
+        其中一个决定要先做：<b
+          ><code>multifloorScene.ts</code>
+          要么提上来当引擎的加载入口，要么按已有的孤儿规则删掉</b
+        >——留着是唯一不允许的选项，因为读者看到
+        <code>VerticalConnector</code> 会合理地以为扶梯已经建模了。
+      </div>
+
+      <footer>
+        依据：<code>CLAUDE.md</code>（项目手册）、<code>docs/CLAIMS_LEDGER.md</code>（宣称台账）、<code>docs/adr/</code>、CI
+        实测与本轮代码核查。<br />
+        边界声明：本页所有性能数字均在 dev server
+        停止状态下测得；所有「未标定」参数不得用于预测真实场所。
+      </footer>
+    </div>
+  </body>
+</html>
