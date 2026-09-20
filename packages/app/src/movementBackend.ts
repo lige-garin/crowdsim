@@ -1,3 +1,18 @@
+/*
+ * NOT WIRED INTO THE SIMULATION.
+ *
+ * The engine steps its crowd in ./crowdMovement.ts, which carries the
+ * behaviour the model is judged on: walking groups, queueing, the
+ * anticipatory push, wall constraints, exits. This module is much narrower —
+ * a CPU and a WebGPU implementation of the bare social force, plus a probe
+ * that checks the two agree on four agents. Nothing in the app asks either
+ * backend to run a simulation.
+ *
+ * So "webgpu-ready" means a GPU device reproduced the CPU result on the probe
+ * fixture. It does not mean any crowd is moving on the GPU, and the readiness
+ * panel is made to say so. Wiring this in for real would mean teaching it
+ * everything crowdMovement already does, not swapping a step function.
+ */
 import {
   createAgentSoA,
   setAgentPosition,

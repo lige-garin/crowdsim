@@ -400,3 +400,24 @@ and testable — people no longer all start on one tick, and they no longer all
 queue at one door — and the tests assert exactly that and nothing more.
 **None of this predicts any real building's evacuation time**, and no number
 produced by it should be quoted as one.
+
+## 2026-09-20: the GPU movement backend is not wired in, and the panel said otherwise
+
+The readiness panel read `WebGPU movement: webgpu-ready verified`. It was not,
+in the only sense that matters: **nothing runs on it.**
+
+The engine steps its crowd in `crowdMovement.ts`, which carries the behaviour
+the model is judged on — walking groups, queueing, the anticipatory push, wall
+constraints, exits. `movementBackend.ts` is a much narrower thing: a CPU and a
+WebGPU implementation of the bare social force, plus a probe that checks the
+two agree **on four agents**. No production code calls either backend to run a
+simulation; `App.tsx` hard-codes `movementBackend: "cpu-compat"`.
+
+So the panel was reporting a probe result as if it were a running system.
+Changed to `webgpu-ready · probe only`, and the module now says at the top
+what it is and is not.
+
+Wiring this in for real is not swapping a step function: it means teaching the
+GPU path everything `crowdMovement.ts` already does. Not done, and it should
+not be started as a performance move — the CPU step is currently 2.42 ms at a
+thousand people, so there is no pressure on it to carry.

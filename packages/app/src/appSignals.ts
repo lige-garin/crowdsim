@@ -107,7 +107,7 @@ export function createSystemSignals({
       label: "WebGPU movement",
       value:
         movementBackendProbe.readyBackend === "webgpu-ready"
-          ? `${movementBackendProbe.readyBackend} verified`
+          ? `${movementBackendProbe.readyBackend} · probe only`
           : formatProbeMessage(movementBackendProbe.message, language),
     },
     {
