@@ -1,6 +1,8 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
+import type { FloorPlace } from "./floorRouting";
 import {
-  nearestAllowedSink,
+  nearestSinkByRoute,
+  placeOf,
   type SimulationAgentDecision,
   type SimulationDecisionBackend,
   type SimulationShop,
@@ -38,7 +40,7 @@ function chooseEvacuationSink(
   agent: SimulationAgent,
   sinks: readonly SimulationSink[],
   loads: ReadonlyMap<string, number>,
-  routeDistance?: (from: ScenePoint, to: ScenePoint) => number,
+  routeDistance?: (from: FloorPlace, to: FloorPlace) => number,
 ): SimulationSink {
   // Every exit, not only the ones the agent's entrance names. Which door you
   // came in by tells you nothing in a fire, and a building's own evacuation
@@ -47,7 +49,7 @@ function chooseEvacuationSink(
   let bestCost = Number.POSITIVE_INFINITY;
   for (const sink of sinks) {
     const distance = routeDistance
-      ? routeDistance(agent, sink.position)
+      ? routeDistance(agent, placeOf(sink))
       : Math.hypot(sink.position.x - agent.x, sink.position.y - agent.y);
     const cost = distance + evacuationExitCrowdingMeters * (loads.get(sink.id) ?? 0);
     if (cost < bestCost) {
@@ -279,6 +281,7 @@ export function createMallCrowdDecisionBackend(options: {
         nextState: "browse",
         selectedStoreId: shop.id,
         target: browseSpot(shop, mindsetSeed, agentId),
+        targetFloorId: shop.floorId,
         queueJoinedSeconds: null,
         // Each shopper draws their own dwell around the shop's mean: a fixed
         // dwell made every browser in a shop leave in lockstep.
@@ -289,11 +292,12 @@ export function createMallCrowdDecisionBackend(options: {
         walkProgress: null,
       });
       const leaveDecision = (agent: SimulationAgent): SimulationAgentDecision => {
-        const sink = nearestAllowedSink(agent, sinks, agent.exitIds);
+        const sink = nearestSinkByRoute(agent, sinks, agent.exitIds, routeDistance);
         return {
           agentId: agent.id,
           nextState: "leave",
           target: sink.position,
+          targetFloorId: sink.floorId,
           targetSinkId: sink.id,
           selectedStoreId: undefined,
           browseUntilSeconds: null,
@@ -328,6 +332,7 @@ export function createMallCrowdDecisionBackend(options: {
         nextState: "walk",
         selectedStoreId: shop.id,
         target: shop.position,
+        targetFloorId: shop.floorId,
         queueUntilSeconds: null,
         // A shopper diverted from one line starts at the back of the next.
         queueJoinedSeconds: null,
@@ -342,6 +347,7 @@ export function createMallCrowdDecisionBackend(options: {
         nextState: "queue",
         selectedStoreId: shop.id,
         target: queueSlotPosition(shop, place),
+        targetFloorId: shop.floorId,
         queueJoinedSeconds: agent.queueJoinedSeconds ?? elapsedSeconds,
         queueUntilSeconds: patienceDeadline(agent),
         walkProgress: null,
@@ -405,6 +411,7 @@ export function createMallCrowdDecisionBackend(options: {
               agentId: agent.id,
               nextState: "evacuate",
               target: sink.position,
+              targetFloorId: sink.floorId,
               targetSinkId: sink.id,
               selectedStoreId: undefined,
               browseUntilSeconds: null,
@@ -445,6 +452,7 @@ export function createMallCrowdDecisionBackend(options: {
                 nextState: "checkout",
                 servicePointId: counter.id,
                 target: counter.position,
+                targetFloorId: counter.floorId,
                 selectedStoreId: undefined,
                 browseUntilSeconds: null,
                 walkProgress: null,
@@ -544,7 +552,7 @@ export function createMallCrowdDecisionBackend(options: {
           // building counts; a shop walls cut off entirely never progresses.
           const progress = agent.walkProgress;
           const remaining = routeDistance
-            ? routeDistance(agent, shop.position)
+            ? routeDistance(agent, placeOf(shop))
             : distance;
 
           if (

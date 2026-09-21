@@ -1,4 +1,5 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
+import type { FloorPlace } from "./floorRouting";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 
 export type SimulationDecisionBackendId = "rule-ts" | "wasm-ready";
@@ -14,6 +15,8 @@ export type SimulationAgentDecisionState =
 
 export type SimulationShop = {
   id: string;
+  /** The floor it is on; absent in a scene with one floor. */
+  floorId?: string;
   position: ScenePoint;
   /** Arrival radius: the agent counts as "at the shop" within this distance. */
   radius: number;
@@ -38,6 +41,8 @@ export type SimulationShop = {
 
 export type SimulationServicePoint = {
   id: string;
+  /** The floor it is on; absent in a scene with one floor. */
+  floorId?: string;
   position: ScenePoint;
   /** Arrival radius: the agent counts as "at the checkout" within this distance. */
   radius: number;
@@ -69,6 +74,8 @@ export type SimulationAgentDecision = {
   /** Clears the field when explicitly null (e.g. when the target changes). */
   walkProgress?: SimulationAgentWalkProgress | null;
   target?: ScenePoint;
+  /** The floor the target is on, when it is not the walker's own. */
+  targetFloorId?: string;
   targetSinkId?: string;
 };
 
@@ -92,7 +99,7 @@ export type SimulationDecisionTickInput = {
    * it, so a shopper detouring round a building is not mistaken for one stuck
    * against a wall. Straight-line distance when absent.
    */
-  routeDistance?: (from: ScenePoint, to: ScenePoint) => number;
+  routeDistance?: (from: FloorPlace, to: FloorPlace) => number;
 };
 
 export type SimulationDecisionBackend = {
@@ -103,6 +110,14 @@ export type SimulationDecisionBackend = {
     input: SimulationDecisionTickInput,
   ) => readonly SimulationAgentDecision[];
 };
+
+/** A thing's position as the router wants it: the point and its floor. */
+export function placeOf(entity: {
+  position: ScenePoint;
+  floorId?: string;
+}): FloorPlace {
+  return { ...entity.position, floorId: entity.floorId };
+}
 
 /**
  * The exit an agent should head for: the nearest of the exits its entrance
@@ -118,6 +133,43 @@ export function nearestAllowedSink(
       ? sinks.filter((sink) => exitIds.includes(sink.id))
       : [];
   return nearest(point, allowed.length > 0 ? allowed : sinks);
+}
+
+/**
+ * The exit with the shortest **walk**, which across floors includes getting
+ * down to it. Falls back to the nearest in a straight line when there is no
+ * router — the same answer as before floors existed, in a scene with one.
+ */
+export function nearestSinkByRoute(
+  agent: SimulationAgent,
+  sinks: readonly SimulationSink[],
+  exitIds: readonly string[] | undefined,
+  routeDistance?: (from: FloorPlace, to: FloorPlace) => number,
+): SimulationSink {
+  if (!routeDistance) {
+    return nearestAllowedSink(agent, sinks, exitIds);
+  }
+
+  const allowed =
+    exitIds && exitIds.length > 0
+      ? sinks.filter((sink) => exitIds.includes(sink.id))
+      : [];
+  const candidates = allowed.length > 0 ? allowed : sinks;
+  let best = candidates[0];
+  let bestCost = Number.POSITIVE_INFINITY;
+
+  for (const sink of candidates) {
+    const cost = routeDistance(agent, placeOf(sink));
+
+    if (cost < bestCost) {
+      bestCost = cost;
+      best = sink;
+    }
+  }
+
+  // Every exit cut off from where they stand: fall back rather than return
+  // nothing, and let the engine's no-progress rule take it from there.
+  return Number.isFinite(bestCost) ? best : nearestAllowedSink(agent, sinks, exitIds);
 }
 
 /** The candidate whose position is closest to `point`. */
@@ -215,8 +267,37 @@ export function applySimulationAgentDecisions(
           ? undefined
           : (decision.walkProgress ?? agent.walkProgress),
       targetSinkId: decision.targetSinkId ?? agent.targetSinkId,
+      ...(decision.target === undefined
+        ? {}
+        : targetFloorFields(agent, target, decision.targetFloorId)),
       targetX: target.x,
       targetY: target.y,
     };
   });
+}
+
+/**
+ * Where a decision's target sits relative to the walker: on their floor, or on
+ * another one they will have to cross to. Recorded as a transfer with no
+ * connector yet — the engine picks that, because only it knows the ways
+ * between floors. A decision with no floor on it means "here", which is what
+ * every one-floor scene says.
+ */
+function targetFloorFields(
+  agent: SimulationAgent,
+  target: ScenePoint,
+  targetFloorId?: string,
+) {
+  if ((targetFloorId ?? null) === (agent.floorId ?? null)) {
+    return { transfer: undefined };
+  }
+
+  return {
+    transfer: {
+      connectorId: agent.transfer?.connectorId ?? "",
+      finalX: target.x,
+      finalY: target.y,
+      floorId: targetFloorId!,
+    },
+  };
 }

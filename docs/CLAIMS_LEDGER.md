@@ -421,3 +421,114 @@ Wiring this in for real is not swapping a step function: it means teaching the
 GPU path everything `crowdMovement.ts` already does. Not done, and it should
 not be started as a performance move — the CPU step is currently 2.42 ms at a
 thousand people, so there is no pressure on it to carry.
+
+## 2026-09-20: floors, stage 1 — drawn, and one of them simulated
+
+ADR-0010 stage 1. A scene can now hold more than one floor, and the editor
+draws one at a time. **Nobody can move between floors**: connectors are stage 2
+and do not exist, so a run simulates one floor and it is the lowest.
+
+What was already there, and what was missing. `scene.floors[]` and a bare
+`floorId` on four retail primitives (basemap, zone, store lot, shop) were
+committed long before this; nothing read either on any running path. The gap
+was that walls, entrances, service points, count lines, targets, areas and
+hazards — the primitives a run is built from — had no floor at all, so a
+"floor" could not have held a plan.
+
+Changed:
+
+- **`floorId` on every primitive that stands somewhere**, through one
+  documented `floorIdSchema`, and a scene whose `floorId` names no declared
+  floor is now **rejected** rather than put nowhere.
+- **One rule for what a floor contains** (`sceneFloors.ts`): a scene with no
+  floors is one floor and everything is on it; a primitive with no `floorId` is
+  on the lowest floor. Both keep every scene written before floors working
+  untouched — and every scene in this repository is one of those.
+- **The editor draws one floor** (`sceneEditorFloors.ts`, `SceneEditorFloorBar`):
+  add a floor, switch floors, and what is drawn, counted and crowded is that
+  floor alone.
+- **A run takes one floor** (`simulatedFloorScene`), inside `deriveSceneGeometry`
+  so that every engine build and every hot update goes through it. Flattening
+  the stack instead would let an upstairs wall block a walker downstairs and
+  still look like an answer.
+
+**The limit, stated where it can be seen**: the floor bar says floors can be
+drawn and not walked between, and the engineering signals say how many floors
+a scene has and that the lowest one is what ran. **No number a run produces
+says anything about an upper floor** — it holds no crowd, its shops are never
+chosen, its count lines count nobody. The editor no longer draws the crowd or
+the heatmap over an upper floor for the same reason: both are measurements of
+a floor that is not the one on screen.
+
+Deleted in the same pass: `multifloorScene.ts` and the "2 楼层" line in
+`ScaleReadinessPanel`. The panel built a two-floor stack out of two copies of
+the demo scene, with a stairs connector nothing routed, and printed the floor
+count as readiness. With real floors in the schema that line is a claim about
+a capability that does not exist. Its `VerticalConnector` types were the only
+part worth keeping, and stage 2 should design them against a router rather
+than inherit them from a display object.
+
+**Not done**: connectors, routing across floors, agents with a floor, and
+rendering a stack. Nothing here is calibrated — the 4.5 m floor-to-floor gap
+is a drawn default, read by nothing that simulates.
+
+One thing the e2e caught that unit tests could not: the editor's grid declared
+one row per child, and the new floor bar took the row sized `1fr` — so the plan
+dropped into an implicit row, shrank to 100 px, and its lower half sat under
+the HUD tray, where a click lands on the tray. Both grid templates now count
+the bar. `pnpm e2e` 9/9.
+
+## 2026-09-21: floors people can actually walk between (ADR-0010, the rest of it)
+
+Stage 1 gave a scene floors that could be drawn and said plainly, on screen,
+that nobody could walk between them. That sentence is now false and has been
+removed from the editor and the engineering signals, because the thing it
+described is built.
+
+What a run does now:
+
+- **Connectors** — `scene.connectors`, stairs and escalators. Someone walking
+  to another floor walks to the connector, crosses it, and walks on; they are
+  held for the flight's travel time and are in no crowd while crossing.
+- **Costs in metres of walking**, so a shop upstairs and a shop at the far end
+  of this floor are comparable numbers. A connector's cost is its travel time
+  times the crowd's mean speed.
+- **One crowd per floor.** Two people over the same plan coordinates on
+  different floors do not push each other.
+- **Capacity.** A connector takes width × Weidmann peak specific flow people a
+  second — the entrance rule (ADR-0008), because a stair mouth and a door are
+  the same constraint. The rest wait at the mouth.
+- **The editor and the stage each show one floor**, with that floor's crowd and
+  that floor's heatmap. A run's heatmap is now per floor for the same reason a
+  plan is: two floors drawn over each other is a picture of neither.
+
+**Numbers that are guesses, and are labelled as guesses in the code**: nothing
+here is calibrated against an observed stair or escalator. The travel speeds
+are literature-typical — Weidmann's 0.61 m/s up and 0.694 m/s down for stairs,
+0.5 m/s for an escalator under EN 115 — applied along a flight taken as twice
+the rise (30° pitch). **No number a run produces is a claim about how long a
+real building's stairs take.**
+
+**Lifts are refused, not faked.** The schema rejects `kind: "elevator"`. A lift
+is a queue with a batch service; modelled as a sloped walk it gives an answer
+that looks reasonable and is wrong, and a scene that cannot describe one cannot
+be read as having simulated one.
+
+**Phased evacuation is still not modelled.** An alarm sends everyone to an
+exit, and people upstairs route down. Whether a real building would evacuate
+the floors away from a fire is a safety claim with no basis here.
+
+Deleted in the same pass, per the orphan rule: `multifloorScene.ts` and the
+readiness panel's "2 楼层" line, which counted two copies of the demo scene
+with a stairs connector nothing routed and printed it as a capability.
+
+### Cost, measured
+
+Corridor harness, 881 people, best of six rounds, both variants inside one run
+so drift hits both: **one floor 0.56–0.70 ms/step, two floors (everyone on the
+ground) 0.65–0.74**. Declaring floors costs about a tenth of a millisecond a
+step. Against the same harness on HEAD before this change (0.53–0.56), the
+one-floor path is unchanged as far as this method can tell — **repeats of one
+build varied more than the two builds differ**, and the same one-floor case
+drifted from 0.53 to 0.70 over the session as the machine warmed. The 2.42 ms
+in CLAUDE.md is a different scene and none of these numbers replace it.

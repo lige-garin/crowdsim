@@ -44,14 +44,39 @@ export function visibleAgentCount(agentCount: number, capacity: number): number 
  * Regression guard for the bug where the InstancedMesh read the always-empty
  * snapshot.agents and rendered nothing in the worker path.
  */
-export type CrowdAgent = Pick<SimulationAgent, "id" | "x" | "y">;
+export type CrowdAgent = Pick<SimulationAgent, "id" | "x" | "y"> & {
+  /** From the snapshot path. */
+  floorId?: string;
+  /** From the shared-memory path, where a floor is an index (ADR-0010). */
+  floorIndex?: number;
+};
+
+/** Which floor the stage is showing, in both the forms a crowd arrives in. */
+export type ViewedFloor = { id: string; index: number };
 
 export function selectCrowdAgents(
   snapshotAgents: readonly CrowdAgent[] | undefined,
   overlayAgents: readonly CrowdAgent[] | undefined,
+  /**
+   * Show only the people on this floor. Undefined in a scene with no floors,
+   * where everyone is on the one plane.
+   */
+  floor?: ViewedFloor,
 ): readonly CrowdAgent[] {
-  if (overlayAgents && overlayAgents.length > 0) {
-    return overlayAgents;
+  const live =
+    overlayAgents && overlayAgents.length > 0 ? overlayAgents : (snapshotAgents ?? []);
+
+  if (!floor) {
+    return live;
   }
-  return snapshotAgents ?? [];
+
+  // The two paths carry a floor differently: the snapshot has the id, the
+  // shared buffer an index into the scene's floors. Someone on neither — a
+  // scene whose floors changed under a running crowd — is not drawn on a floor
+  // that is not theirs.
+  return live.filter((agent) =>
+    agent.floorIndex === undefined
+      ? agent.floorId === floor.id
+      : agent.floorIndex === floor.index,
+  );
 }

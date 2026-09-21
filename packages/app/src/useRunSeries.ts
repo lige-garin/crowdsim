@@ -63,7 +63,12 @@ export function useRunSeries({
         [
           ...samples,
           {
-            agents: snapshot.agents.map(({ id, x, y }) => ({ id, x, y })),
+            agents: snapshot.agents.map(({ floorId, id, x, y }) => ({
+              floorId,
+              id,
+              x,
+              y,
+            })),
             elapsedSeconds: snapshot.elapsedSeconds,
           },
         ].slice(-chartSeconds),

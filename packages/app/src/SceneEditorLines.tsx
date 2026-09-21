@@ -167,6 +167,41 @@ export function EditorLines({
           </text>
         </g>
       ))}
+      {document.connectors.map((connector) => {
+        const onThisFloor =
+          connector.fromFloorId === document.activeFloorId
+            ? connector.fromPoint
+            : connector.toPoint;
+        const up = connector.toFloorId === document.activeFloorId;
+
+        return (
+          <g
+            key={connector.id}
+            className={
+              connector.id === selectedId
+                ? "editor-connector selected"
+                : "editor-connector"
+            }
+            data-testid={`editor-connector-${connector.id}`}
+            transform={`translate(${onThisFloor.x} ${onThisFloor.y})`}
+            onPointerDown={(event) => onEntityPointerDown(event, connector.id)}
+          >
+            <rect
+              x={-connector.width / 2}
+              y={-2.4}
+              width={connector.width}
+              height={4.8}
+            />
+            {/* Which way it leads from here: down to the floor below, or up. */}
+            <text y={0.5}>
+              {connector.name ??
+                `${connector.kind === "escalator" ? "ESC" : "ST"}${
+                  connector.bidirectional ? "" : up ? " ↑" : " ↓"
+                }`}
+            </text>
+          </g>
+        );
+      })}
       {document.targets.map((target) => (
         <g
           key={target.id}

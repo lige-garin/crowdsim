@@ -432,3 +432,48 @@ export function updateDocumentEntranceKind(
     ),
   };
 }
+
+/** A connector's kind: stairs walked, or an escalator ridden. */
+export function updateDocumentConnectorKind(
+  document: EditorDocument,
+  connectorId: string,
+  kind: EditorDocument["connectors"][number]["kind"],
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId ? { ...connector, kind } : connector,
+    ),
+  };
+}
+
+/** Its clear width, which is how many people a second it can pass. */
+export function updateDocumentConnectorWidth(
+  document: EditorDocument,
+  connectorId: string,
+  width: number,
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId
+        ? { ...connector, width: Math.max(0.6, width) }
+        : connector,
+    ),
+  };
+}
+
+/** Both ways, or only the way it was drawn — an escalator runs one way. */
+export function toggleDocumentConnectorBidirectional(
+  document: EditorDocument,
+  connectorId: string,
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId
+        ? { ...connector, bidirectional: !connector.bidirectional }
+        : connector,
+    ),
+  };
+}

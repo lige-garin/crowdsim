@@ -3,6 +3,7 @@ import {
   areaSchema,
   basemapSchema,
   brandProfileSchema,
+  connectorSchema,
   countLineSchema,
   customParametersSchema,
   environmentFactorSchema,
@@ -58,6 +59,7 @@ export const sceneSchema = z
     shops: z.array(shopSchema).default([]),
     servicePoints: z.array(servicePointSchema).default([]),
     countLines: z.array(countLineSchema).default([]),
+    connectors: z.array(connectorSchema).default([]),
     environmentFactors: z.array(environmentFactorSchema).default([]),
     roads: z.array(roadSchema).default([]),
     buildings: z.array(buildingSchema).default([]),
@@ -98,6 +100,7 @@ export const sceneSchema = z
       ...scene.shops,
       ...scene.servicePoints,
       ...scene.countLines,
+      ...scene.connectors,
       ...scene.environmentFactors,
       ...scene.visualAssets,
       ...scene.roads,
@@ -114,6 +117,49 @@ export const sceneSchema = z
     if (scene.weatherProfile.id !== undefined) {
       addId(scene.weatherProfile.id);
     }
+
+    for (const connector of scene.connectors) {
+      for (const end of [connector.from, connector.to]) {
+        if (!scene.floors.some((floor) => floor.id === end.floorId)) {
+          context.addIssue({
+            code: "custom",
+            message: `Connector '${connector.id}' joins floor '${end.floorId}', which the scene does not declare`,
+            path: ["connectors"],
+          });
+        }
+      }
+
+      if (connector.from.floorId === connector.to.floorId) {
+        context.addIssue({
+          code: "custom",
+          message: `Connector '${connector.id}' starts and ends on the same floor`,
+          path: ["connectors"],
+        });
+      }
+    }
+
+    // A floorId naming no floor would put the thing nowhere, and nothing
+    // downstream could tell that from "on the only floor there is". Caught
+    // here, once, rather than by each reader inventing a fallback.
+    const floorIds = new Set(scene.floors.map((floor) => floor.id));
+
+    for (const [key, entities] of Object.entries(scene)) {
+      if (!Array.isArray(entities)) {
+        continue;
+      }
+
+      for (const entity of entities) {
+        const floorId: unknown = (entity as { floorId?: unknown }).floorId;
+
+        if (typeof floorId === "string" && !floorIds.has(floorId)) {
+          context.addIssue({
+            code: "custom",
+            message: `'${(entity as { id?: string }).id ?? "?"}' is on floor '${floorId}', which the scene does not declare`,
+            path: [key],
+          });
+        }
+      }
+    }
   });
 
 export type ScenePoint = z.infer<typeof pointSchema>;
@@ -127,3 +173,11 @@ export function parseScene(input: unknown): CrowdSimScene {
 export function safeParseScene(input: unknown) {
   return sceneSchema.safeParse(input);
 }
+
+export {
+  baseFloorId,
+  resolveFloorId,
+  sceneFloors,
+  sceneOnFloor,
+  type SceneFloor,
+} from "./sceneFloors";

@@ -1,3 +1,4 @@
+import { sceneFloors } from "@crowdsim/scene-schema";
 import {
   createSimulationEngineFromScene,
   type SceneSimulationEngine,
@@ -19,6 +20,8 @@ const workerScope = globalThis as unknown as {
 
 let engine: SceneSimulationEngine | undefined;
 let sharedMemory: SimulationWorkerSharedMemory | undefined;
+/** The scene's floors in order: what an agent's floor index in shared memory means. */
+let floorIds: string[] = [];
 /**
  * Messages are handled one at a time. `init` awaits a dynamic import of the wasm
  * decision backend, and anything that arrived during that await used to run
@@ -44,6 +47,7 @@ async function handleMessage(message: SimulationWorkerRequest) {
               createWasmSimulationDecisionBackend(message.scene),
           )
         : undefined;
+      floorIds = sceneFloors(message.scene).map((floor) => floor.id);
       engine = createSimulationEngineFromScene(message.scene, {
         ...message.simulation,
         decisionBackend,
@@ -57,6 +61,10 @@ async function handleMessage(message: SimulationWorkerRequest) {
 
     if (!engine) {
       throw new Error("Simulation worker is not initialized");
+    }
+
+    if (message.type === "update-scene") {
+      floorIds = sceneFloors(message.scene).map((floor) => floor.id);
     }
 
     if (message.type === "start") {
@@ -108,7 +116,7 @@ function postSnapshot(
   id: number,
   snapshot: ReturnType<SceneSimulationEngine["snapshot"]>,
 ) {
-  writeSimulationSharedMemory(sharedMemory, snapshot);
+  writeSimulationSharedMemory(sharedMemory, snapshot, floorIds);
   workerScope.postMessage({
     id,
     snapshot,

@@ -19,6 +19,7 @@ type TransitStop = EditorDocument["transitStops"][number];
 type Obstacle = EditorDocument["obstacles"][number];
 type Hazard = EditorDocument["hazards"][number];
 type Zone = EditorDocument["zones"][number];
+type Connector = EditorDocument["connectors"][number];
 type Entrance = EditorDocument["entrances"][number];
 
 const entranceKinds: readonly Entrance["kind"][] = ["source", "sink", "bidirectional"];
@@ -167,7 +168,7 @@ export function BuildingParamGrid({
         onChange={(value) => onNumberChange("heightMeters", value)}
       />
       <NumberInput
-        label={t("floors")}
+        label={t("storeys")}
         min={1}
         step={1}
         value={selectedBuilding.floors}
@@ -293,6 +294,50 @@ export function ObstacleParamGrid({
       />
       <button type="button" onClick={onToggleBlocksMovement}>
         {selectedObstacle.blocksMovement ? t("blocksMovement") : t("softObstacle")}
+      </button>
+    </div>
+  );
+}
+
+const connectorKinds: readonly Connector["kind"][] = ["stair", "escalator"];
+
+/**
+ * A stair or escalator: what it is, how wide (which is how many people a
+ * second it passes, ADR-0008's rule), and whether it runs both ways.
+ */
+export function ConnectorParamGrid({
+  onKindChange,
+  onToggleBidirectional,
+  onWidthChange,
+  selectedConnector,
+  t,
+}: {
+  onKindChange: (kind: Connector["kind"]) => void;
+  onToggleBidirectional: () => void;
+  onWidthChange: (value: number) => void;
+  selectedConnector: Connector;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <div className="editor-param-grid">
+      <span>{selectedConnector.id}</span>
+      <SelectInput
+        label={t("connectorKind")}
+        options={connectorKinds}
+        value={selectedConnector.kind}
+        onChange={onKindChange}
+      />
+      <NumberInput
+        label={t("width")}
+        min={0.6}
+        step={0.1}
+        value={selectedConnector.width}
+        onChange={onWidthChange}
+      />
+      <button type="button" onClick={onToggleBidirectional}>
+        {selectedConnector.bidirectional
+          ? t("connectorBothWays")
+          : `${selectedConnector.fromFloorId} → ${selectedConnector.toFloorId}`}
       </button>
     </div>
   );

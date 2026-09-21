@@ -40,37 +40,42 @@ describe("simulation worker client", () => {
       2,
     )!;
 
-    writeSimulationSharedMemory(sharedMemory, {
-      agentCount: 2,
-      agents: [
-        {
-          id: 11,
-          lifecycleState: "queue",
-          targetX: 9,
-          targetY: 4,
-          vx: 1.5,
-          vy: -0.5,
-          x: 2,
-          y: 3,
-        },
-        {
-          id: 12,
-          lifecycleState: "evacuate",
-          targetX: 7,
-          targetY: 8,
-          vx: 0,
-          vy: 2,
-          x: 5,
-          y: 6,
-        },
-      ],
-      elapsedSeconds: 1.25,
-      exitedCount: 1,
-      spawnedCount: 3,
-      status: "running",
-      stepCount: 75,
-      timeScale: 1,
-    });
+    writeSimulationSharedMemory(
+      sharedMemory,
+      {
+        agentCount: 2,
+        agents: [
+          {
+            id: 11,
+            lifecycleState: "queue",
+            targetX: 9,
+            targetY: 4,
+            vx: 1.5,
+            vy: -0.5,
+            x: 2,
+            y: 3,
+          },
+          {
+            floorId: "upper",
+            id: 12,
+            lifecycleState: "evacuate",
+            targetX: 7,
+            targetY: 8,
+            vx: 0,
+            vy: 2,
+            x: 5,
+            y: 6,
+          },
+        ],
+        elapsedSeconds: 1.25,
+        exitedCount: 1,
+        spawnedCount: 3,
+        status: "running",
+        stepCount: 75,
+        timeScale: 1,
+      },
+      ["ground", "upper"],
+    );
 
     expect(readSimulationSharedMemory(sharedMemory)).toMatchObject({
       agentCount: 2,
@@ -81,6 +86,7 @@ describe("simulation worker client", () => {
       {
         behaviorState: 3,
         flags: 1,
+        floorIndex: -1,
         id: 11,
         targetX: 9,
         targetY: 4,
@@ -92,6 +98,7 @@ describe("simulation worker client", () => {
       {
         behaviorState: 6,
         flags: 1,
+        floorIndex: 1,
         id: 12,
         targetX: 7,
         targetY: 8,

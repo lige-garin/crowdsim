@@ -12,6 +12,7 @@ import type {
 } from "./sceneEditorMutations";
 import {
   BuildingParamGrid,
+  ConnectorParamGrid,
   EntranceParamGrid,
   HazardParamGrid,
   ObstacleParamGrid,
@@ -33,6 +34,7 @@ type Hazard = EditorDocument["hazards"][number];
 type Shop = EditorDocument["shops"][number];
 type ServicePoint = EditorDocument["servicePoints"][number];
 type CountLine = EditorDocument["countLines"][number];
+type Connector = EditorDocument["connectors"][number];
 type Zone = EditorDocument["zones"][number];
 type Entrance = EditorDocument["entrances"][number];
 
@@ -44,6 +46,9 @@ type SceneEditorParamPanelProps = {
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onConnectorKindChange: (kind: Connector["kind"]) => void;
+  onConnectorWidthChange: (value: number) => void;
+  onToggleConnectorBidirectional: () => void;
   onCountLineNameChange: (name: string) => void;
   onHazardKindChange: (kind: Hazard["kind"]) => void;
   onHazardNumberChange: (field: HazardNumberField, value: number) => void;
@@ -74,6 +79,7 @@ type SceneEditorParamPanelProps = {
   onZoneNumberChange: (field: ZoneNumberField, value: number) => void;
   pointsToSvg: (points: CountLine["points"]) => string;
   selectedBuilding: Building | undefined;
+  selectedConnector: Connector | undefined;
   selectedCountLine: CountLine | undefined;
   selectedEntrance: Entrance | undefined;
   selectedHazard: Hazard | undefined;
@@ -91,6 +97,9 @@ export function SceneEditorParamPanel({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onConnectorKindChange,
+  onConnectorWidthChange,
+  onToggleConnectorBidirectional,
   onCountLineNameChange,
   onEntranceKindChange,
   onEntranceProfileChange,
@@ -118,6 +127,7 @@ export function SceneEditorParamPanel({
   onZoneNumberChange,
   pointsToSvg,
   selectedBuilding,
+  selectedConnector,
   selectedCountLine,
   selectedEntrance,
   selectedHazard,
@@ -132,7 +142,15 @@ export function SceneEditorParamPanel({
   return (
     <div className="editor-param-panel" aria-label={t("objectParameterPanel")}>
       <h3>{t("parameters")}</h3>
-      {selectedShop ? (
+      {selectedConnector ? (
+        <ConnectorParamGrid
+          onKindChange={onConnectorKindChange}
+          onToggleBidirectional={onToggleConnectorBidirectional}
+          onWidthChange={onConnectorWidthChange}
+          selectedConnector={selectedConnector}
+          t={t}
+        />
+      ) : selectedShop ? (
         <ShopParamGrid
           onNumberChange={onShopNumberChange}
           onSizeChange={onShopSizeChange}

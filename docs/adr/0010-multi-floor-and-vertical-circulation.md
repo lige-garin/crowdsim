@@ -1,8 +1,9 @@
 # ADR 0010: More than one floor, and how people move between them
 
-- Status: **Proposed** (2026-09-20; rewritten the same day after the first
-  version was found to be wrong — see "Correction" below). Nothing in it is
-  implemented.
+- Status: **Accepted and implemented** (2026-09-21), except lifts, which stay
+  out of scope. What landed, and what it cost, is at the end under
+  "What was built". Proposed 2026-09-20 (rewritten the same day after the first
+  version was found to be wrong — see "Correction" below).
 - Touches: router, movement, engine, editor UI, renderer
 - Related: ADR-0008 (entrance exits), ADR-0009 (demand profiles, groups)
 
@@ -22,22 +23,17 @@ there. What was already **committed** at the time:
   `VerticalConnector.kind: "elevator" | "escalator" | "stairs"`,
   `flattenMultiFloorScene` and `summarizeMultiFloorScene`.
 
-**Uncommitted and in progress as this is rewritten** (files dated 2026-09-20
-23:13–23:15, carrying the note "ADR-0010, stage 1"): `sceneFloors.ts` and
-`sceneEditorFloors.ts`. They unify `floorId` under one `floorIdSchema` across
-ten primitives, and give the editor `activeFloorId` with `addFloor` /
-`setActiveFloor` / `floorLabel`, drawing one floor at a time. Both say plainly
-what they are not: "nobody can move between floors yet; connectors are stage 2
-and do not exist. A floor here is a thing you can draw and look at, not
-somewhere people can go."
+**Built in this change** (files dated 2026-09-20 23:13–23:15, carrying the
+note "ADR-0010, stage 1"): `sceneFloors.ts` and `sceneEditorFloors.ts`. They
+unify `floorId` under one `floorIdSchema` across the spatial primitives, and
+give the editor `activeFloorId` with `addFloor` / `setActiveFloor` /
+`floorLabel`, drawing one floor at a time. Stage 2 (connectors) and the runtime
+that carries agents across them landed in the same change, so the "a floor is
+only something you can draw" wording in the first draft is now false and has
+been struck from the code comments.
 
-So the data model exists in part, and is being completed now. What is missing
-is the layer that runs it — a smaller and more specific problem than "design
-multi-floor support", and the plan below is different because of it.
-
-**Consequence for this document:** the table below describes what is
-committed, so it under-reports stage 1 while that work is uncommitted. Re-read
-it once stage 1 lands.
+So the data model already existed in part; the runtime layer that runs it is
+what this ADR adds.
 
 ## What already exists, and what it can actually do
 
@@ -114,6 +110,66 @@ connectors → editor floor switcher → per-floor rendering.
 - **Benchmarks and calibration are single-level.** Nothing fitted so far
   carries to a multi-level scene.
 
+## What was built (2026-09-21)
+
+All five points of the decision, in the order given. `multifloorScene.ts` went
+the way the orphan rule points: **deleted**, along with the "2 楼层" readiness
+line that counted two copies of the demo scene as a capability.
+
+- **`scene.connectors`**, beside `scene.floors`. Stairs and escalators only:
+  the schema **refuses** `kind: "elevator"`, so no scene can describe a lift
+  that would then be simulated as a staircase. A connector that names an
+  undeclared floor, or joins a floor to itself, is rejected.
+- **`floorRouting.ts`** — a router per floor, connectors as the edges between
+  them, everything costed in **metres of walking** so that "the shop upstairs"
+  and "the shop at the far end" are comparable numbers. Dijkstra over
+  connectors; the per-floor grid routing underneath is unchanged.
+- **`floorTransfers.ts`** — a journey is legs: walk to the connector, cross
+  it, walk on. `targetX`/`targetY` is always the leg being walked, so the
+  social force, the wall constraint and the queueing never learn that floors
+  exist. Someone crossing is held for the flight's travel time and is in no
+  crowd meanwhile. Reaching the stairs on the way to an exit does not count as
+  leaving the building.
+- **One crowd per floor** in the engine, sorted in a single pass, so two people
+  over the same plan coordinates on different floors do not push each other.
+- **The editor draws one floor**, adds floors, and places stairs; the stage
+  watches one floor, with its own crowd and its own heatmap.
+
+### The answers chosen, and what they rest on
+
+1. **Speed on a connector**: along-slope, at a literature-typical speed, with
+   the flight twice the rise (30° pitch, standard for an escalator and mid-range
+   for a public stair). Stairs 0.61 m/s up and 0.694 m/s down — Weidmann (1993),
+   the same survey this project's level walking speed comes from. Escalator
+   0.5 m/s, the usual fitted speed under EN 115. **Not calibrated here**; no
+   stair flow has been measured for this project.
+2. **Escalator capacity**: the entrance rule, width × Weidmann peak specific
+   flow (ADR-0008). A stair mouth and a door are the same constraint, and
+   reusing it adds no new mechanism to justify. People who cannot get on wait
+   at the mouth, which is what a queue for an escalator is.
+3. **Choosing a connector**: shortest total journey in metres, including the
+   ride. **Not** the crowding penalty the evacuation exit choice uses — that
+   penalty is itself a guess, and stacking a second guess on it would make the
+   result harder to argue about, not better.
+4. **Phased evacuation**: still not modelled. An alarm sends everyone to an
+   exit, and people upstairs route down through connectors. Whether a real
+   building would evacuate the other floors at all is a safety claim this
+   project has no basis for.
+
+### Cost
+
+Measured on the corridor harness (881 people, best of six rounds, the method in
+CLAUDE.md), interleaved in one run so that drift hits both:
+
+- one floor: **0.56–0.70 ms/step**
+- two floors, everyone on the ground: **0.65–0.74 ms/step**
+
+So declaring floors costs roughly **a tenth of a millisecond a step** at ~880
+people. Against HEAD before this change (0.53–0.56 on the same harness), the
+one-floor path is unchanged as far as this method can tell: repeats of a single
+build varied more than the two builds differ. The 2.42 ms figure in CLAUDE.md
+is a different scene and is not comparable to these.
+
 ## Open questions
 
 1. Does `elevationMeters` change walking speed on a connector, and by what?
@@ -125,5 +181,16 @@ connectors → editor floor switcher → per-floor rendering.
 4. Does a fire on level 3 evacuate levels 1 and 2? Real phased evacuation does
    not, and getting this wrong is a safety claim.
 
-None of these has evidence in this repository. Any answer chosen now is a
-guess, and per this project's rules it has to be written down as one.
+None of these had evidence in this repository when they were asked. Questions
+1–3 were answered above and are written down as what they are; question 4 is
+still open, and nothing in the code pretends otherwise.
+
+### Left for later
+
+- **Lifts**, needing a batch-service model of their own.
+- **A connector as a place with a length.** It is a point at each end: someone
+  crossing is held at the mouth they stepped on rather than drawn on the
+  treads, so a busy escalator has a queue but no visible line on it.
+- **Nothing recalibrated for a stack.** Every fitted parameter and every
+  benchmark in this repository is single-floor, and no claim about a
+  multi-floor building's flow should be read out of them.

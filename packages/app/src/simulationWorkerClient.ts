@@ -10,7 +10,7 @@ import {
   type SimulationSnapshot,
 } from "./simulationEngine";
 const sharedHeaderIntCount = 8;
-const sharedIntLaneCount = 3;
+const sharedIntLaneCount = 4;
 const sharedFloatLaneCount = 6;
 const sharedVersion = 1;
 const headerStatusIndex = 0;
@@ -31,6 +31,12 @@ export type SimulationSharedAgentFrame = {
     Pick<SimulationAgent, "id" | "targetX" | "targetY" | "vx" | "vy" | "x" | "y"> & {
       behaviorState: number;
       flags: number;
+      /**
+       * Which floor they are on, as a place in the scene's floors (ADR-0010):
+       * -1 in a scene with none. An index rather than an id because this is a
+       * shared integer buffer, and the order is the scene's own.
+       */
+      floorIndex: number;
     }
   >;
   capacity: number;
@@ -170,6 +176,8 @@ export function createSimulationSharedMemoryView(
 export function writeSimulationSharedMemory(
   sharedMemory: SimulationWorkerSharedMemory | undefined,
   snapshot: SimulationSnapshot,
+  /** The scene's floors in order, so each agent's floor can go in as an index. */
+  floorIds: readonly string[] = [],
 ) {
   if (!sharedMemory || typeof Atomics !== "object") {
     return;
@@ -190,7 +198,7 @@ export function writeSimulationSharedMemory(
   );
   Atomics.store(sharedMemory.view, headerCapacityIndex, sharedMemory.capacity);
   Atomics.store(sharedMemory.view, headerVersionIndex, sharedVersion);
-  writeSimulationSharedAgents(sharedMemory, snapshot.agents);
+  writeSimulationSharedAgents(sharedMemory, snapshot.agents, floorIds);
 }
 export function readSimulationSharedMemory(sharedMemory: SimulationWorkerSharedMemory) {
   return {
@@ -237,6 +245,10 @@ export function readSimulationSharedAgents(
         sharedMemory.view,
         intLaneOffset("agentId", index, sharedMemory.capacity),
       ),
+      floorIndex: Atomics.load(
+        sharedMemory.view,
+        intLaneOffset("floorIndex", index, sharedMemory.capacity),
+      ),
       targetX: floatView[floatLaneOffset("targetX", index, sharedMemory.capacity)],
       targetY: floatView[floatLaneOffset("targetY", index, sharedMemory.capacity)],
       vx: floatView[floatLaneOffset("velocityX", index, sharedMemory.capacity)],
@@ -253,6 +265,7 @@ export function readSimulationSharedAgents(
 function writeSimulationSharedAgents(
   sharedMemory: SimulationWorkerSharedMemory,
   agents: readonly SimulationAgent[],
+  floorIds: readonly string[],
 ) {
   const floatView = new Float32Array(sharedMemory.buffer);
   const count = Math.min(agents.length, sharedMemory.capacity);
@@ -281,6 +294,11 @@ function writeSimulationSharedAgents(
       intLaneOffset("flags", index, sharedMemory.capacity),
       1,
     );
+    Atomics.store(
+      sharedMemory.view,
+      intLaneOffset("floorIndex", index, sharedMemory.capacity),
+      agent.floorId === undefined ? -1 : floorIds.indexOf(agent.floorId),
+    );
     floatView[floatLaneOffset("positionX", index, sharedMemory.capacity)] = agent.x;
     floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)] = agent.y;
     floatView[floatLaneOffset("velocityX", index, sharedMemory.capacity)] = agent.vx;
@@ -289,7 +307,7 @@ function writeSimulationSharedAgents(
     floatView[floatLaneOffset("targetY", index, sharedMemory.capacity)] = agent.targetY;
   }
 }
-type IntLane = "agentId" | "behaviorState" | "flags";
+type IntLane = "agentId" | "behaviorState" | "flags" | "floorIndex";
 type FloatLane =
   | "positionX"
   | "positionY"
@@ -302,6 +320,7 @@ function intLaneOffset(lane: IntLane, agentIndex: number, capacity: number) {
     agentId: 0,
     behaviorState: 1,
     flags: 2,
+    floorIndex: 3,
   };
   return sharedHeaderIntCount + laneIndex[lane] * capacity + agentIndex;
 }

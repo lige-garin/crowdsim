@@ -58,6 +58,15 @@ export const messages = {
   controlRoom: { zh: "控制台", en: "Control Room" },
   counter: { zh: "柜台", en: "Counter" },
   counterShort: { zh: "CTR", en: "CTR" },
+  connector: { zh: "楼梯/扶梯", en: "Stairs" },
+  connectorKind: { zh: "类型", en: "Kind" },
+  connectorStair: { zh: "楼梯", en: "Stairs" },
+  connectorEscalator: { zh: "扶梯", en: "Escalator" },
+  connectorBothWays: { zh: "双向", en: "Both ways" },
+  connectorNeedsTwoFloors: {
+    zh: "先加一层，楼梯要连两层",
+    en: "Add a floor first: a stair joins two",
+  },
   countLine: { zh: "计数线", en: "Count line" },
   countLines: { zh: "计数线", en: "Count lines" },
   countLineShort: { zh: "COUNT", en: "COUNT" },
@@ -104,6 +113,16 @@ export const messages = {
   exportedScene: { zh: "Exported .csim.json", en: "Exported .csim.json" },
   finishWall: { zh: "完成墙体", en: "Finish wall" },
   floors: { zh: "楼层", en: "Floors" },
+  storeys: { zh: "层数", en: "Storeys" },
+  floorAdd: { zh: "加一层", en: "Add floor" },
+  floorsAllSimulated: {
+    zh: "层，全部参与仿真",
+    en: "floors, all simulated",
+  },
+  floorsNote: {
+    zh: "用楼梯/扶梯连通；电梯未建模",
+    en: "Joined by stairs and escalators; lifts not modelled",
+  },
   flow: { zh: "流量", en: "Flow" },
   flowField: { zh: "流场", en: "Flow field" },
   flowFieldVerified: { zh: "Flow field verified", en: "Flow field verified" },
@@ -323,6 +342,7 @@ export const cleanZhOverrides: Partial<Record<TranslationKey, string>> = {};
 export const zhOverrides: Partial<Record<TranslationKey, string>> = {};
 export const editorToolKeys: Record<string, TranslationKey> = {
   building: "building",
+  connector: "connector",
   countLine: "countLine",
   counter: "counter",
   gate: "gate",

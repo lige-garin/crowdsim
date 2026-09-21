@@ -25,6 +25,7 @@ const TOOL_GLYPH: Record<EditorTool, string> = {
   obstacle: "OB",
   hazard: "HZ",
   countLine: "CL",
+  connector: "ST",
 };
 
 type DocumentCounts = {

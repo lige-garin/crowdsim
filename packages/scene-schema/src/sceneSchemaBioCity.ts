@@ -1,6 +1,7 @@
 ﻿import { z } from "zod";
 import {
   customParametersSchema,
+  floorIdSchema,
   idSchema,
   openingHoursSchema,
   pointSchema,
@@ -12,7 +13,7 @@ import {
 export const roadSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   geometry: polylineSchema,
   widthMeters: z.number().positive().default(6),
   direction: z.enum(["oneWayBackward", "oneWayForward", "twoWay"]).default("twoWay"),
@@ -38,7 +39,7 @@ export const buildingKindSchema = z.enum([
 export const buildingSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   zoneId: idSchema.optional(),
   kind: buildingKindSchema.default("mixedUse"),
   footprint: polygonSchema,
@@ -56,7 +57,7 @@ export const buildingSchema = z.object({
 export const transitStopSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   roadId: idSchema.optional(),
   kind: z.enum(["bus", "metro", "rideHail", "shuttle", "taxi", "tram"]),
   position: pointSchema,
@@ -73,7 +74,7 @@ export const transitStopSchema = z.object({
 export const obstacleSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   kind: z.enum([
     "constructionBarrier",
     "debris",
@@ -93,6 +94,7 @@ export const hazardSchema = z
   .object({
     id: idSchema,
     name: z.string().min(1).optional(),
+    floorId: floorIdSchema,
     kind: z.enum([
       "crowdSurge",
       "fire",

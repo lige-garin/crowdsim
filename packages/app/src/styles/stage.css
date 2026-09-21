@@ -513,7 +513,9 @@
 
 .workspace .stage-tab-edit .scene-editor {
   min-height: 0;
-  grid-template-rows: auto auto auto minmax(120px, 1fr) auto;
+  /* file bar, tools, status, floor bar, plan, parameters. The plan is the row
+     that takes what is left; every other row is its own content's height. */
+  grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
 }
 
 /* The editor canvas keeps the scene's aspect ratio, so a short wide box

@@ -1,4 +1,4 @@
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { sceneFloors, type CrowdSimScene } from "@crowdsim/scene-schema";
 import type {
   AgentStateProbeState,
   DecisionRuntimeState,
@@ -55,6 +55,27 @@ type SystemSignalOptions = {
   workerRuntime: SimulationWorkerControllerState;
 };
 
+/**
+ * How many floors a scene has, all of which a run simulates (ADR-0010).
+ * Nothing when the scene has no floors: there is one plane, and saying so
+ * would be noise.
+ */
+export function floorSignals(
+  scene: CrowdSimScene,
+  t: (key: TranslationKey) => string,
+): SystemSignal[] {
+  const floors = sceneFloors(scene);
+
+  return floors.length === 0
+    ? []
+    : [
+        {
+          label: t("floors"),
+          value: `${floors.length} ${t("floorsAllSimulated")}`,
+        },
+      ];
+}
+
 export function createSystemSignals({
   agentStateProbe,
   behaviorSmokeValue,
@@ -99,6 +120,7 @@ export function createSystemSignals({
       label: t("sceneSchema"),
       value: `${formatSceneName(scene, language)} ${t("valid")}`,
     },
+    ...floorSignals(scene, t),
     {
       label: t("movementBackend"),
       value: `${movementBackend} active @ ${simulationRuntimeProfile.movementHz}Hz`,

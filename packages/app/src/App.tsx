@@ -1,4 +1,4 @@
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { sceneFloors, sceneOnFloor, type CrowdSimScene } from "@crowdsim/scene-schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
 import { AppWorkbench } from "./AppWorkbench";
@@ -8,7 +8,7 @@ import { createHudReadouts } from "./appTopbarMetrics";
 import { createDashboardStats } from "./dashboardStats";
 import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
-import { createHeatmapCellsFromSamples } from "./heatmap";
+import { createHeatmapCellsFromSamples, heatmapSamplesOnFloor } from "./heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
@@ -132,14 +132,33 @@ function AppContent() {
     label: "Normal",
     startedAtSeconds: 0,
   });
+  const floors = useMemo(() => sceneFloors(scene), [scene]);
+  const [watchedFloorId, setWatchedFloorId] = useState<string | undefined>(undefined);
+  // Falls back to the ground floor whenever the scene has no such floor: a
+  // scene swap or an edit can remove the one being watched.
+  const watchedIndex = floors.findIndex((floor) => floor.id === watchedFloorId);
+  const viewFloorIndex = floors.length === 0 ? -1 : Math.max(0, watchedIndex);
+  const viewFloorId = floors[viewFloorIndex]?.id;
+  const viewFloor = useMemo(
+    () => (viewFloorId ? { id: viewFloorId, index: viewFloorIndex } : undefined),
+    [viewFloorId, viewFloorIndex],
+  );
+  const viewScene = useMemo(
+    () => (viewFloorId ? (sceneOnFloor(scene, viewFloorId) ?? scene) : scene),
+    [scene, viewFloorId],
+  );
+  const floorHeatmapSamples = useMemo(
+    () => heatmapSamplesOnFloor(heatmapSamples, viewFloorId),
+    [heatmapSamples, viewFloorId],
+  );
   const heatmapCells = useMemo(
     () =>
       // 2 m cells: the grid Fruin level of service is read on (runAnalytics).
-      createHeatmapCellsFromSamples(scene, heatmapSamples, {
+      createHeatmapCellsFromSamples(viewScene, floorHeatmapSamples, {
         cellSize: 2,
         windowSeconds: heatmapWindowSeconds,
       }),
-    [heatmapSamples, heatmapWindowSeconds, scene],
+    [floorHeatmapSamples, heatmapWindowSeconds, viewScene],
   );
   const densityPeak = useMemo(
     () => heatmapCells.reduce((peak, cell) => Math.max(peak, cell.count), 0),
@@ -455,6 +474,10 @@ function AppContent() {
             onApplyScene: applyScene,
             onEditorToolChange: selectEditorTool,
             onPlaceInWorld: worldBuilding.place,
+            floors,
+            viewFloor,
+            onSelectViewFloor: setWatchedFloorId,
+            viewScene,
             scene: scene,
             crowd: liveCrowd,
             stageTab,

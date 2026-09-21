@@ -2,10 +2,17 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { clampPointToWorld, type SceneWorldBounds } from "./sceneGeometry";
 import { sampleBodyRadius, sampleSpeedFactor } from "./behaviorDistributions";
-import { createRouter } from "./crowdNavigation";
+import { createRouter, type Router } from "./crowdNavigation";
+import { createFloorGraph, type ConnectorRuntime } from "./floorRouting";
+import {
+  createConnectorTraffic,
+  isRiding,
+  planFloorLegs,
+  stepConnectorTravel,
+} from "./floorTransfers";
 import { stepCrowd } from "./crowdMovement";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
-import { createWallIndex } from "./wallIndex";
+import { createWallIndex, type WallIndex } from "./wallIndex";
 import { crowdBudget } from "./crowdBudget";
 import {
   applySimulationAgentDecisions,
@@ -22,6 +29,7 @@ import { mulberry32, samplePoisson } from "./simulationEngineRandom";
 import {
   defaultSpeedMetersPerSecond,
   deriveSceneGeometry,
+  type SceneFloorGeometry,
   type SceneGeometry,
 } from "./simulationSceneConfig";
 import { reconcileAgentsWithScene } from "./simulationSceneReconcile";
@@ -66,9 +74,26 @@ export type SimulationAgent = {
   radius?: number;
   /** Free walking speed relative to the scene's mean, drawn at spawn. */
   speedFactor?: number;
+  /** The floor this person is on (ADR-0010); absent in a one-floor scene. */
+  floorId?: string;
+  /**
+   * Where this person is really going when that is on another floor, with the
+   * connector they are crossing to reach it. While this is set, `targetX`/
+   * `targetY` are the near end of that connector — the leg being walked now.
+   */
+  transfer?: {
+    connectorId: string;
+    finalX: number;
+    finalY: number;
+    floorId: string;
+  };
+  /** Set while on a connector: the time they step off it. */
+  ridingUntilSeconds?: number;
 };
 export type SimulationSource = {
   id: string;
+  /** The floor people arrive on; absent in a scene with one floor. */
+  floorId?: string;
   position: ScenePoint;
   width: number;
   arrivalRatePerSecond: number;
@@ -84,11 +109,17 @@ export type SimulationSource = {
 };
 export type SimulationSink = {
   id: string;
+  /** The floor the exit is on; absent in a scene with one floor. */
+  floorId?: string;
   position: ScenePoint;
   radius: number;
 };
 export type SimulationEngineConfig = {
   decisionBackend?: SimulationDecisionBackend;
+  /** Every floor's plane. A config without it is one floor: `walls` + `world`. */
+  floors?: SceneFloorGeometry[];
+  /** One-way ways between floors (ADR-0010). */
+  connectors?: ConnectorRuntime[];
   fixedDtSeconds?: number;
   maxAgents?: number;
   seed?: number;
@@ -230,9 +261,45 @@ export function createSimulationEngine(
   let shops = config.shops ?? [];
   let servicePoints = config.servicePoints ?? [];
   const seed = config.seed ?? 1;
-  let world = config.world;
-  let router = createRouter(world, config.walls ?? []);
-  let wallIndex = createWallIndex(config.walls ?? []);
+  /**
+   * One routable plane per floor. A scene with no floors has exactly one, with
+   * an undefined id, so stepping a crowd is the same code either way.
+   */
+  type FloorRuntime = {
+    id?: string;
+    router: Router;
+    walls: WallIndex;
+    world?: SceneWorldBounds;
+  };
+  function buildFloors(geometry: {
+    floors?: SceneFloorGeometry[];
+    walls?: WallSegment[];
+    world?: SceneWorldBounds;
+  }): FloorRuntime[] {
+    const planes = geometry.floors?.length
+      ? geometry.floors
+      : [{ id: undefined, walls: geometry.walls ?? [], world: geometry.world }];
+
+    return planes.map((plane) => ({
+      id: plane.id,
+      router: createRouter(plane.world, plane.walls),
+      walls: createWallIndex(plane.walls),
+      world: plane.world,
+    }));
+  }
+  let floors = buildFloors(config);
+  let connectors = config.connectors ?? [];
+  let floorGraph = createFloorGraph({
+    connectors,
+    meanSpeedMetersPerSecond: speedMetersPerSecond,
+    routerFor: (floorId) => floorRuntime(floorId)?.router,
+  });
+  let connectorTraffic = createConnectorTraffic(connectors);
+  function floorRuntime(floorId: string | undefined) {
+    return floors.find((floor) => floor.id === floorId) ?? floors[0];
+  }
+  /** The floor anything with no floor of its own belongs to. */
+  const baseFloor = () => floors[0]?.id;
   let rng = mulberry32(seed);
   let status: SimulationStatus = "paused";
   let elapsedSeconds = 0;
@@ -289,22 +356,33 @@ export function createSimulationEngine(
     jitter: number,
     group: { groupId?: number; speedFactor?: number },
   ) {
+    const floorId = source.floorId ?? baseFloor();
     const spawnPoint = clampPointToWorld(
       {
         x: source.position.x,
         y: source.position.y + jitter,
       },
-      world,
+      floorRuntime(floorId).world,
     );
     const x = spawnPoint.x;
     const y = spawnPoint.y;
-    const sink = nearestAllowedSink({ x, y }, sinks, source.exitIds);
+    // An arrival heads for an exit on their own floor when there is one: a
+    // person who has just walked in is not looking for the stairs.
+    const ownFloor = sinks.filter(
+      (sink) => (sink.floorId ?? null) === (floorId ?? null),
+    );
+    const sink = nearestAllowedSink(
+      { x, y },
+      ownFloor.length > 0 ? ownFloor : sinks,
+      source.exitIds,
+    );
     const id = nextAgentId++;
     agents.push({
       ...(source.exitIds && source.exitIds.length > 0
         ? { exitIds: source.exitIds }
         : {}),
       id,
+      ...(floorId === undefined ? {} : { floorId }),
       ...(group.groupId === undefined ? {} : { groupId: group.groupId }),
       radius: sampleBodyRadius(seed, id),
       speedFactor: group.speedFactor ?? sampleSpeedFactor(seed, id),
@@ -359,11 +437,14 @@ export function createSimulationEngine(
         servicePoints,
         evacuationActive,
         evacuationStartedSeconds,
-        routeDistance: router.distance,
+        routeDistance: floorGraph.distance,
       }),
       decisionTick,
     );
     agents = followLeaders(agents, splitGroups(agents).leaders);
+    // A decision can send someone to another floor; this turns that into the
+    // leg they walk now (floorTransfers).
+    agents = planFloorLegs(agents, floorGraph, sinks);
   }
   /**
    * Arrivals enter through their entrance no faster than it can pass people:
@@ -404,24 +485,54 @@ export function createSimulationEngine(
     // Only handed over during an evacuation, so a normal step allocates
     // nothing for the per-exit tally.
     const exitedSinkIds: string[] = [];
-    const result = stepCrowd({
-      agents,
-      dtSeconds: fixedDtSeconds,
-      replanAnticipation: stepCount % anticipationReplanSteps === 0,
-      // Every agent is spawned with an exit, and reconciliation re-points it
-      // whenever that exit is removed.
-      exitRadius: (agent) =>
-        sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
-      exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
-      isExitBound,
-      meanSpeedMetersPerSecond: speedMetersPerSecond,
-      router,
-      seed,
-      walls: wallIndex,
-      world,
+    // People on a staircase or escalator are not in any crowd: they are on the
+    // treads, and they come back at the far end (floorTransfers).
+    const riding = agents.filter(isRiding);
+    const walking = riding.length === 0 ? agents : agents.filter((a) => !isRiding(a));
+    const stepped: SimulationAgent[] = [];
+
+    for (const floor of floors) {
+      // One floor's crowd pushes only itself: two people standing over the
+      // same plan coordinates on different floors are not near each other.
+      const onFloor =
+        floors.length === 1
+          ? walking
+          : walking.filter((agent) => (agent.floorId ?? baseFloor()) === floor.id);
+
+      if (onFloor.length === 0) {
+        continue;
+      }
+
+      const result = stepCrowd({
+        agents: onFloor,
+        dtSeconds: fixedDtSeconds,
+        replanAnticipation: stepCount % anticipationReplanSteps === 0,
+        // Every agent is spawned with an exit, and reconciliation re-points it
+        // whenever that exit is removed.
+        exitRadius: (agent) =>
+          sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
+        exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
+        isExitBound,
+        meanSpeedMetersPerSecond: speedMetersPerSecond,
+        router: floor.router,
+        seed,
+        walls: floor.walls,
+        world: floor.world,
+      });
+
+      stepped.push(...result.agents);
+      exitedCount += result.exitedCount;
+    }
+
+    connectorTraffic.replenish(fixedDtSeconds);
+    agents = stepConnectorTravel({
+      agents: riding.length === 0 ? stepped : [...stepped, ...riding],
+      connectors,
+      elapsedSeconds,
+      graph: floorGraph,
+      sinks,
+      traffic: connectorTraffic,
     });
-    agents = result.agents;
-    exitedCount += result.exitedCount;
     if (evacuationActive && exitedSinkIds.length > 0) {
       for (const sinkId of exitedSinkIds) {
         evacuationExits.set(sinkId, (evacuationExits.get(sinkId) ?? 0) + 1);
@@ -443,6 +554,11 @@ export function createSimulationEngine(
    * spawned pointing at a sink, so reaching one is still the exit.
    */
   function isExitBound(agent: SimulationAgent) {
+    // Walking to the stairs on the way to an exit downstairs is not arriving
+    // at that exit: without this, reaching the stairs would count as leaving.
+    if (agent.transfer) {
+      return false;
+    }
     if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
       return true;
     }
@@ -460,12 +576,21 @@ export function createSimulationEngine(
       sinks = geometry.sinks;
       sources = geometry.sources;
       speedMetersPerSecond = geometry.speedMetersPerSecond;
-      world = geometry.world;
-      router = createRouter(world, geometry.walls);
-      wallIndex = createWallIndex(geometry.walls);
+      floors = buildFloors(geometry);
+      connectors = geometry.connectors ?? [];
+      connectorTraffic = createConnectorTraffic(connectors);
+      floorGraph = createFloorGraph({
+        connectors,
+        meanSpeedMetersPerSecond: speedMetersPerSecond,
+        routerFor: (floorId) => floorRuntime(floorId)?.router,
+      });
       // Stranded agents (no exit left anywhere) leave the run but are not
       // exits: counting them would report an evacuation that never happened.
-      agents = reconcileAgentsWithScene(agents, geometry);
+      agents = planFloorLegs(
+        reconcileAgentsWithScene(agents, geometry),
+        floorGraph,
+        sinks,
+      );
       return makeSnapshot();
     },
     reset() {

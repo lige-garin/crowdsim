@@ -5,6 +5,14 @@ export const idSchema = z
   .min(1)
   .regex(/^[a-zA-Z0-9_-]+$/, "IDs may contain letters, numbers, '_' and '-'");
 
+/**
+ * The floor a primitive sits on, naming an entry in the scene's `floors`. A
+ * scene with no floors is one unnamed floor and every primitive is on it, which
+ * is every scene written before floors existed — so this stays optional, and an
+ * absent value never means "nowhere".
+ */
+export const floorIdSchema = idSchema.optional();
+
 export const pointSchema = z.object({
   x: z.number().finite(),
   y: z.number().finite(),
@@ -25,6 +33,7 @@ export const polygonSchema = z.object({
 export const wallSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   geometry: z.discriminatedUnion("type", [polylineSchema, polygonSchema]),
   thickness: z.number().positive().default(0.2),
 });
@@ -32,6 +41,7 @@ export const wallSchema = z.object({
 export const entranceSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   kind: z.enum(["source", "sink", "bidirectional"]),
   position: pointSchema,
   width: z.number().positive(),
@@ -62,6 +72,7 @@ export const entranceSchema = z.object({
 export const areaSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   kind: z.enum(["walkable", "blocked"]).default("walkable"),
   geometry: polygonSchema,
 });
@@ -69,6 +80,7 @@ export const areaSchema = z.object({
 export const targetSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   position: pointSchema,
   radius: z.number().positive().default(1),
 });
@@ -143,7 +155,7 @@ export const basemapCalibrationSchema = z
 export const basemapSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   kind: z.enum(["cad", "image", "pdf", "tiles"]).default("image"),
   sourceUri: z.string().min(1),
   opacity: z.number().min(0).max(1).default(0.65),
@@ -260,7 +272,7 @@ export const zoneCategorySchema = z.enum([
 export const zoneSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   category: zoneCategorySchema.default("mixed"),
   geometry: polygonSchema,
   walkable: z.boolean().default(true),
@@ -274,7 +286,7 @@ export const zoneSchema = z.object({
 export const storeLotSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   zoneId: idSchema.optional(),
   shopId: idSchema.optional(),
   geometry: polygonSchema,
@@ -327,7 +339,7 @@ export const openingHoursSchema = z
 export const shopSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  floorId: idSchema.optional(),
+  floorId: floorIdSchema,
   zoneId: idSchema.optional(),
   storeLotId: idSchema.optional(),
   position: pointSchema,
@@ -351,6 +363,7 @@ export const shopSchema = z.object({
 export const servicePointSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   kind: z.enum(["counter", "gate"]),
   position: pointSchema,
   width: z.number().positive().default(3),
@@ -366,10 +379,47 @@ export const servicePointSchema = z.object({
 export const countLineSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
   geometry: z.object({
     type: z.literal("polyline"),
     points: z.array(pointSchema).length(2),
   }),
+});
+
+/**
+ * A way between two floors: stairs or an escalator (ADR-0010, stage 2).
+ *
+ * **Lifts are deliberately not here.** A lift is a queue with a batch service —
+ * people wait, a car arrives, some number board, it travels, they get out —
+ * and modelling it as a sloped walk gives an answer that looks reasonable and
+ * is wrong. It needs a service model of its own, and until it has one the
+ * schema refuses to accept one rather than letting a scene describe a lift
+ * that would be simulated as a staircase.
+ */
+export const connectorSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).optional(),
+  kind: z.enum(["stair", "escalator"]),
+  /** Where someone steps on, and which floor they step on from. */
+  from: z.object({ floorId: idSchema, point: pointSchema }),
+  /** Where they step off, and onto which floor. */
+  to: z.object({ floorId: idSchema, point: pointSchema }),
+  /**
+   * Clear walking width in metres. How many people a second it can pass is
+   * this times Weidmann's peak specific flow — the same rule entrances use
+   * (ADR-0008), because a stair mouth and a door are the same constraint.
+   */
+  width: z.number().positive().default(1.2),
+  /**
+   * Both ways, or only from `from` to `to`. An escalator runs one way; a
+   * staircase is walked in both directions unless a scene says otherwise.
+   */
+  bidirectional: z.boolean().default(false),
+  /**
+   * Travel speed along the flight, m/s. Absent: a literature-typical value for
+   * the kind (see `connectorTravelSeconds`), **not calibrated here**.
+   */
+  speedMetersPerSecond: z.number().positive().optional(),
 });
 
 export const environmentFactorSchema = z

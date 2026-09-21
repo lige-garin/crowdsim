@@ -1,9 +1,16 @@
 import { walkingGroupParameters } from "./walkingGroups";
 import type { WallSegment } from "@crowdsim/core-gpu";
-import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import {
+  resolveFloorId,
+  sceneFloors,
+  sceneOnFloor,
+  type CrowdSimScene,
+} from "@crowdsim/scene-schema";
+import { connectorTravelSeconds, type ConnectorRuntime } from "./floorRouting";
 import { createBrandStoresFromScene } from "./brandAttraction";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
+import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
 import { wallSegmentsFromScene, type SceneWorldBounds } from "./sceneGeometry";
 import type {
   SimulationDecisionBackend,
@@ -34,8 +41,20 @@ function unitVector(from: { x: number; y: number }, to: { x: number; y: number }
  * `CrowdSimScene`, which is what lets a running engine swap geometry in place
  * (ADR-0007): derive this again, hand it over, keep the agents.
  */
+/** One floor's own plane: what a walker on it can be blocked by, and how big it is. */
+export type SceneFloorGeometry = {
+  /** Absent in a scene that declares no floors, where there is one plane. */
+  id?: string;
+  walls: WallSegment[];
+  world?: SceneWorldBounds;
+};
+
 export type SceneGeometry = {
   decisionBackend?: SimulationDecisionBackend;
+  /** Every floor's plane. Always at least one, so the engine has no special case. */
+  floors: SceneFloorGeometry[];
+  /** The ways between floors, each already one-way (ADR-0010). */
+  connectors: ConnectorRuntime[];
   servicePoints: SimulationServicePoint[];
   shops: SimulationShop[];
   sinks: SimulationSink[];
@@ -55,7 +74,7 @@ export type SceneGeometryOverrides = {
 };
 
 export function deriveSceneGeometry(
-  scene: CrowdSimScene,
+  fullScene: CrowdSimScene,
   overrides: SceneGeometryOverrides,
   /**
    * The default behaviour backend's random stream. Passed in so a hot update
@@ -64,7 +83,11 @@ export function deriveSceneGeometry(
    */
   random: () => number,
 ): SceneGeometry {
+  const scene = fullScene;
   const environmentImpact = calculateEnvironmentImpact(scene, 0);
+  // Absent means the base floor, so everything the engine compares — an
+  // agent's floor, a shop's, an exit's — is the same kind of value.
+  const floorOf = (entity: { floorId?: string }) => resolveFloorId(scene, entity);
   // Precedence: explicit override > scene-persisted field > engine default.
   const baseSpeed =
     overrides.speedMetersPerSecond ??
@@ -76,6 +99,7 @@ export function deriveSceneGeometry(
     const queuePosition = shop.queueAnchor ?? door;
     return {
       id: shop.id,
+      floorId: floorOf(shop),
       position: door,
       radius: Math.max(2, Math.max(shop.size.width, shop.size.height) / 2),
       attraction: shop.attraction,
@@ -107,6 +131,7 @@ export function deriveSceneGeometry(
       }),
     servicePoints: scene.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
+      floorId: floorOf(servicePoint),
       position: servicePoint.position,
       radius: Math.max(2, servicePoint.width / 2),
       serviceSeconds: servicePoint.serviceMeanSeconds,
@@ -126,6 +151,7 @@ export function deriveSceneGeometry(
         .filter((entrance) => entrance.kind !== "source")
         .map((entrance) => ({
           id: entrance.id,
+          floorId: floorOf(entrance),
           position: entrance.position,
           radius: Math.max(1, entrance.width / 2),
         })),
@@ -141,6 +167,7 @@ export function deriveSceneGeometry(
         )
         .map((entrance) => ({
           id: entrance.id,
+          floorId: floorOf(entrance),
           position: entrance.position,
           width: entrance.width,
           arrivalRatePerSecond: entrance.arrivalRatePerMinute / 60,
@@ -155,7 +182,96 @@ export function deriveSceneGeometry(
           exitIds: entrance.exitIds,
         })),
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
+    floors: sceneFloorGeometries(scene, overrides),
+    connectors: sceneConnectorRuntimes(scene),
     walls: overrides.walls ?? wallSegmentsFromScene(scene),
     world: overrides.world ?? scene.world,
   };
+}
+
+/**
+ * One plane per floor, each holding only what stands on it.
+ *
+ * A scene with no floors gets a single unnamed plane, which is the whole scene
+ * — so the engine steps every crowd the same way and nothing has to ask
+ * whether this scene has floors.
+ */
+export function sceneFloorGeometries(
+  scene: CrowdSimScene,
+  overrides: SceneGeometryOverrides = {},
+): SceneFloorGeometry[] {
+  const floors = sceneFloors(scene);
+
+  if (floors.length === 0) {
+    return [
+      {
+        id: undefined,
+        walls: overrides.walls ?? wallSegmentsFromScene(scene),
+        world: overrides.world ?? scene.world,
+      },
+    ];
+  }
+
+  return floors.map((floor) => {
+    const onFloor = sceneOnFloor(scene, floor.id) ?? scene;
+
+    return {
+      id: floor.id,
+      walls: wallSegmentsFromScene(onFloor),
+      world: overrides.world ?? onFloor.world,
+    };
+  });
+}
+
+/**
+ * A scene's connectors as the engine uses them: **one-way each**. A staircase
+ * marked `bidirectional` becomes two, because a walker only ever travels one
+ * of the two directions and the router should not have to ask which.
+ */
+export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[] {
+  const elevationOf = (floorId: string) =>
+    scene.floors.find((floor) => floor.id === floorId)?.elevationMeters ?? 0;
+  const runtimes: ConnectorRuntime[] = [];
+
+  for (const connector of scene.connectors) {
+    const rise =
+      elevationOf(connector.to.floorId) - elevationOf(connector.from.floorId);
+    // How many people a second a stair mouth can pass: the same width rule as
+    // an entrance (ADR-0008), because it is the same constraint.
+    const admitPerSecond = connector.width * weidmannMaxSpecificFlow;
+
+    runtimes.push({
+      id: connector.id,
+      kind: connector.kind,
+      fromFloorId: connector.from.floorId,
+      fromPoint: connector.from.point,
+      toFloorId: connector.to.floorId,
+      toPoint: connector.to.point,
+      travelSeconds: connectorTravelSeconds(
+        connector.kind,
+        rise,
+        connector.speedMetersPerSecond,
+      ),
+      admitPerSecond,
+    });
+
+    if (connector.bidirectional) {
+      runtimes.push({
+        id: `${connector.id}:down`,
+        kind: connector.kind,
+        fromFloorId: connector.to.floorId,
+        fromPoint: connector.to.point,
+        toFloorId: connector.from.floorId,
+        toPoint: connector.from.point,
+        travelSeconds: connectorTravelSeconds(
+          connector.kind,
+          -rise,
+          connector.speedMetersPerSecond,
+        ),
+        admitPerSecond,
+      });
+    }
+  }
+
+  return runtimes;
 }

@@ -39,6 +39,7 @@ import {
   type EditorDocument,
   type EditorTool,
 } from "./sceneEditorState";
+import { addFloor, setActiveFloor } from "./sceneEditorFloors";
 import { downloadSceneJson } from "./sceneFileExport";
 import { createSceneEditorParamActions } from "./SceneEditorParamActions";
 import { fileNameValues, makeStatus, sceneNameValues } from "./sceneEditorStatus";
@@ -227,6 +228,9 @@ export function SceneEditor({
     (point) => point.id === selectedId,
   );
   const selectedCountLine = document.countLines.find((line) => line.id === selectedId);
+  const selectedConnector = document.connectors.find(
+    (connector) => connector.id === selectedId,
+  );
   function replaceScene(nextScene: CrowdSimScene, status: LocalizedText) {
     const replaced = createEditorDocumentFromScene(nextScene);
     setBaseScene(nextScene);
@@ -262,6 +266,20 @@ export function SceneEditor({
     setRedoStack([]);
     setDocument(nextDocument);
   }
+  function addFloorAbove() {
+    commit(addFloor(document));
+    setSelectedId(null);
+    setDraftWallPoints([]);
+  }
+  function selectFloor(floorId: string) {
+    const next = setActiveFloor(document, floorId);
+    if (next === document) {
+      return;
+    }
+    setDocument(next);
+    setSelectedId(null);
+    setDraftWallPoints([]);
+  }
   function undo() {
     const previous = undoStack.at(-1);
     if (!previous) {
@@ -270,7 +288,7 @@ export function SceneEditor({
     setParamEditTarget(null);
     setRedoStack((stack) => [...stack, document]);
     setUndoStack((stack) => stack.slice(0, -1));
-    setDocument(previous);
+    setDocument({ ...previous, activeFloorId: document.activeFloorId });
     setSelectedId(null);
     setDraftWallPoints([]);
   }
@@ -282,7 +300,7 @@ export function SceneEditor({
     setParamEditTarget(null);
     setUndoStack((stack) => [...stack, document]);
     setRedoStack((stack) => stack.slice(0, -1));
-    setDocument(next);
+    setDocument({ ...next, activeFloorId: document.activeFloorId });
     setSelectedId(null);
     setDraftWallPoints([]);
   }
@@ -581,6 +599,7 @@ export function SceneEditor({
     document,
     replaceScene,
     selectedBuilding,
+    selectedConnector,
     selectedCountLine,
     selectedHazard,
     selectedObstacle,
@@ -617,11 +636,15 @@ export function SceneEditor({
       crowd={visibleCrowd}
       onTemplateDraft={applyTemplateDraft}
       onTemplatePromptChange={setAiPrompt}
+      onAddFloor={addFloorAbove}
       onApplyScene={applySceneToSimulation}
       onBasemapImport={importBasemap}
       onBasemapNumberChange={paramActions.updateBasemap}
       onBuildingKindChange={paramActions.updateBuildingKind}
       onBuildingNumberChange={paramActions.updateBuildingNumber}
+      onConnectorKindChange={paramActions.updateConnectorKind}
+      onConnectorWidthChange={paramActions.updateConnectorWidth}
+      onToggleConnectorBidirectional={paramActions.toggleConnectorBidirectional}
       onCountLineNameChange={paramActions.updateCountLineName}
       onCanvasPointerDown={handleCanvasPointerDown}
       onCountLineEndpointPointerDown={handleCountLineEndpointPointerDown}
@@ -646,6 +669,7 @@ export function SceneEditor({
       onRoadNumberChange={paramActions.updateRoadNumber}
       onSaveScene={saveScene}
       onSceneChange={selectExampleScene}
+      onSelectFloor={selectFloor}
       onServiceNumberChange={paramActions.updateServiceNumber}
       onShowTracingFixture={showTracingFixture}
       onShopNumberChange={paramActions.updateShopNumber}
@@ -670,6 +694,7 @@ export function SceneEditor({
       onZoneNumberChange={paramActions.updateZoneNumber}
       selectableScenes={selectableScenes}
       selectedBuilding={selectedBuilding}
+      selectedConnector={selectedConnector}
       selectedCountLine={selectedCountLine}
       selectedEntrance={selectedEntrance}
       selectedHazard={selectedHazard}

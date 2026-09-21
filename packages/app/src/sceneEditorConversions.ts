@@ -1,4 +1,4 @@
-import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
+import { parseScene, sceneFloors, type CrowdSimScene } from "@crowdsim/scene-schema";
 
 import type { EditorDocument, EditorShopBrand } from "./sceneEditorTypes";
 
@@ -34,9 +34,19 @@ function nextFreeIdNumber(scene: CrowdSimScene) {
 }
 
 export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocument {
+  const floors = sceneFloors(scene);
+
   return {
+    activeFloorId: floors[0]?.id,
+    floors: floors.map((floor) => ({
+      id: floor.id,
+      name: floor.name,
+      level: floor.level,
+      elevationMeters: floor.elevationMeters,
+    })),
     buildings: scene.buildings.map((building) => ({
       id: building.id,
+      floorId: building.floorId,
       name: building.name,
       kind: building.kind,
       points: building.footprint.points.map((point) => ({ ...point })),
@@ -49,13 +59,26 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       workerCapacity: building.workerCapacity,
       visitorCapacity: building.visitorCapacity,
     })),
+    connectors: scene.connectors.map((connector) => ({
+      id: connector.id,
+      name: connector.name,
+      kind: connector.kind,
+      fromFloorId: connector.from.floorId,
+      fromPoint: { ...connector.from.point },
+      toFloorId: connector.to.floorId,
+      toPoint: { ...connector.to.point },
+      width: connector.width,
+      bidirectional: connector.bidirectional,
+    })),
     countLines: scene.countLines.map((line) => ({
       id: line.id,
+      floorId: line.floorId,
       name: line.name,
       points: [{ ...line.geometry.points[0] }, { ...line.geometry.points[1] }],
     })),
     entrances: scene.entrances.map((entrance) => ({
       id: entrance.id,
+      floorId: entrance.floorId,
       kind: entrance.kind,
       position: { ...entrance.position },
       width: entrance.width,
@@ -69,6 +92,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     hazards: scene.hazards.map((hazard) => ({
       id: hazard.id,
+      floorId: hazard.floorId,
       name: hazard.name,
       kind: hazard.kind,
       position: { ...hazard.position },
@@ -86,6 +110,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     nextId: nextFreeIdNumber(scene),
     obstacles: scene.obstacles.map((obstacle) => ({
       id: obstacle.id,
+      floorId: obstacle.floorId,
       name: obstacle.name,
       kind: obstacle.kind,
       geometryType: obstacle.geometry.type,
@@ -95,6 +120,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     roads: scene.roads.map((road) => ({
       id: road.id,
+      floorId: road.floorId,
       name: road.name,
       points: road.geometry.points.map((point) => ({ ...point })),
       widthMeters: road.widthMeters,
@@ -106,6 +132,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     servicePoints: scene.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
+      floorId: servicePoint.floorId,
       name: servicePoint.name,
       servers: servicePoint.servers,
       kind: servicePoint.kind,
@@ -116,6 +143,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     zones: scene.zones.map((zone) => ({
       id: zone.id,
+      floorId: zone.floorId,
       attraction: zone.attraction,
       category: zone.category,
       dwellMeanSeconds: zone.dwellMeanSeconds,
@@ -125,6 +153,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     shops: scene.shops.map((shop) => ({
       id: shop.id,
+      floorId: shop.floorId,
       brand: copyBrand(shop.brand),
       name: shop.name,
       position: { ...shop.position },
@@ -135,11 +164,13 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     targets: scene.targets.map((target) => ({
       id: target.id,
+      floorId: target.floorId,
       position: { ...target.position },
       radius: target.radius,
     })),
     transitStops: scene.transitStops.map((stop) => ({
       id: stop.id,
+      floorId: stop.floorId,
       name: stop.name,
       roadId: stop.roadId,
       kind: stop.kind,
@@ -153,6 +184,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
     })),
     walls: scene.walls.map((wall) => ({
       id: wall.id,
+      floorId: wall.floorId,
       points: wall.geometry.points.map((point) => ({ ...point })),
     })),
   };
@@ -164,8 +196,16 @@ export function createSceneFromEditorDocument(
 ): CrowdSimScene {
   return parseScene({
     ...baseScene,
+    floors: document.floors.map((floor) => ({
+      ...baseScene.floors.find((existing) => existing.id === floor.id),
+      id: floor.id,
+      name: floor.name,
+      level: floor.level,
+      elevationMeters: floor.elevationMeters,
+    })),
     roads: document.roads.map((road) => ({
       id: road.id,
+      floorId: road.floorId,
       name: road.name,
       geometry: {
         type: "polyline",
@@ -180,6 +220,7 @@ export function createSceneFromEditorDocument(
     })),
     walls: document.walls.map((wall) => ({
       id: wall.id,
+      floorId: wall.floorId,
       geometry: {
         type: "polyline",
         points: wall.points.map((point) => ({ ...point })),
@@ -188,6 +229,7 @@ export function createSceneFromEditorDocument(
     })),
     entrances: document.entrances.map((entrance) => ({
       id: entrance.id,
+      floorId: entrance.floorId,
       kind: entrance.kind,
       position: { ...entrance.position },
       width: entrance.width,
@@ -198,11 +240,13 @@ export function createSceneFromEditorDocument(
     })),
     targets: document.targets.map((target) => ({
       id: target.id,
+      floorId: target.floorId,
       position: { ...target.position },
       radius: target.radius,
     })),
     zones: document.zones.map((zone) => ({
       id: zone.id,
+      floorId: zone.floorId,
       attraction: zone.attraction,
       category: zone.category,
       dwellMeanSeconds: zone.dwellMeanSeconds,
@@ -215,6 +259,7 @@ export function createSceneFromEditorDocument(
     })),
     buildings: document.buildings.map((building) => ({
       id: building.id,
+      floorId: building.floorId,
       name: building.name,
       kind: building.kind,
       footprint: {
@@ -232,6 +277,7 @@ export function createSceneFromEditorDocument(
     })),
     shops: document.shops.map((shop) => ({
       id: shop.id,
+      floorId: shop.floorId,
       brand: copyBrand(shop.brand),
       name: shop.name,
       position: { ...shop.position },
@@ -242,6 +288,7 @@ export function createSceneFromEditorDocument(
     })),
     servicePoints: document.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
+      floorId: servicePoint.floorId,
       name: servicePoint.name,
       servers: servicePoint.servers,
       kind: servicePoint.kind,
@@ -252,6 +299,7 @@ export function createSceneFromEditorDocument(
     })),
     transitStops: document.transitStops.map((stop) => ({
       id: stop.id,
+      floorId: stop.floorId,
       name: stop.name,
       roadId: stop.roadId,
       kind: stop.kind,
@@ -265,6 +313,7 @@ export function createSceneFromEditorDocument(
     })),
     obstacles: document.obstacles.map((obstacle) => ({
       id: obstacle.id,
+      floorId: obstacle.floorId,
       name: obstacle.name,
       kind: obstacle.kind,
       geometry: {
@@ -276,6 +325,7 @@ export function createSceneFromEditorDocument(
     })),
     hazards: document.hazards.map((hazard) => ({
       id: hazard.id,
+      floorId: hazard.floorId,
       name: hazard.name,
       kind: hazard.kind,
       position: { ...hazard.position },
@@ -290,8 +340,18 @@ export function createSceneFromEditorDocument(
       routeCostMultiplier: hazard.routeCostMultiplier,
       riskScore: hazard.riskScore,
     })),
+    connectors: document.connectors.map((connector) => ({
+      id: connector.id,
+      name: connector.name,
+      kind: connector.kind,
+      from: { floorId: connector.fromFloorId, point: { ...connector.fromPoint } },
+      to: { floorId: connector.toFloorId, point: { ...connector.toPoint } },
+      width: connector.width,
+      bidirectional: connector.bidirectional,
+    })),
     countLines: document.countLines.map((line) => ({
       id: line.id,
+      floorId: line.floorId,
       name: line.name,
       geometry: {
         type: "polyline",

@@ -20,6 +20,7 @@ import { viewportAgentCapacity } from "./renderBenchmark";
 import {
   agentWorldPosition,
   selectCrowdAgents,
+  type ViewedFloor,
   visibleAgentCount,
 } from "./agentInstanceField";
 import { crowdBudget } from "./crowdBudget";
@@ -65,6 +66,8 @@ import {
 import { createViewportPostProcessing } from "./viewportPostProcessing";
 type RendererArgs = {
   crowdScene?: CrowdSimScene;
+  /** The floor being watched; its crowd is the only one drawn (ADR-0010). */
+  floor?: ViewedFloor;
   heatmapCells: readonly HeatmapCell[];
   layers: ViewportLayers;
   onPlace?: (tool: EditorTool, point: ScenePoint) => void;
@@ -75,6 +78,7 @@ type RendererArgs = {
 };
 export function useSimulationViewportRenderer({
   crowdScene,
+  floor,
   heatmapCells,
   layers,
   onPlace,
@@ -104,6 +108,10 @@ export function useSimulationViewportRenderer({
   useEffect(() => {
     sharedOverlayRef.current = sharedAgentOverlay;
   }, [sharedAgentOverlay]);
+  const floorRef = useRef(floor);
+  useEffect(() => {
+    floorRef.current = floor;
+  }, [floor]);
   const crowdSceneRef = useRef(crowdScene);
   useEffect(() => {
     crowdSceneRef.current = crowdScene;
@@ -264,6 +272,7 @@ export function useSimulationViewportRenderer({
       const live = selectCrowdAgents(
         snapshotRef.current?.agents,
         sharedOverlayRef.current?.agents,
+        floorRef.current,
       );
       if (figures) {
         figures.update(

@@ -8,6 +8,8 @@ import type { Language, TranslationKey } from "./i18n";
 import { SceneEditor } from "./SceneEditor";
 import type { StageTab, StageViewMode } from "./AppTypes";
 import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
+import { FloorSwitcher, type SwitchableFloor } from "./FloorSwitcher";
+import type { ViewedFloor } from "./agentInstanceField";
 import type { EditorTool } from "./sceneEditorState";
 import type { ViewportLayers } from "./viewportLayers";
 
@@ -20,6 +22,16 @@ const SimulationViewport = lazy(() =>
 const noHeatmapCells: readonly HeatmapCell[] = [];
 
 type AppStageProps = {
+  /** The floors of the scene, lowest first; empty when it has none. */
+  floors: readonly SwitchableFloor[];
+  /** The floor being watched, and where it sits in `floors` (ADR-0010). */
+  viewFloor?: ViewedFloor;
+  onSelectViewFloor: (floorId: string) => void;
+  /**
+   * The scene as it is on the floor being watched. The editor gets the whole
+   * scene instead: it draws one floor at a time but must keep them all.
+   */
+  viewScene: CrowdSimScene;
   editorTool: EditorTool;
   heatmapCells: readonly HeatmapCell[];
   language: Language;
@@ -38,6 +50,10 @@ type AppStageProps = {
 export function AppStage({
   crowd,
   editorTool,
+  floors,
+  viewFloor,
+  onSelectViewFloor,
+  viewScene,
   heatmapCells,
   language,
   layers,
@@ -106,14 +122,29 @@ export function AppStage({
               }
             >
               <SimulationViewport
+                floor={viewFloor}
                 heatmapCells={heatmapCells}
                 layers={layers}
                 onPlace={onPlaceInWorld}
                 placementTool={viewMode === "3d" ? editorTool : undefined}
-                scene={scene}
+                scene={viewScene}
                 crowd={crowd}
                 viewMode={viewMode}
               />
+              {floors.length > 0 ? (
+                <div
+                  className="editor-floorbar stage-floorbar"
+                  aria-label={t("floors")}
+                  data-testid="stage-floors"
+                >
+                  <span className="editor-floorbar-label">{t("floors")}</span>
+                  <FloorSwitcher
+                    activeFloorId={viewFloor?.id}
+                    floors={floors}
+                    onSelect={onSelectViewFloor}
+                  />
+                </div>
+              ) : null}
             </Suspense>
             {/*
               This strip used to hold five permanently-ticked readOnly

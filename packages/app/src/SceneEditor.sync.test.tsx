@@ -103,18 +103,18 @@ describe("SceneEditor parameter edits", () => {
     const { container } = renderEditor(bioCityDemoScene);
     const building = container.querySelector("g.editor-building")!;
     fireEvent.pointerDown(building);
-    const floors = screen.getByLabelText("楼层") as HTMLInputElement;
+    const floors = screen.getByLabelText("层数") as HTMLInputElement;
     const original = floors.value;
 
     fireEvent.change(floors, { target: { value: "1" } });
     fireEvent.change(floors, { target: { value: "12" } });
-    expect((screen.getByLabelText("楼层") as HTMLInputElement).value).toBe("12");
+    expect((screen.getByLabelText("层数") as HTMLInputElement).value).toBe("12");
 
     fireEvent.click(screen.getByTestId("editor-undo"));
 
     // Undo deselects; pick the building again to read its value.
     fireEvent.pointerDown(container.querySelector("g.editor-building")!);
-    expect((screen.getByLabelText("楼层") as HTMLInputElement).value).toBe(original);
+    expect((screen.getByLabelText("层数") as HTMLInputElement).value).toBe(original);
   });
 });
 

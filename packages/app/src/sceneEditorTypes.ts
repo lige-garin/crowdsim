@@ -17,7 +17,8 @@ export type EditorTool =
   | "gate"
   | "obstacle"
   | "hazard"
-  | "countLine";
+  | "countLine"
+  | "connector";
 
 export const editorTools: readonly EditorTool[] = [
   "select",
@@ -35,15 +36,20 @@ export const editorTools: readonly EditorTool[] = [
   "obstacle",
   "hazard",
   "countLine",
+  "connector",
 ];
 
 export type EditorWall = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   points: ScenePoint[];
 };
 
 export type EditorEntrance = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   kind: CrowdSimScene["entrances"][number]["kind"];
   position: ScenePoint;
   width: number;
@@ -55,6 +61,8 @@ export type EditorEntrance = {
 
 export type EditorTarget = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   position: ScenePoint;
   radius: number;
 };
@@ -64,6 +72,8 @@ export type EditorZoneCategory = CrowdSimScene["zones"][number]["category"];
 
 export type EditorZone = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   attraction: number;
   category: EditorZoneCategory;
   dwellMeanSeconds: number;
@@ -74,6 +84,8 @@ export type EditorZone = {
 
 export type EditorShop = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   brand?: EditorShopBrand;
   name?: string;
   position: ScenePoint;
@@ -88,6 +100,8 @@ export type EditorShop = {
 
 export type EditorServicePoint = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   servers?: number;
   kind: "counter" | "gate";
@@ -99,6 +113,8 @@ export type EditorServicePoint = {
 
 export type EditorCountLine = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   /** Absent is fine: a line is useful unnamed, and the label falls back. */
   name?: string;
   points: [ScenePoint, ScenePoint];
@@ -112,6 +128,8 @@ type EditorHazardKind = CrowdSimScene["hazards"][number]["kind"];
 
 export type EditorRoad = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   points: ScenePoint[];
   widthMeters: number;
@@ -124,6 +142,8 @@ export type EditorRoad = {
 
 export type EditorBuilding = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   kind: EditorBuildingKind;
   points: ScenePoint[];
@@ -137,6 +157,8 @@ export type EditorBuilding = {
 
 export type EditorTransitStop = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   roadId?: string;
   kind: EditorTransitStopKind;
@@ -151,6 +173,8 @@ export type EditorTransitStop = {
 
 export type EditorObstacle = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   kind: EditorObstacleKind;
   geometryType: "polygon" | "polyline";
@@ -161,6 +185,8 @@ export type EditorObstacle = {
 
 export type EditorHazard = {
   id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
   name?: string;
   kind: EditorHazardKind;
   position: ScenePoint;
@@ -176,9 +202,46 @@ export type EditorHazard = {
   riskScore: number;
 };
 
+/**
+ * A way between two floors: stairs or an escalator (ADR-0010). It is not on a
+ * floor — it joins two — so it carries both ends rather than a `floorId`.
+ */
+export type EditorConnector = {
+  id: string;
+  name?: string;
+  kind: "escalator" | "stair";
+  fromFloorId: string;
+  fromPoint: ScenePoint;
+  toFloorId: string;
+  toPoint: ScenePoint;
+  width: number;
+  bidirectional: boolean;
+};
+
+/**
+ * A floor of the scene (ADR-0010). `level` orders them, lowest first;
+ * `elevationMeters` is how high it sits, which sets how long a connector to it
+ * takes to climb (`connectorTravelSeconds`).
+ */
+export type EditorFloor = {
+  id: string;
+  name?: string;
+  level: number;
+  elevationMeters: number;
+};
+
 export type EditorDocument = {
+  /**
+   * The floor being drawn on. Newly drawn primitives are stamped with it, and
+   * the canvas shows only what is on it. Undefined when the scene declares no
+   * floors, which is every scene that predates them: then nothing is stamped
+   * and the editor behaves exactly as it did.
+   */
+  activeFloorId?: string;
   buildings: EditorBuilding[];
+  connectors: EditorConnector[];
   countLines: EditorCountLine[];
+  floors: EditorFloor[];
   entrances: EditorEntrance[];
   hazards: EditorHazard[];
   nextId: number;

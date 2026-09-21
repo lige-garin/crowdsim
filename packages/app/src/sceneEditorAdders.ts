@@ -1,6 +1,7 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
 
 import { rectangleAround } from "./sceneEditorGeometry";
+import { editorFloors } from "./sceneEditorFloors";
 import {
   defaultArrivalRatePerMinute,
   type EditorDocument,
@@ -20,6 +21,7 @@ export function addRoad(
       ...document.roads,
       {
         id: `road-${document.nextId}`,
+        floorId: document.activeFloorId,
         points: [
           { x: position.x - 10, y: position.y },
           { x: position.x + 10, y: position.y },
@@ -46,6 +48,7 @@ export function addWall(
       ...document.walls,
       {
         id: `wall-${document.nextId}`,
+        floorId: document.activeFloorId,
         points: points.map((point) => ({ ...point })),
       },
     ],
@@ -63,6 +66,7 @@ export function addBuilding(
       ...document.buildings,
       {
         id: `building-${document.nextId}`,
+        floorId: document.activeFloorId,
         kind: "mixedUse",
         points: rectangleAround(position, 16, 10),
         entrancePosition: { x: position.x, y: position.y + 5 },
@@ -87,6 +91,7 @@ export function addEntrance(
       ...document.entrances,
       {
         id: `${kind}-${document.nextId}`,
+        floorId: document.activeFloorId,
         kind,
         position: { ...position },
         width: kind === "source" ? 4 : 5,
@@ -108,6 +113,7 @@ export function addTarget(
       ...document.targets,
       {
         id: `target-${document.nextId}`,
+        floorId: document.activeFloorId,
         position: { ...position },
         radius: 1,
       },
@@ -126,6 +132,7 @@ export function addZone(
       ...document.zones,
       {
         id: `zone-${document.nextId}`,
+        floorId: document.activeFloorId,
         attraction: 0.5,
         category: "mixed",
         dwellMeanSeconds: 180,
@@ -147,6 +154,7 @@ export function addShop(
       ...document.shops,
       {
         id: `shop-${document.nextId}`,
+        floorId: document.activeFloorId,
         position: { ...position },
         size: {
           width: 8,
@@ -171,6 +179,7 @@ export function addTransitStop(
       ...document.transitStops,
       {
         id: `transit-stop-${document.nextId}`,
+        floorId: document.activeFloorId,
         roadId: document.roads.at(-1)?.id,
         kind: "bus",
         position: { ...position },
@@ -197,6 +206,7 @@ export function addServicePoint(
       ...document.servicePoints,
       {
         id: `${kind}-${document.nextId}`,
+        floorId: document.activeFloorId,
         kind,
         position: { ...position },
         width: kind === "gate" ? 4 : 3,
@@ -218,6 +228,7 @@ export function addObstacle(
       ...document.obstacles,
       {
         id: `obstacle-${document.nextId}`,
+        floorId: document.activeFloorId,
         kind: "constructionBarrier",
         geometryType: "polyline",
         points: [
@@ -242,6 +253,7 @@ export function addHazard(
       ...document.hazards,
       {
         id: `hazard-${document.nextId}`,
+        floorId: document.activeFloorId,
         kind: "roadClosure",
         position: { ...position },
         radiusMeters: 8,
@@ -273,6 +285,7 @@ export function addCountLineBetween(
       ...document.countLines,
       {
         id: `count-line-${document.nextId}`,
+        floorId: document.activeFloorId,
         points: [{ ...start }, { ...end }],
       },
     ],
@@ -290,6 +303,7 @@ export function addCountLine(
       ...document.countLines,
       {
         id: `count-line-${document.nextId}`,
+        floorId: document.activeFloorId,
         points: [
           { ...position },
           {
@@ -310,6 +324,49 @@ export function addCountLine(
  * keeps "what a road tool drops" identical in both. Returns null for tools that
  * are not a single click: select picks, and a wall needs a run of points.
  */
+/**
+ * A staircase at this point, joining the floor being drawn to the one below —
+ * or, on the lowest floor, to the one above. Both ends sit at the same plan
+ * coordinates, which is what a stair well is; either end can be dragged after.
+ *
+ * A scene with one floor gets nothing: there is nothing to join, and inventing
+ * a floor to connect to would be putting a building the user did not draw into
+ * their scene.
+ */
+export function addConnector(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  const floors = editorFloors(document);
+  const here = floors.findIndex((floor) => floor.id === document.activeFloorId);
+
+  if (floors.length < 2 || here < 0) {
+    return document;
+  }
+
+  const other = floors[here - 1] ?? floors[here + 1];
+
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    connectors: [
+      ...document.connectors,
+      {
+        id: `connector-${document.nextId}`,
+        kind: "stair",
+        // Drawn from the lower floor up, so a one-way escalator made from it
+        // runs the way people usually need one.
+        fromFloorId: other.level < floors[here].level ? other.id : floors[here].id,
+        fromPoint: { ...position },
+        toFloorId: other.level < floors[here].level ? floors[here].id : other.id,
+        toPoint: { ...position },
+        width: 1.2,
+        bidirectional: true,
+      },
+    ],
+  };
+}
+
 export function placeEditorTool(
   document: EditorDocument,
   tool: EditorTool,
@@ -341,6 +398,8 @@ export function placeEditorTool(
       return addHazard(document, point);
     case "countLine":
       return addCountLine(document, point);
+    case "connector":
+      return addConnector(document, point);
     case "target":
       return addTarget(document, point);
   }

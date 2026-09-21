@@ -21,6 +21,15 @@ export function moveEntity(
           }
         : building,
     ),
+    connectors: document.connectors.map((connector) =>
+      connector.id === id
+        ? {
+            ...connector,
+            fromPoint: translatePoint(connector.fromPoint, delta),
+            toPoint: translatePoint(connector.toPoint, delta),
+          }
+        : connector,
+    ),
     entrances: document.entrances.map((entrance) =>
       entrance.id === id
         ? {
@@ -144,6 +153,7 @@ export function removeEntity(document: EditorDocument, id: string): EditorDocume
   return {
     ...document,
     buildings: document.buildings.filter((building) => building.id !== id),
+    connectors: document.connectors.filter((connector) => connector.id !== id),
     countLines: document.countLines.filter((line) => line.id !== id),
     entrances: document.entrances.filter((entrance) => entrance.id !== id),
     hazards: document.hazards.filter((hazard) => hazard.id !== id),

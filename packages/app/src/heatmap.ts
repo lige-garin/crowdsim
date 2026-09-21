@@ -8,6 +8,8 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { fruinLevel, type FruinLevel } from "./fruinLevelOfService";
 
 export type HeatmapAgent = {
+  /** The floor they were on; absent in a scene with one floor. */
+  floorId?: string;
   id?: number;
   x: number;
   y: number;
@@ -17,6 +19,21 @@ export type HeatmapSample = {
   elapsedSeconds: number;
   agents: readonly HeatmapAgent[];
 };
+
+/** Only the people who were on this floor; all of them in a one-floor scene. */
+export function heatmapSamplesOnFloor(
+  samples: readonly HeatmapSample[],
+  floorId: string | undefined,
+): readonly HeatmapSample[] {
+  if (floorId === undefined) {
+    return samples;
+  }
+
+  return samples.map((sample) => ({
+    ...sample,
+    agents: sample.agents.filter((agent) => agent.floorId === floorId),
+  }));
+}
 
 export type HeatmapCell = {
   id: string;

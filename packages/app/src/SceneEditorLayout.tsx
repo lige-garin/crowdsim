@@ -4,6 +4,8 @@ import type { HeatmapCell } from "./heatmap";
 import type { Language, LocalizedText, TranslationKey } from "./i18n";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
 import { SceneEditorControls } from "./SceneEditorControls";
+import { SceneEditorFloorBar } from "./SceneEditorFloorBar";
+import { documentOnActiveFloor, editorBaseFloorId } from "./sceneEditorFloors";
 import { SceneEditorParamPanel } from "./SceneEditorParamPanel";
 import type { BasemapNumberField, EditorBasemap } from "./sceneEditorBasemap";
 import type {
@@ -23,6 +25,9 @@ import type {
 import type { SceneImageOverlay } from "./sceneEditorImageOverlay";
 import { pointsToSvg } from "./sceneEditorUtils";
 import type { LiveCrowd } from "./liveCrowd";
+
+/** Nothing measured belongs on a floor the run never simulated. */
+const noHeatmapCells: readonly HeatmapCell[] = [];
 
 type SceneEditorLayoutProps = {
   /** Kept mounted while the stage shows another view, so work is not lost. */
@@ -49,11 +54,15 @@ type SceneEditorLayoutProps = {
   crowd?: LiveCrowd;
   onTemplateDraft: () => void;
   onTemplatePromptChange: (value: string) => void;
+  onAddFloor: () => void;
   onApplyScene: () => void;
   onBasemapImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onConnectorKindChange: (kind: EditorDocument["connectors"][number]["kind"]) => void;
+  onConnectorWidthChange: (value: number) => void;
+  onToggleConnectorBidirectional: () => void;
   onCountLineNameChange: (name: string) => void;
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
   onEntranceProfileChange: (text: string) => void;
@@ -87,6 +96,7 @@ type SceneEditorLayoutProps = {
   onRoadNumberChange: (field: RoadNumberField, value: number) => void;
   onSaveScene: () => void;
   onSceneChange: (sceneId: string) => void;
+  onSelectFloor: (floorId: string) => void;
   onServiceNumberChange: (
     field: "capacityPerMinute" | "serviceMeanSeconds" | "width",
     value: number,
@@ -116,6 +126,7 @@ type SceneEditorLayoutProps = {
   onZoneNumberChange: (field: ZoneNumberField, value: number) => void;
   selectableScenes: readonly CrowdSimScene[];
   selectedBuilding: EditorDocument["buildings"][number] | undefined;
+  selectedConnector: EditorDocument["connectors"][number] | undefined;
   selectedCountLine: EditorDocument["countLines"][number] | undefined;
   selectedEntrance: EditorDocument["entrances"][number] | undefined;
   selectedHazard: EditorDocument["hazards"][number] | undefined;
@@ -160,11 +171,15 @@ export function SceneEditorLayout({
   crowd,
   onTemplateDraft,
   onTemplatePromptChange,
+  onAddFloor,
   onApplyScene,
   onBasemapImport,
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onConnectorKindChange,
+  onConnectorWidthChange,
+  onToggleConnectorBidirectional,
   onCountLineNameChange,
   onEntranceKindChange,
   onEntranceProfileChange,
@@ -192,6 +207,7 @@ export function SceneEditorLayout({
   onRoadNumberChange,
   onSaveScene,
   onSceneChange,
+  onSelectFloor,
   onServiceNumberChange,
   onShopNumberChange,
   onShopSizeChange,
@@ -213,6 +229,7 @@ export function SceneEditorLayout({
   onZoneNumberChange,
   selectableScenes,
   selectedBuilding,
+  selectedConnector,
   selectedCountLine,
   selectedEntrance,
   selectedHazard,
@@ -234,6 +251,12 @@ export function SceneEditorLayout({
   visibleHeatmapCells,
   viewMode,
 }: SceneEditorLayoutProps) {
+  const drawnFloor = documentOnActiveFloor(document);
+  // The run simulates the lowest floor, so only that floor has a crowd to show.
+  const showsSimulatedFloor =
+    document.floors.length === 0 ||
+    document.activeFloorId === editorBaseFloorId(document);
+
   return (
     <section className="scene-editor" aria-label={t("sceneEditor")} hidden={hidden}>
       {onReloadLiveScene ? (
@@ -259,7 +282,7 @@ export function SceneEditorLayout({
         canLoadSavedScene={canLoadSavedScene}
         canRedo={canRedo}
         canUndo={canUndo}
-        documentCounts={countDocumentObjects(document)}
+        documentCounts={countDocumentObjects(drawnFloor)}
         dxfInputRef={dxfInputRef}
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
@@ -294,15 +317,22 @@ export function SceneEditorLayout({
         viewMode={viewMode}
       />
 
+      <SceneEditorFloorBar
+        document={document}
+        onAddFloor={onAddFloor}
+        onSelectFloor={onSelectFloor}
+        t={t}
+      />
+
       <SceneEditorCanvas
         aiImageOverlay={aiImageOverlay}
         baseScene={baseScene}
         basemap={basemap}
-        document={document}
+        document={drawnFloor}
         draftWallPoints={draftWallPoints}
         draftCountLine={draftCountLine}
         gridSize={gridSize}
-        crowd={crowd}
+        crowd={showsSimulatedFloor ? crowd : undefined}
         onCanvasPointerDown={onCanvasPointerDown}
         onCountLineEndpointPointerDown={onCountLineEndpointPointerDown}
         onEntityPointerDown={onEntityPointerDown}
@@ -311,7 +341,7 @@ export function SceneEditorLayout({
         selectedId={selectedId}
         svgRef={svgRef}
         t={t}
-        visibleHeatmapCells={visibleHeatmapCells}
+        visibleHeatmapCells={showsSimulatedFloor ? visibleHeatmapCells : noHeatmapCells}
         viewMode={viewMode}
       />
 
@@ -320,6 +350,9 @@ export function SceneEditorLayout({
         onBasemapNumberChange={onBasemapNumberChange}
         onBuildingKindChange={onBuildingKindChange}
         onBuildingNumberChange={onBuildingNumberChange}
+        onConnectorKindChange={onConnectorKindChange}
+        onConnectorWidthChange={onConnectorWidthChange}
+        onToggleConnectorBidirectional={onToggleConnectorBidirectional}
         onCountLineNameChange={onCountLineNameChange}
         onEntranceKindChange={onEntranceKindChange}
         onEntranceProfileChange={onEntranceProfileChange}
@@ -347,6 +380,7 @@ export function SceneEditorLayout({
         onZoneNumberChange={onZoneNumberChange}
         pointsToSvg={pointsToSvg}
         selectedBuilding={selectedBuilding}
+        selectedConnector={selectedConnector}
         selectedCountLine={selectedCountLine}
         selectedEntrance={selectedEntrance}
         selectedHazard={selectedHazard}

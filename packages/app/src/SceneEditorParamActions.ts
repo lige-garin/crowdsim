@@ -19,6 +19,9 @@ import {
   toggleDocumentZoneWalkable,
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
+  toggleDocumentConnectorBidirectional,
+  updateDocumentConnectorKind,
+  updateDocumentConnectorWidth,
   updateDocumentCountLineName,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
@@ -57,6 +60,7 @@ type SceneEditorParamActionInput = {
   document: EditorDocument;
   replaceScene: (nextScene: CrowdSimScene, status: LocalizedText) => void;
   selectedBuilding?: EditorDocument["buildings"][number];
+  selectedConnector?: EditorDocument["connectors"][number];
   selectedCountLine?: EditorDocument["countLines"][number];
   selectedHazard?: EditorDocument["hazards"][number];
   selectedObstacle?: EditorDocument["obstacles"][number];
@@ -77,6 +81,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
     document,
     replaceScene,
     selectedBuilding,
+    selectedConnector,
     selectedCountLine,
     selectedHazard,
     selectedObstacle,
@@ -108,6 +113,24 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedBuilding) return;
       setDocument((current) =>
         updateDocumentBuildingKind(current, selectedBuilding.id, kind),
+      );
+    },
+    updateConnectorKind(kind: EditorDocument["connectors"][number]["kind"]) {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        updateDocumentConnectorKind(current, selectedConnector.id, kind),
+      );
+    },
+    updateConnectorWidth(width: number) {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        updateDocumentConnectorWidth(current, selectedConnector.id, width),
+      );
+    },
+    toggleConnectorBidirectional() {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        toggleDocumentConnectorBidirectional(current, selectedConnector.id),
       );
     },
     updateCountLineName(name: string) {

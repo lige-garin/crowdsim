@@ -11,7 +11,6 @@ import {
 } from "@crowdsim/core-gpu";
 import { createOneClickDemoModePlan, validateDemoModePlan } from "./demoMode";
 import { demoScene } from "./demoScene";
-import { createMultiFloorScene, summarizeMultiFloorScene } from "./multifloorScene";
 import { createPhotorealisticTilesConfig } from "./photorealisticTiles";
 import {
   createIndirectDrawPlan,
@@ -24,28 +23,6 @@ import { demoVisualAssetManifest } from "./visualAssets";
 export function ScaleReadinessPanel() {
   const { language } = useI18n();
   const summary = useMemo(() => {
-    const multiFloor = createMultiFloorScene({
-      connectors: [
-        {
-          fromFloorId: "level-1",
-          id: "stairs-1",
-          kind: "stairs",
-          position: { x: 20, y: 20 },
-          toFloorId: "level-2",
-        },
-      ],
-      floors: [
-        { elevationMeters: 0, id: "level-1", name: "Level 1", scene: demoScene },
-        {
-          elevationMeters: 4,
-          id: "level-2",
-          name: "Level 2",
-          scene: { ...demoScene, id: "atrium-level-2", name: "Atrium Level 2" },
-        },
-      ],
-      id: "scale-readiness-stack",
-      name: "Scale readiness stack",
-    });
     const budget = estimateScaleBudget({ agentCount: 500_000 });
     const flowLayout = createSpatialHashGridLayout({
       cellSize: 4,
@@ -85,12 +62,10 @@ export function ScaleReadinessPanel() {
       demoPlan,
       demoReady: validateDemoModePlan(demoPlan).ready,
       indirectDraw,
-      multiFloor: summarizeMultiFloorScene(multiFloor),
       projection: projectHalfMillionAgentBudget(budget),
     };
   }, []);
   const title = language === "zh" ? "规模投影" : "Scale projection";
-  const floorsLabel = language === "zh" ? "楼层" : "floors";
   const agentsLabel = language === "zh" ? "50万 agent" : "500k agents";
   const projectionNote =
     language === "zh"
@@ -100,9 +75,7 @@ export function ScaleReadinessPanel() {
   return (
     <section className="probe-panel" aria-label={title}>
       <h3>{title}</h3>
-      <p>
-        {summary.multiFloor.floorCount} {floorsLabel} | {agentsLabel}
-      </p>
+      <p>{agentsLabel}</p>
       <p>{projectionNote}</p>
       <code>
         {summary.budget.renderStrategy} | {summary.budget.estimatedAgentMemoryMegabytes}{" "}

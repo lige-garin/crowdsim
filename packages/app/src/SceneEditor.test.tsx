@@ -353,3 +353,61 @@ describe("count lines in the 2D editor", () => {
     expect(linePoints()).toBe("10,10 18,10");
   });
 });
+
+describe("floors in the 2D editor", () => {
+  function canvas() {
+    return screen.getByTestId("editor-canvas");
+  }
+
+  function countLines() {
+    return document.querySelectorAll(".editor-count-line").length;
+  }
+
+  function drawCountLine(from: [number, number], to: [number, number]) {
+    fireEvent.click(screen.getByTestId("editor-tool-countLine"));
+    fireEvent.pointerDown(canvas(), { clientX: from[0], clientY: from[1] });
+    fireEvent.pointerMove(canvas(), { clientX: to[0], clientY: to[1] });
+    fireEvent.pointerUp(canvas(), { clientX: to[0], clientY: to[1] });
+  }
+
+  it("starts with no floors to choose between, because there is one plane", () => {
+    renderEditor();
+
+    expect(screen.getByTestId("editor-floors")).toBeTruthy();
+    expect(document.querySelectorAll('[data-testid^="editor-floor-"]')).toHaveLength(0);
+  });
+
+  it("adds a floor above and draws on it, leaving the floor below alone", () => {
+    renderEditor();
+    const before = countLines();
+
+    fireEvent.click(screen.getByTestId("editor-add-floor"));
+    const floors = document.querySelectorAll<HTMLButtonElement>(
+      '[data-testid^="editor-floor-"]',
+    );
+
+    expect(floors).toHaveLength(2);
+    expect(floors[1].getAttribute("aria-pressed")).toBe("true");
+    // The plan starts empty up here: everything drawn so far is downstairs.
+    expect(countLines()).toBe(0);
+
+    drawCountLine([10, 10], [10, 30]);
+    expect(countLines()).toBe(1);
+
+    fireEvent.click(floors[0]);
+    expect(floors[0].getAttribute("aria-pressed")).toBe("true");
+    expect(countLines()).toBe(before);
+
+    fireEvent.click(floors[1]);
+    expect(countLines()).toBe(1);
+  });
+
+  it("says what joins the floors, and what is not modelled", () => {
+    renderEditor();
+
+    // The bar's own note, not the toolbar button of the same name.
+    expect(document.querySelector(".editor-floorbar-note")?.textContent).toMatch(
+      /lifts not modelled|电梯未建模/,
+    );
+  });
+});

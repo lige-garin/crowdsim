@@ -1,7 +1,7 @@
 ﻿import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useI18n } from "./i18n";
 import { describeViewportRenderMode } from "./viewportRenderMode";
-import { selectCrowdAgents } from "./agentInstanceField";
+import { selectCrowdAgents, type ViewedFloor } from "./agentInstanceField";
 import { selectAgentIntentOverlay } from "./simulationViewportOverlay";
 import { noLiveCrowd, useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import { defaultViewportLayers, type ViewportLayers } from "./viewportLayers";
@@ -19,6 +19,7 @@ export type { ViewMode } from "./simulationViewportTypes";
 
 export function SimulationViewport({
   crowd = noLiveCrowd,
+  floor,
   heatmapCells = [],
   layers = defaultViewportLayers,
   onPlace,
@@ -28,6 +29,8 @@ export function SimulationViewport({
 }: {
   /** The live crowd (liveCrowd); the view subscribes to it. */
   crowd?: LiveCrowd;
+  /** The floor being watched, when the scene has floors (ADR-0010). */
+  floor?: ViewedFloor;
   heatmapCells?: readonly HeatmapCell[];
   layers?: ViewportLayers;
   onPlace?: (tool: EditorTool, point: ScenePoint) => void;
@@ -40,6 +43,7 @@ export function SimulationViewport({
   const { canvasRef, fps, renderMode, selectedAgentId, status } =
     useSimulationViewportRenderer({
       crowdScene,
+      floor,
       heatmapCells,
       layers,
       onPlace,
@@ -51,7 +55,7 @@ export function SimulationViewport({
   const pickedAgent =
     selectedAgentId == null
       ? undefined
-      : selectCrowdAgents(snapshot?.agents, sharedAgentOverlay?.agents).find(
+      : selectCrowdAgents(snapshot?.agents, sharedAgentOverlay?.agents, floor).find(
           (agent) => agent.id === selectedAgentId,
         );
   const pickedFull =

@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("ScaleReadinessPanel", () => {
-  it("renders multi-floor, 500k, and one-click demo readiness", () => {
+  it("renders the 500k budget and one-click demo readiness", () => {
     render(
       <I18nProvider>
         <ScaleReadinessPanel />
@@ -17,8 +17,10 @@ describe("ScaleReadinessPanel", () => {
     );
 
     expect(screen.getByRole("heading", { name: "规模投影" })).toBeInTheDocument();
-    expect(screen.getByText(/2 楼层/)).toBeInTheDocument();
     expect(screen.getByText(/未在任何设备上实测/)).toBeInTheDocument();
+    // Floors are a real scene concept now, and this panel never simulated one:
+    // it counted two copies of the demo scene it made up on the spot.
+    expect(screen.queryByText(/楼层/)).toBeNull();
     expect(screen.getByText(/webgpu-indirect/)).toBeInTheDocument();
     expect(screen.getByText(/500k within-budget \(not-measured\)/)).toBeInTheDocument();
     expect(screen.getByText(/demo 6 steps/)).toBeInTheDocument();
