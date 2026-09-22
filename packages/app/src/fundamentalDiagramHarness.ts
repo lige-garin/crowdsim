@@ -4,10 +4,10 @@ import type { Router } from "./crowdNavigation";
 import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
 import { weidmannFundamentalDiagram } from "./pedestrianFundamentalDiagram";
 import type { SimulationAgent } from "./simulationEngine";
-import { createWallIndex } from "./wallIndex";
+import { createWallIndex, type WallIndex } from "./wallIndex";
 
 /**
- * Measure the speed–density relation the movement model produces, the way
+ * Measure the speed–density relation a movement model produces, the way
  * pedestrian models are checked against a fundamental diagram: a straight
  * corridor with walls on both sides, closed into a loop (whoever walks out of
  * one end walks back in at the other), filled to a fixed density, run until it
@@ -32,9 +32,25 @@ const GHOST_BAND_METERS = 2.5;
 
 const straightAhead: Pick<Router, "direction"> = { direction: () => ({ x: 1, y: 0 }) };
 
-export function measureCorridorSpeed(
+/** One movement model's own way of stepping a population forward — `stepCrowd`
+ * for social force, `stepCrowdOrca` for `orcaComparison.ts`'s own side of this
+ * same measurement. */
+export type CorridorStepFn = (input: {
+  agents: readonly SimulationAgent[];
+  dtSeconds: number;
+  walls: WallIndex;
+  meanSpeedMetersPerSecond: number;
+}) => readonly SimulationAgent[];
+
+/**
+ * The periodic-corridor measurement itself, independent of which model
+ * steps the crowd — `measureCorridorSpeed` below is social force's own
+ * caller of it; `orcaComparison.ts` supplies `stepCrowdOrca` to measure the
+ * same benchmark under ORCA, without forking this loop.
+ */
+export function runPeriodicCorridor(
+  step: CorridorStepFn,
   densityPerSquareMeter: number,
-  parameters: Partial<SocialForceParameters>,
   options: CorridorOptions = {},
 ): number {
   const length = options.lengthMeters ?? 20;
@@ -76,7 +92,7 @@ export function measureCorridorSpeed(
   let speedSum = 0;
   let samples = 0;
 
-  for (let step = 0; step < warmupSteps + measureSteps; step++) {
+  for (let stepIndex = 0; stepIndex < warmupSteps + measureSteps; stepIndex++) {
     const ghosts: SimulationAgent[] = [];
     for (const agent of agents) {
       if (agent.x < GHOST_BAND_METERS) {
@@ -89,17 +105,12 @@ export function measureCorridorSpeed(
         });
       }
     }
-    const stepped = stepCrowd({
+    const stepped = step({
       agents: [...agents, ...ghosts],
       dtSeconds: dt,
-      exitRadius: () => 0,
-      isExitBound: () => false,
       meanSpeedMetersPerSecond: meanSpeed,
-      parameters,
-      router: straightAhead,
-      seed,
       walls: wallIndex,
-    }).agents;
+    });
 
     agents = stepped
       .filter((agent) => agent.id < GHOST_ID_OFFSET)
@@ -109,7 +120,7 @@ export function measureCorridorSpeed(
         return { ...agent, targetY: agent.y, x: wrapped };
       });
 
-    if (step >= warmupSteps) {
+    if (stepIndex >= warmupSteps) {
       for (const agent of agents) speedSum += agent.vx;
       samples += agents.length;
     }
@@ -117,4 +128,28 @@ export function measureCorridorSpeed(
 
   // Mean walking speed along the corridor, m/s.
   return samples > 0 ? speedSum / samples : 0;
+}
+
+export function measureCorridorSpeed(
+  densityPerSquareMeter: number,
+  parameters: Partial<SocialForceParameters>,
+  options: CorridorOptions = {},
+): number {
+  const seed = options.seed ?? 1;
+  return runPeriodicCorridor(
+    (input) =>
+      stepCrowd({
+        agents: input.agents,
+        dtSeconds: input.dtSeconds,
+        exitRadius: () => 0,
+        isExitBound: () => false,
+        meanSpeedMetersPerSecond: input.meanSpeedMetersPerSecond,
+        parameters,
+        router: straightAhead,
+        seed,
+        walls: input.walls,
+      }).agents,
+    densityPerSquareMeter,
+    options,
+  );
 }

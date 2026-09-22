@@ -1284,3 +1284,41 @@ Majority (not all — the guideline's own text calls its reference data "widely 
 Suite now reads 15/16 built — only test 14 (Fig. 18, an undimensioned isometric schematic) remains, for a reason unrelated to this entry.
 
 794 vitest tests (2 new for test 13, one exercising `stairCrowdBandAt` directly, one running the full scenario), cargo test, typecheck, lint and prettier all clean.
+
+## 2026-09-22 (ninth entry): ORCA — a comparison layer, not a second movement model
+
+Gap-closure plan batch 3.1: a second, well-known collision-avoidance algorithm run on this project's own benchmarks, producing a difference table against social force. Full account in `docs/adr/0013-orca-comparison-layer.md`; this entry records the decision to self-implement rather than bring in RVO2 (a C++/WASM build target this repo does not carry, for an algorithm whose core is a few hundred lines) and the actual numbers.
+
+### What was built
+
+`orcaAvoidance.ts` implements ORCA (van den Berg, Guy, Lin & Manocha, 2008) faithfully for the part that matters — per-pair half-plane constraints (both the approaching-but-not-colliding case, with its time-horizon truncated cone, and the already-overlapping case, with its shorter escape-line horizon) and the paper's own incremental 2D linear program (`linearProgram1`/`linearProgram2`, ported from the reference algorithm and RVO2's own implementation of it). **One deliberate scope cut, disclosed in the ADR and in the code's own comment**: RVO2's `linearProgram3` — a full feasibility relaxation across every constraint when none of them can be jointly satisfied — is not built. In its place, when a single constraint's own escape velocity exceeds the max-speed disc entirely, the solver moves at full speed toward that constraint's feasible side rather than returning the unconstrained candidate unchanged. That second choice was not academic: the first version _did_ return the unconstrained candidate, and a unit test of two already-overlapping, zero-velocity agents got back zero — the ORCA analogue of the exact flight-lane freeze `floorTransfers.ts` was fixed for earlier this same day (an occupancy-cap fallback that gave up instead of pushing through). Same shape of bug, same session, independently discovered in a completely different algorithm, because the underlying failure mode — "when a constraint can't be perfectly satisfied, silently do nothing" — recurs anywhere a solver has a bail-out path.
+
+**Walls are not ORCA obstacles.** `stepCrowdOrca` reuses this project's own `constrainMovement` (the same hard wall clip `stepCrowd` already applies) rather than building ORCA's own line-segment obstacle handling. Disclosed as a real cut, not a hidden one: a scene where the _only_ way through is a gap ORCA's agent-agent constraints alone cannot resolve is not exercising ORCA's own obstacle behaviour in that regime. None of the three benchmarks below depend on it.
+
+### The comparison (`orcaComparison.ts`), against benchmarks that already existed
+
+Fundamental diagram (`measureCorridorSpeedOrca`, the same periodic-corridor technique `measureCorridorSpeed` already uses, calling the _unmodified_ function for the social-force side — a test asserts the two give literally the same number for the same input, so this comparison cannot have quietly forked social force's own measurement):
+
+| density (P/m²) | social force (m/s) | ORCA (m/s) |
+| -------------- | ------------------ | ---------- |
+| 0.5            | 1.255              | 1.334      |
+| 1              | 1.085              | 1.270      |
+| 2              | 0.699              | 0.590      |
+| 3              | 0.291              | 0.224      |
+| 4              | 0.037              | 0.081      |
+
+Both models show the right qualitative shape (speed falls as density rises); they diverge more as density climbs, and cross order at the top of the range — at 4 P/m² ORCA is _faster_ than social force, the two models handling extreme crowding differently, not one being "more correct" (neither is fitted to real trajectory data at all, and social force's own fit was to Weidmann's curve, not to this exact scenario).
+
+Bottleneck specific flow (`measureBottleneckFlow`, `bottleneckTest`'s own room/headcount/2.4 m gap geometry, at the lightweight `stepCrowd`/`stepCrowdOrca` level rather than through the full scene schema): social force 1.58 people/s/m, ORCA 1.42 — both in the neighbourhood of Weidmann's own peak specific flow (1.22, `weidmannMaxSpecificFlow`), consistent with a doorway this size not being the tightest possible constraint in either model.
+
+Passing distance (`measurePassingDistance`, the exact 20 m/0.1 m-offset head-on setup `crowdMovement.test.ts`'s own `headOnPassing` already uses): social force 0.534 m — matching this project's own previously-recorded measurement for that setup almost exactly — ORCA 0.460 m, passing noticeably tighter.
+
+### What this is not
+
+A snapshot, not a standing gate: nothing re-runs this comparison, and nothing fails a build if the numbers drift. Not a calibrated comparison: `orcaParameters` are the ORCA literature's own typical defaults, not fitted to anything, while `socialForceParameters` is fitted to Weidmann's curve — so "which model matches Weidmann's default behaviour better" is answerable from the table above, "which model is more accurate" is not, for the same reason this project's other model-comparison work (`docs/calibration/`) already states its own parameters are not unique. Not wired anywhere: `crowdMovement.ts`, `simulationEngine.ts`, the scene schema and the editor are byte-for-byte unchanged; there is no in-app way to run a scene "on ORCA". "Into the report" (the plan's own acceptance line) is this entry, with real numbers, not a new printable UI section — that would be separate, larger work this pass did not attempt.
+
+12 new tests (`orcaAvoidance.test.ts`, 7: the LP solver's behaviour on an unconstrained case, a symmetric head-on deflection, the overlapping-pair escape fallback, and a max-speed cap; `orcaComparison.test.ts`, 5, including the "matches the unmodified harness exactly" regression). 806 vitest tests total, cargo test, typecheck, lint and prettier all clean.
+
+### This session's own review, applied
+
+Ponytail-review of this diff found four things, all fixed before commit: `directionOpt`, a parameter threaded through both LP functions for a mode (RVO2's own distance-maximizing solve, used only by its `linearProgram3`) this module never calls with `true` — removed, along with its dead branches. `OrcaLine` was exported with no reference outside its own file — dropped to a module-private type. `OrcaStepInput.parameters` (a per-call override of `orcaParameters`) had no caller anywhere in this diff — removed until something needs it. The largest: `measureCorridorSpeedOrca` had re-implemented `fundamentalDiagramHarness.ts`'s own periodic-corridor loop almost line for line, differing only in which step function ran it — `runPeriodicCorridor` is now that loop, exported once, with `measureCorridorSpeed` (social force) and `measureCorridorSpeedOrca` (ORCA) as thin callers supplying their own step closure. Confirmed behaviour-preserving two ways: the existing `fundamentalDiagramHarness.test.ts`/RiMEA suite tests (which exercise `measureCorridorSpeed` through `runFundamentalDiagramTest`/`runOneDimensionalFundamentalDiagramTest`) still pass unchanged, and the comparison table's own numbers (reproduced above) came out bit-for-bit identical before and after the refactor.
