@@ -12,6 +12,7 @@ const openFloor = createRouter({ width: 60, height: 40 }, []);
 function connector(overrides: Partial<ConnectorRuntime> = {}): ConnectorRuntime {
   return {
     id: "stair-1",
+    shaftId: "stair-1",
     kind: "stair",
     fromFloorId: "ground",
     fromPoint: { x: 30, y: 20 },

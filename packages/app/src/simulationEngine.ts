@@ -6,6 +6,7 @@ import { createRouter, type Router } from "./crowdNavigation";
 import {
   buildFlightLane,
   createFloorGraph,
+  elevatorCarFloorId,
   flightFloorId,
   type ConnectorRuntime,
 } from "./floorRouting";
@@ -14,6 +15,7 @@ import {
   planFloorLegs,
   stepConnectorTravel,
 } from "./floorTransfers";
+import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
 import { stepCrowd } from "./crowdMovement";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
 import { createWallIndex, type WallIndex } from "./wallIndex";
@@ -111,6 +113,10 @@ export type SimulationAgent = {
    */
   transfer?: {
     connectorId: string;
+    /** The connector's own shaft/flight id (`ConnectorRuntime.shaftId`) — a
+     * lift's two directions share one, so `isRiding` finds the one shared
+     * car floor regardless of which direction routed this person onto it. */
+    shaftId: string;
     finalX: number;
     finalY: number;
     floorId: string;
@@ -316,23 +322,46 @@ export function createSimulationEngine(
     }));
   }
   /**
-   * One walkable lane per connector (ADR-0010 stage 5, `buildFlightLane`),
+   * One walkable lane per **shaft** (ADR-0010 stages 5–6, `buildFlightLane`),
    * stepped by the same per-floor crowd loop as a real floor. Kept out of
    * `floors` itself: `floorRuntime`/`floorGraph` use `floors` to answer
    * "which real floor is X on", and a flight is not an answer to that — it is
    * somewhere between two of them, never a decision's destination.
+   *
+   * Keyed by `shaftId`, not `id`: a stair's own two directions never share
+   * one (each `shaftId` equals its own `id`), but a lift's two directions do
+   * — one physical car, so one floor for it, not two. A lift with more than
+   * one car gets one floor **per car** (`elevatorCarFloorId`) — two cars in
+   * the same shaft are two boxes, never sharing a floor and so never sharing
+   * the space either.
    */
   function buildFlightFloors(
     connectorList: readonly ConnectorRuntime[],
   ): FloorRuntime[] {
-    return connectorList.map((connector) => {
+    const bySharedShaft = new Map<string, ConnectorRuntime>();
+    for (const connector of connectorList) {
+      if (!bySharedShaft.has(connector.shaftId)) {
+        bySharedShaft.set(connector.shaftId, connector);
+      }
+    }
+
+    return [...bySharedShaft.values()].flatMap((connector) => {
       const lane = buildFlightLane(connector);
-      return {
-        id: flightFloorId(connector.id),
+      const floor = (id: string): FloorRuntime => ({
+        id,
         router: createRouter(lane.world, []),
         walls: createWallIndex(lane.walls),
         world: lane.world,
-      };
+      });
+
+      if (connector.kind !== "elevator") {
+        return [floor(flightFloorId(connector.shaftId))];
+      }
+
+      const carCount = connector.carCount ?? 1;
+      return Array.from({ length: carCount }, (_, carIndex) =>
+        floor(elevatorCarFloorId(connector.shaftId, carIndex)),
+      );
     });
   }
   let floors = buildFloors(config);
@@ -344,6 +373,7 @@ export function createSimulationEngine(
     routerFor: (floorId) => floorRuntime(floorId)?.router,
   });
   let connectorTraffic = createConnectorTraffic(connectors);
+  let elevatorCars = createElevatorRuntime(connectors);
   function floorRuntime(floorId: string | undefined) {
     return floors.find((floor) => floor.id === floorId) ?? floors[0];
   }
@@ -619,6 +649,14 @@ export function createSimulationEngine(
       sinks,
       traffic: connectorTraffic,
     });
+    agents = stepElevatorTravel({
+      agents,
+      cars: elevatorCars,
+      connectors,
+      graph: floorGraph,
+      nowSeconds: elapsedSeconds,
+      sinks,
+    });
     if (evacuationActive && exitedSinkIds.length > 0) {
       for (const sinkId of exitedSinkIds) {
         evacuationExits.set(sinkId, (evacuationExits.get(sinkId) ?? 0) + 1);
@@ -666,6 +704,7 @@ export function createSimulationEngine(
       connectors = geometry.connectors ?? [];
       flightFloors = buildFlightFloors(connectors);
       connectorTraffic = createConnectorTraffic(connectors);
+      elevatorCars = createElevatorRuntime(connectors);
       floorGraph = createFloorGraph({
         connectors,
         meanSpeedMetersPerSecond: speedMetersPerSecond,

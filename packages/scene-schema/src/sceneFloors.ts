@@ -16,9 +16,9 @@ import type { CrowdSimScene } from "./index";
  *
  * What this module does NOT do: route or move anyone. Routing between floors
  * lives in `floorRouting.ts` and the crossing in `floorTransfers.ts`; the scene
- * level declares `connectors` (stairs and escalators, never lifts) and the
- * engine carries agents across them. This module only says which primitive sits
- * on which floor, and resolves an absent `floorId` to the base floor.
+ * level declares `connectors` (stairs, escalators and lifts) and the engine
+ * carries agents across them. This module only says which primitive sits on
+ * which floor, and resolves an absent `floorId` to the base floor.
  */
 
 export type SceneFloor = CrowdSimScene["floors"][number];

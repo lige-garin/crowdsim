@@ -240,14 +240,24 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
   const runtimes: ConnectorRuntime[] = [];
 
   for (const connector of scene.connectors) {
+    const isElevator = connector.kind === "elevator";
     const rise =
       elevationOf(connector.to.floorId) - elevationOf(connector.from.floorId);
     // How many people a second a stair mouth can pass: the same width rule as
-    // an entrance (ADR-0008), because it is the same constraint.
+    // an entrance (ADR-0008), because it is the same constraint. A lift is
+    // capacity-, not width-, limited, so this is never read for one.
     const admitPerSecond = connector.width * weidmannMaxSpecificFlow;
+    const elevatorFields = isElevator
+      ? {
+          capacity: connector.capacity,
+          carCount: connector.carCount,
+          doorSeconds: connector.doorSeconds,
+        }
+      : {};
 
     runtimes.push({
       id: connector.id,
+      shaftId: connector.id,
       kind: connector.kind,
       fromFloorId: connector.from.floorId,
       fromPoint: connector.from.point,
@@ -257,16 +267,25 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
         connector.kind,
         rise,
         connector.speedMetersPerSecond,
+        connector.doorSeconds,
       ),
-      lengthMeters: connectorLengthMeters(rise),
+      lengthMeters: connectorLengthMeters(rise, connector.kind),
       climbing: rise >= 0,
       admitPerSecond,
       width: connector.width,
+      ...elevatorFields,
     });
 
-    if (connector.bidirectional) {
+    // A stair or escalator marked `bidirectional` is really two one-way
+    // flights sharing a footprint, so a second, independent runtime models
+    // it. A lift's car serves both directions itself — `bidirectional` is
+    // meaningless for one (ignored above) — so this always adds the return
+    // direction, sharing `shaftId` with the first so `createElevatorRuntime`
+    // pools them onto the same cars rather than two separate shafts.
+    if (connector.bidirectional || isElevator) {
       runtimes.push({
         id: `${connector.id}:down`,
+        shaftId: connector.id,
         kind: connector.kind,
         fromFloorId: connector.to.floorId,
         fromPoint: connector.to.point,
@@ -276,11 +295,13 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
           connector.kind,
           -rise,
           connector.speedMetersPerSecond,
+          connector.doorSeconds,
         ),
-        lengthMeters: connectorLengthMeters(rise),
+        lengthMeters: connectorLengthMeters(rise, connector.kind),
         climbing: -rise >= 0,
         admitPerSecond,
         width: connector.width,
+        ...elevatorFields,
       });
     }
   }

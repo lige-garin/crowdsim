@@ -1,6 +1,7 @@
 import {
   flightFloorId,
   flightLengthMeters,
+  isOnShaftFlight,
   personFlightSpeedMetersPerSecond,
   type FloorGraph,
   type ConnectorRuntime,
@@ -35,11 +36,12 @@ export const boardingRadiusMeters = 1.2;
 /** How close to the far mouth counts as having crossed the flight. */
 const arrivalRadiusMeters = 0.15;
 
-/** True while this person is walking a connector's own lane, not a real floor. */
+/** True while this person is on a connector's own lane, not a real floor —
+ * walking a stair or escalator's flight, or standing/riding in a lift car. */
 export function isRiding(agent: SimulationAgent): boolean {
   return (
     agent.transfer !== undefined &&
-    agent.floorId === flightFloorId(agent.transfer.connectorId)
+    isOnShaftFlight(agent.floorId, agent.transfer.shaftId)
   );
 }
 
@@ -143,6 +145,7 @@ export function planFloorLegs(
       ...agent,
       transfer: {
         connectorId: connector.id,
+        shaftId: connector.shaftId,
         finalX: destination.x,
         finalY: destination.y,
         floorId: destination.floorId!,
@@ -208,7 +211,7 @@ function boardingLateralMeters(agent: SimulationAgent, width: number) {
 }
 
 /**
- * Step people on and off connectors.
+ * Step people on and off a stair or escalator's flight.
  *
  * Someone who has reached the mouth of the connector they are crossing boards
  * it if there is room, moving onto its own flight lane. From there they are
@@ -217,6 +220,13 @@ function boardingLateralMeters(agent: SimulationAgent, width: number) {
  * distance now, not a timer, so someone squeezed by others on the stairs
  * genuinely takes longer, the way a corridor already works. Arriving there
  * puts them on the floor the connector leads to and gives them their next leg.
+ *
+ * **Never touches a lift connector.** A lift's progress is not "distance to
+ * the far mouth" — a car's own door and travel timing decides it
+ * (`elevatorTransfers.stepElevatorTravel`), which this function would get
+ * wrong by evicting a rider the moment their held position happens to settle
+ * near the car's centre. Both the riding and the boarding check below bail
+ * out on `kind === "elevator"` before doing anything.
  */
 export function stepConnectorTravel({
   agents,
@@ -236,6 +246,10 @@ export function stepConnectorTravel({
   const next = agents.map((agent) => {
     if (isRiding(agent)) {
       const connector = byId.get(agent.transfer!.connectorId);
+
+      if (connector?.kind === "elevator") {
+        return agent; // elevatorTransfers.stepElevatorTravel owns this rider
+      }
 
       if (!connector) {
         // The connector was edited away mid-flight. simulationEngine's
@@ -289,7 +303,11 @@ export function stepConnectorTravel({
 
     const connector = byId.get(agent.transfer.connectorId);
 
-    if (!connector || connector.fromFloorId !== agent.floorId) {
+    if (
+      !connector ||
+      connector.kind === "elevator" ||
+      connector.fromFloorId !== agent.floorId
+    ) {
       return agent;
     }
 
@@ -306,7 +324,7 @@ export function stepConnectorTravel({
 
     return {
       ...agent,
-      floorId: flightFloorId(connector.id),
+      floorId: flightFloorId(connector.shaftId),
       // A slower person is longer on the flight, which is the whole point of
       // drawing them from a population (ADR-0011) — but now it falls out of
       // actually walking it slower, not a precomputed duration.

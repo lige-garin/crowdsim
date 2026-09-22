@@ -76,6 +76,9 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       toPoint: { ...connector.to.point },
       width: connector.width,
       bidirectional: connector.bidirectional,
+      capacity: connector.capacity,
+      carCount: connector.carCount,
+      doorSeconds: connector.doorSeconds,
     })),
     countLines: scene.countLines.map((line) => ({
       id: line.id,
@@ -364,6 +367,9 @@ export function createSceneFromEditorDocument(
       to: { floorId: connector.toFloorId, point: { ...connector.toPoint } },
       width: connector.width,
       bidirectional: connector.bidirectional,
+      capacity: connector.capacity,
+      carCount: connector.carCount,
+      doorSeconds: connector.doorSeconds,
     })),
     countLines: document.countLines.map((line) => ({
       id: line.id,

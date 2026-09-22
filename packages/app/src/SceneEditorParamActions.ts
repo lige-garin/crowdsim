@@ -20,6 +20,9 @@ import {
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
   toggleDocumentConnectorBidirectional,
+  updateDocumentConnectorCapacity,
+  updateDocumentConnectorCarCount,
+  updateDocumentConnectorDoorSeconds,
   updateDocumentConnectorKind,
   updateDocumentConnectorWidth,
   updateDocumentCountLineName,
@@ -126,6 +129,24 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedConnector) return;
       setDocument((current) =>
         updateDocumentConnectorWidth(current, selectedConnector.id, width),
+      );
+    },
+    updateConnectorCapacity(capacity: number) {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        updateDocumentConnectorCapacity(current, selectedConnector.id, capacity),
+      );
+    },
+    updateConnectorCarCount(carCount: number) {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        updateDocumentConnectorCarCount(current, selectedConnector.id, carCount),
+      );
+    },
+    updateConnectorDoorSeconds(doorSeconds: number) {
+      if (!selectedConnector) return;
+      setDocument((current) =>
+        updateDocumentConnectorDoorSeconds(current, selectedConnector.id, doorSeconds),
       );
     },
     toggleConnectorBidirectional() {

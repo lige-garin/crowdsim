@@ -195,6 +195,7 @@ function leaderFloorFields(leader: SimulationAgent) {
       // No connector chosen: planFloorLegs picks the one nearest this
       // companion, who is standing somewhere else than the leader.
       connectorId: "",
+      shaftId: "",
       finalX: destination.finalX,
       finalY: destination.finalY,
       floorId: destination.floorId,
@@ -215,7 +216,7 @@ function crossToLeader(agent: SimulationAgent, leader: SimulationAgent) {
     return {
       targetX: agent.x,
       targetY: agent.y,
-      transfer: { ...leader.transfer!, connectorId: "" },
+      transfer: { ...leader.transfer!, connectorId: "", shaftId: "" },
     };
   }
 
@@ -228,6 +229,7 @@ function crossToLeader(agent: SimulationAgent, leader: SimulationAgent) {
     targetY: leader.y,
     transfer: {
       connectorId: "",
+      shaftId: "",
       finalX: leader.x,
       finalY: leader.y,
       floorId: leader.floorId,

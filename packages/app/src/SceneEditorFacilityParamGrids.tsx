@@ -300,19 +300,28 @@ export function ObstacleParamGrid({
   );
 }
 
-const connectorKinds: readonly Connector["kind"][] = ["stair", "escalator"];
+const connectorKinds: readonly Connector["kind"][] = ["stair", "escalator", "elevator"];
 
 /**
- * A stair or escalator: what it is, how wide (which is how many people a
- * second it passes, ADR-0008's rule), and whether it runs both ways.
+ * A stair, escalator or lift: what it is, and then its own parameters — a
+ * stair/escalator is wide (how many people a second it passes, ADR-0008's
+ * rule) and one- or two-way; a lift has a car capacity, a car count and a
+ * door time instead (ADR-0010 stage 6), and running both ways is not a
+ * choice for it, so that button is hidden rather than shown disabled.
  */
 export function ConnectorParamGrid({
+  onCapacityChange,
+  onCarCountChange,
+  onDoorSecondsChange,
   onKindChange,
   onToggleBidirectional,
   onWidthChange,
   selectedConnector,
   t,
 }: {
+  onCapacityChange: (value: number) => void;
+  onCarCountChange: (value: number) => void;
+  onDoorSecondsChange: (value: number) => void;
   onKindChange: (kind: Connector["kind"]) => void;
   onToggleBidirectional: () => void;
   onWidthChange: (value: number) => void;
@@ -328,18 +337,46 @@ export function ConnectorParamGrid({
         value={selectedConnector.kind}
         onChange={onKindChange}
       />
-      <NumberInput
-        label={t("width")}
-        min={0.6}
-        step={0.1}
-        value={selectedConnector.width}
-        onChange={onWidthChange}
-      />
-      <button type="button" onClick={onToggleBidirectional}>
-        {selectedConnector.bidirectional
-          ? t("connectorBothWays")
-          : `${selectedConnector.fromFloorId} → ${selectedConnector.toFloorId}`}
-      </button>
+      {selectedConnector.kind === "elevator" ? (
+        <>
+          <NumberInput
+            label={t("elevatorCapacity")}
+            min={1}
+            step={1}
+            value={selectedConnector.capacity ?? 8}
+            onChange={onCapacityChange}
+          />
+          <NumberInput
+            label={t("elevatorCarCount")}
+            min={1}
+            step={1}
+            value={selectedConnector.carCount ?? 1}
+            onChange={onCarCountChange}
+          />
+          <NumberInput
+            label={t("elevatorDoorSeconds")}
+            min={0}
+            step={0.5}
+            value={selectedConnector.doorSeconds ?? 4}
+            onChange={onDoorSecondsChange}
+          />
+        </>
+      ) : (
+        <>
+          <NumberInput
+            label={t("width")}
+            min={0.6}
+            step={0.1}
+            value={selectedConnector.width}
+            onChange={onWidthChange}
+          />
+          <button type="button" onClick={onToggleBidirectional}>
+            {selectedConnector.bidirectional
+              ? t("connectorBothWays")
+              : `${selectedConnector.fromFloorId} → ${selectedConnector.toFloorId}`}
+          </button>
+        </>
+      )}
     </div>
   );
 }

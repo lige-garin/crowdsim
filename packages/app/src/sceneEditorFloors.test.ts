@@ -127,7 +127,19 @@ describe("stairs between floors", () => {
 
     expect(scene.connectors[0].from.floorId).toBe(placed.connectors[0].fromFloorId);
     expect(scene.connectors[0].width).toBe(1.2);
-    expect(reopened.connectors).toEqual(placed.connectors);
+    // A round trip through the scene schema also picks up its lift-only
+    // defaults (capacity/carCount/doorSeconds) and a name field, which the
+    // editor's own `addConnector` never set on a plain stair — present now,
+    // not lost.
+    expect(reopened.connectors).toEqual([
+      {
+        ...placed.connectors[0],
+        capacity: 8,
+        carCount: 1,
+        doorSeconds: 4,
+        name: undefined,
+      },
+    ]);
   });
 
   it("moves both ends together when the stair well is dragged", () => {

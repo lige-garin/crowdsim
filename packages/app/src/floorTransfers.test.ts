@@ -20,6 +20,7 @@ const openFloor = createRouter({ width: 60, height: 40 }, []);
 
 const stairs: ConnectorRuntime = {
   id: "stair-1",
+  shaftId: "stair-1",
   kind: "stair",
   fromFloorId: "upper",
   fromPoint: { x: 30, y: 20 },
@@ -79,7 +80,13 @@ function rider(
     targetX: flightLengthMeters(stairs),
     targetY: stairs.width / 2,
     flightSpeedMetersPerSecond: 0.61,
-    transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+    transfer: {
+      connectorId: "stair-1",
+      shaftId: "stair-1",
+      finalX: 55,
+      finalY: 20,
+      floorId: "ground",
+    },
     ...overrides,
   });
 }
@@ -87,7 +94,13 @@ function rider(
 describe("legs of a journey between floors", () => {
   it("aims someone at the connector, keeping where they are really going", () => {
     const agent = walker({
-      transfer: { connectorId: "", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "",
+        shaftId: "",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const [planned] = planFloorLegs([agent], graph, [groundExit]);
 
@@ -95,6 +108,7 @@ describe("legs of a journey between floors", () => {
     expect(planned.targetY).toBe(stairs.fromPoint.y);
     expect(planned.transfer).toEqual({
       connectorId: "stair-1",
+      shaftId: "stair-1",
       finalX: 55,
       finalY: 20,
       floorId: "ground",
@@ -108,7 +122,13 @@ describe("legs of a journey between floors", () => {
       y: 20,
       targetX: 30,
       targetY: 20,
-      transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "stair-1",
+        shaftId: "stair-1",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const [planned] = planFloorLegs([agent], graph, [groundExit]);
 
@@ -118,7 +138,7 @@ describe("legs of a journey between floors", () => {
 
   it("sends someone with no way to their floor to an exit on their own", () => {
     const agent = walker({
-      transfer: { connectorId: "", finalX: 5, finalY: 5, floorId: "roof" },
+      transfer: { connectorId: "", shaftId: "", finalX: 5, finalY: 5, floorId: "roof" },
     });
     const [planned] = planFloorLegs([agent], graph, [groundExit, upperExit]);
 
@@ -153,7 +173,13 @@ describe("stepping onto and off a connector", () => {
     const far = walker({
       x: 20,
       y: 20,
-      transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "stair-1",
+        shaftId: "stair-1",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const [stepped] = step([far]);
 
@@ -165,7 +191,13 @@ describe("stepping onto and off a connector", () => {
     const atMouth = walker({
       x: 30,
       y: 20,
-      transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "stair-1",
+        shaftId: "stair-1",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const [boarded] = step([atMouth]);
 
@@ -210,7 +242,13 @@ describe("stepping onto and off a connector", () => {
         id: index + 1,
         x: 30,
         y: 20,
-        transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+        transfer: {
+          connectorId: "stair-1",
+          shaftId: "stair-1",
+          finalX: 55,
+          finalY: 20,
+          floorId: "ground",
+        },
       }),
     );
     const stepped = step(crowd);
@@ -228,7 +266,13 @@ describe("stepping onto and off a connector", () => {
     // no flight geometry left here to say where they physically were.
     const stranded = rider(4.5, {
       floorId: flightFloorId("gone"),
-      transfer: { connectorId: "gone", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "gone",
+        shaftId: "gone",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const [stepped] = stepConnectorTravel({
       agents: [stranded],
@@ -301,7 +345,13 @@ describe("a flight takes as long as the person is slow", () => {
       y: 20,
       stairUpMetersPerSecond: 0.23,
       stairDownMetersPerSecond: 0.29,
-      transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+      transfer: {
+        connectorId: "stair-1",
+        shaftId: "stair-1",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
     });
     const quick = { ...slow, id: 2, stairUpMetersPerSecond: 0.84 };
     const traffic = createConnectorTraffic([stairs]);

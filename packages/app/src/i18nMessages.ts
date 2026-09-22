@@ -63,6 +63,9 @@ export const messages = {
   connectorStair: { zh: "楼梯", en: "Stairs" },
   connectorEscalator: { zh: "扶梯", en: "Escalator" },
   connectorBothWays: { zh: "双向", en: "Both ways" },
+  elevatorCapacity: { zh: "轿厢限载", en: "Car capacity" },
+  elevatorCarCount: { zh: "轿厢数", en: "Cars" },
+  elevatorDoorSeconds: { zh: "开门时长(秒)", en: "Door time (s)" },
   connectorNeedsTwoFloors: {
     zh: "先加一层，楼梯要连两层",
     en: "Add a floor first: a stair joins two",

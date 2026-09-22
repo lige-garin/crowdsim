@@ -301,6 +301,7 @@ function targetFloorFields(
   return {
     transfer: {
       connectorId: agent.transfer?.connectorId ?? "",
+      shaftId: agent.transfer?.shaftId ?? "",
       finalX: target.x,
       finalY: target.y,
       floorId: targetFloorId!,

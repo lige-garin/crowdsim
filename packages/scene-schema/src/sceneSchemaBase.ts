@@ -438,19 +438,27 @@ export const countLineSchema = z.object({
 });
 
 /**
- * A way between two floors: stairs or an escalator (ADR-0010, stage 2).
+ * A way between two floors: stairs, an escalator, or a lift (ADR-0010, stages
+ * 2 and 6).
  *
- * **Lifts are deliberately not here.** A lift is a queue with a batch service —
- * people wait, a car arrives, some number board, it travels, they get out —
- * and modelling it as a sloped walk gives an answer that looks reasonable and
- * is wrong. It needs a service model of its own, and until it has one the
- * schema refuses to accept one rather than letting a scene describe a lift
- * that would be simulated as a staircase.
+ * A lift is a queue with a batch service — people wait, a car arrives, some
+ * number board, it travels, they get out — modelled that way (`floorTransfers`'s
+ * `stepElevatorTravel`), not as a sloped walk. **One connector is one shaft
+ * between exactly two floors.** A bank that serves three or more floors is
+ * declared as one elevator connector per adjacent pair it actually stops at —
+ * independent shafts and car pools, not one car skipping floors — which is a
+ * disclosed simplification: a real bank's single car serving floors 1, 2 and 3
+ * can be nearer for a 1→3 trip than two separate shafts waiting at floor 2 in
+ * between would be. Dispatch is the simplest rule that is still a rule, not a
+ * fixed order: an idle car already at the calling floor answers it; otherwise
+ * whichever idle car is first in `carCount` order is sent for it — not the
+ * lookahead a real controller uses (predicting who else it can serve on the
+ * way, balancing cars across a whole bank), and the code says so where it is.
  */
 export const connectorSchema = z.object({
   id: idSchema,
   name: z.string().min(1).optional(),
-  kind: z.enum(["stair", "escalator"]),
+  kind: z.enum(["stair", "escalator", "elevator"]),
   /** Where someone steps on, and which floor they step on from. */
   from: z.object({ floorId: idSchema, point: pointSchema }),
   /** Where they step off, and onto which floor. */
@@ -459,11 +467,13 @@ export const connectorSchema = z.object({
    * Clear walking width in metres. How many people a second it can pass is
    * this times Weidmann's peak specific flow — the same rule entrances use
    * (ADR-0008), because a stair mouth and a door are the same constraint.
+   * Ignored for a lift, which is capacity- not width-limited (`capacity`).
    */
   width: z.number().positive().default(1.2),
   /**
    * Both ways, or only from `from` to `to`. An escalator runs one way; a
    * staircase is walked in both directions unless a scene says otherwise.
+   * Ignored for a lift, whose car always serves both directions.
    */
   bidirectional: z.boolean().default(false),
   /**
@@ -471,6 +481,17 @@ export const connectorSchema = z.object({
    * the kind (see `connectorTravelSeconds`), **not calibrated here**.
    */
   speedMetersPerSecond: z.number().positive().optional(),
+  /** A lift car's own passenger limit. Ignored for stairs and escalators. */
+  capacity: z.number().int().positive().default(8),
+  /** Cars sharing this shaft. Ignored for stairs and escalators. */
+  carCount: z.number().int().positive().default(1),
+  /**
+   * Seconds a car's doors stay open at a stop to let people off and on.
+   * Self-chosen, a round number in the range ordinary dwell-plus-door-cycle
+   * times are usually quoted at — not a standard's own figure, and not
+   * calibrated. Ignored for stairs and escalators.
+   */
+  doorSeconds: z.number().nonnegative().default(4),
 });
 
 export const environmentFactorSchema = z

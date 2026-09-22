@@ -1,9 +1,10 @@
 # ADR 0010: More than one floor, and how people move between them
 
-- Status: **Accepted and implemented** (2026-09-21), except lifts, which stay
-  out of scope. What landed, and what it cost, is at the end under
-  "What was built". Proposed 2026-09-20 (rewritten the same day after the first
-  version was found to be wrong — see "Correction" below).
+- Status: **Accepted and implemented** (2026-09-21); lifts, initially out of
+  scope, landed 2026-09-22 (stage 6, see the update near the end). What landed,
+  and what it cost, is at the end under "What was built". Proposed 2026-09-20
+  (rewritten the same day after the first version was found to be wrong —
+  see "Correction" below).
 - Touches: router, movement, engine, editor UI, renderer
 - Related: ADR-0008 (entrance exits), ADR-0009 (demand profiles, groups)
 
@@ -194,7 +195,8 @@ still open, and nothing in the code pretends otherwise.
 
 ### Left for later
 
-- **Lifts**, needing a batch-service model of their own.
+- ~~**Lifts**, needing a batch-service model of their own.~~ **Done,
+  2026-09-22 (stage 6).** See the update below.
 - ~~**A connector as a place with a length.**~~ **Done, 2026-09-22 (stage 5).**
   See the update below.
 - **Nothing recalibrated for a stack.** Every fitted parameter and every
@@ -242,3 +244,60 @@ itself is left for later; it was not needed to make the physics real, and
 1000-person-scale movement still costs about what it did (`crowdMovement.ts`'s
 own performance note is unaffected — no change was made to the level-floor
 path).
+
+## Update 2026-09-22: lifts, the batch-service model this ADR deferred (stage 6)
+
+The gap this ADR's original decision (point 5) and "What was built" both named
+is closed: `connectorSchema` now accepts `kind: "elevator"`, and
+`elevatorTransfers.ts` gives it the batch-service model the schema's own
+refusal said a staircase's walk-a-lane model would get wrong — a queue, a car
+with a door and a capacity, a travel time, not a sloped corridor.
+
+**One connector is one shaft between exactly two floors.** A bank serving
+three or more floors is declared as one elevator connector per adjacent pair
+it stops at — independent shafts and car pools, not one car skipping a floor
+— disclosed in `connectorSchema`'s own doc comment as a real difference from
+a real bank (a single car serving floors 1, 2 and 3 can be nearer for a 1→3
+trip than two separate shafts waiting at floor 2 in between would be).
+
+**The dispatch is the simplest rule that is still a rule**, not the fixed
+order the plan for this work first suggested: an idle car already at the
+calling floor answers it for free; otherwise the first idle car (by
+`carCount` order) still at the other floor is sent to fetch them. On a
+two-floor shaft this is the whole of "nearest idle car" — every idle car not
+already at the calling floor is equally near it, there being only the one
+other floor to be near from — and it does not look ahead the way a real
+controller does (predicting who else is worth picking up along the way,
+balancing idle cars across a whole bank).
+
+**A rider sits in a real box, not a point.** `buildFlightLane` gives a lift
+connector a small enclosed square (`elevatorCarSideMeters`, scaled off
+`capacity` against an 8-person car's own typical ~1.6 m interior, EN 81's
+own car-size-by-load convention) instead of a corridor — four walls, not two,
+since nobody should drift out a side a corridor's open ends do not have. A
+shaft with more than one car gets one box **per car**
+(`elevatorCarFloorId`), never one box shared between them: two cars in the
+same shaft are two physical spaces, occupying different positions in the
+run, never pushing each other the way two people on the same stair flight
+do.
+
+**Literature-typical, not calibrated, same as every other connector speed in
+this ADR**: 1.0 m/s car speed (a typical low-rise figure; nothing built here
+has enough floors to need a high-rise one), a self-chosen 4 s door-open
+default. `connectorTravelSeconds`'s own number for a lift is a **routing-cost
+estimate only** — straight vertical rise at that speed plus two door cycles,
+so the graph (`createFloorGraph`) has one static figure to compare "walk"
+against "ride" with, the same way it already does for a stair — not a live
+prediction of anyone's actual wait; the real wait, capacity and queueing come
+from the car simulation itself, which never reads that number back.
+
+**What still is not here**: dispatch does not look ahead or balance a bank;
+a hall call is only re-evaluated at the moment a car's phase ends, not
+continuously while its doors are open, so someone arriving mid-dwell waits
+for the car's next trip rather than the one already loading; and — as the
+original decision said and nothing here changes — nothing fitted anywhere in
+this repository is calibrated to any real lift's throughput, because this
+project has no observed lift flow to fit to. See `docs/CLAIMS_LEDGER.md`'s
+2026-09-22 section for the same disclosure in the place a report reader
+would actually see it, and `elevatorTransfers.ts`/`elevatorTransfers.test.ts`
+and `simulationElevators.test.ts` for the model and its coverage.

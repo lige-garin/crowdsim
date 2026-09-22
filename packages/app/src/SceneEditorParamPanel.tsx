@@ -47,6 +47,9 @@ type SceneEditorParamPanelProps = {
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onConnectorCapacityChange: (value: number) => void;
+  onConnectorCarCountChange: (value: number) => void;
+  onConnectorDoorSecondsChange: (value: number) => void;
   onConnectorKindChange: (kind: Connector["kind"]) => void;
   onConnectorWidthChange: (value: number) => void;
   onToggleConnectorBidirectional: () => void;
@@ -98,6 +101,9 @@ export function SceneEditorParamPanel({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onConnectorCapacityChange,
+  onConnectorCarCountChange,
+  onConnectorDoorSecondsChange,
   onConnectorKindChange,
   onConnectorWidthChange,
   onToggleConnectorBidirectional,
@@ -146,6 +152,9 @@ export function SceneEditorParamPanel({
       <h3>{t("parameters")}</h3>
       {selectedConnector ? (
         <ConnectorParamGrid
+          onCapacityChange={onConnectorCapacityChange}
+          onCarCountChange={onConnectorCarCountChange}
+          onDoorSecondsChange={onConnectorDoorSecondsChange}
           onKindChange={onConnectorKindChange}
           onToggleBidirectional={onToggleConnectorBidirectional}
           onWidthChange={onConnectorWidthChange}

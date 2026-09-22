@@ -60,6 +60,9 @@ type SceneEditorLayoutProps = {
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: EditorDocument["buildings"][number]["kind"]) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
+  onConnectorCapacityChange: (value: number) => void;
+  onConnectorCarCountChange: (value: number) => void;
+  onConnectorDoorSecondsChange: (value: number) => void;
   onConnectorKindChange: (kind: EditorDocument["connectors"][number]["kind"]) => void;
   onConnectorWidthChange: (value: number) => void;
   onToggleConnectorBidirectional: () => void;
@@ -178,6 +181,9 @@ export function SceneEditorLayout({
   onBasemapNumberChange,
   onBuildingKindChange,
   onBuildingNumberChange,
+  onConnectorCapacityChange,
+  onConnectorCarCountChange,
+  onConnectorDoorSecondsChange,
   onConnectorKindChange,
   onConnectorWidthChange,
   onToggleConnectorBidirectional,
@@ -352,6 +358,9 @@ export function SceneEditorLayout({
         onBasemapNumberChange={onBasemapNumberChange}
         onBuildingKindChange={onBuildingKindChange}
         onBuildingNumberChange={onBuildingNumberChange}
+        onConnectorCapacityChange={onConnectorCapacityChange}
+        onConnectorCarCountChange={onConnectorCarCountChange}
+        onConnectorDoorSecondsChange={onConnectorDoorSecondsChange}
         onConnectorKindChange={onConnectorKindChange}
         onConnectorWidthChange={onConnectorWidthChange}
         onToggleConnectorBidirectional={onToggleConnectorBidirectional}

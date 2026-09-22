@@ -164,7 +164,7 @@ describe("connectors between floors", () => {
     expect(result.error?.issues[0]?.message).toContain("same floor");
   });
 
-  it("refuses a lift, which needs a service model it does not have", () => {
+  it("accepts a lift between two declared floors, with its own capacity/car/door defaults", () => {
     const result = safeParseScene(
       withStairs({
         id: "lift-1",
@@ -174,7 +174,10 @@ describe("connectors between floors", () => {
       }),
     );
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.data?.connectors[0].capacity).toBe(8);
+    expect(result.data?.connectors[0].carCount).toBe(1);
+    expect(result.data?.connectors[0].doorSeconds).toBe(4);
   });
 });
 

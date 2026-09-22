@@ -463,6 +463,54 @@ export function updateDocumentConnectorWidth(
   };
 }
 
+/** A lift car's own passenger limit. */
+export function updateDocumentConnectorCapacity(
+  document: EditorDocument,
+  connectorId: string,
+  capacity: number,
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId
+        ? { ...connector, capacity: Math.max(1, Math.round(capacity)) }
+        : connector,
+    ),
+  };
+}
+
+/** Cars sharing a lift's shaft. */
+export function updateDocumentConnectorCarCount(
+  document: EditorDocument,
+  connectorId: string,
+  carCount: number,
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId
+        ? { ...connector, carCount: Math.max(1, Math.round(carCount)) }
+        : connector,
+    ),
+  };
+}
+
+/** How long a lift car's doors stay open at a stop. */
+export function updateDocumentConnectorDoorSeconds(
+  document: EditorDocument,
+  connectorId: string,
+  doorSeconds: number,
+): EditorDocument {
+  return {
+    ...document,
+    connectors: document.connectors.map((connector) =>
+      connector.id === connectorId
+        ? { ...connector, doorSeconds: Math.max(0, doorSeconds) }
+        : connector,
+    ),
+  };
+}
+
 /** Both ways, or only the way it was drawn — an escalator runs one way. */
 export function toggleDocumentConnectorBidirectional(
   document: EditorDocument,

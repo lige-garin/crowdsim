@@ -886,7 +886,7 @@ Test 4 fails at its own real parameters — verified directly:
 "fail"`, worst deviation 0.142 m/s at 0.5 P/m², against the already-recorded
 0.10 m/s tolerance. This was already known and written up honestly
 elsewhere (CLAUDE.md's 2026-08-30 and 2026-09-21 entries both say test 4
-fails), so nothing about the *finding* was hidden — only this one summary
+fails), so nothing about the _finding_ was hidden — only this one summary
 line, written the same day as the entry it sits in, undercounted it. The
 correct count for the 7 tests built at that point was 6 passed, 1 failed.
 
@@ -1004,7 +1004,7 @@ module comment: test 9 and test 11's doors/exits are built 2.4 m wide (their
 own sinks stay labelled at the guideline's 1 m width, since sinks are not
 throughput-gated in this engine — only sources are, ADR-0008 — so the sink's
 own declared width does not affect what is measured); test 12's bottleneck
-defaults to 2.4 m everywhere, and 12d — the one sub-test where width *is*
+defaults to 2.4 m everywhere, and 12d — the one sub-test where width _is_
 the measured variable — moves its own three points out to 2.0/2.6/3.2 m
 rather than reuse the guideline's 0.8/1.0/1.2 m, still three points testing
 the same claim (flow rises with width).
@@ -1045,7 +1045,7 @@ scene does not rediscover it the slow way.
 
 At the guideline's own 1000 people, the built scene measures **exit 1
 (nearer, 14.5 m from the source) took 473, exit 2 (farther, 20.5 m) took
-527** — the *farther* exit got used more, not less, reversing the
+527** — the _farther_ exit got used more, not less, reversing the
 guideline's own expected result ("persons prefer the closer exit… congestion
 occurs… individual persons will also use the alternative"). This is not a
 scene bug: `mallCrowdDecisionBackend`'s `chooseEvacuationSink` penalises each
@@ -1097,3 +1097,85 @@ different thing from test 4's own failure: test 16 has no comparable point
 past its own corridor's jam density to fail against, while test 4's failure
 is at 0.5 P/m² — well inside Weidmann's comparable range, not a beyond-jam
 artifact.
+
+## 2026-09-22 (fourth entry): lifts — a batch-service model, not a sloped walk
+
+`connectorSchema` refused `kind: "elevator"` since ADR-0010 stage 1, with a
+doc comment saying why: a lift is a queue with a batch service, and
+modelling it as a staircase would produce an answer that looks reasonable
+and is not. That refusal is now lifted — `elevatorTransfers.ts` gives it the
+model the refusal was waiting for.
+
+### What was built
+
+A car has three phases (`idle`/`boarding`/`moving`), timed against the
+engine's own simulated clock, not a fixed schedule. Idle, it answers a call
+at its own floor for free; failing that, the first idle car (by `carCount`
+order) is sent empty to the other floor — the simplest dispatch that is
+still a dispatch, not the real thing (no lookahead, no load balancing across
+a bank; disclosed as such in the module's own doc comment and in
+`connectorSchema`'s). Boarding takes up to `capacity` people from whoever is
+waiting, holds doors for `doorSeconds`, then rides for a travel time derived
+from a 1.0 m/s literature-typical car speed. A rider sits inside a small
+enclosed box (`elevatorCarSideMeters`, scaled off `capacity` against an
+8-person car's own ~1.6 m EN 81-typical interior) — four walls, not the two-
+wall corridor a stair's flight gets, and a shaft with more than one car gets
+one box **per car** (`elevatorCarFloorId`), so two cars never occupy the
+same physical space.
+
+**One connector is one shaft between exactly two floors, same as before.** A
+bank serving three or more floors needs one elevator connector per adjacent
+pair, independent shafts and car pools rather than one car skipping a
+floor — a real difference from a real bank, disclosed in `connectorSchema`'s
+doc comment: a single car serving floors 1, 2 and 3 can be nearer for a 1→3
+trip than two separate shafts waiting at floor 2 in between would be.
+
+`connectorTravelSeconds`'s own number for a lift — used only for the
+floor-graph's routing-cost comparison ("is upstairs nearer than the far end
+of this floor"), never read by the car simulation itself — is straight
+vertical rise at car speed plus two door cycles: a static estimate, not a
+live wait-time prediction. `elevatorRideSeconds` derives the car's actual
+`"moving"`-phase duration by subtracting the two door cycles back out of
+that same number, rather than recomputing it from scratch, so the two stay
+in one relationship instead of two formulas that could drift apart.
+
+### Editor round trip
+
+`EditorConnector` gained `capacity`/`carCount`/`doorSeconds`, threaded
+through both conversion directions (`sceneEditorConversions.ts`) — round-
+tripped even before this pass added a real control for them, on this
+project's own established rule that an unrelated edit must not silently
+revert a value the scene actually declared. A working control now exists
+too: the connector kind dropdown gained "elevator", and its parameter grid
+shows capacity/car-count/door-seconds in place of width/bidirectional when
+that kind is selected — so a lift is not a capability that only JSON authors
+could reach, the class of gap this project's own `multifloorScene.ts`
+episode (2026-09-20/21) warned against building.
+
+### Verified, not assumed
+
+`elevatorTransfers.test.ts` (10 cases) drives the car state machine directly
+at fixed simulated timestamps: doors open for someone waiting at the car's
+own floor for free; a full door-to-alighting cycle at the exact
+`doorSeconds`/`rideSeconds` boundaries; capacity truly caps boarding and
+turns away the rest for the next trip; an idle car is dispatched empty for a
+call at the far floor; two cars in one shaft get two independent boxes; a
+scene with no lift connectors is a no-op. `simulationElevators.test.ts`
+proves the same thing through the real scene → engine pipeline (the same
+shape `simulationFloors.test.ts` already uses for a staircase, built to be
+read side by side with it): arrivals on an upper floor route to the lift's
+own mouth, ride down in a box addressable by `isOnShaftFlight`, and leave
+through a ground-floor door, never carrying more than the car's own declared
+capacity at once, and never counting a lift lobby as having left the
+building.
+
+### What still is not here
+
+Dispatch does not look ahead or balance load across a bank; a hall call is
+only re-evaluated at the moment a car's own phase ends, not continuously
+while doors are open, so someone arriving mid-dwell waits for the car's next
+trip rather than the one already loading. And — unchanged from every other
+connector speed this project has ever quoted — nothing here is calibrated to
+any real lift's throughput; this project has no observed lift flow to fit
+to. See `docs/adr/0010-multi-floor-and-vertical-circulation.md`'s own
+2026-09-22 update for the same account with the full ADR context.

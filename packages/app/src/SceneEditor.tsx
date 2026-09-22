@@ -642,6 +642,9 @@ export function SceneEditor({
       onBasemapNumberChange={paramActions.updateBasemap}
       onBuildingKindChange={paramActions.updateBuildingKind}
       onBuildingNumberChange={paramActions.updateBuildingNumber}
+      onConnectorCapacityChange={paramActions.updateConnectorCapacity}
+      onConnectorCarCountChange={paramActions.updateConnectorCarCount}
+      onConnectorDoorSecondsChange={paramActions.updateConnectorDoorSeconds}
       onConnectorKindChange={paramActions.updateConnectorKind}
       onConnectorWidthChange={paramActions.updateConnectorWidth}
       onToggleConnectorBidirectional={paramActions.toggleConnectorBidirectional}

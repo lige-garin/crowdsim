@@ -205,19 +205,27 @@ export type EditorHazard = {
 };
 
 /**
- * A way between two floors: stairs or an escalator (ADR-0010). It is not on a
- * floor — it joins two — so it carries both ends rather than a `floorId`.
+ * A way between two floors: stairs, an escalator or a lift (ADR-0010). It is
+ * not on a floor — it joins two — so it carries both ends rather than a
+ * `floorId`.
  */
 export type EditorConnector = {
   id: string;
   name?: string;
-  kind: "escalator" | "stair";
+  kind: "escalator" | "stair" | "elevator";
   fromFloorId: string;
   fromPoint: ScenePoint;
   toFloorId: string;
   toPoint: ScenePoint;
   width: number;
   bidirectional: boolean;
+  /** A lift's own fields — set by `ConnectorParamGrid` when its kind is
+   * "elevator", and round-tripped either way, so a scene authored with them
+   * (JSON, or the panel) survives an unrelated edit rather than silently
+   * reverting to defaults. */
+  capacity?: number;
+  carCount?: number;
+  doorSeconds?: number;
 };
 
 /**
