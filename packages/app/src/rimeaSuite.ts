@@ -3071,7 +3071,7 @@ export const unattemptedRimeaTests: readonly RimeaTestResult[] = [
     title: "Choice of route",
     status: "needs-scenario",
     blockedBy:
-      "A 4, p. 44 (its Fig. 18): a start and target connected by two stairs and a corridor on the ground floor, and by a longer corridor on the upper floor — but the figure is an undimensioned isometric schematic, unlike every other test here. Building it would mean inventing lengths RiMEA does not give, not reading them off the page.",
+      'A 4, p. 44 (its Fig. 18): a start and target connected by two stairs and a corridor on the ground floor, and by a longer corridor on the upper floor — but the figure is an undimensioned isometric schematic, unlike every other test here (re-confirmed 2026-09-22 at 400 DPI, after Fig. 3/7/16 all turned out to have real, readable data once actually read at that resolution instead of remembered: this one genuinely has no numbers anywhere on the page). The text asks only a qualitative question ("short"/"long"/"mixed"/"configurable") with no geometry to grade an answer against. Building it would mean inventing every length RiMEA does not give, not reading them off the page.',
   },
 ];
 
