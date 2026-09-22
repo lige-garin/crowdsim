@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
   measureBottleneckFlow,
+  measureCorridorSpeedMoussaid,
   measureCorridorSpeedOrca,
   measurePassingDistance,
   runOrcaComparison,
 } from "./orcaComparison";
 import { measureCorridorSpeed } from "./fundamentalDiagramHarness";
+
+describe("measureCorridorSpeedMoussaid", () => {
+  it("gives a finite, positive speed at a modest density, slowing as density rises", () => {
+    const sparse = measureCorridorSpeedMoussaid(0.5, {
+      warmupSeconds: 3,
+      measureSeconds: 3,
+    });
+    const dense = measureCorridorSpeedMoussaid(3, {
+      warmupSeconds: 3,
+      measureSeconds: 3,
+    });
+
+    expect(Number.isFinite(sparse)).toBe(true);
+    expect(sparse).toBeGreaterThan(0);
+    expect(dense).toBeLessThan(sparse);
+  }, 30_000);
+});
 
 describe("measureCorridorSpeedOrca", () => {
   it("gives a finite, positive speed at a modest density", () => {
@@ -75,18 +93,21 @@ describe("measureBottleneckFlow and measurePassingDistance", () => {
 });
 
 describe("runOrcaComparison", () => {
-  it("returns both sides of all three benchmarks", () => {
+  it("returns all three models' sides of all three benchmarks", () => {
     const result = runOrcaComparison([0.5, 2]);
 
     expect(result.fundamentalDiagram).toHaveLength(2);
     for (const point of result.fundamentalDiagram) {
       expect(point.socialForce).toBeGreaterThan(0);
       expect(point.orca).toBeGreaterThan(0);
+      expect(point.moussaid).toBeGreaterThan(0);
     }
     expect(result.bottleneckSpecificFlow.socialForce).toBeGreaterThanOrEqual(0);
     expect(result.bottleneckSpecificFlow.orca).toBeGreaterThanOrEqual(0);
+    expect(result.bottleneckSpecificFlow.moussaid).toBeGreaterThanOrEqual(0);
     expect(result.passingDistanceMeters.socialForce).toBeGreaterThan(0);
     expect(result.passingDistanceMeters.orca).toBeGreaterThan(0);
+    expect(result.passingDistanceMeters.moussaid).toBeGreaterThan(0);
   }, 60_000);
 
   it("agrees with the unmodified fundamental-diagram harness on the social-force side", () => {
@@ -97,5 +118,5 @@ describe("runOrcaComparison", () => {
     const viaComparison = runOrcaComparison([1]).fundamentalDiagram[0].socialForce;
 
     expect(viaComparison).toBe(direct);
-  });
+  }, 30_000);
 });

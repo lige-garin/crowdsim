@@ -6,19 +6,21 @@ import {
   runPeriodicCorridor,
   type CorridorOptions,
 } from "./fundamentalDiagramHarness";
+import { stepCrowdMoussaid } from "./moussaidHeuristic";
 import { stepCrowdOrca } from "./orcaAvoidance";
 import { weidmannFundamentalDiagram } from "./pedestrianFundamentalDiagram";
 import type { SimulationAgent } from "./simulationEngine";
 import { createWallIndex, type WallIndex } from "./wallIndex";
 
 /**
- * Social-force vs ORCA, on this project's own existing benchmarks — see
- * `docs/adr/0013-orca-comparison-layer.md` for why this exists and what it
- * does and does not claim. Nothing here changes the social-force side: the
- * fundamental-diagram measurement calls the same, unmodified
- * `measureCorridorSpeed` every other benchmark in this project already
- * uses; only the ORCA side (and the bottleneck/passing harnesses, run
- * under both models) is new code.
+ * Social force vs ORCA vs Moussaïd's heuristic, on this project's own
+ * existing benchmarks — see `docs/adr/0013-orca-comparison-layer.md` and
+ * `docs/adr/0014-moussaid-heuristic-comparison-layer.md` for why each
+ * exists and what they do and do not claim. Nothing here changes the
+ * social-force side: the fundamental-diagram measurement calls the same,
+ * unmodified `measureCorridorSpeed` every other benchmark in this project
+ * already uses; the other two models' own measurements are new code, run
+ * through the exact same harness functions.
  */
 
 type StepFn = (input: {
@@ -60,17 +62,34 @@ const orcaStep: StepFn = (input) =>
     exitRadius: () => 0,
   }).agents;
 
+const moussaidStep: StepFn = (input) =>
+  stepCrowdMoussaid({
+    agents: input.agents,
+    dtSeconds: input.dtSeconds,
+    meanSpeedMetersPerSecond: input.meanSpeedMetersPerSecond,
+    walls: input.walls,
+    isExitBound: () => false,
+    exitRadius: () => 0,
+  }).agents;
+
 /**
- * The ORCA side of the fundamental diagram: `runPeriodicCorridor`
+ * The ORCA/Moussaïd side of the fundamental diagram: `runPeriodicCorridor`
  * (`fundamentalDiagramHarness.ts`) — the exact same periodic-corridor loop
- * `measureCorridorSpeed` calls for social force — stepped with `orcaStep`
- * instead.
+ * `measureCorridorSpeed` calls for social force — stepped with the other
+ * model's own step function instead.
  */
 export function measureCorridorSpeedOrca(
   densityPerSquareMeter: number,
   options: CorridorOptions = {},
 ): number {
   return runPeriodicCorridor(orcaStep, densityPerSquareMeter, options);
+}
+
+export function measureCorridorSpeedMoussaid(
+  densityPerSquareMeter: number,
+  options: CorridorOptions = {},
+): number {
+  return runPeriodicCorridor(moussaidStep, densityPerSquareMeter, options);
 }
 
 /**
@@ -206,16 +225,21 @@ export function measurePassingDistance(step: StepFn, seconds = 15): number {
 }
 
 export type OrcaComparisonResult = {
-  fundamentalDiagram: { density: number; socialForce: number; orca: number }[];
-  bottleneckSpecificFlow: { socialForce: number; orca: number };
-  passingDistanceMeters: { socialForce: number; orca: number };
+  fundamentalDiagram: {
+    density: number;
+    socialForce: number;
+    orca: number;
+    moussaid: number;
+  }[];
+  bottleneckSpecificFlow: { socialForce: number; orca: number; moussaid: number };
+  passingDistanceMeters: { socialForce: number; orca: number; moussaid: number };
 };
 
 /**
- * Runs the three benchmarks under both models and returns both sides. The
- * fundamental-diagram densities are a short list, not this project's full
- * seven-point RiMEA sweep (`fundamentalDiagramDensities`) — a comparison
- * snapshot, not a second copy of that regression.
+ * Runs the three benchmarks under all three models and returns each side.
+ * The fundamental-diagram densities are a short list, not this project's
+ * full seven-point RiMEA sweep (`fundamentalDiagramDensities`) — a
+ * comparison snapshot, not a second copy of that regression.
  */
 export function runOrcaComparison(
   densities: readonly number[] = [0.5, 1, 2, 3, 4],
@@ -224,6 +248,7 @@ export function runOrcaComparison(
     density,
     socialForce: measureCorridorSpeed(density, {}),
     orca: measureCorridorSpeedOrca(density),
+    moussaid: measureCorridorSpeedMoussaid(density),
   }));
 
   return {
@@ -231,10 +256,12 @@ export function runOrcaComparison(
     bottleneckSpecificFlow: {
       socialForce: measureBottleneckFlow(socialForceStep),
       orca: measureBottleneckFlow(orcaStep),
+      moussaid: measureBottleneckFlow(moussaidStep),
     },
     passingDistanceMeters: {
       socialForce: measurePassingDistance(socialForceStep),
       orca: measurePassingDistance(orcaStep),
+      moussaid: measurePassingDistance(moussaidStep),
     },
   };
 }

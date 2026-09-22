@@ -1,4 +1,5 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
+import { agentsWithinDistance, splitExitedAgents } from "./crowdStepUtils";
 import { constrainMovement, type SceneWorldBounds } from "./sceneGeometry";
 import type { SimulationAgent } from "./simulationEngine";
 import type { WallIndex } from "./wallIndex";
@@ -262,14 +263,7 @@ function nearestNeighbors(
   agents: readonly SimulationAgent[],
   params: OrcaParameters,
 ): SimulationAgent[] {
-  const maxDistSq = params.neighborDistanceMeters * params.neighborDistanceMeters;
-  return agents
-    .filter((other) => other.id !== self.id)
-    .map((other) => ({
-      agent: other,
-      distSq: (other.x - self.x) ** 2 + (other.y - self.y) ** 2,
-    }))
-    .filter((entry) => entry.distSq <= maxDistSq)
+  return agentsWithinDistance(self, agents, params.neighborDistanceMeters)
     .sort((a, b) => a.distSq - b.distSq)
     .slice(0, params.maxNeighbors)
     .map((entry) => entry.agent);
@@ -301,19 +295,11 @@ export function stepCrowdOrca(input: OrcaStepInput): {
 } {
   const p = orcaParameters;
   const dt = input.dtSeconds;
-  let exitedCount = 0;
-  const remaining: SimulationAgent[] = [];
-
-  for (const agent of input.agents) {
-    const dx = agent.targetX - agent.x;
-    const dy = agent.targetY - agent.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    if (input.isExitBound(agent) && distance <= input.exitRadius(agent)) {
-      exitedCount++;
-      continue;
-    }
-    remaining.push(agent);
-  }
+  const { exitedCount, remaining } = splitExitedAgents(
+    input.agents,
+    input.isExitBound,
+    input.exitRadius,
+  );
 
   const next = remaining.map((agent) => {
     const radius = agent.radius ?? 0.23;
