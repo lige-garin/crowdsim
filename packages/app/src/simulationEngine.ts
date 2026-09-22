@@ -3,10 +3,14 @@ import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { clampPointToWorld, type SceneWorldBounds } from "./sceneGeometry";
 import { sampleBodyRadius, sampleSpeedFactor } from "./behaviorDistributions";
 import { createRouter, type Router } from "./crowdNavigation";
-import { createFloorGraph, type ConnectorRuntime } from "./floorRouting";
+import {
+  buildFlightLane,
+  createFloorGraph,
+  flightFloorId,
+  type ConnectorRuntime,
+} from "./floorRouting";
 import {
   createConnectorTraffic,
-  isRiding,
   planFloorLegs,
   stepConnectorTravel,
 } from "./floorTransfers";
@@ -83,12 +87,27 @@ export type SimulationAgent = {
   /** Their speed on a connector, m/s, when a profile gave them one. */
   stairUpMetersPerSecond?: number;
   stairDownMetersPerSecond?: number;
-  /** The floor this person is on (ADR-0010); absent in a one-floor scene. */
+  /**
+   * Set while riding a connector (floorTransfers, crowdMovement): this
+   * person's own free speed on the flight, m/s, in place of the scene's
+   * walking speed times `speedFactor`. A stair or escalator has its own
+   * literature speed, drawn once at boarding (`personFlightSpeedMetersPerSecond`)
+   * and cleared on arrival so it never leaks into a later walk on a real floor.
+   */
+  flightSpeedMetersPerSecond?: number;
+  /**
+   * The floor this person is on (ADR-0010); absent in a one-floor scene.
+   * While riding a connector this is that connector's own synthetic floor id
+   * (`flightFloorId`, ADR-0010 stage 5) — its own walkable lane, not either
+   * real floor either mouth sits on (floorRouting, floorTransfers).
+   */
   floorId?: string;
   /**
    * Where this person is really going when that is on another floor, with the
    * connector they are crossing to reach it. While this is set, `targetX`/
-   * `targetY` are the near end of that connector — the leg being walked now.
+   * `targetY` are the near end of that connector — the leg being walked now —
+   * or, once they have boarded it, the far end of the flight itself, in the
+   * flight's own coordinates (`isRiding`).
    */
   transfer?: {
     connectorId: string;
@@ -96,8 +115,6 @@ export type SimulationAgent = {
     finalY: number;
     floorId: string;
   };
-  /** Set while on a connector: the time they step off it. */
-  ridingUntilSeconds?: number;
 };
 export type SimulationSource = {
   id: string;
@@ -298,8 +315,29 @@ export function createSimulationEngine(
       world: plane.world,
     }));
   }
+  /**
+   * One walkable lane per connector (ADR-0010 stage 5, `buildFlightLane`),
+   * stepped by the same per-floor crowd loop as a real floor. Kept out of
+   * `floors` itself: `floorRuntime`/`floorGraph` use `floors` to answer
+   * "which real floor is X on", and a flight is not an answer to that — it is
+   * somewhere between two of them, never a decision's destination.
+   */
+  function buildFlightFloors(
+    connectorList: readonly ConnectorRuntime[],
+  ): FloorRuntime[] {
+    return connectorList.map((connector) => {
+      const lane = buildFlightLane(connector);
+      return {
+        id: flightFloorId(connector.id),
+        router: createRouter(lane.world, []),
+        walls: createWallIndex(lane.walls),
+        world: lane.world,
+      };
+    });
+  }
   let floors = buildFloors(config);
   let connectors = config.connectors ?? [];
+  let flightFloors = buildFlightFloors(connectors);
   let floorGraph = createFloorGraph({
     connectors,
     meanSpeedMetersPerSecond: speedMetersPerSecond,
@@ -530,39 +568,43 @@ export function createSimulationEngine(
     // Only handed over during an evacuation, so a normal step allocates
     // nothing for the per-exit tally.
     const exitedSinkIds: string[] = [];
-    // People on a staircase or escalator are not in any crowd: they are on the
-    // treads, and they come back at the far end (floorTransfers).
-    const riding = agents.filter(isRiding);
-    const walking = riding.length === 0 ? agents : agents.filter((a) => !isRiding(a));
     const stepped: SimulationAgent[] = [];
+    // A flight lane is its own plane, stepped by the same loop as a real
+    // floor: a rider pushes, and is pushed by, whoever else is on the same
+    // flight, exactly as in any corridor (buildFlightFloors). No scene has a
+    // connector without at least two real floors, so this is only ever
+    // non-empty alongside more than one floor.
+    const planes = flightFloors.length === 0 ? floors : [...floors, ...flightFloors];
 
-    for (const floor of floors) {
-      // One floor's crowd pushes only itself: two people standing over the
-      // same plan coordinates on different floors are not near each other.
-      const onFloor =
-        floors.length === 1
-          ? walking
-          : walking.filter((agent) => (agent.floorId ?? baseFloor()) === floor.id);
+    for (const plane of planes) {
+      // One plane's crowd pushes only itself: two people at the same
+      // coordinates on different floors, or on two different flights, are
+      // not near each other.
+      const onPlane =
+        planes.length === 1
+          ? agents
+          : agents.filter((agent) => (agent.floorId ?? baseFloor()) === plane.id);
 
-      if (onFloor.length === 0) {
+      if (onPlane.length === 0) {
         continue;
       }
 
       const result = stepCrowd({
-        agents: onFloor,
+        agents: onPlane,
         dtSeconds: fixedDtSeconds,
         replanAnticipation: stepCount % anticipationReplanSteps === 0,
         // Every agent is spawned with an exit, and reconciliation re-points it
-        // whenever that exit is removed.
+        // whenever that exit is removed. Never read for a rider: isExitBound
+        // is always false while `transfer` is set.
         exitRadius: (agent) =>
           sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
         exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
         isExitBound,
         meanSpeedMetersPerSecond: speedMetersPerSecond,
-        router: floor.router,
+        router: plane.router,
         seed,
-        walls: floor.walls,
-        world: floor.world,
+        walls: plane.walls,
+        world: plane.world,
       });
 
       stepped.push(...result.agents);
@@ -571,9 +613,8 @@ export function createSimulationEngine(
 
     connectorTraffic.replenish(fixedDtSeconds);
     agents = stepConnectorTravel({
-      agents: riding.length === 0 ? stepped : [...stepped, ...riding],
+      agents: stepped,
       connectors,
-      elapsedSeconds,
       graph: floorGraph,
       sinks,
       traffic: connectorTraffic,
@@ -623,6 +664,7 @@ export function createSimulationEngine(
       speedMetersPerSecond = geometry.speedMetersPerSecond;
       floors = buildFloors(geometry);
       connectors = geometry.connectors ?? [];
+      flightFloors = buildFlightFloors(connectors);
       connectorTraffic = createConnectorTraffic(connectors);
       floorGraph = createFloorGraph({
         connectors,
@@ -637,8 +679,10 @@ export function createSimulationEngine(
       // So they leave the run here, deliberately and countably, rather than
       // disappearing from the per-floor step with the crowd count dropping and
       // nothing to say why (simulationSceneReconcile makes the same choice for
-      // an agent whose exit is gone).
-      const standing = new Set(floors.map((floor) => floor.id));
+      // an agent whose exit is gone). A rider is standing on a flight, not a
+      // real floor, so it counts here too — the connector it names can vanish
+      // in an edit exactly as a floor can.
+      const standing = new Set([...floors, ...flightFloors].map((floor) => floor.id));
       agents = planFloorLegs(
         reconcileAgentsWithScene(agents, geometry).filter((agent) =>
           standing.has(agent.floorId ?? baseFloor()),

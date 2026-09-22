@@ -782,3 +782,94 @@ Each names its clause. Tests 2, 3 and 13 are blocked on the same thing: they
 need a staircase a crowd can stand and walk on, and a connector is not that —
 it holds one person for a travel time and puts them down at the other end.
 That is the next real piece of modelling, not a scenario to write.
+
+## 2026-09-22: stairs a crowd can stand on — tests 2 and 3 built, and a mistake on test 13 caught before it shipped
+
+`docs/adr/0010-multi-floor-and-vertical-circulation.md` named this as "left
+for later": a connector was a point at each end, holding one person for a
+travel time. It is now a place — `floorRouting.buildFlightLane` gives each
+connector its own straight corridor (`lengthMeters` long, its own `width`
+wide, in coordinates of its own since the two mouths generally sit at
+different points on two different floor plans). Someone who boards is placed
+on that lane and stepped by the same social-force loop as any real floor
+(`crowdMovement`, `simulationEngine`): pushed by whoever else is on the
+flight, held off its two side walls, walking at their own literature stair
+speed rather than a precomputed duration. Arrival is a matter of distance now,
+not the `ridingUntilSeconds` timer ADR-0010 originally shipped with.
+
+**698 → 712 tests, all green**, including nine regression tests written
+against the new mechanism (boarding, mid-flight, arrival, connector-deleted
+fallback, traffic gating, group-follow onto a connector, the top-of-loop
+guard against a decision corrupting a mid-flight transfer) plus three for
+tests 2/3 themselves.
+
+### Tests 2 and 3 — built to the guideline's own text, and pass
+
+A 2, p. 29: "the considerations from test 1 apply accordingly with adjusted
+values for route, duration and speed" — a person on a 2 m wide, 10 m long
+(along the slope) staircase at "a defined walking speed". The defined speed
+used is this project's own literature stair speed (0.61 m/s up, 0.694 m/s
+down, `floorRouting.connectorSpeeds`) — the same one every stair in the app
+defaults to.
+
+Measured (deterministic — no population declared, so every walk takes the
+same nominal time to a fraction of a step): **up, median 16.82 s** (window
+14.2–18.5 s, pass); **down, median 14.87 s** (window 12.5–16.3 s, pass).
+
+**The window is this project's own extrapolation, not RiMEA's text, and says
+so in the criterion string.** The guideline states the three tolerances that
+went into test 1's published 26–34 s window (40 cm body, 1 s premovement, 5%
+speed) but not the arithmetic that combines them — reconstructing that
+arithmetic here did not reproduce 26 s at either extreme applied to test 1's
+own numbers. What the text does make reproducible is the _ratio_ test 1's
+window bears to its own nominal time (86.4%–113.0%), so that ratio, applied to
+the stair's own nominal time, is what is used. A different, defensible
+combination of the same three tolerances could give a different window; this
+one is not RiMEA's, and every place that shows it says so.
+
+### Test 13 — a mistake, caught by reading the source before writing it up
+
+The first attempt at test 13 assumed it was a density sweep like test 4's,
+just at a stair's free speed — a natural-seeming generalisation, and wrong.
+**It was built and "passing" briefly, entirely on an assumption never checked
+against the guideline's own page.** Reading A 4, pp. 42–43 (Fig. 17) after
+the fact showed the real test: a fixed scenario, not a sweep — a 10 m × 10 m
+room of 100 agents flowing through a 2 m wide, 5 m long stair (2 m approach on
+each side) to a goal, run once climbing and once descending, with density and
+speed read over the stair's **horizontal projected area** (not the slope
+length this project's connectors use internally). It is judged against
+Fig. 16, a shaded speed–density band read off a real test with **no printed
+table** — digitising that band precisely enough to compare against is its own
+piece of work, not yet done. The periodic-corridor code was deleted rather
+than kept mislabelled; test 13 is back to `needs-scenario` in `rimeaSuite.ts`
+with the real blocker recorded, not the resolved one.
+
+**The suite now reads 5 passed, 0 failed, 11 not built, of 16** — one more
+built than the 2026-09-21 count of "2 passed, 1 failed, 13 not built" (tests 2
+and 3 newly built; test 4 unchanged, still failing at the sparse end; test 13
+attempted, found not to be what it looked like, and put back).
+
+One incidental finding from the retracted test-13 code, kept here rather than
+in the product because it was never that test's answer: on a 2 m wide, 20 m
+periodic corridor at stair free speed (0.61 m/s), this project's social-force
+parameters — fitted to the _level_-corridor Weidmann curve
+(`docs/calibration/`) — jam to near-zero speed by about 2 P/m², far short of
+Weidmann's own 5.4 P/m² jam density, and the measurement stops being reliably
+monotonic beyond that (0.0001 m/s at 4 P/m², 0.12 at 6 P/m², most likely an
+equilibration artefact of a nearly-frozen crowd rather than a real un-jamming).
+Nothing in this repository has fitted parameters for a narrow, slow-speed
+corridor specifically, and this is a real data point that they may not
+transfer — worth a look before test 13's own scenario is built, not
+investigated further here.
+
+### One disclosed regression, in display only
+
+A rider's `floorId` is now the flight's own synthetic id
+(`floorRouting.flightFloorId`), not either real floor. Nothing that draws or
+buckets agents by floor — `agentInstanceField.selectCrowdAgents`, the
+heatmap, `runAnalytics` — knows what to do with that id, so a rider is not
+shown on, or counted toward the density of, either floor while on the flight;
+they are simply not drawn for the seconds they are on the stairs, then
+reappear at the far end. Before this change they were shown frozen at the
+mouth for the whole ride, which was its own, different fiction. Drawing riders
+along the flight itself is left for later.

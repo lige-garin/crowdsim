@@ -1,5 +1,7 @@
 import {
-  personTravelSeconds,
+  flightFloorId,
+  flightLengthMeters,
+  personFlightSpeedMetersPerSecond,
   type FloorGraph,
   type ConnectorRuntime,
 } from "./floorRouting";
@@ -7,7 +9,7 @@ import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import { nearestAllowedSink } from "./simulationDecisionBackend";
 
 /**
- * Crossing between floors (ADR-0010, stage 4).
+ * Crossing between floors (ADR-0010, stages 4–5).
  *
  * A walk to somewhere on another floor is broken into legs: walk to the
  * connector, travel it, walk on. `targetX`/`targetY` always hold **the leg
@@ -16,16 +18,29 @@ import { nearestAllowedSink } from "./simulationDecisionBackend";
  * to know that floors exist. Where the person is really going is kept in
  * `transfer` until they get to that floor.
  *
- * While travelling a connector a person is not in any crowd: they are on the
- * treads. They are still in the run, still counted, and they reappear at the
- * far end after the time the flight takes.
+ * While travelling a connector a person is on its own flight lane
+ * (`floorRouting.buildFlightLane`), not on either real floor: pushed by, and
+ * pushing, whoever else is on the same flight, exactly as they would be in a
+ * corridor. They are still in the run and still counted, just not on a plane
+ * `selectCrowdAgents`/the heatmap/`runAnalytics` know how to draw or bucket —
+ * a rider is not shown on either floor while riding, and a per-floor density
+ * or count-line report is blind to the flight itself. That is a disclosed
+ * simplification of *display*, not of the physics: unlike the timer this
+ * replaced, the flight is a real place a crowd can queue and slow down on.
  */
 
 /** How close to a connector's mouth someone must be to step on. */
 export const boardingRadiusMeters = 1.2;
 
+/** How close to the far mouth counts as having crossed the flight. */
+const arrivalRadiusMeters = 0.15;
+
+/** True while this person is walking a connector's own lane, not a real floor. */
 export function isRiding(agent: SimulationAgent): boolean {
-  return agent.ridingUntilSeconds !== undefined;
+  return (
+    agent.transfer !== undefined &&
+    agent.floorId === flightFloorId(agent.transfer.connectorId)
+  );
 }
 
 /**
@@ -181,24 +196,37 @@ export function createConnectorTraffic(connectors: readonly ConnectorRuntime[]) 
 export type ConnectorTraffic = ReturnType<typeof createConnectorTraffic>;
 
 /**
+ * Deterministic scatter across a flight's width, keyed by id: the same golden-
+ * angle technique `crowdMovement` uses to separate two people who land on the
+ * exact same point. Several people can board the same connector on the same
+ * step, and starting them all on its centreline would have them shove each
+ * other off it in the first tick rather than simply arrive side by side.
+ */
+function boardingLateralMeters(agent: SimulationAgent, width: number) {
+  const unit = (Math.sin(agent.id * 2.399963) + 1) / 2; // 0..1
+  return width * (0.2 + 0.6 * unit); // stay off the two side walls
+}
+
+/**
  * Step people on and off connectors.
  *
- * Someone who has reached the mouth of the connector they are crossing steps
- * on if there is room, and is then held until the flight's travel time has
- * passed. Someone whose time is up steps off at the far end, on the floor the
- * connector leads to, and is given their next leg.
+ * Someone who has reached the mouth of the connector they are crossing boards
+ * it if there is room, moving onto its own flight lane. From there they are
+ * stepped by the ordinary per-floor crowd loop (`simulationEngine`), exactly
+ * like anyone on a real floor, until they reach the far mouth — a matter of
+ * distance now, not a timer, so someone squeezed by others on the stairs
+ * genuinely takes longer, the way a corridor already works. Arriving there
+ * puts them on the floor the connector leads to and gives them their next leg.
  */
 export function stepConnectorTravel({
   agents,
   connectors,
-  elapsedSeconds,
   graph,
   sinks,
   traffic,
 }: {
   agents: readonly SimulationAgent[];
   connectors: readonly ConnectorRuntime[];
-  elapsedSeconds: number;
   graph: FloorGraph;
   sinks: readonly SimulationSink[];
   traffic: ConnectorTraffic;
@@ -207,21 +235,44 @@ export function stepConnectorTravel({
   const arrived: SimulationAgent[] = [];
   const next = agents.map((agent) => {
     if (isRiding(agent)) {
-      if (elapsedSeconds < agent.ridingUntilSeconds!) {
-        return agent;
-      }
-
-      const connector = byId.get(agent.transfer?.connectorId ?? "");
+      const connector = byId.get(agent.transfer!.connectorId);
 
       if (!connector) {
-        // The connector was edited away mid-journey: step off where they are.
-        return { ...agent, ridingUntilSeconds: undefined, transfer: undefined };
+        // The connector was edited away mid-flight. simulationEngine's
+        // `replaceGeometry` evicts anyone standing on a lane that no longer
+        // exists before this ever runs, so in practice this is unreachable —
+        // but there is no flight geometry left here to say where they
+        // physically were, so the best this can do is land them at the
+        // journey's final destination rather than leave them on a lane gone
+        // from under them.
+        const dest = agent.transfer!;
+        const stepped: SimulationAgent = {
+          ...agent,
+          floorId: dest.floorId,
+          flightSpeedMetersPerSecond: undefined,
+          transfer: undefined,
+          vx: 0,
+          vy: 0,
+          x: dest.finalX,
+          y: dest.finalY,
+          targetX: dest.finalX,
+          targetY: dest.finalY,
+        };
+        arrived.push(stepped);
+        return stepped;
+      }
+
+      const dx = agent.targetX - agent.x;
+      const dy = agent.targetY - agent.y;
+
+      if (Math.sqrt(dx * dx + dy * dy) > arrivalRadiusMeters) {
+        return agent; // still on the flight; stepCrowd moved them this step
       }
 
       const stepped: SimulationAgent = {
         ...agent,
         floorId: connector.toFloorId,
-        ridingUntilSeconds: undefined,
+        flightSpeedMetersPerSecond: undefined,
         vx: 0,
         vy: 0,
         x: connector.toPoint.x,
@@ -255,13 +306,17 @@ export function stepConnectorTravel({
 
     return {
       ...agent,
+      floorId: flightFloorId(connector.id),
       // A slower person is longer on the flight, which is the whole point of
-      // drawing them from a population (ADR-0011).
-      ridingUntilSeconds: elapsedSeconds + personTravelSeconds(connector, agent),
+      // drawing them from a population (ADR-0011) — but now it falls out of
+      // actually walking it slower, not a precomputed duration.
+      flightSpeedMetersPerSecond: personFlightSpeedMetersPerSecond(connector, agent),
       vx: 0,
       vy: 0,
-      x: connector.fromPoint.x,
-      y: connector.fromPoint.y,
+      x: 0,
+      y: boardingLateralMeters(agent, connector.width),
+      targetX: flightLengthMeters(connector),
+      targetY: connector.width / 2,
     };
   });
 

@@ -1,5 +1,7 @@
+import type { WallSegment } from "@crowdsim/core-gpu";
 import type { ScenePoint } from "@crowdsim/scene-schema";
 import type { Router } from "./crowdNavigation";
+import type { SceneWorldBounds } from "./sceneGeometry";
 
 /**
  * Getting from a place on one floor to a place on another (ADR-0010, stage 3).
@@ -37,7 +39,70 @@ export type ConnectorRuntime = {
   climbing: boolean;
   /** People a second it can take, from its width (ADR-0008's rule). */
   admitPerSecond: number;
+  /** Clear walking width, m — the flight's own short dimension (`buildFlightLane`). */
+  width: number;
 };
+
+/** Shortest a flight lane is ever built, m: a connector between floors at the
+ * same elevation has zero rise and so zero length by `connectorLengthMeters`,
+ * but a crowd still needs a corridor to stand in, not a point. */
+const minFlightLengthMeters = 1;
+
+/** A connector's own lane length, m — never shorter than a crowd can stand in
+ * even when its rise (and so `lengthMeters`) is zero. What `buildFlightLane`
+ * actually builds and what a rider actually walks, so anything that needs to
+ * agree with that geometry (`personFlightSpeedMetersPerSecond`,
+ * `floorTransfers`'s boarding) reads it from here rather than the raw field. */
+export function flightLengthMeters(
+  connector: Pick<ConnectorRuntime, "lengthMeters">,
+): number {
+  return Math.max(connector.lengthMeters, minFlightLengthMeters);
+}
+
+/** The synthetic floor id a connector's own lane is stepped under while
+ * someone is on it (`buildFlightLane`, `simulationEngine`'s floor loop). Never
+ * collides with a real floor id, which comes from the scene, not this prefix. */
+export function flightFloorId(connectorId: string): string {
+  return `flight:${connectorId}`;
+}
+
+/**
+ * A connector's own walkable geometry (ADR-0010, stage 5): a straight corridor
+ * `lengthMeters` long and `width` wide, in coordinates of its own — 0 at the
+ * `from` mouth, `lengthMeters` at the `to` mouth, laid out this way (rather
+ * than in either floor's plan coordinates) because the two mouths generally
+ * sit at different points on two different plans, with nothing in common to
+ * place a straight flight between.
+ *
+ * Once a person is placed here, `crowdMovement`'s ordinary social force steps
+ * them exactly as it would in any corridor: pushed by whoever else is on the
+ * flight, held off the two side walls. That is deliberate — it is how this
+ * project gets a stair's speed–density relation (RiMEA test 13) as a measured
+ * outcome of the same model that produces one for a level corridor, rather
+ * than a second, hand-authored formula for stairs specifically.
+ *
+ * The walls returned here are for that push and for `constrainMovement`'s hard
+ * collision only — they are never passed to `createRouter`, which would grid
+ * and block the corridor's cells with them; a flight narrower than a couple of
+ * routing cells would come out fully blocked. A flight has nothing to route
+ * around between its two mouths, so its router is the plain straight line
+ * `createRouter` already returns when given no walls.
+ */
+export function buildFlightLane(connector: ConnectorRuntime): {
+  world: SceneWorldBounds;
+  walls: WallSegment[];
+} {
+  const length = flightLengthMeters(connector);
+  const world: SceneWorldBounds = { width: length, height: connector.width };
+
+  return {
+    world,
+    walls: [
+      { x1: 0, y1: 0, x2: length, y2: 0 },
+      { x1: 0, y1: connector.width, x2: length, y2: connector.width },
+    ],
+  };
+}
 
 /**
  * Travel speeds along the flight, m/s. **Literature-typical, not calibrated
@@ -83,6 +148,20 @@ export function personTravelSeconds(
   return speed === undefined
     ? connector.travelSeconds
     : Math.max(connector.lengthMeters / speed, 1);
+}
+
+/**
+ * This person's free speed while actually walking a flight, m/s: the lane's
+ * own length as `buildFlightLane` builds it (never zero, even for a same-
+ * height connector) divided by how long `personTravelSeconds` says they take
+ * to cross it. A stair or escalator has its own literature speed — this is
+ * not the scene's walking speed times the person's `speedFactor`.
+ */
+export function personFlightSpeedMetersPerSecond(
+  connector: Pick<ConnectorRuntime, "climbing" | "lengthMeters" | "travelSeconds">,
+  person: { stairUpMetersPerSecond?: number; stairDownMetersPerSecond?: number },
+): number {
+  return flightLengthMeters(connector) / personTravelSeconds(connector, person);
 }
 
 /** How long one person takes to travel a connector that rises `riseMeters`. */

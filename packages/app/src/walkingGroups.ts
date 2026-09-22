@@ -204,6 +204,21 @@ function leaderFloorFields(leader: SimulationAgent) {
 
 /** Head for where the leader is standing, on the floor they are standing on. */
 function crossToLeader(agent: SimulationAgent, leader: SimulationAgent) {
+  if (isRiding(leader)) {
+    // The leader has no floor of their own right now: `leader.floorId` is a
+    // connector's own flight lane (floorTransfers), a place a decision can
+    // send its rider and nobody else. `leader.x`/`leader.y` are coordinates on
+    // that lane, meaningless on any real floor a companion could stand on. Aim
+    // at the leader's actual destination instead; the next planFloorLegs picks
+    // whichever connector gets the companion there from where they really are
+    // — most often the very one the leader is on.
+    return {
+      targetX: agent.x,
+      targetY: agent.y,
+      transfer: { ...leader.transfer!, connectorId: "" },
+    };
+  }
+
   if (leader.floorId === undefined) {
     return { targetX: agent.x, targetY: agent.y, transfer: undefined };
   }

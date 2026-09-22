@@ -21,6 +21,7 @@ function connector(overrides: Partial<ConnectorRuntime> = {}): ConnectorRuntime 
     lengthMeters: 9,
     climbing: true,
     admitPerSecond: 2,
+    width: 1.2,
     ...overrides,
   };
 }

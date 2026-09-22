@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 import { demoScene } from "./demoScene";
+import { flightFloorId, flightLengthMeters } from "./floorRouting";
 import { createSimulationEngineFromScene } from "./simulationEngine";
 import {
   deriveSceneGeometry,
@@ -131,11 +132,16 @@ describe("a building with floors", () => {
     const snapshot = engine.snapshot();
 
     expect(snapshot.agents.some((agent) => agent.floorId === "ground")).toBe(true);
-    // Nobody is halfway between floors in the crowd: they are either walking a
-    // floor or riding, and a rider stands at the mouth they stepped on at.
+    // Everyone is either walking a real floor or on the stairs' own flight
+    // lane (ADR-0010 stage 5) — never halfway between floors with nowhere to
+    // be, and never past the far end of the flight they are on.
+    const flightLength = flightLengthMeters(sceneConnectorRuntimes(stacked)[0]);
     for (const agent of snapshot.agents) {
-      if (agent.ridingUntilSeconds !== undefined) {
-        expect(agent.x).toBeCloseTo(30, 5);
+      if (agent.floorId === flightFloorId("stair-1")) {
+        expect(agent.x).toBeGreaterThanOrEqual(0);
+        expect(agent.x).toBeLessThanOrEqual(flightLength);
+      } else {
+        expect(["ground", "upper"]).toContain(agent.floorId);
       }
     }
   });

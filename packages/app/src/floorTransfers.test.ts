@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "./crowdNavigation";
 import {
   createFloorGraph,
+  flightFloorId,
+  flightLengthMeters,
   personTravelSeconds,
   type ConnectorRuntime,
 } from "./floorRouting";
 import {
   createConnectorTraffic,
+  isRiding,
   planFloorLegs,
   stepConnectorTravel,
 } from "./floorTransfers";
@@ -26,6 +29,7 @@ const stairs: ConnectorRuntime = {
   lengthMeters: 9,
   climbing: true,
   admitPerSecond: 2,
+  width: 1.6,
 };
 
 const graph = createFloorGraph({
@@ -61,6 +65,23 @@ function walker(overrides: Partial<SimulationAgent> = {}): SimulationAgent {
     targetSinkId: "ground-exit",
     ...overrides,
   };
+}
+
+/** A walker already placed on the stairs' own flight lane, at local `x`. */
+function rider(
+  localX: number,
+  overrides: Partial<SimulationAgent> = {},
+): SimulationAgent {
+  return walker({
+    floorId: flightFloorId("stair-1"),
+    x: localX,
+    y: stairs.width / 2,
+    targetX: flightLengthMeters(stairs),
+    targetY: stairs.width / 2,
+    flightSpeedMetersPerSecond: 0.61,
+    transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+    ...overrides,
+  });
 }
 
 describe("legs of a journey between floors", () => {
@@ -106,7 +127,7 @@ describe("legs of a journey between floors", () => {
   });
 
   it("leaves someone already on the treads alone", () => {
-    const agent = walker({ ridingUntilSeconds: 40 });
+    const agent = rider(4.5);
 
     expect(planFloorLegs([agent], graph, [groundExit])[0]).toBe(agent);
   });
@@ -119,11 +140,10 @@ describe("stepping onto and off a connector", () => {
     return created;
   };
 
-  const step = (agents: SimulationAgent[], elapsedSeconds: number, t = traffic()) =>
+  const step = (agents: SimulationAgent[], t = traffic()) =>
     stepConnectorTravel({
       agents,
       connectors: [stairs],
-      elapsedSeconds,
       graph,
       sinks: [groundExit],
       traffic: t,
@@ -135,32 +155,53 @@ describe("stepping onto and off a connector", () => {
       y: 20,
       transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
     });
+    const [stepped] = step([far]);
 
-    expect(step([far], 0)[0].ridingUntilSeconds).toBeUndefined();
+    expect(isRiding(stepped)).toBe(false);
+    expect(stepped.floorId).toBe("upper");
   });
 
-  it("holds them for as long as the flight takes", () => {
+  it("boards onto the flight's own lane once someone reaches the mouth", () => {
     const atMouth = walker({
       x: 30,
       y: 20,
       transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
     });
-    const [riding] = step([atMouth], 5);
+    const [boarded] = step([atMouth]);
 
-    expect(riding.ridingUntilSeconds).toBe(5 + stairs.travelSeconds);
-    expect(riding.floorId).toBe("upper");
+    expect(isRiding(boarded)).toBe(true);
+    expect(boarded.floorId).toBe(flightFloorId("stair-1"));
+    // Placed at the near end of the lane, aimed at the far one.
+    expect(boarded.x).toBe(0);
+    expect(boarded.targetX).toBe(flightLengthMeters(stairs));
+    // Off the two side walls, not stacked on the centreline.
+    expect(boarded.y).toBeGreaterThan(0);
+    expect(boarded.y).toBeLessThan(stairs.width);
+    expect(boarded.flightSpeedMetersPerSecond).toBeGreaterThan(0);
+    // Still travelling one call later, not yet at the far mouth.
+    expect(isRiding(step([boarded])[0])).toBe(true);
+  });
 
-    // Still travelling one second before it ends.
-    expect(step([riding], 17)[0].floorId).toBe("upper");
+  it("steps someone off once they reach the far mouth of the flight", () => {
+    // stepCrowd is what actually walks a rider along the lane (crowdMovement);
+    // this only has to prove the handoff once they get there.
+    const almostThere = rider(flightLengthMeters(stairs) - 0.01);
+    const [arrived] = step([almostThere]);
 
-    const [arrived] = step([riding], 5 + stairs.travelSeconds);
-
+    expect(isRiding(arrived)).toBe(false);
     expect(arrived.floorId).toBe("ground");
     expect(arrived.x).toBe(stairs.toPoint.x);
-    expect(arrived.ridingUntilSeconds).toBeUndefined();
+    expect(arrived.flightSpeedMetersPerSecond).toBeUndefined();
     // And they are pointed at what they came for.
     expect(arrived.targetX).toBe(55);
     expect(arrived.transfer).toBeUndefined();
+  });
+
+  it("leaves a rider not yet at the far mouth exactly where stepCrowd put them", () => {
+    const midFlight = rider(4.5);
+    const [stepped] = step([midFlight]);
+
+    expect(stepped).toBe(midFlight);
   });
 
   it("takes only as many people a second as its width allows", () => {
@@ -172,33 +213,33 @@ describe("stepping onto and off a connector", () => {
         transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
       }),
     );
-    const stepped = step(crowd, 0);
-    const boarded = stepped.filter(
-      (agent) => agent.ridingUntilSeconds !== undefined,
-    ).length;
+    const stepped = step(crowd);
+    const boarded = stepped.filter(isRiding).length;
 
     // Two a second at 2/s, and the rest wait at the foot of the stairs.
     expect(boarded).toBe(2);
-    expect(
-      stepped.filter((agent) => agent.ridingUntilSeconds === undefined),
-    ).toHaveLength(4);
+    expect(stepped.filter((agent) => !isRiding(agent))).toHaveLength(4);
   });
 
-  it("steps a stranded rider off where they are if the connector is edited away", () => {
-    const riding = walker({
-      ridingUntilSeconds: 1,
+  it("steps a stranded rider off at their destination if the connector is edited away", () => {
+    // simulationEngine's replaceGeometry evicts anyone on a lane that no
+    // longer exists before this ever runs (the "standing" set), so this is a
+    // defensive path, not one a scene edit can reach in practice — there is
+    // no flight geometry left here to say where they physically were.
+    const stranded = rider(4.5, {
+      floorId: flightFloorId("gone"),
       transfer: { connectorId: "gone", finalX: 55, finalY: 20, floorId: "ground" },
     });
     const [stepped] = stepConnectorTravel({
-      agents: [riding],
+      agents: [stranded],
       connectors: [],
-      elapsedSeconds: 2,
       graph,
       sinks: [groundExit],
       traffic: createConnectorTraffic([]),
     });
 
-    expect(stepped.ridingUntilSeconds).toBeUndefined();
+    expect(stepped.floorId).toBe("ground");
+    expect(stepped.x).toBe(55);
     expect(stepped.transfer).toBeUndefined();
   });
 });
@@ -251,7 +292,10 @@ describe("a flight takes as long as the person is slow", () => {
     expect(personTravelSeconds(flight, {})).toBe(13);
   });
 
-  it("holds someone slow on the stairs longer than someone quick", () => {
+  it("boards someone slow at a lower flight speed than someone quick", () => {
+    // A lower flightSpeedMetersPerSecond is what actually holds someone
+    // longer now: stepCrowd walks the lane at whatever speed boarding gave
+    // them (crowdMovement), rather than a precomputed duration.
     const slow = walker({
       x: 30,
       y: 20,
@@ -266,14 +310,13 @@ describe("a flight takes as long as the person is slow", () => {
     const [steppedSlow, steppedQuick] = stepConnectorTravel({
       agents: [slow, quick],
       connectors: [stairs],
-      elapsedSeconds: 0,
       graph,
       sinks: [groundExit],
       traffic,
     });
 
-    expect(steppedSlow.ridingUntilSeconds!).toBeGreaterThan(
-      steppedQuick.ridingUntilSeconds!,
+    expect(steppedSlow.flightSpeedMetersPerSecond!).toBeLessThan(
+      steppedQuick.flightSpeedMetersPerSecond!,
     );
   });
 });

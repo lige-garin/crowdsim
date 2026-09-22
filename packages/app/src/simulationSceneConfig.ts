@@ -261,6 +261,7 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
       lengthMeters: connectorLengthMeters(rise),
       climbing: rise >= 0,
       admitPerSecond,
+      width: connector.width,
     });
 
     if (connector.bidirectional) {
@@ -279,6 +280,7 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
         lengthMeters: connectorLengthMeters(rise),
         climbing: -rise >= 0,
         admitPerSecond,
+        width: connector.width,
       });
     }
   }

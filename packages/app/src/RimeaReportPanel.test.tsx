@@ -33,14 +33,14 @@ describe("RimeaReportPanel", () => {
     const { worker } = fakeWorker();
     renderPanel(worker);
 
-    // The three that are built are filled in by a run; the rest are listed
+    // The five that are built are filled in by a run; the rest are listed
     // from the start so the panel is never blank.
     for (let number = 1; number <= 16; number += 1) {
-      if (number === 1 || number === 4 || number === 6) continue;
+      if ([1, 2, 3, 4, 6].includes(number)) continue;
       expect(screen.getByTestId(`rimea-test-${number}`)).toBeTruthy();
     }
 
-    expect(screen.getByTestId("rimea-summary").textContent).toContain("未实现 13");
+    expect(screen.getByTestId("rimea-summary").textContent).toContain("未实现 11");
   });
 
   it("names the clause each unbuilt test comes from", () => {
@@ -48,11 +48,10 @@ describe("RimeaReportPanel", () => {
     renderPanel(worker);
 
     // The guideline's own subjects, not the ones this file used to guess from
-    // memory: 13 is the fundamental diagram on stairs, 14 is choice of route,
-    // and there is no smoke or lift test in it at all.
-    expect(screen.getByTestId("rimea-test-13").textContent).toContain("p. 42");
+    // memory: 9 is a crowd leaving a large space, 14 is choice of route, and
+    // there is no smoke or lift test in it at all.
+    expect(screen.getByTestId("rimea-test-9").textContent).toContain("p. 34");
     expect(screen.getByTestId("rimea-test-14").textContent).toContain("p. 44");
-    expect(screen.getByTestId("rimea-test-2").textContent).toContain("p. 29");
   });
 
   it("runs the suite in a worker and shows a failure as a failure", async () => {

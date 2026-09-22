@@ -195,9 +195,50 @@ still open, and nothing in the code pretends otherwise.
 ### Left for later
 
 - **Lifts**, needing a batch-service model of their own.
-- **A connector as a place with a length.** It is a point at each end: someone
-  crossing is held at the mouth they stepped on rather than drawn on the
-  treads, so a busy escalator has a queue but no visible line on it.
+- ~~**A connector as a place with a length.**~~ **Done, 2026-09-22 (stage 5).**
+  See the update below.
 - **Nothing recalibrated for a stack.** Every fitted parameter and every
   benchmark in this repository is single-floor, and no claim about a
   multi-floor building's flow should be read out of them.
+
+## Update 2026-09-22: a connector is now a place with a length (stage 5)
+
+The gap named above is closed: a connector's own geometry
+(`floorRouting.buildFlightLane`) is a straight corridor `lengthMeters` long and
+`width` wide, in coordinates of its own (0 at the `from` mouth, `lengthMeters`
+at the `to` mouth) — not either floor's plan, since the two mouths generally
+sit at different points on two different plans. Someone who boards is placed
+on that lane and stepped by the ordinary per-floor social-force loop
+(`crowdMovement`, `simulationEngine`) exactly as on any corridor: pushed by
+whoever else is on the flight, held off its two side walls, walking at their
+own literature stair speed (`personFlightSpeedMetersPerSecond`,
+ADR-0011-aware) rather than a precomputed duration. Arrival is a matter of
+distance now, not the `ridingUntilSeconds` timer this ADR originally shipped
+with — someone squeezed by others on the stairs genuinely takes longer.
+
+This is what "a busy escalator has a queue but no visible line on it"
+actually meant: the line is now visible to the physics, because it is real
+crowding on a real lane, not a queue counter feeding a fixed duration. It
+unblocks RiMEA tests 2 and 3 (maintaining a defined walking speed up and down
+a 2 m x 10 m staircase, A 2 p. 29), now built and passing —
+`rimeaSuite.runStairSpeedTest`. It does **not** by itself unblock test 13 (the
+fundamental diagram on stairs): that test's own geometry, read from the
+guideline only after a first attempt assumed a periodic-corridor sweep like
+test 4's, turns out to be a fixed 100-agent room-through-a-stair scenario
+judged against a shaded, undigitised chart (A 4 p. 42-43) — a different,
+still-open piece of work. See `rimeaSuite.ts` and `docs/CLAIMS_LEDGER.md`'s
+2026-09-22 section for both the tests 2/3 result and that correction.
+
+**One disclosed regression, in display only.** A rider's `floorId` is now the
+flight's own synthetic id (`flightFloorId`), not either real floor. Nothing
+that draws or buckets agents by floor —
+`agentInstanceField.selectCrowdAgents`, the heatmap, `runAnalytics` — knows
+what to do with that id, so a rider is not shown on, or counted toward the
+density of, either floor while on the flight; they simply are not drawn for
+the seconds they are on the stairs, then reappear at the far end. Before this
+change they were shown frozen at the mouth for the whole ride, which was its
+own, different fiction. Fixing the display to draw riders along the flight
+itself is left for later; it was not needed to make the physics real, and
+1000-person-scale movement still costs about what it did (`crowdMovement.ts`'s
+own performance note is unaffected — no change was made to the level-floor
+path).

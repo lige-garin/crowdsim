@@ -17,7 +17,7 @@ import {
   sampleEvacuationReactionSeconds,
 } from "./behaviorDistributions";
 import { byLineOrder, createCounterTick, queueSpacingMeters } from "./checkoutCounters";
-import { isCrossingFloors } from "./floorTransfers";
+import { isCrossingFloors, isRiding } from "./floorTransfers";
 import { mulberry32 } from "./simulationEngineRandom";
 
 /**
@@ -394,6 +394,16 @@ export function createMallCrowdDecisionBackend(options: {
       };
 
       for (const agent of agents) {
+        // Someone on the treads takes no orders (walkingGroups says the same
+        // for a companion following a leader who is riding): overwriting
+        // their target mid-flight — a new evacuation exit, say — would
+        // corrupt the transfer floorTransfers reads to know which connector
+        // they are actually on, stranding them there. They get a decision
+        // again once they step off.
+        if (isRiding(agent)) {
+          continue;
+        }
+
         const state = agent.lifecycleState;
 
         // Evacuation overrides shopping: abandon the shop, head for an exit.

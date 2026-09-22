@@ -148,7 +148,12 @@ export function stepCrowd(input: CrowdStepInput): {
 
     const radius = agent.radius ?? sampleBodyRadius(input.seed, agent.id);
     const speedFactor = agent.speedFactor ?? sampleSpeedFactor(input.seed, agent.id);
-    const freeSpeed = input.meanSpeedMetersPerSecond * speedFactor;
+    // A stair or escalator has its own literature speed (floorRouting), not a
+    // multiple of the scene's level walking speed: floorTransfers sets this
+    // when someone boards a flight and clears it when they step off, so it
+    // never leaks into their walk on a real floor.
+    const freeSpeed =
+      agent.flightSpeedMetersPerSecond ?? input.meanSpeedMetersPerSecond * speedFactor;
     // Standing in a checkout line holds a slot like any other line.
     const holding =
       holdingStates.has(agent.lifecycleState ?? "") ||
