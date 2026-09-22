@@ -880,6 +880,16 @@ Following on from stairs (above): tests 5 (premovement time) and 16 (1D
 fundamental diagram) are now built. The suite reads **7 passed, 0 failed, 9
 not built, of 16**.
 
+**Correction (2026-09-22, third entry, below): this "0 failed" was wrong.**
+Test 4 fails at its own real parameters — verified directly:
+`runFundamentalDiagramTest()` with no cheap overrides reports `status:
+"fail"`, worst deviation 0.142 m/s at 0.5 P/m², against the already-recorded
+0.10 m/s tolerance. This was already known and written up honestly
+elsewhere (CLAUDE.md's 2026-08-30 and 2026-09-21 entries both say test 4
+fails), so nothing about the *finding* was hidden — only this one summary
+line, written the same day as the entry it sits in, undercounted it. The
+correct count for the 7 tests built at that point was 6 passed, 1 failed.
+
 ### Test 16 (1D fundamental diagram) — built, and it needed its own jam density
 
 A 4, p. 47: density in **persons per metre**, not per square metre — a
@@ -953,3 +963,137 @@ with premovement timing, and both were real:
 consistently ≈0.1 s — one decision tick (10 Hz) — between each of ten
 people's assigned premovement time and when they actually started moving.
 The tolerance (0.5 s) is self-authored; the guideline states none.
+
+## 2026-09-22 (third entry): five more RiMEA tests built (9, 10, 11, 12, 15) — a genuine router limit found, and one honest failure kept
+
+Following the stairs and 5/16 entries above: tests 9 (crowd leaving a large
+public space), 10 (allocation of escape routes), 11 (choice of escape
+route), 12 (bottleneck flow, four sub-tests) and 15 (a large crowd around a
+corner) are now built. The suite reads **10 pass, 2 fail, 4 not built, of
+16** — up from 6 pass/1 fail/9 not built. `runRimeaSuite` gained a single `crowdPeople` cheap
+option that overrides all four crowd-scale tests' headcounts at once (they
+default to the guideline's own 1000/1000/150/500), so a full unit-test run
+stays under 15 seconds instead of the several minutes a full-scale run of
+all five takes.
+
+### A genuine, previously-undocumented limit in this project's own router
+
+Tests 9, 11 and 12 all need a narrow gap in a wall — a door, an exit, a
+bottleneck. Built at the guideline's own widths (test 9/11's 1 m doors,
+test 12d's 0.8/1.0/1.2 m bottleneck), **nobody got through, for the full
+length of a 60 s check, at any width from 0.8 to 1.8 m.** Verified directly,
+not assumed: an isolated debug scene at each width, instrumented to log
+which exit each agent's evacuation decision actually picked. 2.0 m was the
+first width that worked.
+
+The cause is `crowdNavigation.ts`'s routing grid, which never goes finer
+than 1 m (`routeCellSizeMeters`), combined with `wallIndex.ts`'s
+`forEachCellOnSegment`, which marks every grid cell a wall segment so much
+as touches as blocked. Two wall segments bounding a gap at or near the grid's
+own cell size can between them mark both of the gap's cells, sealing it
+regardless of exactly where it sits relative to the grid — a conservative
+rounding choice that is correct for a wide gap and wrong for a narrow one.
+
+This is a real limitation of the pathfinding grid, not a choice about
+physics, and it was not fixed here — fixing it would mean redesigning how
+`wallIndex` marks cells near a gap, which is out of scope for "build RiMEA
+test scenarios" and affects every scene in the product, not just these
+tests. Instead, every affected test uses a wider gap than the guideline asks
+for, and **says so in its own returned `criterion` string**, not only in a
+module comment: test 9 and test 11's doors/exits are built 2.4 m wide (their
+own sinks stay labelled at the guideline's 1 m width, since sinks are not
+throughput-gated in this engine — only sources are, ADR-0008 — so the sink's
+own declared width does not affect what is measured); test 12's bottleneck
+defaults to 2.4 m everywhere, and 12d — the one sub-test where width *is*
+the measured variable — moves its own three points out to 2.0/2.6/3.2 m
+rather than reuse the guideline's 0.8/1.0/1.2 m, still three points testing
+the same claim (flow rises with width).
+
+### The corner (test 15) was built sealed shut, and only negative-scale testing caught it
+
+The first version of the corner scene's `horizontal-north` wall — the inner
+edge of the L-turn someone has to walk around — spanned the wall's full
+nominal width (`verticalX1` to `0`), which includes the vertical leg's own
+footprint. Since the vertical leg and horizontal leg share that footprint (it
+is the inside of the turn, open floor), the wall as built ran straight across
+the only crossing between the two legs, sealing the corner completely: a
+40-person run at the scene's own scale never got a single person past
+y = bandTop in a 900 s check (reported as clear time = infinity). Fixed by
+stopping that wall segment at `verticalX0` — the vertical leg's own western
+edge — leaving the true interior of the turn open. After the fix: same
+40-person scene, clear times 61.0/68.1/95.0 s (short/corner/long,
+correctly ordered); at the guideline's own 500 people, 75.3/100.4/108.0 s,
+same ordering. This was caught by running the test at all, not by reading
+the geometry — a reminder that "the geometry looks right" and "the geometry
+lets anyone through" are different questions to check.
+
+### The negative-coordinate clamp bug, found a third time
+
+`clampPointToWorld` (`sceneGeometry.ts`) clamps every position to
+`[0, width] × [0, height]`; a sink or wall placed at a negative coordinate
+silently clamps movement back to 0 and stranded people there instead of
+ever reaching it. This was the root cause behind a stuck scene in tests 9,
+11 and 15 independently, each caught and fixed separately (a `margin`
+offset, or shifting the whole geometry so nothing sits below (0,0)) before
+it was connected as the same bug three times over. It is not fixed at the
+source (`clampPointToWorld` has no way to distinguish "this scene meant to
+place something off-grid" from "this scene has a coordinate bug"); every
+affected test's scene builder now carries a comment naming it so a fourth
+scene does not rediscover it the slow way.
+
+### Test 11 (choice of escape route): a kept, honest failure
+
+At the guideline's own 1000 people, the built scene measures **exit 1
+(nearer, 14.5 m from the source) took 473, exit 2 (farther, 20.5 m) took
+527** — the *farther* exit got used more, not less, reversing the
+guideline's own expected result ("persons prefer the closer exit… congestion
+occurs… individual persons will also use the alternative"). This is not a
+scene bug: `mallCrowdDecisionBackend`'s `chooseEvacuationSink` penalises each
+exit's cost by `evacuationExitCrowdingMeters` (4 m, "the size of the spread
+is a guess," per its own comment) for every person already committed to it,
+and that commitment count never resets. With only a 6 m distance advantage
+between the two exits and 1000 decisions being made over the course of the
+run, it takes only a couple of people committing to the nearer exit before
+its penalised cost exceeds the farther one's, and the split settles near
+50/50 rather than staying lopsided toward the nearer exit. The test reports
+this as `status: "fail"`, with both numbers in `measured` and the finding
+explained in a code comment next to the test — kept rather than tuned away,
+the same way test 4's low-density deviation stays a reported failure rather
+than a widened tolerance. Recalibrating or redesigning
+`evacuationExitCrowdingMeters` is a change to the product's evacuation
+behaviour for every scene that uses it, not a RiMEA-scenario change, and was
+left alone here.
+
+### Test 11 also needed its step cap cut for the test suite's own stability
+
+At the guideline's own 1000 people and the step cap used for every other
+crowd-scale test (1800 s), `pnpm test` crashed the Vitest worker twice
+("Worker exited unexpectedly") on runs that took 139-149 s each. Cut to 600 s
+— the scene clears well inside that at 1000 people once the crowding
+penalty settles the split, so nothing about what is measured changed — and
+confirmed stable across a full-scale run afterward (122 s, no crash).
+
+### Test 10, unlike the other four, needed no new fix
+
+Built and verified without incident: 23 of 23 people across twelve rooms
+each left by their assigned exit (`exitIds`), at the guideline's own
+headcount, no scale-down needed for either speed or correctness.
+
+### Disclosure the module doc already carried is now repeated where a report reader would see it
+
+Tests 9 and 11's own `criterion` strings now name the 2.4 m routing-gap
+substitution directly (previously it was explained only in a comment near
+`largeRoomTest`'s definition, upstream of both tests but not visible in
+either one's own result) — matching the standard test 12's criterion string
+already set: a departure from the guideline's own numbers belongs in the
+string a report reader actually sees, not only in the source a report reader
+would have to go find.
+
+**Suite total after this entry: 12 built, 10 pass (1, 2, 3, 5, 6, 9, 10, 12,
+15, 16), 2 honest fail (4 — already recorded, low-density deviation; 11 —
+this entry's crowding-penalty overshoot), 4 not built (7, 8, 13, 14).** Test
+16's beyond-jam points stay unjudged rather than failed, which is a
+different thing from test 4's own failure: test 16 has no comparable point
+past its own corridor's jam density to fail against, while test 4's failure
+is at 0.5 P/m² — well inside Weidmann's comparable range, not a beyond-jam
+artifact.

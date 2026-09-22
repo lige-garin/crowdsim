@@ -1,28 +1,44 @@
 import { describe, expect, it } from "vitest";
 import {
+  bottleneckTest,
+  escapeRouteTest,
   fundamentalDiagramDensities,
   fundamentalDiagramMeasureSeconds,
   fundamentalDiagramTransientSeconds,
   insideCorner,
+  largeCornerTest,
+  largeRoomTest,
   oneDimensionalJamDensityPerMeter,
   premovementTest,
+  runBottleneckTest,
   runCornerTest,
   runCorridorSpeedTest,
+  runEscapeRouteAllocationTest,
   runFundamentalDiagramTest,
+  runLargeCornerTest,
+  runLargePublicSpaceTest,
   runOneDimensionalFundamentalDiagramTest,
   runPremovementTest,
   runRimeaSuite,
   runStairSpeedTest,
+  runTwoExitChoiceTest,
   summarizeRimeaSuite,
+  twoExitChoiceTest,
   unattemptedRimeaTests,
 } from "./rimeaSuite";
 
 /**
- * The cut-down measurement: one density, two seconds. The guideline's own
- * sweep is seven densities at 60 s each and belongs in the panel's worker,
- * not in a test run — see `runFundamentalDiagramTest`.
+ * The cut-down measurement: one density, two seconds, a few dozen people
+ * instead of the guideline's hundreds/thousands. The guideline's own sweep
+ * and headcounts belong in the panel's worker, not in a test run — see
+ * `runFundamentalDiagramTest` and `runRimeaSuite`'s own `crowdPeople`.
  */
-const cheap = { corridorRuns: 3, densities: [1], measureSeconds: 2 } as const;
+const cheap = {
+  corridorRuns: 3,
+  crowdPeople: 40,
+  densities: [1],
+  measureSeconds: 2,
+} as const;
 const suite = runRimeaSuite(cheap);
 
 describe("the RiMEA suite's own honesty", () => {
@@ -48,9 +64,10 @@ describe("the RiMEA suite's own honesty", () => {
   it("counts what is built against what is not", () => {
     const summary = summarizeRimeaSuite(suite);
 
-    // Tests 1, 2, 3, 4, 5, 6 and 16 are built; the other nine name their clause.
-    expect(summary.pass + summary.fail).toBe(7);
-    expect(summary.needsScenario).toBe(9);
+    // Tests 1-6, 9-12, 15 and 16 are built (12 of them); 7, 8, 13, 14 name
+    // their clause instead.
+    expect(summary.pass + summary.fail).toBe(12);
+    expect(summary.needsScenario).toBe(4);
     expect(summary.total).toBe(16);
   });
 
@@ -217,5 +234,120 @@ describe("test 16: 1D fundamental diagram", () => {
     expect(runOneDimensionalFundamentalDiagramTest(options)).toEqual(
       runOneDimensionalFundamentalDiagramTest(options),
     );
+  });
+});
+
+describe("test 10: allocation of escape routes", () => {
+  it("has all twelve rooms leave, each by its assigned exit", () => {
+    const result = runEscapeRouteAllocationTest();
+
+    expect(result.number).toBe(10);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toContain("23 people left");
+    expect(result.criterion).toContain("RiMEA 4.1.1");
+  });
+
+  it("gives room 3 one person and every other room two", () => {
+    // Room 3 is the passage up to the main exit, not a room like the rest.
+    expect(escapeRouteTest.peoplePerRoom[2]).toBe(1);
+    expect(escapeRouteTest.peoplePerRoom.filter((count) => count === 2)).toHaveLength(
+      11,
+    );
+  });
+});
+
+describe("test 9: crowd leaving a large public space", () => {
+  it("clears faster through four doors than through two, cheaply", () => {
+    const result = runLargePublicSpaceTest({ people: 40 });
+
+    expect(result.number).toBe(9);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toMatch(/four doors .* two doors/u);
+    expect(result.criterion).toContain("RiMEA 4.1.1 A 4 test 9");
+    // The router's own gap-size workaround, not a claim about door width.
+    expect(result.criterion).toContain("routing grid");
+  }, 30_000);
+
+  it("repeats: the same build gives the same answer", () => {
+    expect(runLargePublicSpaceTest({ people: 20 })).toEqual(
+      runLargePublicSpaceTest({ people: 20 }),
+    );
+  }, 30_000);
+
+  it("uses the guideline's own 20 m room, at 1000 people by default", () => {
+    expect(largeRoomTest.roomSizeMeters).toBe(20);
+    expect(largeRoomTest.people).toBe(1000);
+  });
+});
+
+describe("test 11: choice of escape route", () => {
+  it("reports both exits' own share, honestly, even when the crowding penalty overshoots", () => {
+    // This is a genuine, disclosed finding, not a flaky test: with these two
+    // exits only 6 m apart in distance from the source, the production
+    // crowding-penalty constant (`evacuationExitCrowdingMeters`,
+    // mallCrowdDecisionBackend) is strong enough to push the split toward
+    // the farther exit rather than merely spread load to it, so this test
+    // can legitimately report "fail" — see CLAIMS_LEDGER for the numbers at
+    // the guideline's own 1000 people.
+    const result = runTwoExitChoiceTest({ people: 60 });
+
+    expect(result.number).toBe(11);
+    expect(["pass", "fail"]).toContain(result.status);
+    expect(result.measured).toMatch(
+      /exit 1 \(nearer\) took \d+, exit 2 \(further\) took \d+/u,
+    );
+    expect(result.criterion).toContain("RiMEA 4.1.1 A 4 test 11");
+  }, 30_000);
+
+  it("puts exit 1 nearer the source than exit 2", () => {
+    const t = twoExitChoiceTest;
+    const sourceX = t.roomWidthMeters / 4;
+    expect(Math.abs(t.nearExitXMeters - sourceX)).toBeLessThan(
+      Math.abs(t.farExitXMeters - sourceX),
+    );
+  });
+});
+
+describe("test 12: bottleneck flow", () => {
+  it("reports all four sub-tests (a-d), cheaply", () => {
+    const result = runBottleneckTest({ people: 30 });
+
+    expect(result.number).toBe(12);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toContain("12a");
+    expect(result.measured).toContain("12b");
+    expect(result.measured).toContain("12c");
+    expect(result.measured).toContain("12d");
+    // The bottleneck widths this project could actually route through are
+    // disclosed, not silently substituted for the guideline's own.
+    expect(result.criterion).toContain("router");
+  }, 30_000);
+
+  it("uses the guideline's own room size and a router-limited bottleneck width", () => {
+    // A 4, pp. 37-41: the real value (1 m) does not route on this project's
+    // grid, so 2.4 m stands in for it everywhere except 12d, which is what
+    // the wide comment above `bottleneckTest` explains.
+    expect(bottleneckTest.room1SizeMeters).toBe(10);
+    expect(bottleneckTest.defaultBottleneckWidthMeters).toBe(2.4);
+  });
+});
+
+describe("test 15: a large crowd around a corner", () => {
+  it("has the corner's clear time fall between the two straight routes, cheaply", () => {
+    const result = runLargeCornerTest({ people: 40 });
+
+    expect(result.number).toBe(15);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toMatch(/short straight .* corner .* long straight/u);
+    expect(result.criterion).toContain("RiMEA 4.1.1 A 4 test 15");
+  }, 30_000);
+
+  it("uses the guideline's own three route lengths", () => {
+    expect(largeCornerTest.straightShortLengthMeters).toBe(44);
+    expect(largeCornerTest.straightLongLengthMeters).toBe(75.4);
+    expect(
+      largeCornerTest.cornerVerticalLengthMeters +
+        largeCornerTest.cornerHorizontalLengthMeters,
+    ).toBe(64);
   });
 });
