@@ -1,3 +1,4 @@
+import { boundedNelderMead } from "./boundedNelderMead";
 import type { SocialForceParameters } from "./crowdMovement";
 import {
   measureCorridorSpeed,
@@ -59,7 +60,7 @@ export function speedRmse(
   return Math.sqrt(sumSq / Math.max(1, count));
 }
 
-/** Bounded Nelder–Mead in the unit cube (each parameter scaled to its bounds). */
+/** Bounded Nelder–Mead over the fundamental-diagram RMSE — `boundedNelderMead`'s own solver. */
 export function fitSocialForce(
   start: Record<FittedParameterName, number>,
   target: FitTarget,
@@ -72,82 +73,16 @@ export function fitSocialForce(
     ) => void;
   } = {},
 ): FitResult {
-  const maxEvaluations = options.maxEvaluations ?? 60;
-  const toUnit = (value: number, name: FittedParameterName) =>
-    (value - fitBounds[name][0]) / (fitBounds[name][1] - fitBounds[name][0]);
-  const fromUnit = (unit: number[]) =>
-    Object.fromEntries(
-      names.map((name, index) => {
-        const [low, high] = fitBounds[name];
-        return [name, low + Math.min(1, Math.max(0, unit[index])) * (high - low)];
-      }),
-    ) as Record<FittedParameterName, number>;
-
-  let evaluations = 0;
-  const cost = (unit: number[]) => {
-    const parameters = fromUnit(unit);
-    const rmse = speedRmse(parameters, target, options);
-    evaluations++;
-    options.onEvaluation?.(parameters, rmse);
-    return rmse;
-  };
-
-  const origin = names.map((name) => toUnit(start[name], name));
-  let simplex = [
-    origin,
-    ...names.map((_, axis) =>
-      origin.map((value, index) => (index === axis ? value + 0.15 : value)),
-    ),
-  ].map((point) => ({ point, value: cost(point) }));
-
-  while (evaluations < maxEvaluations) {
-    simplex.sort((a, b) => a.value - b.value);
-    const best = simplex[0];
-    const worst = simplex[simplex.length - 1];
-    const secondWorst = simplex[simplex.length - 2];
-    const centroid = names.map(
-      (_, index) =>
-        simplex.slice(0, -1).reduce((sum, vertex) => sum + vertex.point[index], 0) /
-        (simplex.length - 1),
-    );
-    const along = (factor: number) =>
-      centroid.map((value, index) => value + factor * (worst.point[index] - value));
-
-    const reflected = along(-1);
-    const reflectedValue = cost(reflected);
-    if (reflectedValue < best.value) {
-      const expanded = along(-2);
-      const expandedValue = cost(expanded);
-      simplex[simplex.length - 1] =
-        expandedValue < reflectedValue
-          ? { point: expanded, value: expandedValue }
-          : { point: reflected, value: reflectedValue };
-    } else if (reflectedValue < secondWorst.value) {
-      simplex[simplex.length - 1] = { point: reflected, value: reflectedValue };
-    } else {
-      const contracted = along(0.5);
-      const contractedValue = cost(contracted);
-      if (contractedValue < worst.value) {
-        simplex[simplex.length - 1] = { point: contracted, value: contractedValue };
-      } else {
-        simplex = simplex.map((vertex, index) =>
-          index === 0
-            ? vertex
-            : (() => {
-                const point = vertex.point.map(
-                  (value, axis) => best.point[axis] + 0.5 * (value - best.point[axis]),
-                );
-                return { point, value: cost(point) };
-              })(),
-        );
-      }
-    }
-  }
-
-  simplex.sort((a, b) => a.value - b.value);
+  const result = boundedNelderMead(
+    names,
+    fitBounds,
+    start,
+    (parameters) => speedRmse(parameters, target, options),
+    options,
+  );
   return {
-    evaluations,
-    parameters: fromUnit(simplex[0].point),
-    rmse: simplex[0].value,
+    evaluations: result.evaluations,
+    parameters: result.parameters,
+    rmse: result.value,
   };
 }
