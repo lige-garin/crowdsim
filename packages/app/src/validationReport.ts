@@ -2,6 +2,7 @@ import {
   createFundamentalDiagramPoints,
   type FundamentalDiagramPoint,
 } from "./fundamentalDiagram";
+import { escapeHtml } from "./htmlEscape";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import {
   createCommercialValidationBundle,
@@ -344,15 +345,6 @@ function createReportResidualProjectionValidation(result: BenchmarkRunResult) {
   const target = deriveTrajectoryCalibrationTarget(dataset);
 
   return createResidualProjectionValidationReport(result, target);
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 function escapeAttribute(value: string) {
