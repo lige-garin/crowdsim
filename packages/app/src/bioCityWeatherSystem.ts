@@ -27,7 +27,20 @@ export function createBioCityWeatherRuntimeState(
     environmentFactors: [
       ...weatherSampleToEnvironmentFactors(currentWeatherSample),
       ...activeEvents.flatMap(cityEventToEnvironmentFactors),
-      ...activeHazards.map(hazardToEnvironmentFactor),
+      // fire/smoke excluded (ADR-0012): those two kinds now have their own
+      // localized, distance-and-time model (smokeHazards.ts,
+      // simulationEngine's applyHazardExposure) — someone across the
+      // building from a small fire is not exposed to it. Folding them in
+      // here too would apply the same hazard's speedMultiplier a second
+      // time, uniformly across the whole scene regardless of distance,
+      // which is exactly the crude effect ADR-0012 was written to replace
+      // for these two kinds. Every other hazard kind (crowdSurge, flood,
+      // powerOutage, roadClosure, securityIncident, transitDisruption) has
+      // no localized model of its own, so it keeps this scene-wide
+      // treatment — crude, but the only effect any of them has ever had.
+      ...activeHazards
+        .filter((hazard) => hazard.kind !== "fire" && hazard.kind !== "smoke")
+        .map(hazardToEnvironmentFactor),
     ],
   };
 }

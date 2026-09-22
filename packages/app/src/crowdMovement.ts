@@ -151,11 +151,17 @@ export function stepCrowd(input: CrowdStepInput): {
     // A stair or escalator has its own literature speed (floorRouting), not a
     // multiple of the scene's level walking speed: floorTransfers sets this
     // when someone boards a flight and clears it when they step off, so it
-    // never leaks into their walk on a real floor.
+    // never leaks into their walk on a real floor. Fire/smoke exposure
+    // (ADR-0012, simulationEngine's applyHazardExposure) then scales
+    // whatever that speed is, on top of everything else.
     const freeSpeed =
-      agent.flightSpeedMetersPerSecond ?? input.meanSpeedMetersPerSecond * speedFactor;
-    // Standing in a checkout line holds a slot like any other line.
+      (agent.flightSpeedMetersPerSecond ??
+        input.meanSpeedMetersPerSecond * speedFactor) * (agent.smokeSpeedFactor ?? 1);
+    // Standing in a checkout line holds a slot like any other line — and so,
+    // in the sense that matters here (nobody is walked toward a target), does
+    // someone incapacitated (ADR-0012): pinned where they went down.
     const holding =
+      agent.incapacitated === true ||
       holdingStates.has(agent.lifecycleState ?? "") ||
       (agent.lifecycleState === "checkout" && agent.queueJoinedSeconds !== undefined);
     const heading: ScenePoint = holding
@@ -232,6 +238,14 @@ export function stepCrowd(input: CrowdStepInput): {
           : anticipation(agent, radius, grid, p, input.seed);
       ax += avoidance[0];
       ay += avoidance[1];
+    }
+
+    // Steering away from fire/smoke (ADR-0012): computed once a tick for
+    // everyone exposed (simulationEngine's applyHazardExposure), added in
+    // here the same way the anticipation push above is.
+    if (agent.hazardAvoidance && !holding) {
+      ax += agent.hazardAvoidance[0];
+      ay += agent.hazardAvoidance[1];
     }
 
     const nearbyWalls = input.walls.near(agent.x, agent.y, 1);

@@ -17,6 +17,14 @@ import {
 } from "./floorTransfers";
 import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
 import { stepCrowd } from "./crowdMovement";
+import {
+  exposureSpeedFactor,
+  fedDoseThisTick,
+  fedIncapacitationDose,
+  hazardAvoidancePush,
+  mostExposingHazard,
+  type SimulationHazard,
+} from "./smokeHazards";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
 import { createWallIndex, type WallIndex } from "./wallIndex";
 import { crowdBudget } from "./crowdBudget";
@@ -98,6 +106,44 @@ export type SimulationAgent = {
    */
   flightSpeedMetersPerSecond?: number;
   /**
+   * This tick's free-speed multiplier from fire/smoke exposure
+   * (`smokeHazards.exposureSpeedFactor`), recomputed every tick rather than
+   * drawn once — unlike `speedFactor`, exposure changes as a hazard grows
+   * and as this person moves, so it is not a personal trait to keep.
+   * Absent, not 1, when nothing exposes them: distinguishes "computed and
+   * clear" from "hazards were never evaluated this tick" for anything that
+   * might read it before the first hazard pass runs.
+   */
+  smokeSpeedFactor?: number;
+  /**
+   * This tick's steering push away from whichever hazard exposes this
+   * person worst (`smokeHazards.hazardAvoidancePush`), m/s² — added into
+   * `crowdMovement`'s own force sum alongside the wall and anticipation
+   * pushes, the same way `avoidance` (anticipation) already is.
+   */
+  hazardAvoidance?: readonly [number, number];
+  /**
+   * Fractional dose toward incapacitation (`smokeHazards.fedDoseThisTick`),
+   * accumulated every tick this person is exposed to fire/smoke. Self-
+   * authored in the shape of fractional-effective-dose reasoning, not a
+   * reproduction of a specific published toxicity model — see
+   * `smokeHazards.ts`'s own doc comment for what that means and does not
+   * mean. Absent until first exposed, not 0, so "never exposed" and
+   * "exposed but recovered to zero" stay distinguishable if that ever
+   * matters.
+   */
+  fedDose?: number;
+  /**
+   * Set once `fedDose` reaches `smokeHazards.fedIncapacitationDose` and
+   * never cleared: this person stops walking (pinned where they went down)
+   * and is skipped by every decision backend and by `isExitBound`, so they
+   * can never be decided for again or counted as having left. A disclosed
+   * simplification: incapacitation stops the walk, not the body — someone
+   * who goes down is still a standing-sized obstacle a crowd can jostle,
+   * not a collapsed one a crowd would have to step around or over.
+   */
+  incapacitated?: boolean;
+  /**
    * The floor this person is on (ADR-0010); absent in a one-floor scene.
    * While riding a connector this is that connector's own synthetic floor id
    * (`flightFloorId`, ADR-0010 stage 5) — its own walkable lane, not either
@@ -154,6 +200,8 @@ export type SimulationEngineConfig = {
   floors?: SceneFloorGeometry[];
   /** One-way ways between floors (ADR-0010). */
   connectors?: ConnectorRuntime[];
+  /** Fire/smoke that slows and can incapacitate a crowd (ADR-0012). */
+  hazards?: SimulationHazard[];
   fixedDtSeconds?: number;
   maxAgents?: number;
   seed?: number;
@@ -185,6 +233,16 @@ export type SimulationSnapshot = {
   evacuationClearSeconds?: number;
   /** How many left by each exit during this evacuation. */
   evacuationExits?: Record<string, number>;
+  /**
+   * How many are incapacitated by fire/smoke right now (ADR-0012) — a
+   * running count, not a total, since it is read off `agents` fresh each
+   * snapshot rather than accumulated like `exitedCount`.
+   *
+   * Optional for the same reason `evacuationClearSeconds` is: the many
+   * callers that build a snapshot-shaped object for a run with no hazards in
+   * it need not invent one; the engine's own `makeSnapshot` always sets it.
+   */
+  incapacitatedCount?: number;
 };
 export type SimulationEngine = {
   pause: () => SimulationSnapshot;
@@ -366,6 +424,7 @@ export function createSimulationEngine(
   }
   let floors = buildFloors(config);
   let connectors = config.connectors ?? [];
+  let hazards = config.hazards ?? [];
   let flightFloors = buildFlightFloors(connectors);
   let floorGraph = createFloorGraph({
     connectors,
@@ -408,6 +467,10 @@ export function createSimulationEngine(
       agents: agents.map((agent) => ({ ...agent })),
       evacuationClearSeconds,
       evacuationExits: Object.fromEntries(evacuationExits),
+      incapacitatedCount: agents.reduce(
+        (count, agent) => count + (agent.incapacitated ? 1 : 0),
+        0,
+      ),
     };
   }
   function spawnArrival(source: SimulationSource, size: number) {
@@ -594,7 +657,50 @@ export function createSimulationEngine(
       waitingOutside.set(source.id, gate);
     }
   }
+  /**
+   * Fire/smoke exposure and dose (ADR-0012), once per tick over everyone not
+   * already incapacitated: this tick's speed multiplier
+   * (`smokeSpeedFactor`), the dose added, and — once that dose crosses
+   * `fedIncapacitationDose` — pinning them where they stand and marking them
+   * incapacitated. Runs before the movement loop so `crowdMovement` reads
+   * this tick's multiplier, not last tick's.
+   */
+  function applyHazardExposure() {
+    if (hazards.length === 0) {
+      return;
+    }
+    agents = agents.map((agent) => {
+      if (agent.incapacitated) {
+        return agent;
+      }
+      const worst = mostExposingHazard(hazards, agent.floorId, agent, elapsedSeconds);
+      if (!worst) {
+        return agent.smokeSpeedFactor === undefined &&
+          agent.hazardAvoidance === undefined
+          ? agent
+          : { ...agent, hazardAvoidance: undefined, smokeSpeedFactor: undefined };
+      }
+      const dose =
+        (agent.fedDose ?? 0) +
+        fedDoseThisTick(worst.exposure, worst.hazard.riskScore, fixedDtSeconds);
+      const incapacitated = dose >= fedIncapacitationDose;
+      return {
+        ...agent,
+        fedDose: dose,
+        hazardAvoidance: incapacitated
+          ? undefined
+          : hazardAvoidancePush(worst.hazard, agent, worst.exposure),
+        smokeSpeedFactor: incapacitated
+          ? undefined
+          : exposureSpeedFactor(worst.exposure, worst.hazard.speedMultiplier),
+        incapacitated,
+        ...(incapacitated ? { targetX: agent.x, targetY: agent.y } : {}),
+      };
+    });
+  }
+
   function advanceAgentsCpu() {
+    applyHazardExposure();
     // Only handed over during an evacuation, so a normal step allocates
     // nothing for the per-exit tally.
     const exitedSinkIds: string[] = [];
@@ -683,6 +789,11 @@ export function createSimulationEngine(
     if (agent.transfer) {
       return false;
     }
+    // Pinned where they went down (ADR-0012) — never arriving anywhere
+    // again, whatever sink they happen to have frozen near.
+    if (agent.incapacitated) {
+      return false;
+    }
     if (agent.lifecycleState === "leave" || agent.lifecycleState === "evacuate") {
       return true;
     }
@@ -702,6 +813,7 @@ export function createSimulationEngine(
       speedMetersPerSecond = geometry.speedMetersPerSecond;
       floors = buildFloors(geometry);
       connectors = geometry.connectors ?? [];
+      hazards = geometry.hazards ?? [];
       flightFloors = buildFlightFloors(connectors);
       connectorTraffic = createConnectorTraffic(connectors);
       elevatorCars = createElevatorRuntime(connectors);

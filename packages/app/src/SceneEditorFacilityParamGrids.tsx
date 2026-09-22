@@ -443,6 +443,25 @@ export function HazardParamGrid({
         value={selectedHazard.riskScore}
         onChange={(value) => onNumberChange("riskScore", value)}
       />
+      <NumberInput
+        label={t("hazardVisibilityMultiplier")}
+        min={0}
+        step={0.05}
+        value={selectedHazard.visibilityMultiplier}
+        onChange={(value) => onNumberChange("visibilityMultiplier", value)}
+      />
+      {(selectedHazard.kind === "fire" || selectedHazard.kind === "smoke") && (
+        <>
+          <NumberInput
+            label={t("hazardGrowthSeconds")}
+            min={0.1}
+            step={10}
+            value={selectedHazard.growthSeconds}
+            onChange={(value) => onNumberChange("growthSeconds", value)}
+          />
+          <p className="editor-param-note">{t("hazardSmokeDisclosure")}</p>
+        </>
+      )}
     </div>
   );
 }

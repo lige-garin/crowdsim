@@ -1179,3 +1179,29 @@ connector speed this project has ever quoted — nothing here is calibrated to
 any real lift's throughput; this project has no observed lift flow to fit
 to. See `docs/adr/0010-multi-floor-and-vertical-circulation.md`'s own
 2026-09-22 update for the same account with the full ADR context.
+
+## 2026-09-22 (fifth entry): fire/smoke — a scene-wide multiplier nobody knew was live, replaced with a local one
+
+CLAUDE.md's own history said hazards had no simulated effect at all — "火只画在图上" (a fire was only ever drawn on the map). That was **half wrong**, discovered while building the local exposure/dose model this entry is about: `bioCityWeatherSystem.hazardToEnvironmentFactor` already converted **every** active hazard, of **any** kind, into a scene-wide `EnvironmentFactor` folded into the single `speedMetersPerSecond` the whole scene's crowd walks at (`environmentEffects.calculateEnvironmentImpact`). A fire with `speedMultiplier: 0.1` did not do nothing — it slowed **everyone in the building to a tenth speed**, uniformly, the instant it started, regardless of distance.
+
+**Found by symptom, not by code review.** Building a corridor test scene with a small fire produced a crowd that would not move at all — not just people inside the fire's radius, everyone, including a control group standing at the far end nowhere near it. Direct comparison of `deriveSceneGeometry`'s full output between an otherwise-identical scene with and without the hazard turned up the smoking gun: `speedMetersPerSecond: 1.34` with no hazard, `0.134` with one — a 10x scene-wide drop from a single fire's own `speedMultiplier`, the mechanism above.
+
+**Fix**: `fire`/`smoke` are now excluded from `hazardToEnvironmentFactor`'s conversion (`bioCityWeatherSystem.ts`), since they have their own localized model now (below). Every other hazard kind (`crowdSurge`, `flood`, `powerOutage`, `roadClosure`, `securityIncident`, `transitDisruption`) keeps the old scene-wide mechanism unchanged — this pass built nothing better for them, and narrowing the fix to only the two kinds that now have a real alternative was the smallest correct change.
+
+### The local model (ADR-0012)
+
+Full account in `docs/adr/0012-smoke-and-incapacitation.md`. In short: `smokeHazards.ts` gives fire/smoke a growing circular affected radius (`smokeRadiusAt`, linear over a new self-chosen `growthSeconds` field, default 120 s), exposure falling off linearly within it (`localExposure`, worst-of-overlapping via `mostExposingHazard`), a local speed multiplier read from the hazard's own already-existing `speedMultiplier` field (`exposureSpeedFactor`), a local steering push away from it scaled by the hazard's own `visibilityMultiplier` (`hazardAvoidancePush`, added into `crowdMovement`'s force sum rather than the router — the router's grid is not rebuilt every tick a hazard grows), and a fractional dose toward incapacitation (`fedDoseThisTick`).
+
+**The dose model is self-authored, not Purser's.** The plan for this work asked for the literature FED (fractional effective dose) model; its exact published coefficients were not independently verified here, and reproducing them from memory without that verification would be exactly the class of claim this project's own history exists to catch. What is built instead has the same _shape_ — dose accumulates with time and severity, 1.0 is incapacitation — with a self-chosen anchor (`doseSecondsAtFullExposure = 180`) the code and the ADR both say plainly is not a citation.
+
+**Incapacitation is permanent and honestly excluded from having "escaped"**: past a dose of 1, a person is pinned where they stand, skipped by the decision backend (mirroring how a mid-flight stair rider is already skipped), and `isExitBound` refuses to count them as having left no matter where they froze. `SimulationSnapshot.incapacitatedCount` reports the live count.
+
+**A real dynamic the test suite had to work around, not paper over**: with any nonzero speed multiplier, a person's own small movement reduces their exposure slightly, which raises their speed slightly, which reduces exposure further — a real feature of the model (visibility improves as you near a fire's edge, so you move a little faster, which is not wrong), but it means an open corridor lets even a very slow person eventually walk clear of a fire well short of the ~180 s of full exposure incapacitation needs. `simulationSmoke.test.ts`'s incapacitation cases seal someone into a small walled box with the fire instead of relying on slowness alone to keep them there — the test's own comment explains why, rather than silently picking parameters that happened to work.
+
+### Editor
+
+The hazard param panel gained `growthSeconds` and — present in the mutation type since before this pass but never actually reachable from the panel — `visibilityMultiplier`, both round-tripped through `EditorHazard`/`sceneEditorConversions.ts`/`sceneEditorAdders.ts`, plus a disclosure line shown only for `fire`/`smoke`: "示意性烟气，非 CFD" and what that means concretely (no gas transport, buoyancy or venting; a circle, not a smoke layer).
+
+### Verified
+
+`smokeHazards.test.ts`, 20 cases, pure-function coverage of the radius growth clamp, the falloff shape, `mostExposingHazard` correctly preferring the worse hazard over the nearer one, and the dose formula's own arithmetic against its stated anchor. `simulationSmoke.test.ts`, 8 cases, through the real scene → engine pipeline: local-only slowdown, dose accumulation, a genuine incapacitation (sealed-box scenario), the incapacitated-never-exits guard, the avoidance push's direction, and a no-hazard control scene proved bit-for-bit unaffected. 774 vitest tests total, cargo test, typecheck, lint and prettier all clean.

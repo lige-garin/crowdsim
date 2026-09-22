@@ -257,6 +257,7 @@ export function addHazard(
         kind: "roadClosure",
         position: { ...position },
         radiusMeters: 8,
+        growthSeconds: 120,
         affectedRoadId: document.roads.at(-1)?.id,
         startsAtSeconds: 0,
         severity: 0.5,

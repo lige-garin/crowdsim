@@ -107,6 +107,13 @@ export const hazardSchema = z
     ]),
     position: pointSchema,
     radiusMeters: z.number().positive().default(8),
+    /**
+     * Seconds from `startsAtSeconds` for the affected radius to grow from 0
+     * to `radiusMeters` (`smokeHazards.smokeRadiusAt`) — only meaningful for
+     * `kind: "fire"`/`"smoke"`, ignored otherwise. Self-chosen (2 minutes),
+     * not fitted to any measured fire growth curve; this project has none.
+     */
+    growthSeconds: z.number().positive().default(120),
     affectedRoadId: idSchema.optional(),
     affectedZoneId: idSchema.optional(),
     startsAtSeconds: z.number().nonnegative().default(0),

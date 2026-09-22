@@ -417,6 +417,12 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
+        // Incapacitated by fire/smoke (ADR-0012): pinned where they went
+        // down, never decided for again, the same reason a rider is not.
+        if (agent.incapacitated) {
+          continue;
+        }
+
         const state = agent.lifecycleState;
 
         // Evacuation overrides shopping: abandon the shop, head for an exit.

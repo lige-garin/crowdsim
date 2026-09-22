@@ -26,6 +26,7 @@ export type ObstacleNumberField = "routeCostMultiplier";
  */
 export type EntranceNumberField = "arrivalRatePerMinute" | "groupShare" | "width";
 export type HazardNumberField =
+  | "growthSeconds"
   | "radiusMeters"
   | "riskScore"
   | "routeCostMultiplier"
@@ -250,7 +251,7 @@ export function updateDocumentHazardNumber(
   field: HazardNumberField,
   value: number,
 ) {
-  const minValue = field === "radiusMeters" ? 1 : 0;
+  const minValue = field === "radiusMeters" ? 1 : field === "growthSeconds" ? 0.1 : 0;
   const maxValue =
     field === "riskScore" || field === "severity" ? 1 : Number.POSITIVE_INFINITY;
 

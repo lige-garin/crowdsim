@@ -23,6 +23,7 @@ import type {
   SimulationShop,
 } from "./simulationDecisionBackend";
 import type { SimulationSink, SimulationSource } from "./simulationEngine";
+import type { SimulationHazard } from "./smokeHazards";
 import { weatherCrowdImpact } from "./weatherCrowdImpact";
 
 // Weidmann free-flow speed. Was 8 m/s (~29 km/h, 6x a walking human): every UI
@@ -60,6 +61,8 @@ export type SceneGeometry = {
   floors: SceneFloorGeometry[];
   /** The ways between floors, each already one-way (ADR-0010). */
   connectors: ConnectorRuntime[];
+  /** Fire/smoke that slows and can incapacitate a crowd (ADR-0012). */
+  hazards: SimulationHazard[];
   servicePoints: SimulationServicePoint[];
   shops: SimulationShop[];
   sinks: SimulationSink[];
@@ -190,9 +193,35 @@ export function deriveSceneGeometry(
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
     floors: sceneFloorGeometries(scene, overrides),
     connectors: sceneConnectorRuntimes(scene),
+    hazards: sceneHazardRuntimes(scene),
     walls: overrides.walls ?? wallSegmentsFromScene(scene),
     world: overrides.world ?? scene.world,
   };
+}
+
+/**
+ * A scene's `fire`/`smoke` hazards as the engine uses them (ADR-0012). Every
+ * other hazard kind (`crowdSurge`, `flood`, `powerOutage`, `roadClosure`,
+ * `securityIncident`, `transitDisruption`) is left out here — this pass only
+ * wires up the two kinds `smokeHazards.ts` models; the rest remain what they
+ * were before it, a shape drawn on the map with no simulated effect.
+ */
+export function sceneHazardRuntimes(scene: CrowdSimScene): SimulationHazard[] {
+  return scene.hazards
+    .filter((hazard) => hazard.kind === "fire" || hazard.kind === "smoke")
+    .map((hazard) => ({
+      id: hazard.id,
+      floorId: hazard.floorId,
+      position: hazard.position,
+      radiusMeters: hazard.radiusMeters,
+      growthSeconds: hazard.growthSeconds,
+      startsAtSeconds: hazard.startsAtSeconds,
+      endsAtSeconds: hazard.endsAtSeconds,
+      severity: hazard.severity,
+      speedMultiplier: hazard.speedMultiplier,
+      visibilityMultiplier: hazard.visibilityMultiplier,
+      riskScore: hazard.riskScore,
+    }));
 }
 
 /**

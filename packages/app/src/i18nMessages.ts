@@ -141,6 +141,12 @@ export const messages = {
   hashGrid: { zh: "哈希网格", en: "Hash grid" },
   hazard: { zh: "风险", en: "Hazard" },
   hazardKind: { zh: "风险类型", en: "Hazard type" },
+  hazardGrowthSeconds: { zh: "蔓延时长(秒)", en: "Growth time (s)" },
+  hazardVisibilityMultiplier: { zh: "能见度倍率", en: "Visibility multiplier" },
+  hazardSmokeDisclosure: {
+    zh: "示意性烟气，非 CFD：影响范围是以起火点为圆心随时间线性长大的圆，不模拟气体输运、浮力或门洞排烟；仅 fire/smoke 类型生效，速度/失能倍率按此局部计算，不再叠加到全场速度。",
+    en: "Illustrative smoke, not CFD: the affected area is a circle around the source that grows linearly with time — no gas transport, buoyancy or doorway venting. Only the fire/smoke kinds get this; speed and incapacitation are computed locally now, not folded into the scene-wide speed multiplier.",
+  },
   hazards: { zh: "风险点", en: "Hazards" },
   hazardShort: { zh: "RISK", en: "RISK" },
   heatmap: { zh: "热力图", en: "Heatmap" },

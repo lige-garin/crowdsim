@@ -193,6 +193,9 @@ export type EditorHazard = {
   kind: EditorHazardKind;
   position: ScenePoint;
   radiusMeters: number;
+  /** Seconds for the affected radius to grow from 0 to radiusMeters
+   * (ADR-0012, fire/smoke only, ignored otherwise). */
+  growthSeconds: number;
   affectedRoadId?: string;
   affectedZoneId?: string;
   startsAtSeconds: number;
