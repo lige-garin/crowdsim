@@ -8,6 +8,7 @@ import {
 } from "./floorRouting";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import { nearestAllowedSink } from "./simulationDecisionBackend";
+import { weidmannMaxSpecificFlowDensityPerSquareMeter } from "./pedestrianFundamentalDiagram";
 
 /**
  * Crossing between floors (ADR-0010, stages 4–5).
@@ -199,11 +200,47 @@ export function createConnectorTraffic(connectors: readonly ConnectorRuntime[]) 
 export type ConnectorTraffic = ReturnType<typeof createConnectorTraffic>;
 
 /**
+ * How full a flight lane can get before it stops admitting anyone else.
+ *
+ * `ConnectorTraffic.board` alone is not enough: it rate-limits *admission*,
+ * not the lane's own occupancy, so when the lane's downstream flow is slower
+ * than its admission rate — which congestion on the lane itself causes,
+ * since a crowded flight is a slower one — admission keeps letting more on
+ * while fewer come off, and occupancy climbs without bound. Found building
+ * RiMEA test 8: a whole floor's population (152) funnelling onto one 2 m
+ * stair at once packed a 16 m² flight to 5.8 P/m² — more people than the
+ * physical space this project's own geometry says can fit — and it never
+ * unstuck; everyone on it sat at near-zero velocity for the rest of the run.
+ *
+ * The ceiling is `weidmannMaxSpecificFlowDensityPerSquareMeter` (~1.75
+ * P/m²), not the jam density (5.4): jam density is where the curve has
+ * *already* fallen to zero speed, so capping there reproduces the same
+ * gridlock one density lower. The max-flow density is where throughput
+ * actually peaks — the most people a lane can be moving through it at once,
+ * not the most that can be motionlessly packed into it. This makes the
+ * stated design ("someone who can't get up waits at the mouth" — this
+ * project's own multi-floor ADR) actually hold at scale, rather than only at
+ * the modest headcounts tests 2/3/13 happened to try it at.
+ */
+function flightCapacity(connector: ConnectorRuntime): number {
+  return (
+    connector.width *
+    flightLengthMeters(connector) *
+    weidmannMaxSpecificFlowDensityPerSquareMeter
+  );
+}
+
+/**
  * Deterministic scatter across a flight's width, keyed by id: the same golden-
  * angle technique `crowdMovement` uses to separate two people who land on the
  * exact same point. Several people can board the same connector on the same
  * step, and starting them all on its centreline would have them shove each
  * other off it in the first tick rather than simply arrive side by side.
+ *
+ * Also used as each rider's own *target* Y for the far mouth (below), for
+ * the same reason in reverse: everyone converging on one shared exit point
+ * is what let a crowd jam solid there. A rider keeps to the same lateral
+ * offset all the way across.
  */
 function boardingLateralMeters(agent: SimulationAgent, width: number) {
   const unit = (Math.sin(agent.id * 2.399963) + 1) / 2; // 0..1
@@ -242,6 +279,15 @@ export function stepConnectorTravel({
   traffic: ConnectorTraffic;
 }): SimulationAgent[] {
   const byId = new Map(connectors.map((connector) => [connector.id, connector]));
+  // How many are already on each flight, so `flightCapacity` can be
+  // enforced as people board — mutated below as this step admits more, the
+  // same running-tally shape `traffic` itself already uses.
+  const occupancy = new Map<string, number>();
+  for (const agent of agents) {
+    if (agent.floorId !== undefined && agent.floorId.startsWith("flight:")) {
+      occupancy.set(agent.floorId, (occupancy.get(agent.floorId) ?? 0) + 1);
+    }
+  }
   const arrived: SimulationAgent[] = [];
   const next = agents.map((agent) => {
     if (isRiding(agent)) {
@@ -276,10 +322,20 @@ export function stepConnectorTravel({
         return stepped;
       }
 
-      const dx = agent.targetX - agent.x;
-      const dy = agent.targetY - agent.y;
-
-      if (Math.sqrt(dx * dx + dy * dy) > arrivalRadiusMeters) {
+      // Whether someone has crossed the flight is a question about its
+      // length (x), not its width (y): being jostled a little off their own
+      // lateral aim point is not "still on the stairs". Checking full 2D
+      // distance to `targetY` as well — as this used to — meant someone
+      // whose neighbours had nudged them sideways in transit could arrive at
+      // the far end already past it in x and still never count as arrived,
+      // stuck against the flight's own far wall with the rest of a crowd
+      // behind them equally unable to correct their own drift once nothing
+      // was moving. Found building RiMEA test 8, downstream of the same
+      // jam this file's `flightCapacity`/lateral-target fix addresses:
+      // together they stopped the pile-up, but a handful of already-drifted
+      // riders still could not close a y-gap with everyone stopped around
+      // them.
+      if (agent.targetX - agent.x > arrivalRadiusMeters) {
         return agent; // still on the flight; stepCrowd moved them this step
       }
 
@@ -318,13 +374,22 @@ export function stepConnectorTravel({
       return agent;
     }
 
+    const flightId = flightFloorId(connector.shaftId);
+    const occupied = occupancy.get(flightId) ?? 0;
+
+    if (occupied >= flightCapacity(connector)) {
+      return agent; // the flight itself is full — wait at the mouth
+    }
+
     if (!traffic.board(connector.id)) {
       return agent;
     }
 
+    occupancy.set(flightId, occupied + 1);
+
     return {
       ...agent,
-      floorId: flightFloorId(connector.shaftId),
+      floorId: flightId,
       // A slower person is longer on the flight, which is the whole point of
       // drawing them from a population (ADR-0011) — but now it falls out of
       // actually walking it slower, not a precomputed duration.
@@ -334,7 +399,15 @@ export function stepConnectorTravel({
       x: 0,
       y: boardingLateralMeters(agent, connector.width),
       targetX: flightLengthMeters(connector),
-      targetY: connector.width / 2,
+      // Their own lateral offset again, not the flight's centreline: every
+      // rider walking toward the exact same point is what let a crowd jam
+      // solid right at the far mouth (found building RiMEA test 8) — each
+      // still arriving, at speed, well inside the flight's own capacity, but
+      // never quite converging on that one shared pixel once enough of them
+      // were converging on it together. A rider who heads for the same
+      // lateral spot they boarded at is not shoved off it by everyone else
+      // aiming there too.
+      targetY: boardingLateralMeters(agent, connector.width),
     };
   });
 

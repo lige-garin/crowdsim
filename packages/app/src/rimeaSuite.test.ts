@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bottleneckTest,
+  demographicSpeedTest,
   escapeRouteTest,
   fundamentalDiagramDensities,
   fundamentalDiagramMeasureSeconds,
@@ -9,15 +10,18 @@ import {
   largeCornerTest,
   largeRoomTest,
   oneDimensionalJamDensityPerMeter,
+  parameterStudyTest,
   premovementTest,
   runBottleneckTest,
   runCornerTest,
   runCorridorSpeedTest,
+  runDemographicSpeedTest,
   runEscapeRouteAllocationTest,
   runFundamentalDiagramTest,
   runLargeCornerTest,
   runLargePublicSpaceTest,
   runOneDimensionalFundamentalDiagramTest,
+  runParameterStudyTest,
   runPremovementTest,
   runRimeaSuite,
   runStairSpeedTest,
@@ -38,6 +42,7 @@ const cheap = {
   crowdPeople: 40,
   densities: [1],
   measureSeconds: 2,
+  parameterStudyRows: 2,
 } as const;
 const suite = runRimeaSuite(cheap);
 
@@ -64,10 +69,10 @@ describe("the RiMEA suite's own honesty", () => {
   it("counts what is built against what is not", () => {
     const summary = summarizeRimeaSuite(suite);
 
-    // Tests 1-6, 9-12, 15 and 16 are built (12 of them); 7, 8, 13, 14 name
-    // their clause instead.
-    expect(summary.pass + summary.fail).toBe(12);
-    expect(summary.needsScenario).toBe(4);
+    // Tests 1-12, 15 and 16 are built (14 of them); 13 and 14 name their
+    // clause instead.
+    expect(summary.pass + summary.fail).toBe(14);
+    expect(summary.needsScenario).toBe(2);
     expect(summary.total).toBe(16);
   });
 
@@ -146,6 +151,47 @@ describe("test 1: walking speed in a corridor", () => {
     expect(result.criterion).toContain("26-34 s");
     expect(result.criterion).toContain("19% spread");
   });
+});
+
+describe("test 7: allocation of demographic parameters", () => {
+  it("puts Fig. 3's own mean inside the 95% bootstrap interval of 50 realised speeds", () => {
+    const result = runDemographicSpeedTest();
+
+    expect(result.number).toBe(7);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toMatch(
+      /50 realised speeds: mean [\d.]+ m\/s, sd [\d.]+ m\/s/u,
+    );
+    expect(result.measured).toMatch(/95% bootstrap interval/u);
+    expect(result.criterion).toContain(
+      `${demographicSpeedTest.meanSpeedMetersPerSecond} m/s`,
+    );
+    expect(result.criterion).toContain("age 30");
+  }, 60_000);
+});
+
+describe("test 8: parameter study", () => {
+  it("reports total clear time at each of the guideline's own three speeds", () => {
+    const result = runParameterStudyTest({
+      groundRowCounts: [2, 2, 2, 2],
+      upperRowCounts: [2, 2, 2, 2],
+    });
+
+    expect(result.number).toBe(8);
+    for (const speed of parameterStudyTest.speedsMetersPerSecond) {
+      expect(result.measured).toContain(`${speed} m/s`);
+    }
+    expect(result.criterion).toContain("recorded in graphs");
+  }, 120_000);
+
+  it("clears faster, not slower, at a higher speed", () => {
+    const result = runParameterStudyTest({
+      groundRowCounts: [1, 1, 1, 1],
+      upperRowCounts: [1, 1, 1, 1],
+    });
+
+    expect(result.status).toBe("pass");
+  }, 120_000);
 });
 
 describe("test 6: round a corner", () => {

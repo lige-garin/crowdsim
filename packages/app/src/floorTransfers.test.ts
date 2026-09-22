@@ -15,6 +15,7 @@ import {
 } from "./floorTransfers";
 import { applySimulationAgentDecisions } from "./simulationDecisionBackend";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
+import { weidmannMaxSpecificFlowDensityPerSquareMeter } from "./pedestrianFundamentalDiagram";
 
 const openFloor = createRouter({ width: 60, height: 40 }, []);
 
@@ -229,6 +230,24 @@ describe("stepping onto and off a connector", () => {
     expect(arrived.transfer).toBeUndefined();
   });
 
+  it("still counts someone as having crossed even if a crowd nudged them off their own lateral aim", () => {
+    // A real rider's y drifts from their own target as neighbours jostle
+    // them — this project's own crowd model, not a contrived input. Found
+    // building RiMEA test 8: checking full 2D distance to (targetX,
+    // targetY) meant a drifted rider who had genuinely crossed the flight's
+    // whole length could still fail the old check by a few tenths of a
+    // metre of y, and — once everyone on a crowded flight was equally
+    // stuck — never close that gap again. Only x should gate "crossed".
+    const drifted = rider(flightLengthMeters(stairs) - 0.01, {
+      y: 0.2,
+      targetY: 1.4, // more than arrivalRadiusMeters (0.15) away in y alone
+    });
+    const [stepped] = step([drifted]);
+
+    expect(isRiding(stepped)).toBe(false);
+    expect(stepped.floorId).toBe("ground");
+  });
+
   it("leaves a rider not yet at the far mouth exactly where stepCrowd put them", () => {
     const midFlight = rider(4.5);
     const [stepped] = step([midFlight]);
@@ -257,6 +276,40 @@ describe("stepping onto and off a connector", () => {
     // Two a second at 2/s, and the rest wait at the foot of the stairs.
     expect(boarded).toBe(2);
     expect(stepped.filter((agent) => !isRiding(agent))).toHaveLength(4);
+  });
+
+  it("stops boarding once the flight is already at its own capacity, whatever the rate allowance says", () => {
+    // A crowd already at (in fact just past) the lane's own max-flow-density
+    // ceiling — found happening for real in RiMEA test 8, where a whole
+    // floor funnelling onto one stair packed its flight past that point and
+    // it never unstuck. `ConnectorTraffic`'s own rate limit does not catch
+    // this: it is generous here on purpose, so only the occupancy cap is
+    // under test.
+    const capacity =
+      stairs.width *
+      flightLengthMeters(stairs) *
+      weidmannMaxSpecificFlowDensityPerSquareMeter;
+    const alreadyOnLane = Array.from({ length: Math.ceil(capacity) }, (_, index) =>
+      rider(1 + (index % 5), { id: 100 + index }),
+    );
+    const waiting = walker({
+      id: 999,
+      x: 30,
+      y: 20,
+      transfer: {
+        connectorId: "stair-1",
+        shaftId: "stair-1",
+        finalX: 55,
+        finalY: 20,
+        floorId: "ground",
+      },
+    });
+    const t = traffic();
+    t.replenish(10); // ample rate allowance — not what this test checks
+    const stepped = step([...alreadyOnLane, waiting], t);
+    const newcomer = stepped.find((agent) => agent.id === 999)!;
+
+    expect(isRiding(newcomer)).toBe(false);
   });
 
   it("steps a stranded rider off at their destination if the connector is edited away", () => {

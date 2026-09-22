@@ -3,6 +3,7 @@ import {
   bodyRadiusRangeMeters,
   sampleUniformReactionSeconds,
 } from "./behaviorDistributions";
+import { bootstrapMeanInterval } from "./experimentSweep";
 import { measureCorridorSpeed } from "./fundamentalDiagramHarness";
 import { connectorSpeeds, flightFloorId } from "./floorRouting";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
@@ -86,7 +87,10 @@ export const corridorTest = {
  */
 export const corridorTestRuns = 20;
 
-function corridorScene(seed: number): CrowdSimScene {
+function corridorScene(
+  seed: number,
+  speedMetersPerSecond: number = corridorTest.speedMetersPerSecond,
+): CrowdSimScene {
   const y = 3;
   const halfWidth = corridorTest.widthMeters / 2;
   // The exit's radius is 1 m, so its centre sits one metre past the 40 m mark
@@ -98,7 +102,7 @@ function corridorScene(seed: number): CrowdSimScene {
     id: `rimea-test-1-${seed}`,
     name: "RiMEA test 1: corridor",
     seed,
-    speedMetersPerSecond: corridorTest.speedMetersPerSecond,
+    speedMetersPerSecond,
     world: { width: exitX + 3, height: 6 },
     walls: [
       {
@@ -142,10 +146,14 @@ function corridorScene(seed: number): CrowdSimScene {
 }
 
 /** One person's walk down the corridor, in seconds, or null if they never arrive. */
-function walkCorridorOnce(seed: number): number | null {
-  const engine = createSimulationEngineFromScene(corridorScene(seed), {
-    maxAgents: 1,
-  });
+function walkCorridorOnce(
+  seed: number,
+  speedMetersPerSecond: number = corridorTest.speedMetersPerSecond,
+): number | null {
+  const engine = createSimulationEngineFromScene(
+    corridorScene(seed, speedMetersPerSecond),
+    { maxAgents: 1 },
+  );
   engine.start();
 
   let startedAt: number | null = null;
@@ -214,6 +222,101 @@ export function runCorridorSpeedTest(runs = corridorTestRuns): RimeaTestResult {
 
 function corridorCriterion() {
   return `RiMEA 4.1.1 A 2 test 1 (p. 29): one person, ${corridorTest.widthMeters} m x ${corridorTest.lengthMeters} m corridor at ${corridorTest.speedMetersPerSecond} m/s, travel time ${corridorTest.travelSecondsMin}-${corridorTest.travelSecondsMax} s. Judged on the median of ${corridorTestRuns} walks: this engine draws free speeds with a 19% spread where the window assumes 5%, so single walks fall outside it by design.`;
+}
+
+/**
+ * Test 7's population (A 2, p. 31, its Fig. 3): the guideline says to
+ * "select, per Fig. 3, a group consisting of adult persons" and then "show
+ * that the distribution of walking speeds in the simulation is consistent
+ * with the distribution in the table". RiMEA's own English column names
+ * "Figure 2" for the first half of that sentence, but Figure 2 (p. 11) is an
+ * unrelated diagram of evacuation-time components — grepped for across the
+ * whole document to be sure — while the German original says "Abb. 3", the
+ * only age-speed curve the guideline has. Read as a translation slip, not a
+ * second data source, and Fig. 3 is used throughout.
+ *
+ * Fig. 3 is a continuous curve, not one group, so a point on it had to be
+ * chosen: age 30, a round age inside the plateau that follows the steep
+ * 10-20 climb and precedes the post-50 decline — away from the sharp peak
+ * near age 20, where a small misreading swings the mean the most. Read off
+ * the curve's own gridlines (0.2 m/s squares, 400 DPI render of the source
+ * PDF) at age 30: v_mean ~= 1.52 m/s, v_mean+sigma ~= 1.83, v_mean-sigma ~=
+ * 1.19 -- half-widths of 0.31 and 0.33, agreeing with each other and with
+ * the same half-widths read at age 20 (0.31 and 0.32), so sigma ~= 0.32 m/s
+ * from the figure.
+ *
+ * Table 2 (p. 14) is a different, single-row table -- "persons with impaired
+ * mobility", 0.46-0.76 m/s -- that no test in this guideline's Annex 1
+ * actually cites by number; it is not an alternative reading of this test.
+ *
+ * This test reuses the engine's existing per-agent speed spread
+ * (`sampleSpeedFactor`, a fixed 0.26/1.34 ~= 19.4% of whichever mean speed a
+ * scene declares -- the same mechanism every other test in this file walks
+ * through) rather than adding a second, one-off Gaussian sampler: at
+ * 1.52 m/s that gives sigma ~= 0.295 m/s, close enough to the figure's 0.32
+ * (both round to "about 0.3 m/s" given how imprecise reading a printed
+ * curve is) that the gap is disclosed here rather than built around.
+ *
+ * Each of the 50 is walked alone down test 1's own corridor — a person with
+ * nobody nearby is exactly what "free walking speed" means — and their
+ * realised speed (length / travel time) stands in for "the distribution of
+ * walking speeds in the simulation". Consistency is judged the same way
+ * this project's own bootstrap tooling already judges a sweep
+ * (`bootstrapMeanInterval`, gap-closure plan 1.3): the figure's mean passes
+ * if it falls inside the 95% bootstrap interval of the 50 realised speeds'
+ * own mean. The sample's standard deviation is reported alongside it, not
+ * gated on — 50 draws estimate a spread too noisily to threshold.
+ */
+export const demographicSpeedTest = {
+  ageYears: 30,
+  meanSpeedMetersPerSecond: 1.52,
+  figureSigmaMetersPerSecond: 0.32,
+  people: 50,
+} as const;
+
+/**
+ * Test 7: does the distribution of realised free walking speeds over a
+ * population of adults match the mean read off the guideline's own Fig. 3?
+ */
+export function runDemographicSpeedTest(): RimeaTestResult {
+  const t = demographicSpeedTest;
+  const times = Array.from({ length: t.people }, (_, index) =>
+    walkCorridorOnce(index + 1, t.meanSpeedMetersPerSecond),
+  ).filter((time): time is number => time !== null);
+
+  if (times.length < 2) {
+    return {
+      number: 7,
+      title: "Allocation of demographic parameters",
+      status: "fail",
+      measured: `only ${times.length} of ${t.people} reached the end of the corridor`,
+      criterion: demographicSpeedCriterion(),
+    };
+  }
+
+  const speeds = times.map((seconds) => corridorTest.lengthMeters / seconds);
+  const mean = speeds.reduce((sum, speed) => sum + speed, 0) / speeds.length;
+  const variance =
+    speeds.reduce((sum, speed) => sum + (speed - mean) ** 2, 0) / (speeds.length - 1);
+  const stdDev = Math.sqrt(variance);
+  const interval = bootstrapMeanInterval(speeds, { seed: 1 });
+  const withinInterval =
+    interval !== null &&
+    t.meanSpeedMetersPerSecond >= interval.low &&
+    t.meanSpeedMetersPerSecond <= interval.high;
+
+  return {
+    number: 7,
+    title: "Allocation of demographic parameters",
+    status: withinInterval ? "pass" : "fail",
+    measured: `${speeds.length} realised speeds: mean ${mean.toFixed(3)} m/s, sd ${stdDev.toFixed(3)} m/s; 95% bootstrap interval of the mean ${interval ? `[${interval.low.toFixed(3)}, ${interval.high.toFixed(3)}]` : "unavailable"}`,
+    criterion: demographicSpeedCriterion(),
+  };
+}
+
+function demographicSpeedCriterion() {
+  const t = demographicSpeedTest;
+  return `RiMEA 4.1.1 A 2 test 7 (p. 31, its Fig. 3): distribute walking speeds over a population of ${t.people} adults per Fig. 3 and show the simulated distribution is consistent with it. Fig. 3 read at age ${t.ageYears} (a round age on its plateau, away from the peak near 20): v_mean ~= ${t.meanSpeedMetersPerSecond} m/s, sigma ~= ${t.figureSigmaMetersPerSecond} m/s (digitised off the guideline's own printed gridlines, not a value it tabulates). Each person walked test 1's corridor alone; the figure's mean passes if it sits inside the 95% bootstrap interval of the ${t.people} realised speeds' own mean.`;
 }
 
 /**
@@ -2237,6 +2340,377 @@ export function runTwoExitChoiceTest(
 }
 
 /**
+ * Test 8's building (A 3, p. 31, its Fig. 7): a three-storey test plan, each
+ * floor built from four rows of 2 m x 3 m "rooms" holding four people each —
+ * ground floor rows of 9/8/8/11 rooms (144 people), 1st and 2nd floor rows
+ * of 11/8/8/11 (152 people each), 448 in total — a stair connecting ground
+ * to 1st and 1st to 2nd (the guideline's own text: "on the 2nd floor there
+ * are no more stairs upwards"), and a single ground-floor exit. Counted
+ * directly off a 400 DPI render of the guideline's own page 32, row by row.
+ *
+ * Two simplifications, both disclosed rather than silently built around:
+ *
+ * 1. **Rooms have no doors.** Fig. 7's own door width is 1 m in a 2 m wide
+ *    room — the same 1 m gap tests 9/11/12/15 already found this project's
+ *    1 m routing grid cannot resolve (a wall segment marks every cell it
+ *    touches, and two segments bounding a ~1 m gap between them mark both of
+ *    the gap's own cells, sealing it), and widening it to the router's own
+ *    working minimum (`routingGapMeters`, 2.4 m) would make a room's door
+ *    wider than the room. So each "room" is an open three-sided alcove off
+ *    its corridor — same position, same floor area, same headcount as
+ *    Fig. 7, no per-room bottleneck modelled.
+ * 2. **The path from each floor's two corridor bands to its stair (or, on
+ *    the ground floor, its exit) is a single connecting corridor along the
+ *    building's east edge.** Fig. 7 draws a jogged connection past the
+ *    stairwell itself; this is a simplified, fully-connected reading of it,
+ *    not the same bend — the test's own acceptance is "recorded in graphs",
+ *    not a geometry match.
+ *
+ * Reaction time is immediate (test 9's own precedent, `evacuationReactionSecondsFor:
+ * () => 0`), so what is measured is total clear time moving with each
+ * parameter value, not premovement.
+ *
+ * The guideline's own worked example is speed ("z.B. Geschwindigkeit aller
+ * Personen: 0,5 m/s, 0,75 m/s, 1,0 m/s"), and this project's engine has one
+ * scenario-level speed knob (`speedMetersPerSecond`, the population's mean —
+ * every other test in this file already sets it). The guideline's *second*
+ * case — the same mean held fixed while the spread around it changes — has
+ * no matching knob: this engine's per-agent speed spread is a fixed 19.4%
+ * everywhere (`freeSpeedRelativeSigma`, `behaviorDistributions.ts`), not a
+ * per-scenario setting. Building one for a single test would be new,
+ * untested machinery for a test the guideline itself says is not scored
+ * ("results recorded in graphs... freely accessible", no pass/fail); this
+ * test instead varies the mean across the guideline's own three example
+ * points and reports total clear time for each — the method the guideline
+ * demonstrates, scoped to the one axis this engine already exposes.
+ */
+export const parameterStudyTest = {
+  roomWidthMeters: 2,
+  roomDepthMeters: 3,
+  corridorWidthMeters: 2,
+  peoplePerRoom: 4,
+  groundRowCounts: [9, 8, 8, 11] as const,
+  upperRowCounts: [11, 8, 8, 11] as const,
+  speedsMetersPerSecond: [0.5, 0.75, 1.0] as const,
+} as const;
+
+function parameterStudyFloorPlan(rowCounts: readonly [number, number, number, number]) {
+  const Rw = parameterStudyTest.roomWidthMeters;
+  const Rd = parameterStudyTest.roomDepthMeters;
+  const Cw = parameterStudyTest.corridorWidthMeters;
+  const [n1, n2, n3, n4] = rowCounts;
+  const wmax = Math.max(n1, n2, n3, n4) * Rw;
+  const height = 4 * Rd + 2 * Cw;
+  return {
+    Rw,
+    Rd,
+    wmax,
+    height,
+    spineX: wmax + Cw / 2,
+    rowY: {
+      row1: [0, Rd] as const,
+      row2: [Rd + Cw, 2 * Rd + Cw] as const,
+      row3: [2 * Rd + Cw, 3 * Rd + Cw] as const,
+      row4: [3 * Rd + 2 * Cw, height] as const,
+    },
+    spineWallX: wmax,
+  };
+}
+
+type WallInput = {
+  id: string;
+  floorId: string;
+  geometry: { type: "polyline"; points: { x: number; y: number }[] };
+};
+
+function wallLine(
+  id: string,
+  floorId: string,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): WallInput {
+  return {
+    id,
+    floorId,
+    geometry: {
+      type: "polyline",
+      points: [
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+      ],
+    },
+  };
+}
+
+/** The room dividers and outer back wall for one row — open on the corridor side. */
+function roomRowWalls(
+  floorId: string,
+  rowId: "row1" | "row2" | "row3" | "row4",
+  count: number,
+  [yTop, yBottom]: readonly [number, number],
+  backWallY: number,
+): WallInput[] {
+  const Rw = parameterStudyTest.roomWidthMeters;
+  const walls = [
+    wallLine(`${floorId}-${rowId}-back`, floorId, 0, backWallY, count * Rw, backWallY),
+  ];
+  for (let i = 0; i <= count; i++) {
+    walls.push(
+      wallLine(`${floorId}-${rowId}-div-${i}`, floorId, i * Rw, yTop, i * Rw, yBottom),
+    );
+  }
+  return walls;
+}
+
+function roomRowEntrances(
+  floorId: string,
+  rowId: "row1" | "row2" | "row3" | "row4",
+  count: number,
+  y: number,
+) {
+  const Rw = parameterStudyTest.roomWidthMeters;
+  return Array.from({ length: count }, (_, i) => ({
+    id: `${floorId}-${rowId}-room-${i}`,
+    floorId,
+    kind: "source" as const,
+    position: { x: i * Rw + Rw / 2, y },
+    width: Rw,
+    arrivalProfile: {
+      intervalMinutes: 1,
+      ratesPerMinute: [parameterStudyTest.peoplePerRoom * 1.5],
+    },
+    arrivalRatePerMinute: 0,
+    groupShare: 0,
+  }));
+}
+
+const parameterStudyRowIds = ["row1", "row2", "row3", "row4"] as const;
+
+function parameterStudyFloorWallsAndEntrances(
+  floorId: string,
+  rowCounts: readonly [number, number, number, number],
+) {
+  const plan = parameterStudyFloorPlan(rowCounts);
+  // Row 1 and row 4 back onto the building's own north/south exterior; rows
+  // 2 and 3 back onto each other across the spine (`parameterStudyFloorPlan`'s
+  // own doc comment on `rowY`).
+  const backWallY = [0, plan.height / 2, plan.height / 2, plan.height];
+  const rows = parameterStudyRowIds.map((rowId, index) => ({
+    rowId,
+    count: rowCounts[index],
+    range: plan.rowY[rowId],
+    backWallY: backWallY[index],
+  }));
+
+  const walls: WallInput[] = [
+    wallLine(
+      `${floorId}-north`,
+      floorId,
+      0,
+      0,
+      plan.wmax + parameterStudyTest.corridorWidthMeters,
+      0,
+    ),
+    wallLine(
+      `${floorId}-south`,
+      floorId,
+      0,
+      plan.height,
+      plan.wmax + parameterStudyTest.corridorWidthMeters,
+      plan.height,
+    ),
+    wallLine(`${floorId}-west`, floorId, 0, 0, 0, plan.height),
+    // The spine between the two corridor bands — the only way from one to
+    // the other is around its east end, through the connecting corridor.
+    wallLine(
+      `${floorId}-spine-wall`,
+      floorId,
+      0,
+      plan.height / 2,
+      plan.spineWallX,
+      plan.height / 2,
+    ),
+    ...rows.flatMap((row) =>
+      roomRowWalls(floorId, row.rowId, row.count, row.range, row.backWallY),
+    ),
+  ];
+  const entrances = rows.flatMap((row) =>
+    roomRowEntrances(floorId, row.rowId, row.count, row.range[0] + plan.Rd / 2),
+  );
+  return { walls, entrances, plan };
+}
+
+function parameterStudyScene(
+  speedMetersPerSecond: number,
+  groundRowCounts: readonly [number, number, number, number],
+  upperRowCounts: readonly [number, number, number, number],
+): CrowdSimScene {
+  const ground = parameterStudyFloorWallsAndEntrances("ground", groundRowCounts);
+  const first = parameterStudyFloorWallsAndEntrances("first", upperRowCounts);
+  const second = parameterStudyFloorWallsAndEntrances("second", upperRowCounts);
+  const half = routingGapMeters / 2;
+  const exitY = ground.plan.height / 2;
+  const eastX = ground.plan.wmax + parameterStudyTest.corridorWidthMeters;
+
+  return parseScene({
+    schemaVersion: "1.0.0",
+    id: "rimea-test-8",
+    name: "RiMEA test 8: parameter study",
+    seed: 8,
+    speedMetersPerSecond,
+    world: { width: eastX + 4, height: ground.plan.height },
+    floors: [
+      { id: "ground", level: 0, elevationMeters: 0 },
+      { id: "first", level: 1, elevationMeters: 4 },
+      { id: "second", level: 2, elevationMeters: 8 },
+    ],
+    walls: [
+      ...ground.walls,
+      wallLine("ground-east-1", "ground", eastX, 0, eastX, exitY - half),
+      wallLine(
+        "ground-east-2",
+        "ground",
+        eastX,
+        exitY + half,
+        eastX,
+        ground.plan.height,
+      ),
+      ...first.walls,
+      wallLine("first-east", "first", eastX, 0, eastX, first.plan.height),
+      ...second.walls,
+      wallLine("second-east", "second", eastX, 0, eastX, second.plan.height),
+    ],
+    entrances: [
+      ...ground.entrances,
+      ...first.entrances,
+      ...second.entrances,
+      {
+        id: "exit",
+        floorId: "ground",
+        kind: "sink",
+        position: { x: eastX + 2, y: exitY },
+        width: routingGapMeters,
+      },
+    ],
+    connectors: [
+      {
+        id: "stair-first-ground",
+        kind: "stair",
+        from: {
+          floorId: "first",
+          point: { x: first.plan.spineX, y: first.plan.height / 2 - 2 },
+        },
+        to: { floorId: "ground", point: { x: ground.plan.spineX, y: exitY } },
+        width: 2,
+        bidirectional: true,
+      },
+      {
+        id: "stair-second-first",
+        kind: "stair",
+        from: {
+          floorId: "second",
+          point: { x: second.plan.spineX, y: second.plan.height / 2 },
+        },
+        to: {
+          floorId: "first",
+          point: { x: first.plan.spineX, y: first.plan.height / 2 + 2 },
+        },
+        width: 2,
+        bidirectional: true,
+      },
+    ],
+  });
+}
+
+/** How many people the plan puts on one floor. */
+function parameterStudyFloorPeople(
+  rowCounts: readonly [number, number, number, number],
+) {
+  return rowCounts.reduce((sum, n) => sum + n, 0) * parameterStudyTest.peoplePerRoom;
+}
+
+/** Seconds for everyone in the building to reach the ground-floor exit. */
+function clearParameterStudyBuilding(
+  speedMetersPerSecond: number,
+  groundRowCounts: readonly [number, number, number, number],
+  upperRowCounts: readonly [number, number, number, number],
+): number {
+  const totalPeople =
+    parameterStudyFloorPeople(groundRowCounts) +
+    2 * parameterStudyFloorPeople(upperRowCounts);
+  const engine = createSimulationEngineFromScene(
+    parameterStudyScene(speedMetersPerSecond, groundRowCounts, upperRowCounts),
+    {
+      decisionBackend: createMallCrowdDecisionBackend({
+        evacuationReactionSecondsFor: () => 0,
+        seed: 8,
+        shops: [],
+      }),
+      maxAgents: totalPeople,
+    },
+  );
+  engine.start();
+  engine.setEvacuation(true);
+
+  for (let step = 0; step < 1800 * 60; step++) {
+    engine.step(1 / 60);
+    if (engine.snapshot().exitedCount >= totalPeople) {
+      return engine.snapshot().elapsedSeconds;
+    }
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Test 8: how does total clear time move with the population's mean speed,
+ * across the guideline's own three example values?
+ */
+export function runParameterStudyTest(
+  options: {
+    /**
+     * Cut-down row counts, for exercising this code path without the full
+     * 448-person building. **A result produced with these is not the
+     * test**: the guideline's own row counts (from Fig. 7) are the
+     * defaults, and the panel uses the defaults.
+     */
+    groundRowCounts?: readonly [number, number, number, number];
+    upperRowCounts?: readonly [number, number, number, number];
+  } = {},
+): RimeaTestResult {
+  const groundRowCounts = options.groundRowCounts ?? [
+    ...parameterStudyTest.groundRowCounts,
+  ];
+  const upperRowCounts = options.upperRowCounts ?? [
+    ...parameterStudyTest.upperRowCounts,
+  ];
+  const totalPeople =
+    parameterStudyFloorPeople(groundRowCounts) +
+    2 * parameterStudyFloorPeople(upperRowCounts);
+  const results = parameterStudyTest.speedsMetersPerSecond.map((speed) => ({
+    speed,
+    seconds: clearParameterStudyBuilding(speed, groundRowCounts, upperRowCounts),
+  }));
+  const allCleared = results.every((r) => Number.isFinite(r.seconds));
+  // Not a pass/fail bound (the guideline scores nothing here) — only a
+  // sanity check that a faster population does not come out slower.
+  const monotonic = results.every(
+    (r, i) => i === 0 || r.seconds <= results[i - 1].seconds + 1e-6,
+  );
+
+  return {
+    number: 8,
+    title: "Parameter study",
+    status: allCleared && monotonic ? "pass" : "fail",
+    measured: allCleared
+      ? results.map((r) => `${r.speed} m/s: ${r.seconds.toFixed(1)} s`).join(", ")
+      : `did not clear at every speed: ${results.map((r) => `${r.speed} m/s: ${Number.isFinite(r.seconds) ? `${r.seconds.toFixed(1)} s` : "never"}`).join(", ")}`,
+    criterion: `RiMEA 4.1.1 A 3 test 8 (p. 31, its Fig. 7): ${totalPeople} people across a three-storey test plan (144/152/152 by floor at the guideline's own row counts), one stair per floor pair, one exit. The guideline's own worked example varies the population's speed (0.5/0.75/1.0 m/s) and asks for total clear time to be "recorded in graphs" — it sets no pass/fail bound. Reported here as clear time per speed, sanity-checked only for the direction any physically sound model must move (faster population, no slower a clear); the guideline's second case (same mean, wider spread) is not built — see this test's own doc comment for why.`,
+  };
+}
+
+/**
  * The sixteen tests, from the guideline's own table of contents (Annex 1,
  * A 2–A 4, pp. 29–48 of version 4.1.1).
  *
@@ -2246,20 +2720,6 @@ export function runTwoExitChoiceTest(
  * does not guarantee.
  */
 export const unattemptedRimeaTests: readonly RimeaTestResult[] = [
-  {
-    number: 7,
-    title: "Allocation of demographic parameters",
-    status: "needs-scenario",
-    blockedBy:
-      "A 2, p. 31: distribute walking speeds over 50 adults per the guideline's own Figure 2 and show the simulated distribution matches it. ADR-0011 can draw a declared population, but Figure 2's table has not been transcribed.",
-  },
-  {
-    number: 8,
-    title: "Parameter study",
-    status: "needs-scenario",
-    blockedBy:
-      "A 3, p. 31: vary one person parameter at a time on the guideline's three-storey plan (its Figure 7) and show how total evacuation time moves. Needs that plan.",
-  },
   {
     number: 13,
     title: "Fundamental diagram on stairs",
@@ -2284,17 +2744,36 @@ export const unattemptedRimeaTests: readonly RimeaTestResult[] = [
  * `crowdPeople` overrides all four crowd-scale tests (9, 11, 12, 15) at
  * once, to the same headcount — a single cheap knob rather than four, since
  * a test walking the code path does not care that the guideline gives each
- * of them a different real number (1000, 1000, 150, 500).
+ * of them a different real number (1000, 1000, 150, 500). `parameterStudyRows`
+ * does the same for test 8's own building, one row count in place of its
+ * four (ground and upper floors alike) — its real building is 448 people
+ * across three floors, too slow to walk in every test run.
  */
 export function runRimeaSuite(
   options: Parameters<typeof runFundamentalDiagramTest>[0] & {
     corridorRuns?: number;
     crowdPeople?: number;
+    parameterStudyRows?: number;
   } = {},
 ): readonly RimeaTestResult[] {
+  const parameterStudyRowCounts: [number, number, number, number] | undefined =
+    options.parameterStudyRows === undefined
+      ? undefined
+      : [
+          options.parameterStudyRows,
+          options.parameterStudyRows,
+          options.parameterStudyRows,
+          options.parameterStudyRows,
+        ];
+
   return [
     ...unattemptedRimeaTests,
     runCorridorSpeedTest(options.corridorRuns),
+    runDemographicSpeedTest(),
+    runParameterStudyTest({
+      groundRowCounts: parameterStudyRowCounts,
+      upperRowCounts: parameterStudyRowCounts,
+    }),
     runPremovementTest(),
     runStairSpeedTest("up"),
     runStairSpeedTest("down"),

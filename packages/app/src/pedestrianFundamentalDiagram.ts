@@ -63,17 +63,36 @@ export function weidmannSpeedAtDensity(densityPerSquareMeter: number): number {
  * the peak of specific flow J = ρ·v(ρ), found numerically (≈1.22 P/(m·s) near
  * 1.75 P/m²). Used as the capacity of a doorway or entrance.
  */
-export const weidmannMaxSpecificFlow = (() => {
-  let best = 0;
+const weidmannMaxSpecificFlowSearch = (() => {
+  let bestFlow = 0;
+  let bestDensity = 0;
   for (
     let density = 0.01;
     density < weidmannFundamentalDiagram.jamDensityPerSquareMeter;
     density += 0.01
   ) {
-    best = Math.max(best, density * weidmannSpeedAtDensity(density));
+    const flow = density * weidmannSpeedAtDensity(density);
+    if (flow > bestFlow) {
+      bestFlow = flow;
+      bestDensity = density;
+    }
   }
-  return best;
+  return { density: bestDensity, flow: bestFlow };
 })();
+
+export const weidmannMaxSpecificFlow = weidmannMaxSpecificFlowSearch.flow;
+
+/**
+ * The density (P/m²) at which `weidmannMaxSpecificFlow` occurs — where the
+ * curve packs in the most throughput a space can sustain. Above this, more
+ * people only means less flow, not more: Weidmann's curve is falling from
+ * here to zero at the jam density. Used as an occupancy ceiling for a space
+ * people flow *through* (a stair's own flight lane), where jam density
+ * itself would be the wrong cap — it is the point flow has already reached
+ * zero, not the point past which it starts dropping.
+ */
+export const weidmannMaxSpecificFlowDensityPerSquareMeter =
+  weidmannMaxSpecificFlowSearch.density;
 
 export type SpeedDensitySample = {
   densityPerSquareMeter: number;
