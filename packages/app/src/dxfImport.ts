@@ -3,6 +3,7 @@ import {
   type CrowdSimScene,
   type ScenePoint,
 } from "@crowdsim/scene-schema";
+import { dedupeWalls, worldContaining } from "./importGeometry";
 
 /**
  * ASCII DXF -> scene walls.
@@ -388,42 +389,4 @@ function dxfWallId(entity: DxfEntity, index: number): string {
   const stem = layer ? `dxf-${layer}` : "dxf-entity";
 
   return `${stem}-${index + 1}`;
-}
-
-function dedupeWalls(walls: CrowdSimScene["walls"]): CrowdSimScene["walls"] {
-  const seen = new Set<string>();
-
-  return walls.filter((wall) => {
-    if (seen.has(wall.id)) {
-      return false;
-    }
-
-    seen.add(wall.id);
-    return true;
-  });
-}
-
-function worldContaining(
-  world: { height: number; width: number },
-  walls: readonly { geometry: { points: readonly ScenePoint[] } }[],
-): { height: number; width: number } {
-  let maxX = world.width;
-  let maxY = world.height;
-
-  for (const wall of walls) {
-    for (const point of wall.geometry.points) {
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
-    }
-  }
-
-  if (maxX === world.width && maxY === world.height) {
-    return world;
-  }
-
-  // Round up so the plan never lands exactly on the boundary.
-  return {
-    height: Math.ceil(maxY + 1),
-    width: Math.ceil(maxX + 1),
-  };
 }

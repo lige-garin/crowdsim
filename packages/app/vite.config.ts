@@ -11,6 +11,16 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 750,
   },
+  optimizeDeps: {
+    // web-ifc's own worker script (spawned for its multithreaded WASM build,
+    // which it picks automatically once this project's own COOP/COEP headers
+    // make the page cross-origin isolated) uses `import.meta` in a way esbuild's
+    // dependency pre-bundling breaks -- confirmed by actually loading it in a
+    // real browser: pre-bundled, the worker throws "Cannot use 'import.meta'
+    // outside a module" on every IFC import attempt. Excluding it here lets
+    // the browser load web-ifc as the real ES module it already is.
+    exclude: ["web-ifc"],
+  },
   server: {
     headers: crossOriginIsolationHeaders,
   },

@@ -47,6 +47,7 @@ type SceneEditorLayoutProps = {
   /** A count line being dragged out, or null when none is. */
   draftCountLine: { end: ScenePoint; start: ScenePoint } | null;
   dxfInputRef: RefObject<HTMLInputElement | null>;
+  ifcInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
   gridSize: number;
@@ -79,6 +80,7 @@ type SceneEditorLayoutProps = {
   ) => void;
   onDeleteSelected: () => void;
   onDxfImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onIfcImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onEntityPointerDown: (event: ReactPointerEvent<SVGElement>, id: string) => void;
   onExportScene: () => void;
   onFinishWall: () => void;
@@ -168,6 +170,7 @@ export function SceneEditorLayout({
   draftWallPoints,
   draftCountLine,
   dxfInputRef,
+  ifcInputRef,
   fileInputRef,
   geoJsonInputRef,
   gridSize,
@@ -196,6 +199,7 @@ export function SceneEditorLayout({
   onCountLineEndpointPointerDown,
   onDeleteSelected,
   onDxfImport,
+  onIfcImport,
   onEntityPointerDown,
   onExportScene,
   onFinishWall,
@@ -292,6 +296,7 @@ export function SceneEditorLayout({
         canUndo={canUndo}
         documentCounts={countDocumentObjects(drawnFloor)}
         dxfInputRef={dxfInputRef}
+        ifcInputRef={ifcInputRef}
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
         language={language}
@@ -302,6 +307,7 @@ export function SceneEditorLayout({
         onBasemapImport={onBasemapImport}
         onDeleteSelected={onDeleteSelected}
         onDxfImport={onDxfImport}
+        onIfcImport={onIfcImport}
         onExportScene={onExportScene}
         onGeoJsonImport={onGeoJsonImport}
         onImportScene={onImportScene}

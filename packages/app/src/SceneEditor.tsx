@@ -21,6 +21,7 @@ import {
 } from "./sceneEditorImageOverlay";
 import { createSceneFromGeoJson } from "./geojsonImport";
 import { createSceneFromDxfWithReport } from "./dxfImport";
+import { createSceneFromIfcWithReport } from "./ifcImport";
 import type { HeatmapCell } from "./heatmap";
 import { useI18n, type LocalizedText } from "./i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
@@ -85,6 +86,7 @@ export function SceneEditor({
   const geoJsonInputRef = useRef<HTMLInputElement | null>(null);
   const basemapInputRef = useRef<HTMLInputElement | null>(null);
   const dxfInputRef = useRef<HTMLInputElement | null>(null);
+  const ifcInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
   /** A count line being dragged out: where it started, and where it is now. */
   const [draftCountLine, setDraftCountLine] = useState<{
@@ -554,6 +556,47 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
+  async function importIfc(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const wasmUrl = (await import("web-ifc/web-ifc.wasm?url")).default;
+      const result = await createSceneFromIfcWithReport(
+        currentScene,
+        new Uint8Array(await file.arrayBuffer()),
+        { wasmUrl },
+      );
+
+      if (result.wallCount === 0) {
+        setStorageStatus(makeStatus("ifcInvalid"));
+        return;
+      }
+
+      replaceScene(
+        result.scene,
+        makeStatus("ifcImportedWalls", {
+          en: { count: result.wallCount },
+          zh: { count: result.wallCount },
+        }),
+      );
+
+      // Doors, windows, spaces and every other IFC entity type this
+      // importer does not read geometry for are reported rather than
+      // dropped silently, the same as DXF's ignored entity types above.
+      if (result.hadUnconvertedEntities) {
+        setStorageStatus({
+          zh: `已导入 ${result.wallCount} 面墙；文件中的门/窗/空间等其他构件未导入`,
+          en: `Imported ${result.wallCount} walls; doors/windows/spaces and other elements in the file were not imported`,
+        });
+      }
+    } catch {
+      setStorageStatus(makeStatus("ifcInvalid"));
+    } finally {
+      event.target.value = "";
+    }
+  }
   async function importBasemap(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -629,6 +672,7 @@ export function SceneEditor({
       draftWallPoints={draftWallPoints}
       draftCountLine={draftCountLine}
       dxfInputRef={dxfInputRef}
+      ifcInputRef={ifcInputRef}
       fileInputRef={fileInputRef}
       geoJsonInputRef={geoJsonInputRef}
       gridSize={gridSize}
@@ -657,6 +701,7 @@ export function SceneEditor({
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
       onDxfImport={importDxf}
+      onIfcImport={importIfc}
       onGenerateZoneStores={paramActions.generateStoresForSelectedZone}
       onHazardKindChange={paramActions.updateHazardKind}
       onHazardNumberChange={paramActions.updateHazardNumber}

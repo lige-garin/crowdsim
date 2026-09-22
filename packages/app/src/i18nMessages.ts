@@ -96,6 +96,12 @@ export const messages = {
   },
   dxfInvalid: { zh: "DXF 无效", en: "DXF invalid" },
   editableSceneCanvas: { zh: "Editable scene canvas", en: "Editable scene canvas" },
+  ifcImport: { zh: "导入 IFC", en: "Import IFC" },
+  ifcImportedWalls: {
+    zh: "已导入 IFC：{count} 面墙",
+    en: "Imported IFC: {count} walls",
+  },
+  ifcInvalid: { zh: "IFC 无效", en: "IFC invalid" },
   editorStatus: { zh: "编辑器状态", en: "Editor status" },
   editorTools: { zh: "编辑工具", en: "Editor tools" },
   engine: { zh: "引擎", en: "Engine" },
