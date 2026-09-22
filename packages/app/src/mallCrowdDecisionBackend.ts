@@ -17,6 +17,7 @@ import {
   sampleEvacuationReactionSeconds,
 } from "./behaviorDistributions";
 import { byLineOrder, createCounterTick, queueSpacingMeters } from "./checkoutCounters";
+import { isCrossingFloors } from "./floorTransfers";
 import { mulberry32 } from "./simulationEngineRandom";
 
 /**
@@ -554,6 +555,25 @@ export function createMallCrowdDecisionBackend(options: {
           const remaining = routeDistance
             ? routeDistance(agent, placeOf(shop))
             : distance;
+
+          // Crossing a floor is not a stalled walk. A rider is held for the
+          // flight's travel time and someone queueing for it is standing
+          // still, so without this the stall rule (5 s) fires part way up any
+          // real staircase (14.7 s for a 4.5 m storey) and sends a shopper who
+          // is on their way to an exit instead. The distance already reached
+          // is kept, so the walk is judged from the same baseline afterwards.
+          if (isCrossingFloors(agent)) {
+            decisions.push({
+              agentId: agent.id,
+              nextState: "walk",
+              selectedStoreId: shop.id,
+              walkProgress: {
+                distance: Math.min(remaining, progress?.distance ?? remaining),
+                tick: decisionTick,
+              },
+            });
+            continue;
+          }
 
           if (
             !progress ||

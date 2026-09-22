@@ -1,3 +1,4 @@
+import { isRiding } from "./floorTransfers";
 import type { SimulationAgent } from "./simulationEngine";
 
 /**
@@ -109,11 +110,31 @@ export function followLeaders(
     if (!leader || leader.id === agent.id || leader.lifecycleState === undefined) {
       return agent;
     }
+    // Someone on the treads takes no orders: they are mid-crossing, and the
+    // connector they are on is recorded in their transfer. Rewriting it from
+    // the leader's plan dropped them off again every decision tick, so a
+    // companion rode the same staircase for the whole run without arriving.
+    if (isRiding(agent)) {
+      return agent;
+    }
     const shared = sharedStates.has(leader.lifecycleState);
+    const differentFloor = (leader.floorId ?? null) !== (agent.floorId ?? null);
     if (!shared) {
       // The leader is in a line or at a till: wait where you are rather than
       // crowd into the line (walking toward the leader's place in it blocked
       // the counters and halved the demo scene's exits).
+      //
+      // Unless they are waiting on another floor, in which case waiting here
+      // means never catching them up: follow them across first, and wait on
+      // the floor they are on.
+      if (differentFloor) {
+        return {
+          ...agent,
+          lifecycleState: "walk",
+          selectedStoreId: undefined,
+          ...crossToLeader(agent, leader),
+        };
+      }
       const settled = Math.hypot(agent.targetX - agent.x, agent.targetY - agent.y) < 1;
       return {
         ...agent,
@@ -121,6 +142,21 @@ export function followLeaders(
         selectedStoreId: undefined,
         targetX: settled ? agent.targetX : agent.x,
         targetY: settled ? agent.targetY : agent.y,
+      };
+    }
+    if (differentFloor) {
+      // Catch the leader up first. Taking their state as well would have a
+      // companion still downstairs standing in a shop they have not reached:
+      // browse and the till states hold someone where they are (crowdMovement),
+      // so the companion would never walk to the stairs at all.
+      return {
+        ...agent,
+        browseUntilSeconds: undefined,
+        exitIds: leader.exitIds,
+        lifecycleState: "walk",
+        selectedStoreId: undefined,
+        targetSinkId: leader.targetSinkId,
+        ...crossToLeader(agent, leader),
       };
     }
     return {
@@ -132,8 +168,56 @@ export function followLeaders(
       targetSinkId: leader.targetSinkId,
       targetX: leader.targetX,
       targetY: leader.targetY,
+      // Where the leader is going, including which floor it is on (ADR-0010).
+      // Copying only the coordinates left companions walking to the leader's
+      // destination as though it were on their own floor: they never took the
+      // stairs, and the group split the first time its leader changed floor.
+      ...leaderFloorFields(leader),
     };
   });
+}
+
+/**
+ * The companion's share of the leader's journey: the leader's destination and
+ * its floor, with no connector chosen — each companion picks their own, since
+ * they are standing somewhere else (planFloorLegs).
+ */
+function leaderFloorFields(leader: SimulationAgent) {
+  const destination = leader.transfer;
+
+  if (!destination) {
+    // Somewhere on the floor they are both standing on: nothing to cross.
+    return { transfer: undefined };
+  }
+
+  return {
+    transfer: {
+      // No connector chosen: planFloorLegs picks the one nearest this
+      // companion, who is standing somewhere else than the leader.
+      connectorId: "",
+      finalX: destination.finalX,
+      finalY: destination.finalY,
+      floorId: destination.floorId,
+    },
+  };
+}
+
+/** Head for where the leader is standing, on the floor they are standing on. */
+function crossToLeader(agent: SimulationAgent, leader: SimulationAgent) {
+  if (leader.floorId === undefined) {
+    return { targetX: agent.x, targetY: agent.y, transfer: undefined };
+  }
+
+  return {
+    targetX: leader.x,
+    targetY: leader.y,
+    transfer: {
+      connectorId: "",
+      finalX: leader.x,
+      finalY: leader.y,
+      floorId: leader.floorId,
+    },
+  };
 }
 
 export type GroupFormation = {

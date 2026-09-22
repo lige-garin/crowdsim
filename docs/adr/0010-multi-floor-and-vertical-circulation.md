@@ -159,16 +159,23 @@ line that counted two copies of the demo scene as a capability.
 ### Cost
 
 Measured on the corridor harness (881 people, best of six rounds, the method in
-CLAUDE.md), interleaved in one run so that drift hits both:
+CLAUDE.md), with both variants inside one process so that drift hits them
+equally:
 
-- one floor: **0.56–0.70 ms/step**
-- two floors, everyone on the ground: **0.65–0.74 ms/step**
+| variant                            | ms/step, three runs |
+| ---------------------------------- | ------------------- |
+| one floor                          | 0.955, 0.983, 0.988 |
+| two floors, everyone on the ground | 1.099, 1.101, 1.138 |
 
-So declaring floors costs roughly **a tenth of a millisecond a step** at ~880
-people. Against HEAD before this change (0.53–0.56 on the same harness), the
-one-floor path is unchanged as far as this method can tell: repeats of a single
-build varied more than the two builds differ. The 2.42 ms figure in CLAUDE.md
-is a different scene and is not comparable to these.
+So declaring floors costs about **0.12 ms a step** at ~880 people, consistently
+across runs.
+
+**Do not read the absolute numbers across sessions.** The same one-floor case
+measured 0.53–0.56 ms earlier the same day on the same machine and 0.96–0.99 ms
+a few hours later, with no change to that path: the machine drifts far more
+than the two variants differ. Only a pair measured in one run is worth
+comparing. The 2.42 ms in CLAUDE.md is a different scene again and none of
+these replace it.
 
 ## Open questions
 

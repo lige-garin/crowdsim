@@ -20,6 +20,55 @@ export const pointSchema = z.object({
 
 export const customParametersSchema = z.record(z.string(), z.unknown()).default({});
 
+/**
+ * Who the crowd is made of: a share of people drawn from each named walking
+ * profile (ADR-0011).
+ *
+ * The profile ids are resolved by the app, not here, because the speeds behind
+ * them come from a published population table and belong with the code that
+ * cites it. An absent or empty population means the scene does not say, and
+ * everyone walks at the engine's own default.
+ */
+export const populationMixEntrySchema = z.object({
+  /** A walking profile the app knows, e.g. an IMO population group. */
+  profileId: z.string().min(1),
+  /** Share of arrivals drawn from it, 0..1. */
+  share: z.number().min(0).max(1),
+});
+
+export const populationSchema = z
+  .object({
+    name: z.string().min(1).optional(),
+    mix: z.array(populationMixEntrySchema).min(1),
+  })
+  .superRefine((population, context) => {
+    const total = population.mix.reduce((sum, entry) => sum + entry.share, 0);
+
+    // A mix that does not add up is a scene that has not said what happens to
+    // the rest of the crowd, and every reader would have to invent an answer.
+    if (Math.abs(total - 1) > 1e-6) {
+      context.addIssue({
+        code: "custom",
+        message: `Population shares add up to ${total}, not 1`,
+        path: ["mix"],
+      });
+    }
+
+    const seen = new Set<string>();
+
+    for (const entry of population.mix) {
+      if (seen.has(entry.profileId)) {
+        context.addIssue({
+          code: "custom",
+          message: `Population names '${entry.profileId}' twice`,
+          path: ["mix"],
+        });
+      }
+
+      seen.add(entry.profileId);
+    }
+  });
+
 export const polylineSchema = z.object({
   type: z.literal("polyline"),
   points: z.array(pointSchema).min(2),
@@ -67,6 +116,8 @@ export const entranceSchema = z.object({
    * any exit. Evacuation ignores it.
    */
   exitIds: z.array(idSchema).optional(),
+  /** Who comes through this door (ADR-0011). Absent: the scene's population. */
+  population: populationSchema.optional(),
 });
 
 export const areaSchema = z.object({

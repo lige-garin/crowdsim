@@ -138,3 +138,29 @@ describe("stairs between floors", () => {
     expect(moved.connectors[0].toPoint).toEqual({ x: 24, y: 18 });
   });
 });
+
+describe("ids for floors and stairs", () => {
+  it("does not hand the same number out again after a save and reopen", () => {
+    const drawn = addConnector(addFloor(baseDocument), { x: 20, y: 20 });
+    const applied = createSceneFromEditorDocument(baseScene, drawn);
+    const reopened = createEditorDocumentFromScene(applied);
+
+    // Whatever the scene already holds, the next id is past all of it —
+    // including the floors and the stair, which used to be skipped.
+    const used = [
+      ...applied.floors.map((floor) => floor.id),
+      ...applied.connectors.map((connector) => connector.id),
+    ];
+    for (const id of used) {
+      const number = Number(/-(\d+)$/.exec(id)?.[1] ?? 0);
+      expect(reopened.nextId).toBeGreaterThan(number);
+    }
+
+    // And a second floor drawn after reopening applies cleanly.
+    const second = addFloor(reopened);
+    const ids = second.floors.map((floor) => floor.id);
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(() => createSceneFromEditorDocument(applied, second)).not.toThrow();
+  });
+});

@@ -11,6 +11,7 @@ import {
   floorSchema,
   idSchema,
   pointSchema,
+  populationSchema,
   servicePointSchema,
   shopSchema,
   storeLotSchema,
@@ -42,6 +43,11 @@ export const sceneSchema = z
     // Defaults to Weidmann free-flow speed; the engine's own default must match
     // this so scenes that predate the field simulate at a plausible pace.
     speedMetersPerSecond: z.number().positive().default(1.34),
+    /**
+     * Who the crowd is (ADR-0011). Absent: the engine's own speed distribution,
+     * which is what every scene written before this said.
+     */
+    population: populationSchema.optional(),
     world: z.object({
       width: z.number().positive(),
       height: z.number().positive(),

@@ -911,6 +911,14 @@
   font-size: var(--fs-micro);
 }
 
+/* What the numbers above it are, and are not (single run, no interval). */
+.run-analytics-single-run {
+  margin: 2px 0 6px;
+  color: var(--lab-faint);
+  font-size: var(--fs-micro);
+  line-height: 1.35;
+}
+
 .los-bar {
   display: flex;
   height: 18px;
@@ -943,4 +951,43 @@
   min-height: 28px;
   padding: 0 8px;
   font-size: var(--fs-micro);
+}
+
+/* RiMEA verification: a status per test, failures as visible as passes. */
+.rimea-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--fs-micro);
+}
+
+.rimea-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.rimea-status {
+  font-family: var(--lab-mono);
+  letter-spacing: 0.04em;
+}
+
+.rimea-status-pass {
+  color: #2e8b57;
+}
+
+.rimea-status-fail {
+  color: #c2382f;
+}
+
+.rimea-status-needs-source,
+.rimea-status-needs-model {
+  color: var(--lab-faint);
+}
+
+.rimea-detail {
+  color: var(--lab-faint);
+  line-height: 1.35;
 }

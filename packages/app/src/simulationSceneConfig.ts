@@ -6,11 +6,16 @@ import {
   sceneOnFloor,
   type CrowdSimScene,
 } from "@crowdsim/scene-schema";
-import { connectorTravelSeconds, type ConnectorRuntime } from "./floorRouting";
+import {
+  connectorLengthMeters,
+  connectorTravelSeconds,
+  type ConnectorRuntime,
+} from "./floorRouting";
 import { createBrandStoresFromScene } from "./brandAttraction";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 import { createMallCrowdDecisionBackend } from "./mallCrowdDecisionBackend";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
+import { populationFor } from "./populationSampling";
 import { wallSegmentsFromScene, type SceneWorldBounds } from "./sceneGeometry";
 import type {
   SimulationDecisionBackend,
@@ -180,6 +185,7 @@ export function deriveSceneGeometry(
           groupShare:
             entrance.groupShare ?? walkingGroupParameters.shareOfPeopleInGroups,
           exitIds: entrance.exitIds,
+          population: populationFor(scene, entrance),
         })),
     speedMetersPerSecond: baseSpeed * environmentImpact.speedMultiplier,
     floors: sceneFloorGeometries(scene, overrides),
@@ -252,6 +258,8 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
         rise,
         connector.speedMetersPerSecond,
       ),
+      lengthMeters: connectorLengthMeters(rise),
+      climbing: rise >= 0,
       admitPerSecond,
     });
 
@@ -268,6 +276,8 @@ export function sceneConnectorRuntimes(scene: CrowdSimScene): ConnectorRuntime[]
           -rise,
           connector.speedMetersPerSecond,
         ),
+        lengthMeters: connectorLengthMeters(rise),
+        climbing: -rise >= 0,
         admitPerSecond,
       });
     }

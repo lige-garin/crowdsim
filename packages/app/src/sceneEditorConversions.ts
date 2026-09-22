@@ -1,4 +1,5 @@
 import { parseScene, sceneFloors, type CrowdSimScene } from "@crowdsim/scene-schema";
+import { populationLibraryEntry, populationLibraryIdOf } from "./populationSampling";
 
 import type { EditorDocument, EditorShopBrand } from "./sceneEditorTypes";
 
@@ -11,6 +12,12 @@ import type { EditorDocument, EditorShopBrand } from "./sceneEditorTypes";
 function nextFreeIdNumber(scene: CrowdSimScene) {
   const groups = [
     scene.buildings,
+    // Floors and connectors are named the same way and from the same counter,
+    // so leaving them out handed their numbers straight back out: adding a
+    // floor, applying, reopening and adding another produced a second
+    // 'floor-1' and the apply was rejected as a duplicate id.
+    scene.floors,
+    scene.connectors,
     scene.countLines,
     scene.entrances,
     scene.hazards,
@@ -89,6 +96,7 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       },
       groupShare: entrance.groupShare,
       exitIds: entrance.exitIds ? [...entrance.exitIds] : undefined,
+      populationId: populationLibraryIdOf(entrance.population?.mix),
     })),
     hazards: scene.hazards.map((hazard) => ({
       id: hazard.id,
@@ -237,6 +245,14 @@ export function createSceneFromEditorDocument(
       arrivalProfile: entrance.arrivalProfile,
       groupShare: entrance.groupShare,
       exitIds: entrance.exitIds,
+      population: entrance.populationId
+        ? {
+            mix:
+              populationLibraryEntry(entrance.populationId)?.mix.map((entry) => ({
+                ...entry,
+              })) ?? [],
+          }
+        : undefined,
     })),
     targets: document.targets.map((target) => ({
       id: target.id,

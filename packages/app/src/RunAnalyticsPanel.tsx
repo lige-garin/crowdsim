@@ -40,6 +40,8 @@ const copy = {
     peakLine: "peak/min",
     places: "Stays and waits",
     region: "Measured results",
+    singleRun:
+      "One run of this scene, with one seed: these are measurements, not estimates with an interval. For a range, repeat the run in Parameter sweep.",
     share: "D or worse, whole run",
     title: "Measured",
     visits: "visits",
@@ -70,6 +72,8 @@ const copy = {
     peakLine: "峰值/分",
     places: "停留与等待",
     region: "实测指标",
+    singleRun:
+      "本页是这一次运行（单一种子）的实测值，不带置信区间。要区间请在「参数扫描」里重复运行。",
     share: "D 级及更差（全程）",
     title: "实测",
     visits: "人次",
@@ -108,6 +112,10 @@ export function RunAnalyticsPanel({
         <span>{text.title}</span>
         <strong>{seconds(summary.elapsedSeconds)}</strong>
       </header>
+
+      <p className="run-analytics-single-run" data-testid="run-analytics-single-run">
+        {text.singleRun}
+      </p>
 
       {summary.samples === 0 ? (
         <p className="run-analytics-empty">{text.empty}</p>

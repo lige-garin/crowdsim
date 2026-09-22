@@ -8,7 +8,13 @@ import {
   renderCommercialValidationHtml,
   type CommercialValidationBundle,
 } from "./commercialValidation";
-import { createPedestrianPresetSummary, pedestrianPresets } from "./pedestrianPresets";
+import {
+  createPedestrianPresetSummary,
+  getPedestrianPreset,
+  pedestrianPresets,
+  type PedestrianPresetId,
+} from "./pedestrianPresets";
+import { populationFor } from "./populationSampling";
 import { rimeaCoreScenarios } from "./benchmarkScenarios";
 import { runBenchmarkSuite } from "./benchmarkRunner";
 import type { BenchmarkRunResult, BenchmarkScenario } from "./benchmarkTypes";
@@ -38,6 +44,8 @@ export type ValidationReport = {
   sceneName?: string;
   notes: string[];
   pedestrianPresetSummaries: ReturnType<typeof createPedestrianPresetSummary>[];
+  /** What the profiles above mean for this run (ADR-0011). */
+  populationNote: string;
   referenceLinks: {
     label: string;
     url: string;
@@ -56,6 +64,39 @@ const weidmannReference = {
   label: "Weidmann 1993 pedestrian speed-density reference curve",
   url: "https://doi.org/10.3929/ethz-a-000687810",
 };
+
+/**
+ * The walking profiles the report should show: the ones this scene's crowd is
+ * drawn from, or all of them when the scene declares no population — in which
+ * case they are reference material, not a description of the run, and
+ * `populationNote` says so.
+ */
+function reportedPresets(scene?: CrowdSimScene) {
+  const mix = scene ? populationFor(scene) : undefined;
+
+  if (!mix) {
+    return pedestrianPresets;
+  }
+
+  return mix
+    .map((entry) => getPedestrianPreset(entry.profileId as PedestrianPresetId))
+    .filter((preset): preset is (typeof pedestrianPresets)[number] => Boolean(preset));
+}
+
+/** What the table above means for this run, in one honest sentence. */
+function populationNote(scene?: CrowdSimScene): string {
+  const mix = scene ? populationFor(scene) : undefined;
+
+  if (!mix) {
+    return "This scene declares no population: everyone walks at the engine's own speed distribution, and the profiles below are reference values the run did not use.";
+  }
+
+  const shares = mix
+    .map((entry) => `${entry.profileId} ${Math.round(entry.share * 100)}%`)
+    .join(", ");
+
+  return `This run drew its crowd from: ${shares}. Speeds come from the published ranges below; the distribution inside each range is uniform, which is this project's choice and not the source's.`;
+}
 
 export function createValidationReport(
   options: ValidationReportOptions = {},
@@ -91,8 +132,12 @@ export function createValidationReport(
       "Current M5 fixtures are deterministic regression baselines for the browser engine.",
       "Wall-aware routing and empirical calibration should be tightened before these results are treated as certified RiMEA validation.",
       "The residual projection is fitted to the same trajectory target it is scored against, so its improvement is an in-sample fit, not held-out validation.",
+      "Every figure here is one run at one seed. None of them carries a confidence interval, because none was repeated: for a range, run the sweep panel, which repeats each variant and reports a bootstrap interval.",
     ],
-    pedestrianPresetSummaries: pedestrianPresets.map(createPedestrianPresetSummary),
+    pedestrianPresetSummaries: reportedPresets(options.commercialScene).map(
+      createPedestrianPresetSummary,
+    ),
+    populationNote: populationNote(options.commercialScene),
     referenceLinks: [
       weidmannReference,
       {
@@ -251,6 +296,7 @@ export function renderValidationReportHtml(
     </tbody>
   </table>
   <h2>${escapeHtml(labels.presets)}</h2>
+  <p>${escapeHtml(report.populationNote)}</p>
   <table>
     <thead>
       <tr>

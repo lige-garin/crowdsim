@@ -532,3 +532,253 @@ one-floor path is unchanged as far as this method can tell — **repeats of one
 build varied more than the two builds differ**, and the same one-floor case
 drifted from 0.53 to 0.70 over the session as the machine warmed. The 2.42 ms
 in CLAUDE.md is a different scene and none of these numbers replace it.
+
+## 2026-09-21 (later): the floors feature reviewed, and seven defects fixed
+
+A review of the multi-floor commit found that **the case the feature exists for
+did not work**, while the tests shipped with it stayed green — they followed
+people to an exit, and the retail path was never walked. Measured before the
+fixes, on a two-floor scene with one shop upstairs: with a 4.5 m storey, **not
+one person reached the upper floor in 200 s**; with the same scene at a 0.2 m
+storey, 59 did.
+
+Fixed, in the order they were found:
+
+1. **A ride counted as a stalled walk.** The blocked-route rule gives a shopper
+   five seconds to close 0.25 m; a rider is held still for the flight's travel
+   time, which is 14.7 s for a real storey. So everyone bound for a shop
+   upstairs was declared unable to reach it and sent to an exit, part way up.
+   `isCrossingFloors` now tells the rule the difference between crossing and
+   being stuck; the distance already covered is kept as the baseline.
+2. **Companions never followed their leader across.** `followLeaders` copied
+   the leader's target coordinates but not their floor, so a companion walked
+   to the leader's destination as though it were on their own floor. They also
+   inherited `browse`, which holds someone where they stand, so they never even
+   reached the stairs; and rewriting their transfer each tick dropped them off
+   the connector they were already on. Measured before: 25 of 40 leaders
+   upstairs, **0 of 37 companions**. Default group share is 0.7.
+3. **Floors and connectors were not counted when issuing ids.** Add a floor,
+   apply, reopen, add another, and the second was called `floor-1` again —
+   apply then failed with "Duplicate scene entity id". The same failure this
+   function's comment records having fixed once for shops.
+4. **Deleting an occupied floor deleted the people on it, silently.** They
+   matched no floor in the per-floor step, so they vanished a step after the
+   edit with the crowd count dropping and `exitedCount` unmoved (80 → 59).
+   They now leave the run at the edit, where it can be seen, and still are not
+   counted as exits — nobody walked out.
+5. **The measured metrics mixed floors.** A count line on one floor counted
+   people crossing the same plan coordinates on another, and the density grid
+   behind Fruin level of service summed the floors, reporting a crowd standing
+   where nobody is. Both are per floor now, the density CSV carries the floor,
+   and the jump from one floor to another no longer registers as a crossing.
+6. **A decision with no floor on it invented a transfer to an undefined
+   floor.** `checkoutCounters` emits exactly such decisions, so every till
+   decision on an upper floor set a cross-floor transfer that no connector
+   could serve. A missing floor now means "here", which is what every
+   floor-unaware decision backend means, and the till decisions carry their
+   floor.
+7. **A whole-building KPI had quietly become a per-floor one.** "Peak density"
+   was read off the watched floor's heatmap, so it changed when someone clicked
+   a floor button, beside an agent count that stayed whole-building. It is
+   measured per floor and reported as the highest of them.
+
+**Nine regression tests** cover these, all of which fail on the previous
+commit: shopping up a 4.5 m staircase, a buyer reaching a till, companions
+following, ids surviving a save and reopen, a deleted floor's crowd leaving
+countably, count lines and density staying on their own floor, and a
+floor-less decision staying on the walker's floor.
+
+The step cost was re-measured on the fixed code, and the ADR's figures were
+wrong in a way worth naming: they had been taken on a build with three step-loop
+optimisations that never reached the commit. The new figures are in ADR-0010,
+with the warning that the absolute numbers drift by a factor of two over a few
+hours on the same machine and only a pair measured in one run means anything.
+
+## 2026-09-21 (later still): who the crowd is (ADR-0011, plan item 1.1)
+
+`pedestrianPresets.ts` has held a published population since M5 — IMO
+MSC.1/Circ.1533's twelve groups, each with a walking speed range on the flat,
+up stairs and down — and **it was wired to the validation report only.** The
+report printed the table while the simulation walked every one of those people
+at the same 1.34 m/s. A page about mobility-impaired passengers, and a run that
+did not have any.
+
+A scene can now declare who its crowd is (`scene.population`, or
+`entrance.population` per door), and the people drawn from it walk at that
+profile's speeds — including **per person on a staircase**: a connector carries
+its length, and whoever crosses is held for `length / their own stair speed`.
+The editor offers the IMO passenger mix by name on the entrance panel, so the
+feature is reachable without hand-editing JSON.
+
+**A scene that declares nothing is unchanged**, and a test pins that: no agent
+carries a profile and the speed distribution is what it was. This matters
+because `docs/calibration/` was fitted against that single distribution and
+does not carry to a declared population.
+
+What it does not claim: the shape inside each published range is uniform, which
+is **this project's choice, not the source's** (IMO gives min and max only) —
+said so in the module and printed in the report. The label carries speed and
+nothing else: no behaviour, patience or route choice follows from it. And the
+IMO population describes **ship passengers** (40% mobility impaired, no
+children), so choosing it for a shopping street is the scene author's decision;
+the report now names the population a run used so that decision stays visible.
+
+**A correction to the plan that ordered this work.** It said wheelchair users
+must not be routed to stairs. That rule was **not built, because the data does
+not support it**: IMO's table gives the mobility-impaired groups non-zero stair
+speeds, and does not separate wheelchair users from people with a stick or a
+slow gait. Building the flag anyway would have invented a category the source
+does not have. It belongs with the lift work, and ADR-0011 says so.
+
+### A test-suite finding, unrelated to the feature
+
+Adding these cases made two or three arbitrary tests fail on `Test timed out`,
+a different set each run, while each passed on its own. The cause was **CPU
+over-subscription, not a slow test**: the heavy cases render every panel or step
+a simulation, and a fork per core starved them. Measured: over-subscribed →
+three timed out; at `maxWorkers: "50%"` → 686 passed. The cap is now in
+`packages/app/vite.config.ts` with that measurement in the comment. Two of the
+new cases were also made cheaper first, and one redundant simulation was
+dropped — but the cap is what fixed it, and pretending otherwise would leave
+the next person chasing a flake.
+
+## 2026-09-21: repeated runs and intervals (plan item 1.3)
+
+Every number this product showed came from **one run at one seed**. A first-line
+report gives a range over repeated runs. The machinery for that — an experiment
+runner, a queue, a worker and its client — had been written and unit-tested
+since M6 and **was never called by the app**: `ExperimentSweepPanel` ran one
+sweep synchronously on the main thread (freezing the page) and printed the
+worker request it never sent as a label.
+
+Changed:
+
+- **The sweep runs in the worker that was written for it**, with progress and a
+  stop button. An e2e pins the part that was missing: the crowd keeps moving
+  while the sweep runs, which it cannot do if the work is on this thread.
+- **A bootstrap interval for the mean** (`bootstrapMeanInterval`): percentile
+  bootstrap, 2,000 resamples, seeded so a report repeats. Chosen over mean ±
+  1.96·SE because these metrics are not symmetric — an evacuation time has a
+  floor and a long tail — and the bootstrap does not assume they are. Coverage
+  is checked against a known mean: 100 trials, the interval must contain it at
+  least 88 times.
+- **No interval below two runs.** One run has no spread, so the panel prints
+  "1 run, no interval" instead of a bare number that reads as exact.
+- **The measured panel says what it is**: one run, one seed, no interval, and
+  where to get one. The printable validation report carries the same sentence.
+  Neither invents an interval it did not measure — the live panel _cannot_ have
+  one, because it watches a single run by construction.
+
+The default is five runs per variant. That is a starting point for a look and
+**not a defensible sample size for a report**; the code says so where the
+number is set. Nothing here makes the underlying figures more accurate: it
+makes the spread visible, which is a different and more honest claim.
+
+## 2026-09-21: where this engine stands against RiMEA
+
+`benchmarkScenarios.ts` has said since P0 that its scenarios are **named
+after** RiMEA tests but are not RiMEA geometry. So "which RiMEA tests does it
+pass?" had no answer in the product. It has one now, and getting it required
+correcting three of this session's own mistakes.
+
+### What the guideline actually says
+
+Obtained from the publisher: **RiMEA 4.1.1 of 11.09.2025**, RiMEA e.V.,
+www.rimea.de, licensed **CC BY-ND 4.0**, German version authoritative. Annex 1
+defines **sixteen** tests across A 2 (components), A 3 (functional) and A 4
+(qualitative). Only the parameters are recorded in `rimeaSuite.ts` — geometry,
+densities, time windows — each with its clause; the text is not reproduced.
+
+### Three corrections to what was written earlier today
+
+1. **The version was wrong.** Everything written before this said "RiMEA 3.0".
+   The current edition is 4.1.1; 4.0.0 (2022) is the previous one.
+2. **The test list was wrong.** An earlier pass wrote fourteen tests from
+   memory with smoke at 13 and lifts at 14. There are sixteen, and **there is
+   no smoke test and no lift test at all**: 13 is the fundamental diagram on
+   stairs, 14 is choice of route. That list is now the guideline's.
+3. **The judgement was wrong.** Test 4 asks for densities up to 6 P/m², and
+   Weidmann's curve — the yardstick this project chose — reaches **zero at its
+   jam density of 5.4**. Comparing against it above that density made every
+   non-zero speed a deviation, so the worst error always landed on the densest
+   point (0.465 m/s at 6 P/m², against a reference of 0.00). Those points are
+   now measured and reported but judged against nothing, which is what the
+   guideline asks for: it wants the diagram measured and sets no threshold.
+
+### Test 4, run to the guideline's own parameters — and it FAILS
+
+Densities 0.5, 1, 2, 3, 4, 5, 6 P/m²; the mean speed over **60 s** after a
+**10 s** transient (A 2, p. 30). Result: **worst deviation 0.148 m/s at
+0.5 P/m²** (model 1.15, Weidmann 1.30) against a 0.10 m/s tolerance — so it
+fails, at the _sparse_ end, where the model does not quite reach free-flow
+speed. 6 P/m² measured 0.47 m/s and is reported unjudged. The tolerance was
+not widened to make any of this pass.
+
+**A declared departure**: the guideline's corridor is 1,000 m × 10 m, which at
+6 P/m² is 60,000 people — not steppable in a browser, and not what the
+measurement needs (a local speed in an equilibrium stream). It is measured in
+a 20 m × 4 m periodic corridor instead, the usual approach in the literature.
+That paragraph sits beside the number in the code and in the panel's criterion
+string, so it travels with any report that quotes it.
+
+### The other fifteen
+
+All `needs-scenario`: the parameters are recorded with their clause, the
+scenario is not built. Two are worth noting because the engine is close —
+test 1 (one person, 2 m × 40 m corridor, travel time 26–34 s at 1.33 m/s) and
+test 6 (twenty people round a left-hand corner without passing through walls)
+are buildable today. Tests 2, 3 and 13 need a staircase a crowd can stand on,
+and connectors are not that: they hold one person for a travel time.
+
+The suite runs in its own worker (about 90 s for the sweep) and the unit tests
+exercise the same code path with one density and a two-second window — a
+result produced that way is **not** the test, and the code says so.
+
+## 2026-09-21: two RiMEA tests built, and one of them says something awkward
+
+Tests 1 and 6 are now built to the guideline's own parameters, so the suite
+reads **2 passed, 1 failed, 13 not built, of 16** — measured in the app, not
+only in a test run.
+
+### Test 1 (corridor) — passes, and the interesting number is the one beside it
+
+A 2, p. 29: one person, a 2 m x 40 m corridor at 1.33 m/s, travel time
+26-34 s. Measured: **median 30.4 s over 20 walks, range 24.6-46.8 s, and only
+10 of the 20 inside the window**.
+
+The median is almost exactly 40 / 1.33 = 30.1 s, so the model's typical speed
+is right. Half the walks miss the window because **this engine draws free
+speeds with a 19% spread (N(1.34, 0.26)) where the guideline's window was
+built from 5%**. The criterion is stated about one person, so which person is
+drawn decides the answer; the test is therefore judged on the median of twenty
+walks, with the share inside the window reported next to it.
+
+Turning the spread off would have made it pass twenty times out of twenty and
+told nobody anything. The spread is a modelling choice this project made and
+documented (`behaviorDistributions.ts`); the mismatch with the window is a real
+finding about both.
+
+### Test 6 (corner) — passes
+
+A 2, pp. 30-31: twenty people round a left turn in a 2 m corridor with 10 m
+arms, without passing through walls. Measured: **20 went round and out, nobody
+left the corridor**, where leaving is checked every step against the L-shaped
+region (`insideCorner`).
+
+Two mistakes surfaced while building it, both in the scene rather than the
+engine: the exit was placed a metre past the end of the arm, so walking to it
+meant leaving the corridor and the check correctly failed; and the intake
+window let 39 people in when the test wants twenty.
+
+**A declared departure**: the guideline starts the twenty already standing,
+spread over a 6 m stretch. This engine only brings people in through a door, so
+they enter over ten seconds at the middle of that stretch. What the test checks
+— getting round, staying inside — is unaffected, and the criterion string says
+so.
+
+### Still not built: thirteen
+
+Each names its clause. Tests 2, 3 and 13 are blocked on the same thing: they
+need a staircase a crowd can stand and walk on, and a connector is not that —
+it holds one person for a travel time and puts them down at the other end.
+That is the next real piece of modelling, not a scenario to write.

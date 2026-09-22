@@ -172,3 +172,80 @@ describe("a building with floors", () => {
     expect(snapshot.agents.every((agent) => agent.transfer === undefined)).toBe(true);
   });
 });
+
+describe("an edit that deletes a floor people are on", () => {
+  const twoFloors = parseScene({
+    ...demoScene,
+    id: "floor-deletion",
+    walls: [],
+    shops: [],
+    servicePoints: [],
+    floors: [
+      { id: "ground", level: 0, elevationMeters: 0 },
+      { id: "upper", level: 1, elevationMeters: 0.2 },
+    ],
+    entrances: [
+      {
+        id: "upper-door",
+        floorId: "upper",
+        kind: "source",
+        position: { x: 10, y: 20 },
+        width: 4,
+        arrivalRatePerMinute: 240,
+        groupShare: 0,
+      },
+      {
+        id: "ground-exit",
+        floorId: "ground",
+        kind: "sink",
+        position: { x: 70, y: 20 },
+        width: 5,
+      },
+    ],
+    connectors: [
+      {
+        id: "stair-1",
+        kind: "stair",
+        from: { floorId: "ground", point: { x: 20, y: 20 } },
+        to: { floorId: "upper", point: { x: 20, y: 20 } },
+        width: 2,
+        bidirectional: true,
+      },
+    ],
+  });
+
+  /** The same building with that floor, and everything on it, taken away. */
+  const groundOnly = parseScene({
+    ...twoFloors,
+    floors: [{ id: "ground", level: 0, elevationMeters: 0 }],
+    entrances: twoFloors.entrances.map((entrance) => ({
+      ...entrance,
+      floorId: "ground",
+    })),
+    connectors: [],
+  });
+
+  it("takes them out of the run at the edit, and not as exits", () => {
+    const engine = createSimulationEngineFromScene(twoFloors, { maxAgents: 80 });
+    engine.start();
+    for (let step = 0; step < 60 * 30; step += 1) engine.step(1 / 60);
+
+    const before = engine.snapshot();
+    const upstairs = before.agents.filter((agent) => agent.floorId === "upper").length;
+
+    expect(upstairs).toBeGreaterThan(0);
+
+    const upstairsIds = new Set(
+      before.agents.filter((agent) => agent.floorId === "upper").map((a) => a.id),
+    );
+    const swapped = engine.updateScene(groundOnly);
+
+    // Gone at the swap, where the count can be seen to drop — not one step
+    // later with no explanation, which is what the per-floor step used to do.
+    expect(swapped.agents.some((agent) => upstairsIds.has(agent.id))).toBe(false);
+    expect(swapped.agents.every((agent) => agent.floorId === "ground")).toBe(true);
+    expect(swapped.agentCount).toBeLessThan(before.agentCount);
+    // Nobody walked out, so nobody is counted as having walked out.
+    expect(swapped.exitedCount).toBe(before.exitedCount);
+  });
+});

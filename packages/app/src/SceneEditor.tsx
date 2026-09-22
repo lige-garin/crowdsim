@@ -685,6 +685,7 @@ export function SceneEditor({
       onToggleTransitStopActive={paramActions.toggleTransitStopActive}
       onToolChange={switchTool}
       onEntranceKindChange={paramActions.updateEntranceKind}
+      onEntrancePopulationChange={paramActions.updateEntrancePopulation}
       onEntranceProfileChange={paramActions.updateEntranceProfile}
       onEntranceNumberChange={paramActions.updateEntranceNumber}
       onTransitStopKindChange={paramActions.updateTransitStopKind}

@@ -57,6 +57,8 @@ export type EditorEntrance = {
   arrivalProfile?: { intervalMinutes: number; ratesPerMinute: number[] };
   groupShare?: number;
   exitIds?: string[];
+  /** A population from the library, by id (ADR-0011). Absent: the default. */
+  populationId?: string;
 };
 
 export type EditorTarget = {

@@ -1,4 +1,5 @@
 import type { BenchmarkScenario } from "./benchmarkTypes";
+import { mulberry32 } from "./simulationEngineRandom";
 import type {
   ExperimentDefinition,
   ExperimentRunResult,
@@ -21,13 +22,66 @@ export type SweepParameter =
     };
 
 export type MetricDistribution = {
+  /**
+   * A 95% confidence interval for the mean, or **null from a single run**.
+   * One run has no spread to measure, and printing an interval for it would
+   * claim a precision nobody measured.
+   */
+  ci95: { high: number; low: number } | null;
   max: number;
   mean: number;
   min: number;
   p50: number;
   p95: number;
+  /** How many runs are behind the numbers above. */
+  runs: number;
   samples: number[];
 };
+
+/** Resamples per bootstrap. 2,000 is the usual floor for a 95% interval. */
+export const bootstrapResamples = 2000;
+
+/**
+ * A percentile bootstrap interval for the mean (Efron 1979): resample the runs
+ * with replacement, take each resample's mean, and read the 2.5th and 97.5th
+ * percentiles of those means.
+ *
+ * Chosen over a normal (mean ± 1.96·SE) interval because these metrics are not
+ * symmetric — an evacuation time has a floor and a long tail — and the
+ * bootstrap does not assume they are. It is seeded, so a report is
+ * reproducible: the same runs give the same interval.
+ *
+ * **Null below two runs.** An interval needs a spread, and one number has none.
+ */
+export function bootstrapMeanInterval(
+  samples: readonly number[],
+  options: { resamples?: number; seed?: number } = {},
+): { high: number; low: number } | null {
+  if (samples.length < 2) {
+    return null;
+  }
+
+  const resamples = options.resamples ?? bootstrapResamples;
+  const random = mulberry32(options.seed ?? 1);
+  const means: number[] = [];
+
+  for (let draw = 0; draw < resamples; draw += 1) {
+    let total = 0;
+
+    for (let pick = 0; pick < samples.length; pick += 1) {
+      total += samples[Math.floor(random() * samples.length)];
+    }
+
+    means.push(total / samples.length);
+  }
+
+  means.sort((left, right) => left - right);
+
+  return {
+    high: round(means[Math.min(means.length - 1, Math.ceil(0.975 * means.length) - 1)]),
+    low: round(means[Math.max(0, Math.floor(0.025 * means.length))]),
+  };
+}
 
 export function createExperimentFromSweep(options: {
   id: string;
@@ -135,6 +189,8 @@ function createDistribution(samples: readonly number[]): MetricDistribution {
   const sorted = [...samples].sort((left, right) => left - right);
 
   return {
+    ci95: bootstrapMeanInterval(sorted),
+    runs: sorted.length,
     max: round(sorted.at(-1) ?? 0),
     mean: round(
       sorted.reduce((sum, value) => sum + value, 0) / Math.max(1, sorted.length),

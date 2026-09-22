@@ -29,8 +29,12 @@ export type ConnectorRuntime = {
   fromPoint: ScenePoint;
   toFloorId: string;
   toPoint: ScenePoint;
-  /** Seconds to travel it, one person's journey (`connectorTravelSeconds`). */
+  /** Seconds to travel it at the default speed (`connectorTravelSeconds`). */
   travelSeconds: number;
+  /** Metres of flight, so a person with their own speed can time it themselves. */
+  lengthMeters: number;
+  /** Which way this one goes: true when it climbs. */
+  climbing: boolean;
   /** People a second it can take, from its width (ADR-0008's rule). */
   admitPerSecond: number;
 };
@@ -57,6 +61,29 @@ export const connectorSpeeds = {
  * is twice the height climbed (1/sin 30° = 2).
  */
 export const connectorPitchDegrees = 30;
+
+/** Metres walked along a flight that rises `riseMeters`, at a 30 degree pitch. */
+export function connectorLengthMeters(riseMeters: number) {
+  return Math.abs(riseMeters) / Math.sin((connectorPitchDegrees * Math.PI) / 180);
+}
+
+/**
+ * How long this person takes on a flight of `lengthMeters`, at their own stair
+ * speed (ADR-0011). Falls back to the connector's default time for anyone the
+ * scene drew no profile for.
+ */
+export function personTravelSeconds(
+  connector: Pick<ConnectorRuntime, "climbing" | "lengthMeters" | "travelSeconds">,
+  person: { stairUpMetersPerSecond?: number; stairDownMetersPerSecond?: number },
+) {
+  const speed = connector.climbing
+    ? person.stairUpMetersPerSecond
+    : person.stairDownMetersPerSecond;
+
+  return speed === undefined
+    ? connector.travelSeconds
+    : Math.max(connector.lengthMeters / speed, 1);
+}
 
 /** How long one person takes to travel a connector that rises `riseMeters`. */
 export function connectorTravelSeconds(

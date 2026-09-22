@@ -68,6 +68,7 @@ export const messages = {
     en: "Add a floor first: a stair joins two",
   },
   countLine: { zh: "计数线", en: "Count line" },
+  population: { zh: "人口构成", en: "Population" },
   countLines: { zh: "计数线", en: "Count lines" },
   countLineShort: { zh: "COUNT", en: "COUNT" },
   countLineName: { zh: "名称", en: "Name" },

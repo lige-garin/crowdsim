@@ -18,6 +18,8 @@ function connector(overrides: Partial<ConnectorRuntime> = {}): ConnectorRuntime 
     toFloorId: "upper",
     toPoint: { x: 30, y: 20 },
     travelSeconds: connectorTravelSeconds("stair", 4.5),
+    lengthMeters: 9,
+    climbing: true,
     admitPerSecond: 2,
     ...overrides,
   };

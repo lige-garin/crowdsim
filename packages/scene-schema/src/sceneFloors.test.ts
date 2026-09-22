@@ -177,3 +177,60 @@ describe("connectors between floors", () => {
     expect(result.success).toBe(false);
   });
 });
+
+describe("who the crowd is", () => {
+  const withPopulation = (population: unknown) => ({
+    ...validScene,
+    population,
+  });
+
+  it("accepts a mix whose shares add up", () => {
+    const result = safeParseScene(
+      withPopulation({
+        name: "Half and half",
+        mix: [
+          { profileId: "male-over-50", share: 0.5 },
+          { profileId: "female-over-50", share: 0.5 },
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a mix that leaves part of the crowd unaccounted for", () => {
+    const result = safeParseScene(
+      withPopulation({ mix: [{ profileId: "male-over-50", share: 0.5 }] }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain("not 1");
+  });
+
+  it("rejects a mix that names the same profile twice", () => {
+    const result = safeParseScene(
+      withPopulation({
+        mix: [
+          { profileId: "male-over-50", share: 0.5 },
+          { profileId: "male-over-50", share: 0.5 },
+        ],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toContain("twice");
+  });
+
+  it("lets a door bring its own crowd, and a scene say nothing at all", () => {
+    expect(safeParseScene(validScene).success).toBe(true);
+    expect(
+      safeParseScene({
+        ...validScene,
+        entrances: validScene.entrances.map((entrance) => ({
+          ...entrance,
+          population: { mix: [{ profileId: "crew-male", share: 1 }] },
+        })),
+      }).success,
+    ).toBe(true);
+  });
+});

@@ -1,4 +1,8 @@
-import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import {
+  baseFloorId,
+  type CrowdSimScene,
+  type ScenePoint,
+} from "@crowdsim/scene-schema";
 import { fruinLevel, fruinLevels, type FruinLevel } from "./fruinLevelOfService";
 import type { SimulationAgent, SimulationSnapshot } from "./simulationEngine";
 
@@ -61,6 +65,8 @@ export type RunAnalyticsSummary = {
 
 type Tracked = {
   firstSeen: number;
+  /** The floor they were on when last sampled (ADR-0010). */
+  floorId?: string;
   lastSeen: number;
   x: number;
   y: number;
@@ -87,7 +93,10 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
   const stays: Stay[] = [];
   const peakConcurrent = new Map<string, number>();
 
-  const cells = new Map<string, { x: number; y: number; sum: number; max: number }>();
+  const cells = new Map<
+    string,
+    { floorId?: string; x: number; y: number; sum: number; max: number }
+  >();
   const losSeries: { t: number; counts: number[] }[] = [];
   let occupiedCellSamples = 0;
   let dOrWorseCellSamples = 0;
@@ -125,13 +134,14 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
 
       const column = Math.floor(agent.x / cellSize);
       const row = Math.floor(agent.y / cellSize);
-      const cellKey = `${column},${row}`;
+      const cellKey = `${agent.floorId ?? ""}|${column},${row}`;
       counts.set(cellKey, (counts.get(cellKey) ?? 0) + 1);
 
       const previous = tracked.get(agent.id);
       if (!previous) {
         tracked.set(agent.id, {
           firstSeen: t,
+          floorId: agent.floorId,
           lastSeen: t,
           stayKey: key,
           staySince: t,
@@ -140,7 +150,13 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
         });
         continue;
       }
+      // Stepping off a connector moves someone from one floor to another in
+      // one sample. That jump is not a walk across the plan, so it counts for
+      // nothing: a line between the two mouths would otherwise tally it.
+      const crossedFloors = previous.floorId !== agent.floorId;
+
       for (const line of scene.countLines) {
+        if (crossedFloors || !onSameFloor(scene, line, agent)) continue;
         const direction = crossing(
           previous,
           agent,
@@ -159,6 +175,7 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
         previous.stayKey = key;
         previous.staySince = t;
       }
+      previous.floorId = agent.floorId;
       previous.lastSeen = t;
       previous.x = agent.x;
       previous.y = agent.y;
@@ -182,8 +199,10 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
       levelCounts[fruinLevels.indexOf(level)]++;
       occupiedCellSamples++;
       if (fruinLevels.indexOf(level) >= 3) dOrWorseCellSamples++;
-      const [column, row] = cellKey.split(",").map(Number);
+      const [floorId, plan] = cellKey.split("|");
+      const [column, row] = plan.split(",").map(Number);
       const cell = cells.get(cellKey) ?? {
+        floorId: floorId === "" ? undefined : floorId,
         max: 0,
         sum: 0,
         x: column * cellSize,
@@ -306,6 +325,7 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
           "mean_density_p_m2",
           "max_density_p_m2",
           "max_los",
+          "floor_id",
         ],
         [...cells.values()].map((cell) => [
           cell.x,
@@ -314,6 +334,7 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
           round(samples ? cell.sum / samples : 0, 4),
           round(cell.max, 4),
           fruinLevel(cell.max),
+          cell.floorId ?? "",
         ]),
       ),
   };
@@ -350,6 +371,21 @@ function splitKey(key: string): [StayKind, string] {
  * +1 ("forward") is crossing with b on your left as the plan is drawn
  * (x to the right, y down); −1 is the other way.
  */
+/**
+ * Whether a walker is on the floor a count line is drawn on. Both resolve an
+ * absent floor to the scene's base floor, the same rule the rest of the scene
+ * uses (sceneFloors), so a scene with no floors always agrees.
+ */
+function onSameFloor(
+  scene: CrowdSimScene,
+  line: { floorId?: string },
+  agent: { floorId?: string },
+) {
+  const base = baseFloorId(scene);
+
+  return (line.floorId ?? base) === (agent.floorId ?? base);
+}
+
 export function crossing(
   from: ScenePoint,
   to: ScenePoint,

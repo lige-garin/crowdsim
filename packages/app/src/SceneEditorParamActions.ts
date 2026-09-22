@@ -23,6 +23,7 @@ import {
   updateDocumentConnectorKind,
   updateDocumentConnectorWidth,
   updateDocumentCountLineName,
+  updateDocumentEntrancePopulation,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
   updateDocumentObstacleKind,
@@ -131,6 +132,12 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedConnector) return;
       setDocument((current) =>
         toggleDocumentConnectorBidirectional(current, selectedConnector.id),
+      );
+    },
+    updateEntrancePopulation(populationId: string) {
+      if (!selectedEntrance) return;
+      setDocument((current) =>
+        updateDocumentEntrancePopulation(current, selectedEntrance.id, populationId),
       );
     },
     updateCountLineName(name: string) {

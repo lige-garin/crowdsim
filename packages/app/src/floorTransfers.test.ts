@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { createRouter } from "./crowdNavigation";
-import { createFloorGraph, type ConnectorRuntime } from "./floorRouting";
+import {
+  createFloorGraph,
+  personTravelSeconds,
+  type ConnectorRuntime,
+} from "./floorRouting";
 import {
   createConnectorTraffic,
   planFloorLegs,
   stepConnectorTravel,
 } from "./floorTransfers";
+import { applySimulationAgentDecisions } from "./simulationDecisionBackend";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 
 const openFloor = createRouter({ width: 60, height: 40 }, []);
@@ -18,6 +23,8 @@ const stairs: ConnectorRuntime = {
   toFloorId: "ground",
   toPoint: { x: 30, y: 20 },
   travelSeconds: 13,
+  lengthMeters: 9,
+  climbing: true,
   admitPerSecond: 2,
 };
 
@@ -193,5 +200,80 @@ describe("stepping onto and off a connector", () => {
 
     expect(stepped.ridingUntilSeconds).toBeUndefined();
     expect(stepped.transfer).toBeUndefined();
+  });
+});
+
+describe("a decision that says nothing about floors", () => {
+  it("is read as a target on the walker's own floor, not another one", () => {
+    const upstairs = walker({ floorId: "upper", transfer: undefined });
+    const [after] = applySimulationAgentDecisions(
+      [upstairs],
+      [{ agentId: upstairs.id, nextState: "checkout", target: { x: 46, y: 20 } }],
+      1,
+    );
+
+    // It used to build a transfer whose floor was undefined: no connector
+    // leads there, so planFloorLegs sent the buyer to an exit instead.
+    expect(after.transfer).toBeUndefined();
+    expect(after.targetX).toBe(46);
+    expect(planFloorLegs([after], graph, [groundExit, upperExit])[0].targetX).toBe(46);
+  });
+});
+
+describe("a flight takes as long as the person is slow", () => {
+  const flight = { climbing: true, lengthMeters: 9, travelSeconds: 13 };
+
+  it("times it at the person's own stair speed when they have one", () => {
+    // IMO's slowest impaired group climbs at 0.23 m/s, its quickest men at 0.84.
+    expect(personTravelSeconds(flight, { stairUpMetersPerSecond: 0.23 })).toBeCloseTo(
+      9 / 0.23,
+      6,
+    );
+    expect(personTravelSeconds(flight, { stairUpMetersPerSecond: 0.84 })).toBeCloseTo(
+      9 / 0.84,
+      6,
+    );
+  });
+
+  it("uses the way they are going: up is not down", () => {
+    const descending = { ...flight, climbing: false };
+    const person = {
+      stairUpMetersPerSecond: 0.28,
+      stairDownMetersPerSecond: 0.34,
+    };
+
+    expect(personTravelSeconds(descending, person)).toBeLessThan(
+      personTravelSeconds(flight, person),
+    );
+  });
+
+  it("falls back to the connector's own time for anyone with no profile", () => {
+    expect(personTravelSeconds(flight, {})).toBe(13);
+  });
+
+  it("holds someone slow on the stairs longer than someone quick", () => {
+    const slow = walker({
+      x: 30,
+      y: 20,
+      stairUpMetersPerSecond: 0.23,
+      stairDownMetersPerSecond: 0.29,
+      transfer: { connectorId: "stair-1", finalX: 55, finalY: 20, floorId: "ground" },
+    });
+    const quick = { ...slow, id: 2, stairUpMetersPerSecond: 0.84 };
+    const traffic = createConnectorTraffic([stairs]);
+    traffic.replenish(1);
+
+    const [steppedSlow, steppedQuick] = stepConnectorTravel({
+      agents: [slow, quick],
+      connectors: [stairs],
+      elapsedSeconds: 0,
+      graph,
+      sinks: [groundExit],
+      traffic,
+    });
+
+    expect(steppedSlow.ridingUntilSeconds!).toBeGreaterThan(
+      steppedQuick.ridingUntilSeconds!,
+    );
   });
 });

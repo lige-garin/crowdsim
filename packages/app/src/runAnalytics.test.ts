@@ -164,3 +164,98 @@ describe("toCsv", () => {
     );
   });
 });
+
+describe("measuring a building with floors", () => {
+  const stacked = parseScene({
+    schemaVersion: "1.0.0",
+    name: "Measured stack",
+    world: { width: 60, height: 40 },
+    id: "measured-stack",
+    floors: [
+      { id: "ground", level: 0, elevationMeters: 0 },
+      { id: "upper", level: 1, elevationMeters: 4.5 },
+    ],
+    countLines: [
+      {
+        id: "ground-line",
+        floorId: "ground",
+        geometry: {
+          type: "polyline",
+          points: [
+            { x: 30, y: 10 },
+            { x: 30, y: 30 },
+          ],
+        },
+      },
+    ],
+  });
+
+  function at(floorId: string, x: number, id = 1) {
+    return {
+      agentCount: 1,
+      agents: [{ id, floorId, x, y: 20, vx: 0, vy: 0, targetX: x, targetY: 20 }],
+      elapsedSeconds: 0,
+      exitedCount: 0,
+      spawnedCount: 1,
+      status: "running" as const,
+      stepCount: 0,
+      timeScale: 1,
+    };
+  }
+
+  it("does not count someone walking over the line on another floor", () => {
+    const analytics = createRunAnalytics();
+    analytics.record(stacked, { ...at("upper", 25), elapsedSeconds: 0 });
+    analytics.record(stacked, { ...at("upper", 35), elapsedSeconds: 1 });
+
+    const counts = analytics.summary().flows[0];
+
+    expect(counts.forward + counts.backward).toBe(0);
+  });
+
+  it("counts someone walking over it on its own floor", () => {
+    const analytics = createRunAnalytics();
+    analytics.record(stacked, { ...at("ground", 25), elapsedSeconds: 0 });
+    analytics.record(stacked, { ...at("ground", 35), elapsedSeconds: 1 });
+
+    const counts = analytics.summary().flows[0];
+
+    expect(counts.forward + counts.backward).toBe(1);
+  });
+
+  it("keeps the density of one floor out of the density of another", () => {
+    const analytics = createRunAnalytics();
+    const together = {
+      ...at("ground", 20),
+      agentCount: 2,
+      agents: [
+        {
+          id: 1,
+          floorId: "ground",
+          x: 20,
+          y: 20,
+          vx: 0,
+          vy: 0,
+          targetX: 20,
+          targetY: 20,
+        },
+        {
+          id: 2,
+          floorId: "upper",
+          x: 20,
+          y: 20,
+          vx: 0,
+          vy: 0,
+          targetX: 20,
+          targetY: 20,
+        },
+      ],
+    };
+
+    analytics.record(stacked, together);
+
+    // Two people over the same spot on different floors are one person per
+    // floor, not two in one cell.
+    expect(analytics.summary().levelOfService.peakDensity).toBeCloseTo(1 / 4, 6);
+  });
+});

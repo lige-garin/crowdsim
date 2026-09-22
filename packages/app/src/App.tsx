@@ -160,10 +160,33 @@ function AppContent() {
       }),
     [floorHeatmapSamples, heatmapWindowSeconds, viewScene],
   );
-  const densityPeak = useMemo(
-    () => heatmapCells.reduce((peak, cell) => Math.max(peak, cell.count), 0),
-    [heatmapCells],
-  );
+  /**
+   * The busiest cell in the building, not in the view.
+   *
+   * The heatmap beside it is one floor's plan, so its cells are that floor's.
+   * Deriving the KPI from them made "peak density" change every time someone
+   * clicked a floor button, next to an agent count that stayed whole-building.
+   * Each floor is counted on its own grid — adding the floors together would
+   * report a crowd standing where nobody is (ADR-0010).
+   */
+  const densityPeak = useMemo(() => {
+    // With one floor the heatmap beside it already is the whole building, so
+    // read the peak off it rather than gridding the same samples again on
+    // every render — which was slow enough to time the panel tests out.
+    if (floors.length === 0) {
+      return heatmapCells.reduce((peak, cell) => Math.max(peak, cell.count), 0);
+    }
+
+    return floors.reduce((peak, floor) => {
+      const cells = createHeatmapCellsFromSamples(
+        sceneOnFloor(scene, floor.id) ?? scene,
+        heatmapSamplesOnFloor(heatmapSamples, floor.id),
+        { cellSize: 2, windowSeconds: heatmapWindowSeconds },
+      );
+
+      return cells.reduce((best, cell) => Math.max(best, cell.count), peak);
+    }, 0);
+  }, [floors, heatmapCells, heatmapSamples, heatmapWindowSeconds, scene]);
   const dashboardStats = useMemo(
     () =>
       createDashboardStats({

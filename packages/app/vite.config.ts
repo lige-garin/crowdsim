@@ -26,5 +26,13 @@ export default defineConfig({
     // green run never exits (CI killed it at the timeout, exit 124). Fork
     // workers are processes and get torn down for real.
     pool: "forks",
+    // Half the cores, not all of them. The heavy cases here render every panel
+    // or step a simulation for a minute of sim time, and with a fork per core
+    // they starve each other: a fully green suite would fail two or three
+    // arbitrary cases on a test timeout, a different set each run. Measured on
+    // this machine: over-subscribed, three cases timed out; at half the cores,
+    // 686 passed. Slower overall, but a timeout that moves around is worse
+    // than a slower run.
+    maxWorkers: "50%",
   },
 });

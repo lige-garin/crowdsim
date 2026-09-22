@@ -43,6 +43,7 @@ type SceneEditorParamPanelProps = {
   onBasemapNumberChange: (field: BasemapNumberField, value: number) => void;
   onBuildingKindChange: (kind: Building["kind"]) => void;
   onEntranceKindChange: (kind: Entrance["kind"]) => void;
+  onEntrancePopulationChange: (populationId: string) => void;
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
@@ -102,6 +103,7 @@ export function SceneEditorParamPanel({
   onToggleConnectorBidirectional,
   onCountLineNameChange,
   onEntranceKindChange,
+  onEntrancePopulationChange,
   onEntranceProfileChange,
   onEntranceNumberChange,
   onHazardKindChange,
@@ -176,6 +178,7 @@ export function SceneEditorParamPanel({
       ) : selectedEntrance ? (
         <EntranceParamGrid
           onKindChange={onEntranceKindChange}
+          onPopulationChange={onEntrancePopulationChange}
           onProfileChange={onEntranceProfileChange}
           onNumberChange={onEntranceNumberChange}
           selectedEntrance={selectedEntrance}

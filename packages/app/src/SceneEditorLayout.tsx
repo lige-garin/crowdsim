@@ -65,6 +65,7 @@ type SceneEditorLayoutProps = {
   onToggleConnectorBidirectional: () => void;
   onCountLineNameChange: (name: string) => void;
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
+  onEntrancePopulationChange: (populationId: string) => void;
   onEntranceProfileChange: (text: string) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
@@ -182,6 +183,7 @@ export function SceneEditorLayout({
   onToggleConnectorBidirectional,
   onCountLineNameChange,
   onEntranceKindChange,
+  onEntrancePopulationChange,
   onEntranceProfileChange,
   onEntranceNumberChange,
   onCanvasPointerDown,
@@ -355,6 +357,7 @@ export function SceneEditorLayout({
         onToggleConnectorBidirectional={onToggleConnectorBidirectional}
         onCountLineNameChange={onCountLineNameChange}
         onEntranceKindChange={onEntranceKindChange}
+        onEntrancePopulationChange={onEntrancePopulationChange}
         onEntranceProfileChange={onEntranceProfileChange}
         onEntranceNumberChange={onEntranceNumberChange}
         onHazardKindChange={onHazardKindChange}

@@ -477,3 +477,22 @@ export function toggleDocumentConnectorBidirectional(
     ),
   };
 }
+
+/** Who comes through a door (ADR-0011). "default" clears it. */
+export function updateDocumentEntrancePopulation(
+  document: EditorDocument,
+  entranceId: string,
+  populationId: string,
+): EditorDocument {
+  return {
+    ...document,
+    entrances: document.entrances.map((entrance) =>
+      entrance.id === entranceId
+        ? {
+            ...entrance,
+            populationId: populationId === "default" ? undefined : populationId,
+          }
+        : entrance,
+    ),
+  };
+}

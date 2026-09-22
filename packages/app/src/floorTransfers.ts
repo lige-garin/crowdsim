@@ -1,4 +1,8 @@
-import type { FloorGraph, ConnectorRuntime } from "./floorRouting";
+import {
+  personTravelSeconds,
+  type FloorGraph,
+  type ConnectorRuntime,
+} from "./floorRouting";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 import { nearestAllowedSink } from "./simulationDecisionBackend";
 
@@ -22,6 +26,31 @@ export const boardingRadiusMeters = 1.2;
 
 export function isRiding(agent: SimulationAgent): boolean {
   return agent.ridingUntilSeconds !== undefined;
+}
+
+/**
+ * Whether this person is in the middle of crossing between floors: on the
+ * treads, or waiting at the mouth for room on them.
+ *
+ * Neither closes the distance to where they are going — a rider is held still
+ * for the whole flight, and a queue for an escalator is people standing. To
+ * any rule that measures progress in metres both look exactly like being
+ * stuck against a wall, so the rule has to be told the difference.
+ */
+export function isCrossingFloors(agent: SimulationAgent): boolean {
+  if (isRiding(agent)) {
+    return true;
+  }
+
+  if (!agent.transfer) {
+    return false;
+  }
+
+  // With a transfer set, the target is the connector's mouth (planFloorLegs).
+  const dx = agent.targetX - agent.x;
+  const dy = agent.targetY - agent.y;
+
+  return Math.sqrt(dx * dx + dy * dy) <= boardingRadiusMeters;
 }
 
 /** Where this person is really going, whether or not a leg is in progress. */
@@ -226,7 +255,9 @@ export function stepConnectorTravel({
 
     return {
       ...agent,
-      ridingUntilSeconds: elapsedSeconds + connector.travelSeconds,
+      // A slower person is longer on the flight, which is the whole point of
+      // drawing them from a population (ADR-0011).
+      ridingUntilSeconds: elapsedSeconds + personTravelSeconds(connector, agent),
       vx: 0,
       vy: 0,
       x: connector.fromPoint.x,

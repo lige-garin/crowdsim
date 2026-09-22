@@ -71,3 +71,23 @@ describe("RunAnalyticsPanel", () => {
     expect(onExport).toHaveBeenCalledWith("journeys");
   });
 });
+
+describe("what the measured numbers are", () => {
+  it("says they come from one run and carry no interval", () => {
+    render(
+      <RunAnalyticsPanel
+        language="zh"
+        onExport={vi.fn()}
+        scene={scene}
+        summary={createRunAnalytics().summary()}
+      />,
+    );
+
+    const note = screen.getByTestId("run-analytics-single-run").textContent ?? "";
+
+    expect(note).toContain("单一种子");
+    expect(note).toContain("不带置信区间");
+    // And it points at the place that can give one.
+    expect(note).toContain("参数扫描");
+  });
+});

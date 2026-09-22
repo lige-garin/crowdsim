@@ -96,6 +96,7 @@ export function createCounterTick(options: CounterTickOptions) {
       agentId: agent.id,
       nextState: "enterStore",
       servicePointId: counter.id,
+      targetFloorId: counter.floorId,
       target: {
         x: counter.position.x - state.direction.y * along,
         y: counter.position.y + state.direction.x * along,
@@ -167,6 +168,7 @@ export function createCounterTick(options: CounterTickOptions) {
           agentId: agent.id,
           nextState: "checkout",
           servicePointId: state.counter.id,
+          targetFloorId: state.counter.floorId,
           target,
         };
       }
@@ -187,6 +189,7 @@ export function createCounterTick(options: CounterTickOptions) {
         agentId: agent.id,
         nextState: "checkout",
         servicePointId: counter.id,
+        targetFloorId: counter.floorId,
         target: slot(state, state.line.length - 1),
         queueJoinedSeconds: elapsedSeconds,
         queueUntilSeconds: options.patienceDeadline(agent),

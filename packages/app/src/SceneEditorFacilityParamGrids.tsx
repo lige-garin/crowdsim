@@ -11,6 +11,7 @@ import type {
   TransitStopNumberField,
   ZoneNumberField,
 } from "./sceneEditorMutations";
+import { populationLibrary } from "./populationSampling";
 import { NumberInput, SelectInput } from "./SceneEditorParamInputs";
 
 type Road = EditorDocument["roads"][number];
@@ -472,14 +473,19 @@ export function ZoneParamGrid({
  * input in a crowd model — it is what "how busy is this place" means — and it
  * was the one number that could only be changed by hand-editing JSON.
  */
+/** "default" stands for "the scene says nothing", which is the engine's own. */
+const populationChoices = ["default", ...populationLibrary.map((entry) => entry.id)];
+
 export function EntranceParamGrid({
   onKindChange,
   onNumberChange,
+  onPopulationChange,
   onProfileChange,
   selectedEntrance,
   t,
 }: {
   onKindChange: (kind: Entrance["kind"]) => void;
+  onPopulationChange: (populationId: string) => void;
   onProfileChange: (text: string) => void;
   onNumberChange: (field: EntranceNumberField, value: number) => void;
   selectedEntrance: Entrance;
@@ -518,6 +524,13 @@ export function EntranceParamGrid({
               walkingGroupParameters.shareOfPeopleInGroups
             }
             onChange={(value) => onNumberChange("groupShare", value)}
+          />
+          {/* Who comes through this door (ADR-0011). */}
+          <SelectInput
+            label={t("population")}
+            options={populationChoices}
+            value={selectedEntrance.populationId ?? "default"}
+            onChange={onPopulationChange}
           />
         </>
       )}

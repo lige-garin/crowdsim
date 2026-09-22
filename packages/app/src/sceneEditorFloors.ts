@@ -40,7 +40,7 @@ export function editorBaseFloorId(document: EditorDocument): string | undefined 
 }
 
 /** Whether this primitive shows on the floor being drawn. */
-export function isOnFloor(
+function isOnFloor(
   document: EditorDocument,
   entity: { floorId?: string },
   floorId: string | undefined,

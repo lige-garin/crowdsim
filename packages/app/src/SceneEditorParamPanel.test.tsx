@@ -130,6 +130,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onToggleConnectorBidirectional: vi.fn(),
     onCountLineNameChange: vi.fn(),
     onEntranceKindChange: vi.fn(),
+    onEntrancePopulationChange: vi.fn(),
     onEntranceProfileChange: vi.fn(),
     onEntranceNumberChange: vi.fn(),
     onHazardKindChange: vi.fn(),

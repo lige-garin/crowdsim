@@ -25,6 +25,7 @@ import {
   type SimulationServicePoint,
   type SimulationShop,
 } from "./simulationDecisionBackend";
+import { samplePerson, type PopulationMix } from "./populationSampling";
 import { mulberry32, samplePoisson } from "./simulationEngineRandom";
 import {
   defaultSpeedMetersPerSecond,
@@ -74,6 +75,14 @@ export type SimulationAgent = {
   radius?: number;
   /** Free walking speed relative to the scene's mean, drawn at spawn. */
   speedFactor?: number;
+  /**
+   * The walking profile this person was drawn from (ADR-0011), when the scene
+   * declared a population. Absent means the engine's own speed distribution.
+   */
+  profileId?: string;
+  /** Their speed on a connector, m/s, when a profile gave them one. */
+  stairUpMetersPerSecond?: number;
+  stairDownMetersPerSecond?: number;
   /** The floor this person is on (ADR-0010); absent in a one-floor scene. */
   floorId?: string;
   /**
@@ -106,6 +115,8 @@ export type SimulationSource = {
   groupShare?: number;
   /** Exits arrivals here may leave by; absent or empty means any. */
   exitIds?: readonly string[];
+  /** Who comes through this door (ADR-0011); absent means the engine default. */
+  population?: PopulationMix;
 };
 export type SimulationSink = {
   id: string;
@@ -340,7 +351,7 @@ export function createSimulationEngine(
     const ids = Array.from({ length: size }, (_, index) => firstId + index);
     const speedFactor =
       size > 1
-        ? Math.min(...ids.map((id) => sampleSpeedFactor(seed, id))) *
+        ? Math.min(...ids.map((id) => spawnSpeedFactor(source, id))) *
           groupSpeedRatio(size)
         : undefined;
     ids.forEach((_, index) =>
@@ -385,7 +396,8 @@ export function createSimulationEngine(
       ...(floorId === undefined ? {} : { floorId }),
       ...(group.groupId === undefined ? {} : { groupId: group.groupId }),
       radius: sampleBodyRadius(seed, id),
-      speedFactor: group.speedFactor ?? sampleSpeedFactor(seed, id),
+      speedFactor: group.speedFactor ?? spawnSpeedFactor(source, id),
+      ...personFields(source, id),
       x,
       y,
       vx: 0,
@@ -395,6 +407,39 @@ export function createSimulationEngine(
       targetSinkId: sink.id,
     });
     spawnedCount++;
+  }
+  /**
+   * The person drawn for this arrival, or undefined when the door declares no
+   * population (or names a profile this build does not know).
+   */
+  function drawPerson(source: SimulationSource, agentId: number) {
+    return source.population
+      ? samplePerson(seed, agentId, source.population)
+      : undefined;
+  }
+  /**
+   * Speed as the engine already carries it: a factor on the scene's mean. A
+   * drawn person's published speed is expressed the same way, so nothing
+   * downstream — the social force, the groups, the fundamental diagram — has
+   * to learn that populations exist.
+   */
+  function spawnSpeedFactor(source: SimulationSource, agentId: number) {
+    const person = drawPerson(source, agentId);
+
+    return person
+      ? person.freeSpeedMetersPerSecond / speedMetersPerSecond
+      : sampleSpeedFactor(seed, agentId);
+  }
+  function personFields(source: SimulationSource, agentId: number) {
+    const person = drawPerson(source, agentId);
+
+    return person
+      ? {
+          profileId: person.profileId,
+          stairUpMetersPerSecond: person.stairUpMetersPerSecond,
+          stairDownMetersPerSecond: person.stairDownMetersPerSecond,
+        }
+      : {};
   }
   function runFixedStep() {
     spawnArrivals();
@@ -586,8 +631,18 @@ export function createSimulationEngine(
       });
       // Stranded agents (no exit left anywhere) leave the run but are not
       // exits: counting them would report an evacuation that never happened.
+      // An edit can delete a floor people are standing on. They cannot be
+      // stepped — there is no plane to step them on — and moving them to
+      // another floor would put people somewhere the run never walked them.
+      // So they leave the run here, deliberately and countably, rather than
+      // disappearing from the per-floor step with the crowd count dropping and
+      // nothing to say why (simulationSceneReconcile makes the same choice for
+      // an agent whose exit is gone).
+      const standing = new Set(floors.map((floor) => floor.id));
       agents = planFloorLegs(
-        reconcileAgentsWithScene(agents, geometry),
+        reconcileAgentsWithScene(agents, geometry).filter((agent) =>
+          standing.has(agent.floorId ?? baseFloor()),
+        ),
         floorGraph,
         sinks,
       );

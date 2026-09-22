@@ -5,6 +5,7 @@ import type { BrandDecisionInsight } from "./brandDecisionProbe";
 import type { BackendClient } from "./backendClient";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
+import { RimeaReportPanel } from "./RimeaReportPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
@@ -55,6 +56,13 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "情景对比",
     labelEn: "Scenario comparison",
     render: () => <ScenarioComparisonPanel />,
+  },
+  {
+    dataSource: "fixture",
+    id: "rimea-verification",
+    labelZh: "RiMEA 验证",
+    labelEn: "RiMEA verification",
+    render: () => <RimeaReportPanel />,
   },
   {
     dataSource: "fixture",

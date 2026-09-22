@@ -288,7 +288,13 @@ function targetFloorFields(
   target: ScenePoint,
   targetFloorId?: string,
 ) {
-  if ((targetFloorId ?? null) === (agent.floorId ?? null)) {
+  // No floor on the decision means the target is where the walker already is.
+  // Reading it as "another floor" invented a transfer to an undefined floor —
+  // which no connector leads to, so planFloorLegs sent the walker to an exit
+  // instead of where they had just been told to go. Every decision backend
+  // that does not know about floors, and every one that does but leaves a
+  // same-floor target unlabelled, depends on this.
+  if (targetFloorId === undefined || targetFloorId === agent.floorId) {
     return { transfer: undefined };
   }
 

@@ -574,3 +574,44 @@ test("edit canvas shows the whole plan and HUD windows cover no controls", async
   });
   expect(covered).toEqual({ heatmapOptions: 0, toolbar: 0, windowsOffScreen: 0 });
 });
+
+/**
+ * The sweep runs off the main thread.
+ *
+ * It used to run synchronously while the app froze, and print the worker
+ * request it never sent as a label. What this pins is the part that was
+ * missing: the run happens in a worker, the page stays alive while it does,
+ * and the result says how many runs are behind each number.
+ */
+test("the parameter sweep runs in a worker and reports an interval", async ({
+  page,
+}) => {
+  const errors = captureRuntimeErrors(page);
+
+  await page.goto("/");
+  await enterWorkbench(page);
+
+  // The panels live in a floating window opened from the info rail.
+  await page.getByTestId("info-window-tools").click();
+  await page.getByTestId("panel-chip-experiment-sweep").click();
+  await expect(page.getByTestId("panel-dock-body")).toBeVisible();
+
+  const clock = page.getByTestId("hud-agent-count");
+  const before = await clock.innerText();
+
+  await page.getByTestId("sweep-run").click();
+
+  // The crowd keeps moving while the sweep runs: it is not on this thread.
+  await expect
+    .poll(async () => (await clock.innerText()) !== before, { timeout: 20_000 })
+    .toBe(true);
+
+  const firstResult = page.locator('[data-testid^="sweep-result-"]').first();
+
+  await expect(firstResult).toBeVisible({ timeout: 60_000 });
+  // Five runs per variant, so every line carries an interval and its count.
+  await expect(firstResult).toContainText("95%");
+  await expect(firstResult).toContainText("次");
+
+  expect(errors.messages).toEqual([]);
+});
