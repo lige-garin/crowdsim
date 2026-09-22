@@ -5,6 +5,7 @@ import type { BrandDecisionInsight } from "./brandDecisionProbe";
 import type { BackendClient } from "./backendClient";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
+import { SensitivityPanel } from "./SensitivityPanel";
 import { RimeaReportPanel } from "./RimeaReportPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
@@ -77,6 +78,13 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "实验汇总",
     labelEn: "Experiment summary",
     render: () => <ExperimentSummaryPanel />,
+  },
+  {
+    dataSource: "fixture",
+    id: "sensitivity-screening",
+    labelZh: "参数敏感性",
+    labelEn: "Parameter sensitivity",
+    render: () => <SensitivityPanel />,
   },
   {
     dataSource: "live",

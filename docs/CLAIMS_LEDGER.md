@@ -1205,3 +1205,29 @@ The hazard param panel gained `growthSeconds` and — present in the mutation ty
 ### Verified
 
 `smokeHazards.test.ts`, 20 cases, pure-function coverage of the radius growth clamp, the falloff shape, `mostExposingHazard` correctly preferring the worse hazard over the nearer one, and the dose formula's own arithmetic against its stated anchor. `simulationSmoke.test.ts`, 8 cases, through the real scene → engine pipeline: local-only slowdown, dose accumulation, a genuine incapacitation (sealed-box scenario), the incapacitated-never-exits guard, the avoidance push's direction, and a no-hazard control scene proved bit-for-bit unaffected. 774 vitest tests total, cargo test, typecheck, lint and prettier all clean.
+
+## 2026-09-22 (sixth entry): parameter sensitivity — Morris screening, off the main thread
+
+The last of the three item-④ sub-parts this session's user ordered (electric lift, fire/smoke, then this): "which parameters actually determine the outcome" for this project's own social-force model, cheaply — Morris (1991) elementary-effects screening, not a full factorial or a fitted surrogate.
+
+### What was built
+
+`sensitivityAnalysis.ts` is a generic implementation of the method — `generateMorrisTrajectories` (randomized one-at-a-time trajectories over a discretized grid, the same construction Morris's own B* matrix produces, written iteratively), `computeElementaryEffects` (output change ÷ parameter change, read directly off two trajectory points), `summarizeMorrisEffects` (μ*/μ/σ per parameter, ranked by μ\* descending). None of this is a fitted or approximated version of the method: "Morris (1991)" here names the actual algorithm running, unlike this project's several self-authored constants elsewhere that explicitly say they are not a citation.
+
+**Verified against known ground truth, not just internally consistent.** `runMorrisScreening` was tested against synthetic functions with a known sensitivity ranking — a parameter the function is linear in scored μ*=5 exactly and ranked first; a parameter it does not depend on at all scored μ*=0 and ranked last; a parameter with a genuine interaction (`x*y*10`) showed a nonzero σ, distinguishing "moves the metric" from "moves it in a way that depends on something else too". This is the same kind of verification this project used for RiMEA test 1's spread-vs-window finding and the bootstrap-CI coverage check in M6 — prove the tool against a case where the right answer is already known, not just that it runs.
+
+**A concrete application to this product**: `runSocialForceSensitivity`/`defaultSocialForceScreeningParameters` screens six of `crowdMovement.socialForceParameters`'s own fitted constants (relaxationSeconds, agentStrength, agentRangeMeters, anisotropy, wallStrength, sidestep) at ±50% of their fitted value, against a scenario's throughput. This needed one small piece of previously-missing engine plumbing: `SimulationEngineConfig` gained `movementParameters?: Partial<SocialForceParameters>`, threaded to `stepCrowd`'s own `parameters` argument — which already existed and was already documented as "Overrides for the model parameters (calibration)" but was never actually wired up from the engine's public config before this. Confirmed against `HEAD` before writing it: dead plumbing, not a duplicate of existing wiring.
+
+### Off the main thread, per this project's own established rule
+
+`ExperimentSweepPanel`'s own history records that it used to run a sweep synchronously and freeze the page. `SensitivityPanel.tsx` does not repeat that: `buildMorrisExperiment` turns each trajectory point into one `ExperimentVariant` (`replications: 1` — Morris's own trajectory sampling already spreads the randomness, not repeats of one point) and runs the whole thing through the existing, unmodified `runExperimentInBackgroundWorker`/`experiment.worker.ts` machinery; `summarizeMorrisExperimentResults` reconstructs the ranking client-side once results return, matching each one back to its trajectory and point by id. The panel is registered in `panelRegistry.tsx` (id `sensitivity-screening`) and covered by the existing render-smoke test pattern (`panelRegistry.experiments.test.tsx`) and the dock's generic fixture-labelling/reachability tests — reachable, not built and left an orphan, the exact class of gap this project's own history (the M6 background worker, several panel-registration passes) has repeatedly had to go back and fix.
+
+### One finding from this session's own review, applied
+
+Ponytail-review of this diff found `MorrisOptions.levels` (the method's own discretization parameter, Morris's p) was never actually varied from its default anywhere — not in production code, not in any test. Removed as a public option; fixed at 4 (the literature's own common choice) as an internal constant instead, with the reasoning kept in its own comment. Confirmed harmless: the one test that had explicitly passed `levels: 4` was already passing the default value under a different name.
+
+### What this is not
+
+A screening, not a full sensitivity study: it ranks parameters by how much they move the metric, not by what share of the output's variance each one explains — that is Sobol indices, a different and considerably more expensive method, not built here. The screened range (±50% of each constant's fitted value) is this pass's own choice for "wide enough to see an effect", not a claim about a plausible real-world calibration range.
+
+787 vitest tests (12 new for `sensitivityAnalysis.ts`, plus the new panel's render-smoke coverage), cargo test, typecheck, lint and prettier all clean. One pre-existing test (`simulationFloors.test.ts`'s "gets people out of a door on a floor they did not arrive on") needed its timeout raised from the 5000 ms default to 30 000 ms — measured flaking under full-suite CPU contention this session's own heavier test files made more likely, not a logic change; it passes in under 2.3 s standalone.

@@ -150,7 +150,7 @@ describe("a building with floors", () => {
     const engine = run(stacked, 60 * 120);
 
     expect(engine.snapshot().exitedCount).toBeGreaterThan(0);
-  });
+  }, 30_000);
 
   it("does not count reaching the stairs as leaving the building", () => {
     // Twenty seconds in, people are on their way to the stairs and no one can

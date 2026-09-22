@@ -16,7 +16,7 @@ import {
   stepConnectorTravel,
 } from "./floorTransfers";
 import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
-import { stepCrowd } from "./crowdMovement";
+import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
 import {
   exposureSpeedFactor,
   fedDoseThisTick,
@@ -202,6 +202,14 @@ export type SimulationEngineConfig = {
   connectors?: ConnectorRuntime[];
   /** Fire/smoke that slows and can incapacitate a crowd (ADR-0012). */
   hazards?: SimulationHazard[];
+  /**
+   * Overrides for the social-force model's own constants (calibration,
+   * sensitivity analysis) — passed straight through to `stepCrowd`'s own
+   * `parameters`. Absent means the fitted defaults
+   * (`crowdMovement.socialForceParameters`), which is every scene run
+   * before this existed and everywhere a scene does not ask otherwise.
+   */
+  movementParameters?: Partial<SocialForceParameters>;
   fixedDtSeconds?: number;
   maxAgents?: number;
   seed?: number;
@@ -346,6 +354,7 @@ export function createSimulationEngine(
   const fixedDtSeconds = config.fixedDtSeconds ?? defaultFixedDtSeconds;
   let decisionBackend = config.decisionBackend;
   const maxAgents = config.maxAgents ?? defaultMaxAgents;
+  const movementParameters = config.movementParameters;
   // Scene-derived: replaced as a set by replaceGeometry (ADR-0007).
   let speedMetersPerSecond = config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
   let sources = config.sources;
@@ -737,6 +746,7 @@ export function createSimulationEngine(
         exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
         isExitBound,
         meanSpeedMetersPerSecond: speedMetersPerSecond,
+        parameters: movementParameters,
         router: plane.router,
         seed,
         walls: plane.walls,

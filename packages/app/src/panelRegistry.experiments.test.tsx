@@ -21,6 +21,7 @@ describe("experiment + analytics panels are registered and render", () => {
     "scenario-comparison",
     "experiment-sweep",
     "experiment-summary",
+    "sensitivity-screening",
     "validation-report",
   ]) {
     it(`renders ${id}`, () => {
