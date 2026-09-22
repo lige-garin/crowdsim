@@ -4,9 +4,13 @@ import {
   fundamentalDiagramMeasureSeconds,
   fundamentalDiagramTransientSeconds,
   insideCorner,
+  oneDimensionalJamDensityPerMeter,
+  premovementTest,
   runCornerTest,
   runCorridorSpeedTest,
   runFundamentalDiagramTest,
+  runOneDimensionalFundamentalDiagramTest,
+  runPremovementTest,
   runRimeaSuite,
   runStairSpeedTest,
   summarizeRimeaSuite,
@@ -44,9 +48,9 @@ describe("the RiMEA suite's own honesty", () => {
   it("counts what is built against what is not", () => {
     const summary = summarizeRimeaSuite(suite);
 
-    // Tests 1, 2, 3, 4 and 6 are built; the other eleven name their clause.
-    expect(summary.pass + summary.fail).toBe(5);
-    expect(summary.needsScenario).toBe(11);
+    // Tests 1, 2, 3, 4, 5, 6 and 16 are built; the other nine name their clause.
+    expect(summary.pass + summary.fail).toBe(7);
+    expect(summary.needsScenario).toBe(9);
     expect(summary.total).toBe(16);
   });
 
@@ -86,6 +90,30 @@ describe("test 4: the fundamental diagram", () => {
     expect(fundamentalDiagramDensities).toHaveLength(7);
     expect(fundamentalDiagramMeasureSeconds).toBe(60);
   });
+});
+
+describe("test 5: premovement time", () => {
+  it("has each of ten people start moving within a decision tick of their own assigned time", () => {
+    const result = runPremovementTest();
+
+    expect(result.number).toBe(5);
+    expect(result.status).toBe("pass");
+    expect(result.measured).toMatch(/worst gap 0\.\d\d s/u);
+    expect(result.criterion).toContain("RiMEA 4.1.1 A 2 test 5");
+    // The tolerance is self-authored, and the criterion says so.
+    expect(result.criterion).toContain("self-authored");
+  }, 30_000);
+
+  it("uses the guideline's own bounds, not this project's lognormal", () => {
+    // A 2, p. 30. The lognormal (behaviorDistributions) has no upper bound
+    // and a mean of 16 s; this window is a flat 10-100 s.
+    expect(premovementTest.minReactionSeconds).toBe(10);
+    expect(premovementTest.maxReactionSeconds).toBe(100);
+  });
+
+  it("repeats: the same seed gives the same answer", () => {
+    expect(runPremovementTest(11)).toEqual(runPremovementTest(11));
+  }, 30_000);
 });
 
 describe("test 1: walking speed in a corridor", () => {
@@ -155,4 +183,39 @@ describe("tests 2 and 3: walking speed on stairs", () => {
 
     expect(medianOf(down.measured)).toBeLessThan(medianOf(up.measured));
   }, 60_000);
+});
+
+describe("test 16: 1D fundamental diagram", () => {
+  it("reports a measured speed at every density, judged only below this corridor's own jam", () => {
+    const result = runOneDimensionalFundamentalDiagramTest({
+      densities: [0.5, 1, 1.5],
+      measureSeconds: 2,
+    });
+
+    expect(result.number).toBe(16);
+    expect(["pass", "fail"]).toContain(result.status);
+    expect(result.criterion).toContain("RiMEA 4.1.1 A 4 test 16");
+    // There is no digitised reference here, and the criterion says why not.
+    expect(result.criterion).toContain("not fetched here");
+  });
+
+  it("passes on the guideline's own densities, below this corridor's own jam", () => {
+    const result = runOneDimensionalFundamentalDiagramTest();
+
+    expect(result.status).toBe("pass");
+    expect(result.measured).toContain("not judged");
+  }, 60_000);
+
+  it("puts the jam density where bodies would already be touching", () => {
+    // bodyRadiusRangeMeters tops out at 0.26 m: two in line, back to back,
+    // are 0.52 m apart, i.e. 1 / 0.52 people per metre.
+    expect(oneDimensionalJamDensityPerMeter).toBeCloseTo(1 / 0.52, 5);
+  });
+
+  it("repeats: the same build gives the same answer", () => {
+    const options = { densities: [0.5, 1], measureSeconds: 2 };
+    expect(runOneDimensionalFundamentalDiagramTest(options)).toEqual(
+      runOneDimensionalFundamentalDiagramTest(options),
+    );
+  });
 });

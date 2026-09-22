@@ -12,7 +12,7 @@ import { runRimeaSuiteInWorker, type RimeaWorkerLike } from "./rimeaWorkerClient
  *
  * The panel shows all sixteen before anything is run, each with its status,
  * so the answer to "which ones pass?" is never a blank. Running fills in the
- * five tests whose geometry and criterion are recorded here; the rest keep
+ * seven tests whose geometry and criterion are recorded here; the rest keep
  * saying why they were not attempted.
  *
  * A failure is displayed as a failure. Nothing in this panel is tuned until
@@ -21,7 +21,7 @@ import { runRimeaSuiteInWorker, type RimeaWorkerLike } from "./rimeaWorkerClient
 
 const copy = {
   en: {
-    idle: "Not run yet. Five tests are implemented (corridor speed, up and down stairs, the fundamental diagram on a level corridor, and a corner); the rest say why not.",
+    idle: "Not run yet. Seven tests are implemented (corridor speed, premovement time, up and down stairs, the fundamental diagram on a level corridor and single file, and a corner); the rest say why not.",
     run: "Run suite",
     running: "Running the corridor measurements…",
     status: {
@@ -34,7 +34,7 @@ const copy = {
     title: "RiMEA verification",
   },
   zh: {
-    idle: "RiMEA 4.1.1 附录 1 共 16 条。已实现 5 条（走廊速度、楼梯上/下行、平层基本图、拐角）；其余逐条标明出自哪一节、还缺什么。",
+    idle: "RiMEA 4.1.1 附录 1 共 16 条。已实现 7 条（走廊速度、预动作时间、楼梯上/下行、平层与单列基本图、拐角）；其余逐条标明出自哪一节、还缺什么。",
     run: "运行套件",
     running: "正在跑走廊实测…",
     status: {

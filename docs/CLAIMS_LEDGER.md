@@ -873,3 +873,83 @@ they are simply not drawn for the seconds they are on the stairs, then
 reappear at the far end. Before this change they were shown frozen at the
 mouth for the whole ride, which was its own, different fiction. Drawing riders
 along the flight itself is left for later.
+
+## 2026-09-22 (second entry): RiMEA tests 5 and 16 built — and a real bug found along the way
+
+Following on from stairs (above): tests 5 (premovement time) and 16 (1D
+fundamental diagram) are now built. The suite reads **7 passed, 0 failed, 9
+not built, of 16**.
+
+### Test 16 (1D fundamental diagram) — built, and it needed its own jam density
+
+A 4, p. 47: density in **persons per metre**, not per square metre — a
+different unit from test 4's — on a corridor "the width of one agent, so
+agents can move freely without being able to overtake". Reused test 4's
+periodic-corridor method (the guideline's own text says its ring and a
+straight corridor answer the same question) at that width instead of a level
+corridor's, converting the 1D density to the area density the harness takes.
+Judged against Fig. 20 — a shaded 10/90th-percentile envelope with **no
+printed table**, raw data behind a download from RiMEA's own site, not
+fetched — so, as with test 4's points past Weidmann's jam density, the only
+judged property is physical necessity: speed does not rise with density.
+
+That property needed its own boundary: this corridor's own geometric jam
+(bodies of radius up to 0.26 m cannot stand closer than one diameter apart,
+`1 / 0.52 ≈ 1.92` people/m) is far short of test 4's 6 P/m² ceiling, and past
+it the measured curve **swung between states seconds apart** (0.30, 0.53,
+0.37, 0.46 m/s at 2.25-3 people/m in one run) rather than settle — plausibly a
+real stop-and-go instability single-file crowds are known to show near their
+own jam density, or a 60 s window too short for this geometry, or both;
+nothing built here distinguishes which. Judging that range against an
+invented slack would have hidden the question rather than answered it, so it
+is measured and reported, unjudged, the same way test 4 already treats its
+own beyond-jam points.
+
+### Test 5 (premovement time) — built, and building it found two real problems
+
+A 2, p. 30: ten people in an 8 m x 5 m room, a 1 m exit, premovement times
+"uniformly distributed between 10 s and 100 s" — not this project's own
+lognormal. `createMallCrowdDecisionBackend` gained an injectable
+`evacuationReactionSecondsFor`, defaulting to the existing lognormal, so a
+scenario can supply a different draw without a second permanent distribution
+living in the product. `behaviorDistributions.sampleUniformReactionSeconds` is
+that draw for this test.
+
+The first two attempts to run it failed for reasons that had nothing to do
+with premovement timing, and both were real:
+
+1. **A waiting person was not standing still.** Every agent is spawned
+   pointing at a sink by default (`simulationEngine`), and "carry on with
+   what they were doing" — the evacuation branch's existing rule for anyone
+   whose premovement time has not passed — has nothing to carry on with for
+   someone who has never been given a real decision at all. With no shops in
+   this scene, that meant every person spent their whole wait visibly walking
+   toward the exit regardless of their assigned time, making the premovement
+   window invisible in practice. **Fixed in the product, not just the
+   test**: `mallCrowdDecisionBackend`'s evacuation branch now pins anyone
+   caught with no decision at all to where they are, once, until their own
+   time comes. This also corrects the same case in any real scene — someone
+   who spawns after an alarm has already sounded, mid-run, no longer
+   speedwalks to the nearest exit before they have had time to react to
+   anything.
+2. **Ten people at a 1 m door queue, regardless of reaction time.** Even
+   after (1), several seeds showed gaps of 30-60 s between an assigned
+   premovement time and when that person actually got out the door — because
+   Weidmann's peak specific flow puts a 1 m door's throughput under two
+   people a second, and a uniform draw over 10-100 s clusters more than a
+   couple of departures together often enough with only ten draws. Measuring
+   time-to-exit conflates queueing (an unavoidable consequence of the
+   guideline's own geometry) with reaction time (what the test is actually
+   about). Fixed by measuring the moment each decision flips to "evacuate" —
+   starts moving — instead of the moment the door lets them through.
+3. **A third, smaller bug**: the burst that spawns the ten people drew from a
+   Poisson distribution with mean 10 over a one-second window and no way to
+   catch up once that window closed, so an unlucky draw (as few as 4 of 10 on
+   some seeds) meant some people never existed to react to anything. Widened
+   to a three-second window (mean 30), making missing the cap of ten
+   vanishingly unlikely rather than merely likely enough.
+
+**Measured, after all three fixes**: 29 of 29 seeds tried pass, worst gap
+consistently ≈0.1 s — one decision tick (10 Hz) — between each of ten
+people's assigned premovement time and when they actually started moving.
+The tolerance (0.5 s) is self-authored; the guideline states none.

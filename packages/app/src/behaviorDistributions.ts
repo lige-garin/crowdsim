@@ -104,6 +104,23 @@ export function sampleEvacuationReactionSeconds(seed: number, agentId: number) {
   );
 }
 
+/**
+ * A premovement time uniform on `[minSeconds, maxSeconds]`, for a scenario
+ * that specifies one directly rather than this project's own lognormal —
+ * RiMEA test 5 (A 2, p. 30) is the only caller: "uniformly distributed
+ * between 10 s and 100 s", not a shape this project chose or calibrated.
+ */
+export function sampleUniformReactionSeconds(
+  seed: number,
+  agentId: number,
+  minSeconds: number,
+  maxSeconds: number,
+) {
+  return (
+    minSeconds + hashUnit(seed, agentId, "uniform-reaction") * (maxSeconds - minSeconds)
+  );
+}
+
 /** How long this shopper's checkout takes, averaging `meanSeconds` (Erlang). */
 export function sampleServiceSeconds(
   meanSeconds: number,

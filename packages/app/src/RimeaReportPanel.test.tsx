@@ -33,14 +33,14 @@ describe("RimeaReportPanel", () => {
     const { worker } = fakeWorker();
     renderPanel(worker);
 
-    // The five that are built are filled in by a run; the rest are listed
+    // The seven that are built are filled in by a run; the rest are listed
     // from the start so the panel is never blank.
     for (let number = 1; number <= 16; number += 1) {
-      if ([1, 2, 3, 4, 6].includes(number)) continue;
+      if ([1, 2, 3, 4, 5, 6, 16].includes(number)) continue;
       expect(screen.getByTestId(`rimea-test-${number}`)).toBeTruthy();
     }
 
-    expect(screen.getByTestId("rimea-summary").textContent).toContain("未实现 11");
+    expect(screen.getByTestId("rimea-summary").textContent).toContain("未实现 9");
   });
 
   it("names the clause each unbuilt test comes from", () => {

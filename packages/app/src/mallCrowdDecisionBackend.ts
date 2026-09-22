@@ -179,9 +179,22 @@ export function createMallCrowdDecisionBackend(options: {
    * edit continues the sequence instead of replaying it (ADR-0007).
    */
   random?: () => number;
+  /**
+   * How long each person waits after the alarm before starting to move.
+   * Defaults to `sampleEvacuationReactionSeconds`'s lognormal draw (this
+   * project's own, self-chosen and uncalibrated). Overridable so a scenario
+   * can draw premovement times from a distribution of its own — RiMEA test 5
+   * (A 2, p. 30) specifies one uniform on 10-100 s, not this project's
+   * lognormal, and `rimeaSuite.ts` supplies it this way rather than adding a
+   * second, permanent distribution nothing else uses.
+   */
+  evacuationReactionSecondsFor?: (agentId: number) => number;
 }): SimulationDecisionBackend {
   const random = options.random ?? mulberry32(options.seed ?? 1);
   const mindsetSeed = options.seed ?? 1;
+  const reactionSecondsFor =
+    options.evacuationReactionSecondsFor ??
+    ((agentId: number) => sampleEvacuationReactionSeconds(mindsetSeed, agentId));
 
   return {
     id: "rule-ts",
@@ -414,7 +427,7 @@ export function createMallCrowdDecisionBackend(options: {
           // confirm delay looks like from outside.
           if (
             state !== "evacuate" &&
-            secondsSinceAlarm >= sampleEvacuationReactionSeconds(mindsetSeed, agent.id)
+            secondsSinceAlarm >= reactionSecondsFor(agent.id)
           ) {
             const sink = chooseEvacuationSink(agent, sinks, exitLoad, routeDistance);
             exitLoad.set(sink.id, (exitLoad.get(sink.id) ?? 0) + 1);
@@ -428,6 +441,21 @@ export function createMallCrowdDecisionBackend(options: {
               browseUntilSeconds: null,
               queueUntilSeconds: null,
               walkProgress: null,
+            });
+          } else if (state === undefined) {
+            // "Carry on with what they were doing" has nothing to carry on
+            // with for someone who has never been decided at all — every
+            // agent is spawned pointing at a sink by default
+            // (simulationEngine), so with nothing overriding that they would
+            // spend their whole premovement time visibly walking toward the
+            // exit, which is not what a premovement time means. One decision
+            // pins them where they are; it is never repeated because `state`
+            // is no longer undefined once it has, so the target is not kept
+            // refreshed and does not chase them if something else moves them.
+            decisions.push({
+              agentId: agent.id,
+              nextState: "walk",
+              target: { x: agent.x, y: agent.y },
             });
           }
           continue;
