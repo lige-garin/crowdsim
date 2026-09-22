@@ -1,7 +1,8 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import { RealObservationsPanel } from "./RealObservationsPanel";
 import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
-import type { RunAnalyticsSummary } from "./runAnalytics";
+import type { MinuteFlow, RunAnalyticsSummary } from "./runAnalytics";
 import type { EvacuationState, SystemSignal } from "./AppTypes";
 import type { HeatmapCell } from "./heatmap";
 import { formatSceneName, useI18n } from "./i18n";
@@ -13,6 +14,7 @@ type AppInspectorProps = {
   elapsedSeconds: number;
   evacuation: EvacuationState;
   heatmapCells: readonly HeatmapCell[];
+  minuteFlows: () => MinuteFlow[];
   onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
   runSummary: RunAnalyticsSummary;
   scene: CrowdSimScene;
@@ -26,6 +28,7 @@ export function AppInspector({
   elapsedSeconds,
   evacuation,
   heatmapCells,
+  minuteFlows,
   onExportRunAnalytics,
   runSummary,
   scene,
@@ -61,6 +64,12 @@ export function AppInspector({
         onExport={onExportRunAnalytics}
         scene={scene}
         summary={runSummary}
+      />
+
+      <RealObservationsPanel
+        language={language}
+        minuteFlows={minuteFlows}
+        places={runSummary.places}
       />
 
       <BioCityAnalyticsPanel

@@ -1,3 +1,5 @@
+import { parseCsv, parseFiniteNumber, resolveColumnIndexes } from "./csvParsing";
+
 export type TrajectoryDatasetMetadata = {
   id: string;
   name: string;
@@ -63,7 +65,7 @@ export function parseTrajectoryDatasetCsv(
   }
 
   const headers = rows[0].map((header) => header.trim());
-  const columnIndexes = resolveColumnIndexes(headers);
+  const columnIndexes = resolveColumnIndexes(headers, requiredColumns);
   const tracks = new Map<string, TrajectorySample[]>();
 
   for (const [rowIndex, row] of rows.slice(1).entries()) {
@@ -145,68 +147,6 @@ function parseSample(
     xMeters: parseFiniteNumber(row[columnIndexes.xMeters], rowNumber, "x"),
     yMeters: parseFiniteNumber(row[columnIndexes.yMeters], rowNumber, "y"),
   };
-}
-
-function resolveColumnIndexes(headers: readonly string[]) {
-  return Object.fromEntries(
-    Object.entries(requiredColumns).map(([field, aliases]) => {
-      const index = aliases.findIndex((alias) => headers.includes(alias));
-      const header = aliases[index];
-
-      if (!header) {
-        throw new Error(`Trajectory CSV is missing '${aliases[0]}' column`);
-      }
-
-      return [field, headers.indexOf(header)];
-    }),
-  ) as Record<keyof typeof requiredColumns, number>;
-}
-
-function parseCsv(csv: string) {
-  return csv
-    .trim()
-    .split(/\r?\n/)
-    .map((line) => splitCsvLine(line));
-}
-
-function splitCsvLine(line: string) {
-  const cells: string[] = [];
-  let current = "";
-  let quoted = false;
-
-  for (let index = 0; index < line.length; index++) {
-    const char = line[index];
-    const next = line[index + 1];
-
-    if (char === '"' && next === '"') {
-      current += '"';
-      index++;
-    } else if (char === '"') {
-      quoted = !quoted;
-    } else if (char === "," && !quoted) {
-      cells.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
-  }
-
-  cells.push(current);
-  return cells;
-}
-
-function parseFiniteNumber(
-  value: string | undefined,
-  rowNumber: number,
-  field: string,
-) {
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    throw new Error(`Trajectory row ${rowNumber} has invalid ${field} value`);
-  }
-
-  return number;
 }
 
 function calculateBounds(samples: readonly TrajectorySample[]) {

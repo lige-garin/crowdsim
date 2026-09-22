@@ -95,8 +95,13 @@ function AppContent() {
     scene,
     snapshot: simulation.snapshot,
   });
-  const { dashboardSamples, heatmapSamples, runSummary, trajectoryRecording } =
-    runSeries;
+  const {
+    dashboardSamples,
+    heatmapSamples,
+    minuteFlows,
+    runSummary,
+    trajectoryRecording,
+  } = runSeries;
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
   const [editorTool, setEditorTool] = useState<EditorTool>("select");
   const [stageTab, setStageTab] = useState<StageTab>("run");
@@ -460,6 +465,7 @@ function AppContent() {
           inspectorProps={{
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
+            minuteFlows,
             onExportRunAnalytics: (kind: RunAnalyticsExport) =>
               downloadCsv(
                 `${scene.id}-${kind}-${Math.floor(simulation.snapshot.elapsedSeconds)}s.csv`,

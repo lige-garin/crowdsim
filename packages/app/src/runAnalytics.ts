@@ -26,6 +26,18 @@ import type { SimulationAgent, SimulationSnapshot } from "./simulationEngine";
  */
 export type StayKind = "browse" | "shopQueue" | "counterQueue" | "service";
 
+/** One count line's crossings in one simulated minute — the same tally
+ * `csv.flows()` exports, as structured data instead of a CSV string, so a
+ * real-observation comparison (`realObservations.ts`) can line it up against
+ * imported turnstile/camera counts without round-tripping through text. */
+export type MinuteFlow = {
+  id: string;
+  name: string;
+  minuteStartSeconds: number;
+  forward: number;
+  backward: number;
+};
+
 export type RunAnalyticsSummary = {
   elapsedSeconds: number;
   samples: number;
@@ -273,21 +285,31 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
     };
   }
 
+  function minuteFlows(): MinuteFlow[] {
+    return [...lines].flatMap(([id, tally]) =>
+      [...tally.minutes]
+        .sort(([a], [b]) => a - b)
+        .map(([minute, [ahead, behind]]) => ({
+          backward: behind,
+          forward: ahead,
+          id,
+          minuteStartSeconds: minute * 60,
+          name: tally.name,
+        })),
+    );
+  }
+
   const csv = {
     flows: () =>
       toCsv(
         ["line_id", "line_name", "minute_start_s", "forward", "backward"],
-        [...lines].flatMap(([id, tally]) =>
-          [...tally.minutes]
-            .sort(([a], [b]) => a - b)
-            .map(([minute, [ahead, behind]]) => [
-              id,
-              tally.name,
-              minute * 60,
-              ahead,
-              behind,
-            ]),
-        ),
+        minuteFlows().map((flow) => [
+          flow.id,
+          flow.name,
+          flow.minuteStartSeconds,
+          flow.forward,
+          flow.backward,
+        ]),
       ),
     journeys: () =>
       toCsv(
@@ -339,7 +361,7 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
       ),
   };
 
-  return { csv, record, summary };
+  return { csv, minuteFlows, record, summary };
 }
 
 export type RunAnalytics = ReturnType<typeof createRunAnalytics>;
