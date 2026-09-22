@@ -23,6 +23,7 @@ import {
 import {
   bioAgentProfileSchema,
   buildingSchema,
+  crosswalkSchema,
   eventTimelineSchema,
   hazardSchema,
   obstacleSchema,
@@ -68,6 +69,7 @@ export const sceneSchema = z
     connectors: z.array(connectorSchema).default([]),
     environmentFactors: z.array(environmentFactorSchema).default([]),
     roads: z.array(roadSchema).default([]),
+    crosswalks: z.array(crosswalkSchema).default([]),
     buildings: z.array(buildingSchema).default([]),
     transitStops: z.array(transitStopSchema).default([]),
     obstacles: z.array(obstacleSchema).default([]),
@@ -110,6 +112,7 @@ export const sceneSchema = z
       ...scene.environmentFactors,
       ...scene.visualAssets,
       ...scene.roads,
+      ...scene.crosswalks,
       ...scene.buildings,
       ...scene.transitStops,
       ...scene.obstacles,

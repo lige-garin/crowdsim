@@ -17,11 +17,43 @@ export const roadSchema = z.object({
   geometry: polylineSchema,
   widthMeters: z.number().positive().default(6),
   direction: z.enum(["oneWayBackward", "oneWayForward", "twoWay"]).default("twoWay"),
+  // Note: despite the name, this has always defaulted to a walking speed
+  // (1.4 m/s) and had no live consumer — a cosmetic leftover, not vehicle
+  // config. `vehicleSpeedLimitMetersPerSecond` below is the real one (ADR-0016);
+  // this field is left as-is to avoid changing any scene that reads it today.
   speedLimitMetersPerSecond: z.number().positive().default(1.4),
   capacityPerMinute: z.number().nonnegative().default(180),
   walkable: z.boolean().default(true),
   transitOnly: z.boolean().default(false),
+  /**
+   * Whether SP-3 stage 1 vehicle simulation (ADR-0016) spawns and drives
+   * vehicles on this road at all. Default false: an existing scene's roads
+   * stay exactly as decorative as they always were until an author opts in.
+   */
+  vehicleAccessible: z.boolean().default(false),
+  /** Vehicles spawned per minute, per direction of travel. 0 (default):
+   * no spawning even if `vehicleAccessible` is true. */
+  vehicleArrivalRatePerMinute: z.number().nonnegative().default(0),
+  /** ~30 km/h, a plausible urban default — not fitted or measured (ADR-0016). */
+  vehicleSpeedLimitMetersPerSecond: z.number().positive().default(8.33),
   customParameters: customParametersSchema,
+  visual: visual2d5Schema,
+});
+
+/**
+ * A marked place a pedestrian may be crossing a vehicle-accessible road
+ * (ADR-0016, SP-3 stage 1) — not a routing target (pedestrians are not
+ * steered to use it; roads are not part of the pedestrian navigation grid),
+ * only a point vehicles on `roadId` check for an occupying pedestrian and
+ * yield to.
+ */
+export const crosswalkSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
+  roadId: idSchema,
+  position: pointSchema,
+  widthMeters: z.number().positive().default(3),
   visual: visual2d5Schema,
 });
 

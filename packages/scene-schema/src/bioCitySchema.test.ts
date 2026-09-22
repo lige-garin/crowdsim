@@ -91,6 +91,13 @@ describe("sceneSchema BioCity extensions", () => {
           },
         },
       ],
+      crosswalks: [
+        {
+          id: "main-street-crossing",
+          roadId: "main-street",
+          position: { x: 40, y: 34 },
+        },
+      ],
       buildings: [
         {
           id: "market-hall",
@@ -175,6 +182,10 @@ describe("sceneSchema BioCity extensions", () => {
     });
 
     expect(scene.roads[0].widthMeters).toBe(6);
+    expect(scene.roads[0].vehicleAccessible).toBe(false);
+    expect(scene.roads[0].vehicleArrivalRatePerMinute).toBe(0);
+    expect(scene.roads[0].vehicleSpeedLimitMetersPerSecond).toBeCloseTo(8.33, 2);
+    expect(scene.crosswalks[0].widthMeters).toBe(3);
     expect(scene.buildings[0].floors).toBe(5);
     expect(scene.transitStops[0].capacity).toBe(80);
     expect(scene.obstacles[0].blocksMovement).toBe(true);
