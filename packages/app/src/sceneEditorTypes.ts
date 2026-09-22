@@ -111,6 +111,11 @@ export type EditorServicePoint = {
   width: number;
   serviceMeanSeconds: number;
   capacityPerMinute: number;
+  /** The next stage in a checkpoint chain (ADR-0017). No editor control
+   * exists for this yet — round-tripped so an apply doesn't silently drop a
+   * value a scene author set some other way (e.g. hand-edited JSON). */
+  nextServicePointId?: string;
+  outageWindows: { startsAtSeconds: number; endsAtSeconds: number }[];
 };
 
 export type EditorCountLine = {

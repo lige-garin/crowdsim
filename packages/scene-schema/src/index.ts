@@ -147,6 +147,20 @@ export const sceneSchema = z
       }
     }
 
+    const servicePointIds = new Set(scene.servicePoints.map((point) => point.id));
+    for (const servicePoint of scene.servicePoints) {
+      if (
+        servicePoint.nextServicePointId !== undefined &&
+        !servicePointIds.has(servicePoint.nextServicePointId)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: `Service point '${servicePoint.id}' chains to '${servicePoint.nextServicePointId}', which the scene does not declare`,
+          path: ["servicePoints"],
+        });
+      }
+    }
+
     // A floorId naming no floor would put the thing nowhere, and nothing
     // downstream could tell that from "on the only floor there is". Caught
     // here, once, rather than by each reader inventing a fallback.

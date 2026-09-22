@@ -456,6 +456,7 @@ describe("editor round-trip of ADR-0008 fields", () => {
           id: "till",
           kind: "counter" as const,
           name: "Main tills",
+          outageWindows: [],
           position: { x: 4, y: 4 },
           serviceMeanSeconds: 30,
           servers: 4,
@@ -471,6 +472,43 @@ describe("editor round-trip of ADR-0008 fields", () => {
 
     expect(back.entrances[0].exitIds).toEqual(["somewhere"]);
     expect(back.servicePoints[0]).toMatchObject({ name: "Main tills", servers: 4 });
+  });
+
+  it("keeps a service point's checkpoint chain and outage windows through apply, even with no editor control for them yet (ADR-0017)", () => {
+    const scene = {
+      ...demoScene,
+      servicePoints: [
+        {
+          capacityPerMinute: 60,
+          id: "security",
+          kind: "gate" as const,
+          nextServicePointId: "ticket-gate",
+          outageWindows: [{ endsAtSeconds: 900, startsAtSeconds: 600 }],
+          position: { x: 4, y: 4 },
+          serviceMeanSeconds: 8,
+          width: 3,
+        },
+        {
+          capacityPerMinute: 120,
+          id: "ticket-gate",
+          kind: "gate" as const,
+          outageWindows: [],
+          position: { x: 8, y: 4 },
+          serviceMeanSeconds: 4,
+          width: 3,
+        },
+      ],
+    };
+
+    const back = createSceneFromEditorDocument(
+      scene,
+      createEditorDocumentFromScene(scene),
+    );
+
+    expect(back.servicePoints[0].nextServicePointId).toBe("ticket-gate");
+    expect(back.servicePoints[0].outageWindows).toEqual([
+      { endsAtSeconds: 900, startsAtSeconds: 600 },
+    ]);
   });
 
   it("edits an entrance's demand profile and group share and keeps them through apply", () => {

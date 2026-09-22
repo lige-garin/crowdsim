@@ -212,6 +212,7 @@ export function addServicePoint(
         width: kind === "gate" ? 4 : 3,
         serviceMeanSeconds: kind === "gate" ? 8 : 30,
         capacityPerMinute: kind === "gate" ? 120 : 30,
+        outageWindows: [],
       },
     ],
   };

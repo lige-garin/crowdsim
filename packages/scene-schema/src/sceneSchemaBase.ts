@@ -425,6 +425,31 @@ export const servicePointSchema = z.object({
    * capacity, max(1, round(capacityPerMinute × serviceMeanSeconds / 60)).
    */
   servers: z.number().int().positive().optional(),
+  /**
+   * The next service point in a chain (ADR-0017, batch 5.2 of the
+   * gap-closure plan) — "security check, then ticket gate, then escalator"
+   * as one queueing network. Absent: served here ends the chain, the same
+   * as every service point behaved before this field existed.
+   */
+  nextServicePointId: idSchema.optional(),
+  /**
+   * Windows this point admits nobody new (still finishes whoever it was
+   * already serving) — a scripted outage, not a live fault model. Default
+   * empty: never down, unchanged from before this field existed.
+   */
+  outageWindows: z
+    .array(
+      z
+        .object({
+          startsAtSeconds: z.number().nonnegative(),
+          endsAtSeconds: z.number().positive(),
+        })
+        .refine(
+          (window) => window.endsAtSeconds > window.startsAtSeconds,
+          "outage end must be after its start",
+        ),
+    )
+    .default([]),
 });
 
 export const countLineSchema = z.object({

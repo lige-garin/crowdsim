@@ -152,6 +152,8 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       width: servicePoint.width,
       serviceMeanSeconds: servicePoint.serviceMeanSeconds,
       capacityPerMinute: servicePoint.capacityPerMinute,
+      nextServicePointId: servicePoint.nextServicePointId,
+      outageWindows: servicePoint.outageWindows.map((window) => ({ ...window })),
     })),
     zones: scene.zones.map((zone) => ({
       id: zone.id,
@@ -316,6 +318,8 @@ export function createSceneFromEditorDocument(
       width: servicePoint.width,
       serviceMeanSeconds: servicePoint.serviceMeanSeconds,
       capacityPerMinute: servicePoint.capacityPerMinute,
+      nextServicePointId: servicePoint.nextServicePointId,
+      outageWindows: servicePoint.outageWindows.map((window) => ({ ...window })),
     })),
     transitStops: document.transitStops.map((stop) => ({
       id: stop.id,

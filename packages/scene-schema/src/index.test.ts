@@ -77,6 +77,8 @@ describe("sceneSchema", () => {
     expect(scene.shops[0].brand?.priceTier).toBe(3);
     expect(scene.shops[0].capacity).toBe(12);
     expect(scene.servicePoints[0].capacityPerMinute).toBe(60);
+    expect(scene.servicePoints[0].nextServicePointId).toBeUndefined();
+    expect(scene.servicePoints[0].outageWindows).toEqual([]);
     expect(scene.countLines[0].geometry.points).toHaveLength(2);
   });
 
@@ -265,5 +267,59 @@ describe("entrance exits and counter servers (ADR-0008)", () => {
         ],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("chained service points and outage windows (ADR-0017)", () => {
+  it("parses a service point's chain to the next stage and its outage windows", () => {
+    const scene = parseScene({
+      ...validScene,
+      servicePoints: [
+        {
+          id: "security",
+          kind: "gate",
+          position: { x: 5, y: 5 },
+          nextServicePointId: "ticket-gate",
+          outageWindows: [{ startsAtSeconds: 600, endsAtSeconds: 900 }],
+        },
+        { id: "ticket-gate", kind: "gate", position: { x: 15, y: 5 } },
+      ],
+    });
+
+    expect(scene.servicePoints[0].nextServicePointId).toBe("ticket-gate");
+    expect(scene.servicePoints[0].outageWindows).toEqual([
+      { startsAtSeconds: 600, endsAtSeconds: 900 },
+    ]);
+    expect(scene.servicePoints[1].nextServicePointId).toBeUndefined();
+  });
+
+  it("rejects an outage window that ends before (or exactly when) it starts", () => {
+    const result = safeParseScene({
+      ...validScene,
+      servicePoints: [
+        {
+          id: "security",
+          kind: "gate",
+          position: { x: 5, y: 5 },
+          outageWindows: [{ startsAtSeconds: 900, endsAtSeconds: 600 }],
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a chain to a service point the scene doesn't declare", () => {
+    const result = safeParseScene({
+      ...validScene,
+      servicePoints: [
+        {
+          id: "security",
+          kind: "gate",
+          position: { x: 5, y: 5 },
+          nextServicePointId: "no-such-gate",
+        },
+      ],
+    });
+    expect(result.success).toBe(false);
   });
 });
