@@ -26,6 +26,8 @@ import {
   updateDocumentConnectorKind,
   updateDocumentConnectorWidth,
   updateDocumentCountLineName,
+  updateDocumentCrosswalkNumber,
+  updateDocumentCrosswalkRoadId,
   updateDocumentEntrancePopulation,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
@@ -51,6 +53,7 @@ import {
   type ShopNumberField,
   type ShopSizeField,
   type EntranceNumberField,
+  type CrosswalkNumberField,
   type TransitStopNumberField,
   type ZoneNumberField,
 } from "./sceneEditorMutations";
@@ -66,6 +69,7 @@ type SceneEditorParamActionInput = {
   selectedBuilding?: EditorDocument["buildings"][number];
   selectedConnector?: EditorDocument["connectors"][number];
   selectedCountLine?: EditorDocument["countLines"][number];
+  selectedCrosswalk?: EditorDocument["crosswalks"][number];
   selectedHazard?: EditorDocument["hazards"][number];
   selectedObstacle?: EditorDocument["obstacles"][number];
   selectedRoad?: EditorDocument["roads"][number];
@@ -87,6 +91,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
     selectedBuilding,
     selectedConnector,
     selectedCountLine,
+    selectedCrosswalk,
     selectedHazard,
     selectedObstacle,
     selectedRoad,
@@ -165,6 +170,18 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedCountLine) return;
       setDocument((current) =>
         updateDocumentCountLineName(current, selectedCountLine.id, name),
+      );
+    },
+    updateCrosswalkNumber(field: CrosswalkNumberField, value: number) {
+      if (!selectedCrosswalk || !Number.isFinite(value)) return;
+      setDocument((current) =>
+        updateDocumentCrosswalkNumber(current, selectedCrosswalk.id, field, value),
+      );
+    },
+    updateCrosswalkRoadId(roadId: string) {
+      if (!selectedCrosswalk) return;
+      setDocument((current) =>
+        updateDocumentCrosswalkRoadId(current, selectedCrosswalk.id, roadId),
       );
     },
     toggleObstacleBlocksMovement() {

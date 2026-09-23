@@ -4,6 +4,7 @@ import {
   addBuilding,
   addCountLine,
   addCountLineBetween,
+  addCrosswalk,
   addEntrance,
   addHazard,
   addObstacle,
@@ -29,6 +30,8 @@ import {
   updateDocumentBuildingKind,
   updateDocumentBuildingNumber,
   updateDocumentCountLineName,
+  updateDocumentCrosswalkNumber,
+  updateDocumentCrosswalkRoadId,
   updateDocumentEntranceNumber,
   updateDocumentEntranceProfile,
   updateDocumentHazardKind,
@@ -541,6 +544,61 @@ describe("editor round-trip of ADR-0008 fields", () => {
       vehicleArrivalRatePerMinute: 12,
       vehicleSpeedLimitMetersPerSecond: 11.1,
     });
+  });
+
+  it("places a crosswalk on the nearest road, not just the last one drawn (ADR-0020)", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 0, y: 0 }); // -10..10 on y=0
+    document = addRoad(document, { x: 0, y: 40 }); // -10..10 on y=40, drawn last
+    const nearFirstRoad = { x: 0, y: 1 };
+
+    document = addCrosswalk(document, nearFirstRoad);
+    const crosswalk = document.crosswalks.at(-1)!;
+
+    expect(crosswalk.roadId).toBe(document.roads.at(-2)!.id);
+    expect(crosswalk.roadId).not.toBe(document.roads.at(-1)!.id);
+    expect(crosswalk.widthMeters).toBe(3);
+  });
+
+  it("does not place a crosswalk with no road to attach it to, the same guard addConnector uses for a scene with too few floors", () => {
+    const document = createEditorDocumentFromScene(
+      parseScene({ ...demoScene, roads: [] }),
+    );
+
+    expect(addCrosswalk(document, { x: 5, y: 5 }).crosswalks).toHaveLength(0);
+  });
+
+  it("edits a crosswalk's road and width, and keeps both through apply", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 20, y: 20 });
+    document = addCrosswalk(document, { x: 20, y: 20 });
+    const crosswalk = document.crosswalks[0];
+    const otherRoad = document.roads[0];
+
+    document = updateDocumentCrosswalkRoadId(document, crosswalk.id, otherRoad.id);
+    document = updateDocumentCrosswalkNumber(document, crosswalk.id, "widthMeters", 5);
+
+    expect(document.crosswalks[0].roadId).toBe(otherRoad.id);
+    expect(document.crosswalks[0].widthMeters).toBe(5);
+
+    const back = createSceneFromEditorDocument(demoScene, document);
+    expect(back.crosswalks[0]).toMatchObject({
+      roadId: otherRoad.id,
+      widthMeters: 5,
+    });
+  });
+
+  it("moves and deletes a crosswalk the same way every other point entity does", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 0, y: 0 });
+    document = addCrosswalk(document, { x: 0, y: 1 });
+    const crosswalk = document.crosswalks[0];
+
+    document = moveEntity(document, crosswalk.id, { x: 3, y: 4 });
+    expect(document.crosswalks[0].position).toEqual({ x: 3, y: 5 });
+
+    document = removeEntity(document, crosswalk.id);
+    expect(document.crosswalks).toHaveLength(0);
   });
 
   it("edits an entrance's demand profile and group share and keeps them through apply", () => {

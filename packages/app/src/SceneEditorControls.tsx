@@ -20,6 +20,7 @@ const TOOL_GLYPH: Record<EditorTool, string> = {
   target: "TG",
   shop: "SH",
   transitStop: "BU",
+  crosswalk: "CW",
   counter: "CT",
   gate: "GT",
   obstacle: "OB",
@@ -31,6 +32,7 @@ const TOOL_GLYPH: Record<EditorTool, string> = {
 type DocumentCounts = {
   buildings: number;
   countLines: number;
+  crosswalks: number;
   entrances: number;
   hazards: number;
   obstacles: number;
@@ -347,6 +349,9 @@ export function SceneEditorControls({
         </span>
         <span>
           {t("transitStops")} {documentCounts.transitStops}
+        </span>
+        <span>
+          {t("crosswalks")} {documentCounts.crosswalks}
         </span>
         <span>
           {t("obstacles")} {documentCounts.obstacles}

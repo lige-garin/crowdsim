@@ -13,6 +13,7 @@ export type EditorTool =
   | "target"
   | "shop"
   | "transitStop"
+  | "crosswalk"
   | "counter"
   | "gate"
   | "obstacle"
@@ -31,6 +32,7 @@ export const editorTools: readonly EditorTool[] = [
   "target",
   "shop",
   "transitStop",
+  "crosswalk",
   "counter",
   "gate",
   "obstacle",
@@ -172,6 +174,28 @@ export type EditorBuilding = {
   visitorCapacity: number;
 };
 
+/**
+ * A marked crossing on a road (ADR-0016, editor support ADR-0020). `roadId`
+ * is required (unlike a transit stop's optional one) because the simulation
+ * only ever checks it against that one road's own polyline — it never
+ * searches for "the real nearest road" (`vehicleSimulation.projectToArclength`'s
+ * own doc comment says so). `addCrosswalk` (`sceneEditorAdders.ts`) picks it
+ * with a real nearest-road spatial search at placement time, and the param
+ * grid exposes a dropdown to correct it afterward — unlike a transit stop's
+ * `roadId` or a hazard's `affectedRoadId`, which are set once from a
+ * placeholder ("the last road drawn") and have no way to fix a wrong guess
+ * except hand-editing JSON.
+ */
+export type EditorCrosswalk = {
+  id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
+  name?: string;
+  roadId: string;
+  position: ScenePoint;
+  widthMeters: number;
+};
+
 export type EditorTransitStop = {
   id: string;
   /** The floor this is on; absent means the scene's only floor. */
@@ -269,6 +293,7 @@ export type EditorDocument = {
   buildings: EditorBuilding[];
   connectors: EditorConnector[];
   countLines: EditorCountLine[];
+  crosswalks: EditorCrosswalk[];
   floors: EditorFloor[];
   entrances: EditorEntrance[];
   hazards: EditorHazard[];

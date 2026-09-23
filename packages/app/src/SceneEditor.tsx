@@ -221,6 +221,9 @@ export function SceneEditor({
   const selectedTransitStop = document.transitStops.find(
     (stop) => stop.id === selectedId,
   );
+  const selectedCrosswalk = document.crosswalks.find(
+    (crosswalk) => crosswalk.id === selectedId,
+  );
   const selectedObstacle = document.obstacles.find(
     (obstacle) => obstacle.id === selectedId,
   );
@@ -644,6 +647,7 @@ export function SceneEditor({
     selectedBuilding,
     selectedConnector,
     selectedCountLine,
+    selectedCrosswalk,
     selectedHazard,
     selectedObstacle,
     selectedRoad,
@@ -693,6 +697,8 @@ export function SceneEditor({
       onConnectorWidthChange={paramActions.updateConnectorWidth}
       onToggleConnectorBidirectional={paramActions.toggleConnectorBidirectional}
       onCountLineNameChange={paramActions.updateCountLineName}
+      onCrosswalkNumberChange={paramActions.updateCrosswalkNumber}
+      onCrosswalkRoadIdChange={paramActions.updateCrosswalkRoadId}
       onCanvasPointerDown={handleCanvasPointerDown}
       onCountLineEndpointPointerDown={handleCountLineEndpointPointerDown}
       onDeleteSelected={deleteSelected}
@@ -748,6 +754,7 @@ export function SceneEditor({
       selectedBuilding={selectedBuilding}
       selectedConnector={selectedConnector}
       selectedCountLine={selectedCountLine}
+      selectedCrosswalk={selectedCrosswalk}
       selectedEntrance={selectedEntrance}
       selectedHazard={selectedHazard}
       selectedId={selectedId}

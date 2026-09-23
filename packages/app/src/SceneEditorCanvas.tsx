@@ -242,6 +242,26 @@ function EditorBioCityObjects({
           <text y={0.45}>{t("transitStopShort")}</text>
         </g>
       ))}
+      {document.crosswalks.map((crosswalk) => (
+        <g
+          key={crosswalk.id}
+          className={
+            crosswalk.id === selectedId
+              ? "editor-crosswalk selected"
+              : "editor-crosswalk"
+          }
+          transform={`translate(${crosswalk.position.x} ${crosswalk.position.y})`}
+          onPointerDown={(event) => onEntityPointerDown(event, crosswalk.id)}
+        >
+          <rect
+            x={-crosswalk.widthMeters / 2}
+            y={-1}
+            width={crosswalk.widthMeters}
+            height={2}
+          />
+          <text y={0.45}>{t("crosswalkShort")}</text>
+        </g>
+      ))}
       {document.hazards.map((hazard) => (
         <g
           key={hazard.id}

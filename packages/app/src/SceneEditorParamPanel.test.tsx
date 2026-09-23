@@ -136,6 +136,39 @@ describe("SceneEditorParamPanel", () => {
     );
   });
 
+  it("renders and wires a crosswalk's road dropdown and width (ADR-0020)", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const onCrosswalkNumberChange = vi.fn();
+    const onCrosswalkRoadIdChange = vi.fn();
+    const otherRoadId = "road-elsewhere";
+    const crosswalk = {
+      id: "crosswalk-1",
+      roadId: document.roads[0].id,
+      position: { x: 10, y: 10 },
+      widthMeters: 3,
+    };
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onCrosswalkNumberChange={onCrosswalkNumberChange}
+        onCrosswalkRoadIdChange={onCrosswalkRoadIdChange}
+        roadIds={[document.roads[0].id, otherRoadId]}
+        selectedCrosswalk={crosswalk}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("crosswalkRoad"), {
+      target: { value: otherRoadId },
+    });
+    fireEvent.change(screen.getByLabelText("crosswalkWidth"), {
+      target: { value: "5" },
+    });
+
+    expect(onCrosswalkRoadIdChange).toHaveBeenCalledWith(otherRoadId);
+    expect(onCrosswalkNumberChange).toHaveBeenCalledWith("widthMeters", 5);
+  });
+
   it("renders and wires hazard BioCity controls", () => {
     const document = createEditorDocumentFromScene(bioCityDemoScene);
     const onHazardKindChange = vi.fn();
@@ -175,6 +208,8 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onConnectorWidthChange: vi.fn(),
     onToggleConnectorBidirectional: vi.fn(),
     onCountLineNameChange: vi.fn(),
+    onCrosswalkNumberChange: vi.fn(),
+    onCrosswalkRoadIdChange: vi.fn(),
     onEntranceKindChange: vi.fn(),
     onEntrancePopulationChange: vi.fn(),
     onEntranceProfileChange: vi.fn(),
@@ -202,9 +237,11 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onZoneCategoryChange: vi.fn(),
     onZoneNumberChange: vi.fn(),
     pointsToSvg: (points) => points.map((point) => `${point.x},${point.y}`).join(" "),
+    roadIds: [],
     selectedBuilding: undefined,
     selectedConnector: undefined,
     selectedCountLine: undefined,
+    selectedCrosswalk: undefined,
     selectedEntrance: undefined,
     selectedHazard: undefined,
     selectedObstacle: undefined,

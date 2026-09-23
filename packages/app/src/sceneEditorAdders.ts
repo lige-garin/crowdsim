@@ -1,6 +1,6 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
 
-import { rectangleAround } from "./sceneEditorGeometry";
+import { distanceToPolyline, rectangleAround } from "./sceneEditorGeometry";
 import { editorFloors } from "./sceneEditorFloors";
 import {
   defaultArrivalRatePerMinute,
@@ -192,6 +192,53 @@ export function addTransitStop(
         boardingCapacityPerMinute: 60,
         delayFactor: 1,
         active: true,
+      },
+    ],
+  };
+}
+
+/**
+ * A crosswalk on whichever road on the active floor is spatially nearest to
+ * `position` — a real search, not the "grab the last road drawn" placeholder
+ * `addTransitStop`/`addHazard` use for their own (optional) road references.
+ * `crosswalkSchema.roadId` is required, so there is nothing sane to fall back
+ * to: with no road on this floor at all, this is a no-op (the same choice
+ * `addConnector` makes with fewer than two floors to join) rather than
+ * inventing a `roadId` the simulation would read as pointing at a road that
+ * does not exist.
+ */
+export function addCrosswalk(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  const candidates = document.roads.filter(
+    (road) => road.floorId === document.activeFloorId,
+  );
+  let nearestId: string | undefined;
+  let nearestDistance = Infinity;
+  for (const road of candidates) {
+    const distance = distanceToPolyline(position, road.points);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestId = road.id;
+    }
+  }
+
+  if (!nearestId) {
+    return document;
+  }
+
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    crosswalks: [
+      ...document.crosswalks,
+      {
+        id: `crosswalk-${document.nextId}`,
+        floorId: document.activeFloorId,
+        roadId: nearestId,
+        position: { ...position },
+        widthMeters: 3,
       },
     ],
   };
@@ -394,6 +441,8 @@ export function placeEditorTool(
       return addShop(document, point);
     case "transitStop":
       return addTransitStop(document, point);
+    case "crosswalk":
+      return addCrosswalk(document, point);
     case "counter":
     case "gate":
       return addServicePoint(document, tool, point);

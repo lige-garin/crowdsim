@@ -140,6 +140,23 @@ export function createBioCityPrimitiveMesh(
     return group;
   }
 
+  if (primitive.kind === "crosswalk") {
+    // Un-oriented flat patch (ADR-0020) — see the render-plan's own comment
+    // on why this does not align across its road's direction of travel.
+    const mesh = new Mesh(
+      new BoxGeometry(primitive.widthMeters, primitive.widthMeters, 0.04),
+      new MeshBasicMaterial({ color: primitive.color }),
+    );
+
+    mesh.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      0.03,
+    );
+
+    return mesh;
+  }
+
   if (primitive.kind === "hazard") {
     const mesh = new Mesh(
       new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, 0.06, 32),

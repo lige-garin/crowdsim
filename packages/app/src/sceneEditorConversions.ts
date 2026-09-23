@@ -19,6 +19,7 @@ function nextFreeIdNumber(scene: CrowdSimScene) {
     scene.floors,
     scene.connectors,
     scene.countLines,
+    scene.crosswalks,
     scene.entrances,
     scene.hazards,
     scene.obstacles,
@@ -85,6 +86,14 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       floorId: line.floorId,
       name: line.name,
       points: [{ ...line.geometry.points[0] }, { ...line.geometry.points[1] }],
+    })),
+    crosswalks: scene.crosswalks.map((crosswalk) => ({
+      id: crosswalk.id,
+      floorId: crosswalk.floorId,
+      name: crosswalk.name,
+      roadId: crosswalk.roadId,
+      position: { ...crosswalk.position },
+      widthMeters: crosswalk.widthMeters,
     })),
     entrances: scene.entrances.map((entrance) => ({
       id: entrance.id,
@@ -391,6 +400,14 @@ export function createSceneFromEditorDocument(
         type: "polyline",
         points: line.points.map((point) => ({ ...point })),
       },
+    })),
+    crosswalks: document.crosswalks.map((crosswalk) => ({
+      id: crosswalk.id,
+      floorId: crosswalk.floorId,
+      name: crosswalk.name,
+      roadId: crosswalk.roadId,
+      position: { ...crosswalk.position },
+      widthMeters: crosswalk.widthMeters,
     })),
   });
 }

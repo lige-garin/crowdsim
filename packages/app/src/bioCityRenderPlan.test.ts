@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseScene } from "@crowdsim/scene-schema";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import { createBioCityRenderPlan } from "./bioCityRenderPlan";
 
@@ -53,6 +54,31 @@ describe("bioCityRenderPlan", () => {
     expect(
       Math.hypot(plan.weather.windVector.x, plan.weather.windVector.y),
     ).toBeGreaterThan(0);
+  });
+
+  it("produces a crosswalk primitive from scene.crosswalks (ADR-0020, previously produced nothing at all)", () => {
+    const scene = parseScene({
+      ...bioCityDemoScene,
+      crosswalks: [
+        {
+          id: "crosswalk-test",
+          roadId: bioCityDemoScene.roads[0].id,
+          position: { x: 5, y: 5 },
+          widthMeters: 4,
+        },
+      ],
+    });
+
+    const plan = createBioCityRenderPlan(scene, 0);
+
+    expect(plan.primitives).toContainEqual(
+      expect.objectContaining({
+        id: "crosswalk-crosswalk-test",
+        kind: "crosswalk",
+        position: { x: 5, y: 5 },
+        widthMeters: 4,
+      }),
+    );
   });
 
   it("marks active hazard visuals more strongly than inactive hazards", () => {

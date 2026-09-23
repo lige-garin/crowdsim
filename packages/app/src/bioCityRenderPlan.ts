@@ -32,6 +32,13 @@ export type BioCityRenderPrimitive =
       opacity: number;
       position: ScenePoint;
       radiusMeters: number;
+    }
+  | {
+      color: string;
+      id: string;
+      kind: "crosswalk";
+      position: ScenePoint;
+      widthMeters: number;
     };
 
 export type BioCityWeatherVisualState = {
@@ -123,6 +130,16 @@ export function createBioCityRenderPlan(
       kind: "transitStop" as const,
       position: copyPoint(stop.position),
       radiusMeters: Math.max(1.6, Math.min(3.2, stop.capacity / 42)),
+    })),
+    // Un-oriented (ADR-0020, the same disclosed simplification the vehicle
+    // boxes themselves carry): a marker at the crossing's own point, not a
+    // stripe aligned across its road's actual direction of travel.
+    ...scene.crosswalks.map((crosswalk) => ({
+      color: "#f8fafc",
+      id: `crosswalk-${crosswalk.id}`,
+      kind: "crosswalk" as const,
+      position: copyPoint(crosswalk.position),
+      widthMeters: crosswalk.widthMeters,
     })),
     ...scene.obstacles.flatMap((obstacle) =>
       obstacle.geometry.points.slice(1).map((point, index) => ({

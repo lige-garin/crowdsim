@@ -3,6 +3,7 @@ import { Plane, Raycaster, Vector2, Vector3, type Camera } from "three";
 import { screenToNdc } from "./agentPicking";
 import { overlaps, rectOf, type Rect } from "./cityLayout";
 import { pointInPolygon } from "./routeCostMap";
+import { distanceToSegment } from "./sceneEditorGeometry";
 import {
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
@@ -231,18 +232,4 @@ function distanceToRect(point: ScenePoint, rect: Rect) {
   const dx = Math.max(rect.minX - point.x, 0, point.x - rect.maxX);
   const dy = Math.max(rect.minY - point.y, 0, point.y - rect.maxY);
   return Math.hypot(dx, dy);
-}
-
-function distanceToSegment(point: ScenePoint, a: ScenePoint, b: ScenePoint) {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lengthSq = dx * dx + dy * dy;
-  const t =
-    lengthSq === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq),
-        );
-  return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
 }

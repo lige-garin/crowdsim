@@ -20,6 +20,7 @@ export type TransitStopNumberField =
   | "capacity"
   | "delayFactor";
 export type ObstacleNumberField = "routeCostMultiplier";
+export type CrosswalkNumberField = "widthMeters";
 /**
  * Entrances were the one drawable object with no parameter editor at all: you
  * could place a door and then had no way to say how many people come through
@@ -60,6 +61,35 @@ export function updateDocumentRoadNumber(
     ...document,
     roads: document.roads.map((road) =>
       road.id === roadId ? { ...road, [field]: Math.max(minValue, value) } : road,
+    ),
+  };
+}
+
+export function updateDocumentCrosswalkNumber(
+  document: EditorDocument,
+  crosswalkId: string,
+  field: CrosswalkNumberField,
+  value: number,
+) {
+  return {
+    ...document,
+    crosswalks: document.crosswalks.map((crosswalk) =>
+      crosswalk.id === crosswalkId
+        ? { ...crosswalk, [field]: Math.max(0.5, value) }
+        : crosswalk,
+    ),
+  };
+}
+
+export function updateDocumentCrosswalkRoadId(
+  document: EditorDocument,
+  crosswalkId: string,
+  roadId: string,
+) {
+  return {
+    ...document,
+    crosswalks: document.crosswalks.map((crosswalk) =>
+      crosswalk.id === crosswalkId ? { ...crosswalk, roadId } : crosswalk,
     ),
   };
 }

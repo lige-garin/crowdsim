@@ -73,6 +73,14 @@ export function moveEntity(
           }
         : line,
     ),
+    crosswalks: document.crosswalks.map((crosswalk) =>
+      crosswalk.id === id
+        ? {
+            ...crosswalk,
+            position: translatePoint(crosswalk.position, delta),
+          }
+        : crosswalk,
+    ),
     servicePoints: document.servicePoints.map((servicePoint) =>
       servicePoint.id === id
         ? {
@@ -155,6 +163,7 @@ export function removeEntity(document: EditorDocument, id: string): EditorDocume
     buildings: document.buildings.filter((building) => building.id !== id),
     connectors: document.connectors.filter((connector) => connector.id !== id),
     countLines: document.countLines.filter((line) => line.id !== id),
+    crosswalks: document.crosswalks.filter((crosswalk) => crosswalk.id !== id),
     entrances: document.entrances.filter((entrance) => entrance.id !== id),
     hazards: document.hazards.filter((hazard) => hazard.id !== id),
     obstacles: document.obstacles.filter((obstacle) => obstacle.id !== id),

@@ -4,6 +4,7 @@ import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import { walkingGroupParameters } from "./walkingGroups";
 import type {
   BuildingNumberField,
+  CrosswalkNumberField,
   EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
@@ -17,6 +18,7 @@ import { NumberInput, SelectInput } from "./SceneEditorParamInputs";
 type Road = EditorDocument["roads"][number];
 type Building = EditorDocument["buildings"][number];
 type TransitStop = EditorDocument["transitStops"][number];
+type Crosswalk = EditorDocument["crosswalks"][number];
 type Obstacle = EditorDocument["obstacles"][number];
 type Hazard = EditorDocument["hazards"][number];
 type Zone = EditorDocument["zones"][number];
@@ -285,6 +287,46 @@ export function TransitStopParamGrid({
       <button type="button" onClick={onToggleActive}>
         {selectedTransitStop.active ? t("active") : t("inactive")}
       </button>
+    </div>
+  );
+}
+
+/**
+ * `roadIds` is a dropdown, not free text: `addCrosswalk` already guesses the
+ * nearest road at placement time (`sceneEditorAdders.ts`), and this is the
+ * correction UI for when that guess is wrong — unlike a transit stop's or a
+ * hazard's own road reference, which have no way to fix a bad guess short of
+ * hand-editing JSON.
+ */
+export function CrosswalkParamGrid({
+  onNumberChange,
+  onRoadIdChange,
+  roadIds,
+  selectedCrosswalk,
+  t,
+}: {
+  onNumberChange: (field: CrosswalkNumberField, value: number) => void;
+  onRoadIdChange: (roadId: string) => void;
+  roadIds: readonly string[];
+  selectedCrosswalk: Crosswalk;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <div className="editor-param-grid">
+      <span>{selectedCrosswalk.id}</span>
+      <SelectInput
+        label={t("crosswalkRoad")}
+        options={roadIds}
+        value={selectedCrosswalk.roadId}
+        onChange={onRoadIdChange}
+      />
+      <NumberInput
+        label={t("crosswalkWidth")}
+        min={0.5}
+        step={0.5}
+        value={selectedCrosswalk.widthMeters}
+        onChange={(value) => onNumberChange("widthMeters", value)}
+      />
     </div>
   );
 }
