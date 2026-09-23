@@ -1657,3 +1657,25 @@ Two guards were each temporarily removed and the tests written against them conf
 Real dev server: selecting an entrance with no profile showed no slot-length field; typing a rate profile and blurring made the field appear, defaulting to 15; changing it to 5, selecting a different entity, and selecting the original entrance again showed the field still reading 5 — proof the value round-tripped through the document's actual state rather than only a local input's DOM value. No console errors.
 
 ponytail-review found nothing to cut ("clean, minimal, precedent-following... no speculative abstraction, no new dependency, no dead code path"). No new ADR: this is not a new architectural or model decision, only an editor control for a field ADR-0009 already settled. 3 new tests, 955 vitest tests, cargo test, typecheck, lint and prettier all clean.
+
+## 2026-09-23 (fourteenth entry): a waiting companion no longer freezes in the middle of a corridor
+
+Another small, disclosed loose end from CLAUDE.md's handoff summary: "同伴原地等待会站在通道里" (a waiting companion freezes in place, which can be mid-corridor). `walkingGroups.ts`'s `followLeaders`: while a group's leader is queuing or checking out, a companion previously froze at exactly whatever coordinates it occupied the moment the leader stopped — which, since companions walk in step with their leader until then, could be square in the middle of a walkway, for as long as the leader stayed in line. The module's own doc comment already promised "wait nearby," not "wait exactly here."
+
+### What changed
+
+A companion now steps `walkingGroupParameters.waitStepAsideMeters` (0.8 m, self-chosen — Moussaïd et al. 2010 says nothing about where a waiting companion stands) to one side of the straight line between itself and its leader, computed once — the first tick it is not yet "settled" at its previous target — and held steady afterward via the `settled` check the code already used before this change (so it does not jitter every decision tick). No wall or obstacle knowledge is used: `crowdMovement`'s own wall constraint clips the actual walk the same way it does for every other agent, so worst case a companion stops short of the offset point rather than passing through something solid.
+
+### Verified decisive
+
+Two behaviors were each temporarily reverted and the tests written against them confirmed to fail first: freezing in place again made the "steps aside" test find the companion's target unchanged from its own position; always recomputing the offset (instead of holding it once settled) made the "holds the step-aside point" test find a target that had drifted from where it was pinned.
+
+### Ponytail-review caught a real duplication
+
+The new `stepAsideFromLeader`'s perpendicular-rotation math — `(-dy, dx)` normalized — was hand-rolled a second time in the same file: `groupFormation`, a few dozen lines down, already computes the identical rotation to lay group members out side-by-side across their direction of travel. Extracted into a shared `perpendicularUnit(dx, dy)` and both call sites switched to it; `groupFormation`'s output is bit-for-bit unchanged (confirmed by the existing "keeps people arriving together together, walking abreast at one pace" test, which drives a real engine and checks the actual spacing between paired companions, not just that the function returns).
+
+### Not verified live
+
+This is a sub-meter positioning adjustment — whether a companion's wait point sits 0.8 m to one side is not something a rendered viewport can confirm by eye at any zoom level worth using. Unit tests driving `followLeaders` directly, plus the pre-existing full-engine formation test, are the actual proof here, the same way this session has verified other fine-grained physics/behavior tuning (letting distance, formation spacing) without a browser click-through.
+
+No new ADR: a local improvement to an already-decided behavior model, not a new architectural or model decision. 2 new tests, 957 vitest tests, cargo test, typecheck, lint and prettier all clean.

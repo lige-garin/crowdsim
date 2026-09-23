@@ -33,6 +33,13 @@ export const walkingGroupParameters = {
   spacingMeters: 0.5,
   /** Pull toward one's place in the formation, 1/s². Self-chosen. */
   formationGain: 1,
+  /**
+   * How far a companion steps to one side of the leader while the leader
+   * queues or pays, metres. Self-chosen (Moussaïd et al. 2010 says nothing
+   * about where a waiting companion stands) -- large enough to clear a
+   * single walking lane, not so large that "wait nearby" stops meaning it.
+   */
+  waitStepAsideMeters: 0.8,
 };
 
 const meanGroupSize = walkingGroupParameters.sizeWeights.reduce(
@@ -120,9 +127,9 @@ export function followLeaders(
     const shared = sharedStates.has(leader.lifecycleState);
     const differentFloor = (leader.floorId ?? null) !== (agent.floorId ?? null);
     if (!shared) {
-      // The leader is in a line or at a till: wait where you are rather than
-      // crowd into the line (walking toward the leader's place in it blocked
-      // the counters and halved the demo scene's exits).
+      // The leader is in a line or at a till: wait nearby rather than crowd
+      // into the line (walking toward the leader's place in it blocked the
+      // counters and halved the demo scene's exits).
       //
       // Unless they are waiting on another floor, in which case waiting here
       // means never catching them up: follow them across first, and wait on
@@ -135,13 +142,21 @@ export function followLeaders(
           ...crossToLeader(agent, leader),
         };
       }
+      // Freezing exactly where they happened to be standing could leave a
+      // companion square in the middle of a corridor for the whole time the
+      // leader is in line. Step a short distance to one side of the leader
+      // instead, computed once (while not yet settled) and then held, the
+      // same way `settled` already avoids recomputing a target every tick.
       const settled = Math.hypot(agent.targetX - agent.x, agent.targetY - agent.y) < 1;
+      const waitPoint = settled
+        ? { x: agent.targetX, y: agent.targetY }
+        : stepAsideFromLeader(agent, leader);
       return {
         ...agent,
         lifecycleState: "walk",
         selectedStoreId: undefined,
-        targetX: settled ? agent.targetX : agent.x,
-        targetY: settled ? agent.targetY : agent.y,
+        targetX: waitPoint.x,
+        targetY: waitPoint.y,
       };
     }
     if (differentFloor) {
@@ -200,6 +215,39 @@ function leaderFloorFields(leader: SimulationAgent) {
       finalY: destination.finalY,
       floorId: destination.floorId,
     },
+  };
+}
+
+/**
+ * The unit vector across (dx, dy), rotated 90°. Null when there is nothing
+ * to normalize (the input has ~zero length).
+ */
+function perpendicularUnit(dx: number, dy: number) {
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-6) return null;
+  return { x: -dy / length, y: dx / length };
+}
+
+/**
+ * A point a short step to one side of the line between a waiting companion
+ * and their queuing/paying leader, not the exact spot they were standing
+ * when the leader stopped. The side alternates by id parity so two
+ * companions of the same leader do not both step to the identical point.
+ * No knowledge of walls or other obstacles here: the movement step's own
+ * wall constraint (`crowdMovement`) clips the actual walk the same way it
+ * does for every other agent, so at worst a companion stops short of this
+ * point rather than passing through something solid.
+ */
+function stepAsideFromLeader(agent: SimulationAgent, leader: SimulationAgent) {
+  const perpendicular = perpendicularUnit(leader.x - agent.x, leader.y - agent.y);
+  if (!perpendicular) {
+    return { x: agent.x, y: agent.y };
+  }
+  const side = agent.id % 2 === 0 ? 1 : -1;
+  const offset = walkingGroupParameters.waitStepAsideMeters * side;
+  return {
+    x: agent.x + perpendicular.x * offset,
+    y: agent.y + perpendicular.y * offset,
   };
 }
 
@@ -267,18 +315,19 @@ export function groupFormation(agents: readonly SimulationAgent[]): GroupFormati
       hx += member.targetX - member.x;
       hy += member.targetY - member.y;
     }
-    const heading = Math.hypot(hx, hy);
-    if (heading < 1e-6) continue;
     // Across the direction of travel.
-    const ax = -hy / heading;
-    const ay = hx / heading;
+    const perpendicular = perpendicularUnit(hx, hy);
+    if (!perpendicular) continue;
     group
       .slice()
       .sort((left, right) => left.id - right.id)
       .forEach((member, rank) => {
         const offset =
           (rank - (group.length - 1) / 2) * walkingGroupParameters.spacingMeters;
-        slots.set(member.id, { x: cx + ax * offset, y: cy + ay * offset });
+        slots.set(member.id, {
+          x: cx + perpendicular.x * offset,
+          y: cy + perpendicular.y * offset,
+        });
       });
   }
   return { slots };

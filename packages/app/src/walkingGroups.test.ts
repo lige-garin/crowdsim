@@ -1,13 +1,21 @@
 import { parseScene } from "@crowdsim/scene-schema";
 import { describe, expect, it } from "vitest";
-import { createSimulationEngineFromScene } from "./simulationEngine";
+import {
+  createSimulationEngineFromScene,
+  type SimulationAgent,
+} from "./simulationEngine";
 import { mulberry32 } from "./simulationEngineRandom";
 import {
+  followLeaders,
   groupSpeedRatio,
   meanArrivalSize,
   sampleArrivalSize,
   walkingGroupParameters,
 } from "./walkingGroups";
+
+function agent(overrides: Partial<SimulationAgent>): SimulationAgent {
+  return { id: 1, x: 0, y: 0, vx: 0, vy: 0, targetX: 0, targetY: 0, ...overrides };
+}
 
 function scene(entrance: Record<string, unknown>, shops = true) {
   return parseScene({
@@ -138,6 +146,73 @@ describe("walking groups (Moussaïd et al. 2010)", () => {
       }
     }
     expect(sawShared).toBe(true);
+  });
+
+  it("steps a waiting companion aside instead of freezing them in the middle of a corridor", () => {
+    const leader = agent({
+      id: 1,
+      groupId: 1,
+      lifecycleState: "queue",
+      x: 10,
+      y: 10,
+    });
+    // Standing well short of the leader, in the middle of the walkway they
+    // both came down.
+    const companion = agent({
+      id: 2,
+      groupId: 1,
+      lifecycleState: "walk",
+      x: 10,
+      y: 4,
+      targetX: 10,
+      targetY: 10,
+    });
+    const leaders = new Map([[1, leader]]);
+
+    const [, followed] = followLeaders([leader, companion], leaders);
+
+    // Not frozen at their own current position (the old behaviour), and not
+    // walking to the leader's exact spot either (that crowded the line).
+    expect(followed.x).toBe(10);
+    expect(followed.y).toBe(4);
+    expect([followed.targetX, followed.targetY]).not.toEqual([
+      companion.x,
+      companion.y,
+    ]);
+    expect([followed.targetX, followed.targetY]).not.toEqual([leader.x, leader.y]);
+    // The step is the configured distance from where the companion is standing.
+    const stepped = Math.hypot(
+      followed.targetX - companion.x,
+      followed.targetY - companion.y,
+    );
+    expect(stepped).toBeCloseTo(walkingGroupParameters.waitStepAsideMeters, 5);
+  });
+
+  it("holds a waiting companion's step-aside point once they arrive, rather than recomputing it every tick", () => {
+    const leader = agent({
+      id: 1,
+      groupId: 1,
+      lifecycleState: "checkout",
+      x: 10,
+      y: 10,
+    });
+    // Already at a step-aside point from a previous tick (within the 1 m
+    // "settled" radius of its own target).
+    const companion = agent({
+      id: 2,
+      groupId: 1,
+      lifecycleState: "walk",
+      x: 10.5,
+      y: 6,
+      targetX: 10.5,
+      targetY: 6,
+    });
+    const leaders = new Map([[1, leader]]);
+
+    const [, followed] = followLeaders([leader, companion], leaders);
+
+    expect(followed.targetX).toBe(10.5);
+    expect(followed.targetY).toBe(6);
   });
 });
 
