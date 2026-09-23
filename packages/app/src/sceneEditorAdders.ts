@@ -32,6 +32,9 @@ export function addRoad(
         capacityPerMinute: 180,
         walkable: true,
         transitOnly: false,
+        vehicleAccessible: false,
+        vehicleArrivalRatePerMinute: 0,
+        vehicleSpeedLimitMetersPerSecond: 8.33,
       },
     ],
   };

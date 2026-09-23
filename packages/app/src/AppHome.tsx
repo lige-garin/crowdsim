@@ -98,7 +98,15 @@ export function AppHome({
     // fixtures, so the home screen no longer advertises a capability that
     // does not exist. See docs/CLAIMS_LEDGER.md.
     { label: "TRACE", value: "fixture" },
-    { label: "DATA", value: "D1/R2" },
+    // Was "D1/R2", read as "connected to Cloudflare D1/R2" by anyone who
+    // doesn't already know otherwise. The backend's default (and only
+    // production-reachable) store is in-memory (`InMemoryProjectStore`);
+    // `D1DatabaseLike`/`R2BucketLike` are structural TypeScript interfaces
+    // with no wrangler.toml or worker entrypoint anywhere in the repo that
+    // ever constructs a real D1/R2-backed store. `CollaborationStatusPanel`
+    // already says this correctly ("local demo storage plus Cloudflare
+    // D1/R2 contracts"); this pulse just hadn't been updated to match.
+    { label: "DATA", value: "memory" },
   ];
 
   return (

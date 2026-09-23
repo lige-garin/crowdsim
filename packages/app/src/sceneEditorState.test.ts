@@ -511,6 +511,38 @@ describe("editor round-trip of ADR-0008 fields", () => {
     ]);
   });
 
+  it("keeps a road's vehicle fields through apply, even with no editor control for them yet (ADR-0016) -- found on review, not by a later bug report", () => {
+    const scene = parseScene({
+      ...demoScene,
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          vehicleAccessible: true,
+          vehicleArrivalRatePerMinute: 12,
+          vehicleSpeedLimitMetersPerSecond: 11.1,
+        },
+      ],
+    });
+
+    const back = createSceneFromEditorDocument(
+      scene,
+      createEditorDocumentFromScene(scene),
+    );
+
+    expect(back.roads[0]).toMatchObject({
+      vehicleAccessible: true,
+      vehicleArrivalRatePerMinute: 12,
+      vehicleSpeedLimitMetersPerSecond: 11.1,
+    });
+  });
+
   it("edits an entrance's demand profile and group share and keeps them through apply", () => {
     let document = createEditorDocumentFromScene(demoScene);
     const gate = document.entrances.find((entrance) => entrance.kind !== "sink")!;

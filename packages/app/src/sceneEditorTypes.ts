@@ -145,6 +145,16 @@ export type EditorRoad = {
   capacityPerMinute: number;
   walkable: boolean;
   transitOnly: boolean;
+  /** Vehicle simulation fields (ADR-0016). No editor control exists for
+   * these yet — round-tripped so an apply doesn't silently reset a road a
+   * scene author configured some other way (e.g. hand-edited JSON) back to
+   * the schema defaults. This is the same lesson `EditorServicePoint`'s
+   * chain/outage fields already apply (see that type's own comment) —
+   * missed for roads the first time these fields were added, found on
+   * review rather than by a later bug report. */
+  vehicleAccessible: boolean;
+  vehicleArrivalRatePerMinute: number;
+  vehicleSpeedLimitMetersPerSecond: number;
 };
 
 export type EditorBuilding = {

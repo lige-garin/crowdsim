@@ -72,8 +72,18 @@ describe("the RiMEA suite's own honesty", () => {
     const summary = summarizeRimeaSuite(suite);
 
     // Tests 1-13 and 15-16 are built (15 of them); only 14 names its clause
-    // instead.
-    expect(summary.pass + summary.fail).toBe(15);
+    // instead. Pinned to the exact pass/fail split, not just their sum: a
+    // test that individually asserts `["pass","fail"]).toContain(status)`
+    // (4, 11 — both real, disclosed findings whose actual guideline-scale
+    // status differs from what this cheap harness measures, see their own
+    // describe blocks) still has a single deterministic outcome *under this
+    // specific cheap parameterization*, so a silent flip here is either a
+    // real regression in the step it exercises or the seeded randomness
+    // changing underneath it — either way worth a red test, not just a
+    // preserved sum that a flip on one side and a flip on the other could
+    // cancel out.
+    expect(summary.pass).toBe(15);
+    expect(summary.fail).toBe(0);
     expect(summary.needsScenario).toBe(1);
     expect(summary.total).toBe(16);
   });

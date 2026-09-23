@@ -141,6 +141,9 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       capacityPerMinute: road.capacityPerMinute,
       walkable: road.walkable,
       transitOnly: road.transitOnly,
+      vehicleAccessible: road.vehicleAccessible,
+      vehicleArrivalRatePerMinute: road.vehicleArrivalRatePerMinute,
+      vehicleSpeedLimitMetersPerSecond: road.vehicleSpeedLimitMetersPerSecond,
     })),
     servicePoints: scene.servicePoints.map((servicePoint) => ({
       id: servicePoint.id,
@@ -231,6 +234,9 @@ export function createSceneFromEditorDocument(
       capacityPerMinute: road.capacityPerMinute,
       walkable: road.walkable,
       transitOnly: road.transitOnly,
+      vehicleAccessible: road.vehicleAccessible,
+      vehicleArrivalRatePerMinute: road.vehicleArrivalRatePerMinute,
+      vehicleSpeedLimitMetersPerSecond: road.vehicleSpeedLimitMetersPerSecond,
     })),
     walls: document.walls.map((wall) => ({
       id: wall.id,

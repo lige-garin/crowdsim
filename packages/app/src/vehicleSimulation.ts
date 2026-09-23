@@ -22,10 +22,11 @@ import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
  * congestion that propagates between roads, and any live pedestrian
  * ridership feeding a transit stop's boarding count (no code anywhere in
  * this project currently generates pedestrians who walk to and wait at a
- * transit stop — `bioAgentBehavior.ts`'s `chooseTransitStop` is a scoring
- * heuristic with no caller outside its own test). A bus's dwell therefore
- * only ever accounts for `alightingPerArrival` — its scripted per-arrival
- * alighting count — never a real boarding queue.
+ * transit stop — the closest thing, `bioAgentBehavior.ts`'s
+ * `chooseTransitStop` scoring heuristic, was deleted as an orphan; see
+ * CLAUDE.md's 孤儿模块 section). A bus's dwell therefore only ever accounts
+ * for `alightingPerArrival` — its scripted per-arrival alighting count —
+ * never a real boarding queue.
  */
 
 export type LaneDirection = "forward" | "backward";
