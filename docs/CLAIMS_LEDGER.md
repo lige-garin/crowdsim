@@ -1861,3 +1861,23 @@ Having hit this twice already this session (`countLineFlowChart.ts`/`CountLineFl
 ### Verified
 
 `pnpm typecheck`/`pnpm lint` clean. New tests: `placesRanking.test.ts` (input order preserved, axis inversion asserted, empty-array no-throw, visit counts stay paired with their own label), `RunAnalyticsPanel.test.tsx` gained a case constructing a summary via `{...createRunAnalytics().summary(), places: [...], samples: 1}` (ponytail-review confirmed this shape -- a single real `PlaceStat` the way `runAnalytics.ts` actually produces one -- isn't an impossible fixture, just a more direct way to reach this render path than driving `analytics.record()` through a full browse/queue/leave sequence). Full app suite: 927 passed, 2 skipped (was 923/2, +4). Live in the real dev server: ran the demo scene at 4x speed until shop visits accumulated, confirmed the ranking bar renders with two shops sized proportionally to their visit counts and zero console errors. ponytail-review (two passes): first found the unnecessary array-reversal; second not required, the fix was mechanical and re-covered by the updated tests.
+
+## 2026-09-24 (tenth entry): B2's e2e golden path, and a real stale-reference regression caught along the way
+
+The plan's own B2 acceptance criteria named an e2e golden-path test as a deliverable ("e2e 黄金路径 1 条"), and no chart added in the four prior commits today had ever been checked end-to-end in a real browser -- only via unit tests (which run against jsdom, with no real canvas 2D, and structurally cannot verify a chart actually paints) and manual live-dev-server checks (real, but not repeatable or CI-enforced).
+
+### A genuine correction: e2e can actually run in this sandbox
+
+CLAUDE.md has documented since 2026-07-28 that this environment has no Playwright browsers installed and `pnpm e2e` cannot be run locally here. Attempting it directly this session found that's no longer true: `pnpm e2e --list` and then a full `pnpm e2e` run both worked against a real Chrome browser, no workarounds needed. This is recorded as a correction, not a silent update, because every prior e2e-related entry in this file and in CLAUDE.md was written under the old (now-stale) assumption.
+
+### A real regression, found by actually trying to run the existing suite
+
+Before writing anything new, running the existing suite surfaced a genuine failure: the "panel dock opens panels" test referenced a panel id (`scale-readiness`) that batch B1, earlier today, deleted from `panelRegistry.tsx`, and asserted a chip count of at least 13 when the registry now has 9 entries. This is a real e2e regression from this session's own earlier work, invisible until the suite was actually run -- not caught by `pnpm typecheck`/`pnpm lint`/`pnpm test`, none of which touch e2e specs, and not caught by CI on any commit since B1 landed because this was the first time this session actually ran `pnpm e2e` rather than relying on the (mistaken) belief that it couldn't run here at all. Fixed by swapping `scale-readiness` for `sensitivity-screening` (a still-registered panel) and updating the count to 9, with a comment explaining both numbers against the current file rather than leaving a bare magic number for the next person to also have to re-derive. Decisively verified: reverted the fix, reran just that test, watched it fail exactly as expected (30s timeout waiting for a chip that will never appear), restored the fix, reran, passed.
+
+### The new test
+
+"Live analytics draws real charts for the running crowd, not just numbers" -- runs the default scene at 4x speed, opens the analytics window, confirms the population strip renders with a real `<canvas>`, polls generically for at least one `.echart-container` to appear (deliberately not pinned to a specific chart: the count-line, journey-time, and places-ranking charts have different data preconditions -- crossings, completed journeys, store visits respectively -- that a single 60-second run at 4x is not guaranteed to satisfy for all three at once, and each chart's own correctness is already covered by its dedicated unit tests from its own commit today), toggles the heatmap layer and confirms the legend goes from absent to visible, then opens the validation-report panel as the "get a report" step of the plan's four-step normal-user path.
+
+### Verified
+
+Full e2e suite (11 tests, real Chrome, not a dry run): all pass, ~1.1 minutes total, including the new test at 14-17s across two separate real runs. `pnpm lint`/a standalone `tsc --noEmit` pass on the spec file/`npx prettier --check` all clean. Full vitest suite unaffected (927 passed, 2 skipped, as before -- this batch touched no application code, only the e2e spec). ponytail-review: no findings.

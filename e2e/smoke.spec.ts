@@ -284,13 +284,20 @@ test("panel dock opens panels without runtime errors or long freezes", async ({
    * Every registered panel must be ON SCREEN, not merely in the DOM. This
    * suite used to only click chips, and `chip.click()` auto-scrolls its
    * container first — so it stayed green while a stray `grid-column: auto`
-   * squeezed the dock into the 238px sidebar track and left 12 of the 13
-   * chips inside a scrollbar-less horizontal scroller. Reachable-by-Playwright
-   * is not reachable-by-human; assert the human version.
+   * squeezed the dock into a narrow sidebar track and left most chips inside
+   * a scrollbar-less horizontal scroller. Reachable-by-Playwright is not
+   * reachable-by-human; assert the human version.
+   *
+   * The panel count below was 13 as of 2026-09-24; batch B1 that same day
+   * deleted three low-value panels (scale-readiness, scenario-comparison,
+   * plus the two already-removed AI/tiles ones), bringing panelRegistry.tsx
+   * down to 9. `scale-readiness` specifically no longer exists, so asserting
+   * it below would fail every run -- both stale numbers are updated here
+   * against the current panelRegistry.tsx rather than left to rot again.
    */
   const chips = page.locator('[data-testid^="panel-chip-"]');
   const chipCount = await chips.count();
-  expect(chipCount).toBeGreaterThanOrEqual(13);
+  expect(chipCount).toBeGreaterThanOrEqual(9);
 
   for (let index = 0; index < chipCount; index += 1) {
     const chip = chips.nth(index);
@@ -300,7 +307,11 @@ test("panel dock opens panels without runtime errors or long freezes", async ({
     });
   }
 
-  for (const id of ["validation-report", "brand-intelligence", "scale-readiness"]) {
+  for (const id of [
+    "validation-report",
+    "brand-intelligence",
+    "sensitivity-screening",
+  ]) {
     const chip = page.getByTestId(`panel-chip-${id}`);
     await chip.click();
     await expect(page.getByTestId("panel-dock-body")).toBeVisible();
@@ -612,6 +623,71 @@ test("the parameter sweep runs in a worker and reports an interval", async ({
   // Five runs per variant, so every line carries an interval and its count.
   await expect(firstResult).toContainText("95%");
   await expect(firstResult).toContainText("次");
+
+  expect(errors.messages).toEqual([]);
+});
+
+/**
+ * The golden path this batch of chart work was for: run the default scene,
+ * open live analytics, and see real charts draw from the live crowd -- not
+ * just the raw numbers the panel showed before this batch (B2). Each chart
+ * added in this batch (RealtimeStrip.tsx, CountLineFlowChart.tsx,
+ * JourneyTimeHistogram.tsx, PlacesRankingChart.tsx, HeatmapLegendOverlay in
+ * SimulationViewportOverlays.tsx) has its own unit tests and was checked by
+ * hand in a live dev server while it was built; this is the first assertion
+ * that walks the whole chain end to end in a real browser, which unit tests
+ * -- run against jsdom, with no real canvas 2D -- structurally cannot do.
+ */
+test("live analytics draws real charts for the running crowd, not just numbers", async ({
+  page,
+}) => {
+  const errors = captureRuntimeErrors(page);
+
+  await page.goto("/");
+  await enterWorkbench(page);
+
+  await expect(page.getByTestId("sim-toggle")).toHaveAttribute(
+    "aria-label",
+    /Pause|暂停/,
+    { timeout: 20_000 },
+  );
+
+  // Speed up: shop visits and completed journeys are what turn the
+  // ranking bar and the journey-time histogram from empty into real charts,
+  // and the default scene takes tens of seconds of simulated time to
+  // accumulate either at 1x.
+  await page.getByRole("button", { name: "4×" }).click();
+
+  await page.getByTestId("info-window-analytics").click();
+  await expect(page.getByTestId("hud-window-analytics")).toBeVisible();
+
+  // The population strip draws from dashboardSamples as soon as the run has
+  // sampled at all -- no crowd activity required, so this is checked first
+  // as the fast, low-bar half of the assertion.
+  const strip = page.getByTestId("realtime-strip");
+  await expect(strip).toBeVisible();
+  await expect(strip.locator("canvas")).toHaveCount(1);
+
+  // The slower half: at least one of the count-line, journey-time, or
+  // places-ranking charts (all built on the same EChart wrapper, all
+  // .echart-container) must actually render once there is real data behind
+  // it -- not stay permanently gated behind "nothing measured yet".
+  await expect
+    .poll(() => page.locator(".echart-container").count(), { timeout: 60_000 })
+    .toBeGreaterThan(0);
+
+  // The heatmap legend only draws once that layer is switched on -- it
+  // should not appear before the toggle, and must appear after.
+  await expect(page.locator(".render-heatmap-legend")).toHaveCount(0);
+  await page.getByTestId("palette-layer-heatmap").click();
+  await expect(page.locator(".render-heatmap-legend")).toBeVisible();
+
+  // The report: a live, scored check against the actual running scene, not
+  // a fixture -- the last step of the plan's four-step normal-user path
+  // ("select a template, run, watch the cockpit, get a report").
+  await page.getByTestId("info-window-tools").click();
+  await page.getByTestId("panel-chip-validation-report").click();
+  await expect(page.getByTestId("panel-dock-body")).toBeVisible();
 
   expect(errors.messages).toEqual([]);
 });
