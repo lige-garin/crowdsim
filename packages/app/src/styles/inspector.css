@@ -13,7 +13,7 @@
   grid-column: 1 / -1;
 }
 
-.brand-field-map text {
+.brand-attraction-graph text {
   fill: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: var(--fs-micro);
@@ -139,15 +139,51 @@
   white-space: nowrap;
 }
 
-.brand-field-map {
+.brand-attraction-graph {
   width: 100%;
-  height: 84px;
+  height: 130px;
   overflow: hidden;
   border: 1px solid rgba(0, 183, 255, 0.18);
   border-radius: var(--product-radius-sm);
   background: var(--lab-surface);
   background-size: 18px 18px;
   border-color: var(--lab-line);
+}
+
+.brand-graph-link {
+  stroke: url(#brandGraphEdge);
+}
+
+.brand-graph-node-halo {
+  fill: rgba(47, 208, 255, 0.12);
+  stroke: rgba(47, 208, 255, 0.3);
+  stroke-width: 1;
+}
+
+.brand-graph-node-core {
+  fill: var(--lab-cyan);
+  opacity: 0.85;
+}
+
+.brand-graph-node-selected .brand-graph-node-halo {
+  fill: rgba(242, 169, 59, 0.18);
+  stroke: rgba(242, 169, 59, 0.55);
+  stroke-width: 1.5;
+}
+
+.brand-graph-node-selected .brand-graph-node-core {
+  fill: var(--lab-blue);
+  opacity: 1;
+}
+
+.brand-graph-hub-halo {
+  fill: rgba(200, 255, 45, 0.14);
+  stroke: rgba(200, 255, 45, 0.4);
+  stroke-width: 1;
+}
+
+.brand-graph-hub-core {
+  fill: var(--lab-acid);
 }
 
 .brand-reasons code {
@@ -162,17 +198,6 @@
   font-weight: 760;
   overflow-wrap: anywhere;
   border-color: var(--lab-line);
-}
-
-.brand-field-halo {
-  fill: rgba(37, 87, 214, 0.1);
-  stroke: rgba(37, 87, 214, 0.24);
-  stroke-width: 1;
-}
-
-.brand-field-core {
-  fill: var(--lab-blue);
-  opacity: 0.82;
 }
 
 .brand-rank-list meter {
@@ -240,7 +265,7 @@
   filter: saturate(0.88) brightness(0.86);
 }
 
-.inspector .brand-field-map {
+.inspector .brand-attraction-graph {
   border-color: rgba(126, 176, 215, 0.16);
   background: rgba(7, 18, 30, 0.78);
   color: #dcefff;

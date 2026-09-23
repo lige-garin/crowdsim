@@ -1,3 +1,4 @@
+import { BrandAttractionGraph } from "./BrandAttractionGraph";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
 import { useI18n, type LocalizedText } from "./i18n";
 
@@ -48,7 +49,7 @@ export function BrandIntelligencePanel({
               {insight.calibration.meanAbsoluteErrorAfter}
             </code>
           </article>
-          <BrandFieldMap insight={insight} label={text(copy.field)} />
+          <BrandAttractionGraph insight={insight} label={text(copy.field)} />
           <div className="brand-rank-list">
             {insight.topStores.map((store) => (
               <article key={store.id}>
@@ -72,33 +73,6 @@ export function BrandIntelligencePanel({
         <code className="dashboard-summary">{text(copy.empty)}</code>
       )}
     </section>
-  );
-}
-
-function BrandFieldMap({
-  insight,
-  label,
-}: {
-  insight: BrandDecisionInsight;
-  label: string;
-}) {
-  return (
-    <svg className="brand-field-map" viewBox="0 0 220 84" role="img" aria-label={label}>
-      <g>
-        {insight.topStores.map((store, index) => {
-          const x = 30 + index * 52;
-          const radius = 7 + store.probabilityPercent * 0.16;
-
-          return (
-            <g key={store.id} transform={`translate(${x} 42)`}>
-              <circle className="brand-field-halo" r={radius} />
-              <circle className="brand-field-core" r={Math.max(5, radius * 0.35)} />
-              <text y="30">{store.probabilityPercent}%</text>
-            </g>
-          );
-        })}
-      </g>
-    </svg>
   );
 }
 
