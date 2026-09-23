@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
 import { useI18n } from "./i18n";
 import {
+  rimeaStatusLabel,
   summarizeRimeaSuite,
   unattemptedRimeaTests,
   type RimeaTestResult,
 } from "./rimeaSuite";
 import { runRimeaSuiteInWorker, type RimeaWorkerLike } from "./rimeaWorkerClient";
+import { RimeaStatusGrid } from "./RimeaStatusGrid";
 
 /**
  * Where this engine stands against RiMEA's sixteen verification tests.
@@ -24,11 +26,6 @@ const copy = {
     idle: "Not run yet. Twelve tests are implemented (corridor speed, premovement time, up and down stairs, the fundamental diagram on a level corridor and single file, a corner, allocation of escape routes, a large public space through four/two doors, choice of escape route, bottleneck flow, and a large crowd around a corner); the rest say why not.",
     run: "Run suite",
     running: "Running the corridor measurements…",
-    status: {
-      fail: "FAIL",
-      "needs-scenario": "NOT BUILT",
-      pass: "PASS",
-    },
     summary: (pass: number, fail: number, blocked: number) =>
       `${pass} passed, ${fail} failed, ${blocked} not built, of 16`,
     title: "RiMEA verification",
@@ -37,11 +34,6 @@ const copy = {
     idle: "RiMEA 4.1.1 附录 1 共 16 条。已实现 15 条（走廊速度、人口构成配速、参数研究、预动作时间、楼梯上/下行、楼梯人群基本图、平层与单列基本图、拐角、疏散路线分配、大空间经四/两门疏散、逃生出口选择、瓶颈流量、大人群绕拐角）；仅剩 14（路径选择）未建，原因见该条自身说明。",
     run: "运行套件",
     running: "正在跑走廊实测…",
-    status: {
-      fail: "未通过",
-      "needs-scenario": "未实现",
-      pass: "通过",
-    },
     summary: (pass: number, fail: number, blocked: number) =>
       `16 条中：通过 ${pass}，未通过 ${fail}，未实现 ${blocked}`,
     title: "RiMEA 验证",
@@ -55,7 +47,9 @@ export function RimeaReportPanel({
   workerFactory?: () => RimeaWorkerLike;
 } = {}) {
   const { language } = useI18n();
-  const text = copy[language === "zh" ? "zh" : "en"];
+  const resolvedLanguage = language === "zh" ? "zh" : "en";
+  const text = copy[resolvedLanguage];
+  const statusText = rimeaStatusLabel[resolvedLanguage];
   // Before a run, show the tests that need no measuring — which is all but one.
   const [results, setResults] =
     useState<readonly RimeaTestResult[]>(unattemptedRimeaTests);
@@ -88,6 +82,7 @@ export function RimeaReportPanel({
       <code data-testid="rimea-summary">
         {text.summary(summary.pass, summary.fail, summary.needsScenario)}
       </code>
+      <RimeaStatusGrid language={resolvedLanguage} results={results} />
       <ol className="rimea-list">
         {[...results]
           .sort((left, right) => left.number - right.number)
@@ -97,7 +92,7 @@ export function RimeaReportPanel({
                 {result.number}. {result.title}
               </strong>
               <span className={`rimea-status rimea-status-${result.status}`}>
-                {text.status[result.status]}
+                {statusText[result.status]}
               </span>
               {/* Whichever applies: what was measured, or why it was not. */}
               <span className="rimea-detail">

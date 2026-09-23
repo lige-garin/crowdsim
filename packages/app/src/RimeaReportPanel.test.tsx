@@ -77,4 +77,23 @@ describe("RimeaReportPanel", () => {
     expect(screen.getByTestId("rimea-test-4").textContent).toContain("0.148");
     expect(screen.getByTestId("rimea-summary").textContent).toContain("未通过 1");
   });
+
+  it("keeps the status grid's tile 4 in sync with a failing run result", async () => {
+    const { reply, worker } = fakeWorker();
+    renderPanel(worker);
+
+    fireEvent.click(screen.getByTestId("rimea-run"));
+    reply({
+      results: [
+        {
+          number: 4,
+          status: "fail",
+          title: "Fundamental diagram: speed against density",
+        },
+      ],
+      type: "complete",
+    });
+
+    await waitFor(() => expect(screen.getByText("4")).toHaveClass("rimea-tile-fail"));
+  });
 });

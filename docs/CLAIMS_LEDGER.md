@@ -1881,3 +1881,23 @@ Before writing anything new, running the existing suite surfaced a genuine failu
 ### Verified
 
 Full e2e suite (11 tests, real Chrome, not a dry run): all pass, ~1.1 minutes total, including the new test at 14-17s across two separate real runs. `pnpm lint`/a standalone `tsc --noEmit` pass on the spec file/`npx prettier --check` all clean. Full vitest suite unaffected (927 passed, 2 skipped, as before -- this batch touched no application code, only the e2e spec). ponytail-review: no findings.
+
+## 2026-09-24 (eleventh entry): B3 first slice — RiMEA 16-tile status grid, and a real dead-CSS bug found along the way
+
+First slice of B3 (panel-dock charting), following five B2 chart commits. The RiMEA verification panel listed all 16 tests as a detailed but dense text list; added a 16-tile status grid above it, colour-coded by status, sorted by RiMEA's own numbering -- the "one glance" summary the plan's §4.4B named, with the detailed list kept below it as the panel's source of precision (measured values, criteria, why a test was not built), the same "chart for shape, text for precision" pattern every B2 chart slice already established.
+
+### Not built on ECharts, and that's the right call
+
+Unlike the five prior chart commits, `RimeaStatusGrid.tsx` is a plain CSS grid of coloured `<span>` tiles, not an `EChart`-wrapped chart. Sixteen fixed categorical tiles with a static native `title` tooltip don't need axes, hover-over-data-point tooltips, or any of what a charting library is for -- pulling in `EChart`/`echartsCore.ts` here would have been the inconsistency, not skipping them.
+
+### A real, pre-existing dead-CSS bug, found while touching this exact styling area
+
+`RimeaStatus` (`rimeaSuite.ts`) has exactly three values: `"pass" | "fail" | "needs-scenario"`. The existing CSS had `.rimea-status-needs-source, .rimea-status-needs-model { color: var(--lab-faint) }` -- neither selector has ever matched anything the app actually renders (`className={\`rimea-status rimea-status-${result.status}\`}`can only ever produce`rimea-status-needs-scenario`), so every "not built" row in the detailed list has rendered in the browser's default inherited text colour instead of the intended muted grey since this list existed. Fixed to `.rimea-status-needs-scenario`, the class the app actually produces. Not hunted for separately -- found because the same tile-colouring logic needed writing for the grid and the mismatch was impossible to miss once the actual class name was checked against the actual CSS.
+
+### ponytail-review caught a duplicated translation table
+
+The first version had the same `{fail, "needs-scenario", pass}` label strings hardcoded twice: once in `RimeaReportPanel.tsx`'s existing `copy.{en,zh}.status`, once in `RimeaStatusGrid.tsx`'s own new `statusLabel` constant -- two independent sources of truth for the same three words in two languages, that could silently drift apart on the next wording change. Extracted to a single `rimeaStatusLabel` export from `rimeaSuite.ts` (the module that already owns the `RimeaStatus` type itself), imported by both the panel and the grid.
+
+### Verified
+
+`pnpm typecheck`/`pnpm lint` clean. New tests: `RimeaStatusGrid.test.tsx` (one tile per test sorted correctly regardless of input order, each tile coloured by its own status, tooltip carries the localized title+status), `RimeaReportPanel.test.tsx` gained a case proving a worker's failing result reaches the grid's tile (not just the detailed list) through the panel's own state wiring -- coverage `RimeaStatusGrid.test.tsx`'s isolated-prop tests structurally cannot provide. Full app suite: 931 passed, 2 skipped (was 927/2, +4). Live in the real dev server: opened the panel, confirmed the initial single grey tile (test 14, the only one not yet run) renders with the correct hover tooltip and no console errors; triggered a real suite run and watched it still in progress past 270 seconds of wall-clock time in this session's heavily loaded environment (documented elsewhere as taking roughly 90 seconds under lighter load) -- the run was not waited out to completion given the strong, decisive unit-test coverage of the exact same worker-reply-to-tile-colour path already in hand, and because the wait time reflects this session's own background load, not anything about the chart component. ponytail-review (two passes): first found the duplicated label table; second not required, the fix was mechanical and re-covered by the existing tests.

@@ -997,6 +997,40 @@
   font-size: var(--fs-micro);
 }
 
+/* RiMEA verification: all 16 tests as one glance, before the detailed list. */
+.rimea-status-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin: 8px 0 0;
+}
+
+.rimea-tile {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  border-radius: 4px;
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  color: #10201a;
+}
+
+.rimea-tile-pass {
+  background: #2e8b57;
+  color: #eafaf1;
+}
+
+.rimea-tile-fail {
+  background: #c2382f;
+  color: #fdecea;
+}
+
+.rimea-tile-needs-scenario {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lab-faint);
+}
+
 /* RiMEA verification: a status per test, failures as visible as passes. */
 .rimea-list {
   margin: 6px 0 0;
@@ -1026,8 +1060,7 @@
   color: #c2382f;
 }
 
-.rimea-status-needs-source,
-.rimea-status-needs-model {
+.rimea-status-needs-scenario {
   color: var(--lab-faint);
 }
 

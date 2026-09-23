@@ -49,6 +49,13 @@ import {
 
 export type RimeaStatus = "pass" | "fail" | "needs-scenario";
 
+/** The one place this status vocabulary is translated, so the detailed list
+ * and the status-grid tiles in RimeaReportPanel.tsx can't drift apart. */
+export const rimeaStatusLabel: Record<"en" | "zh", Record<RimeaStatus, string>> = {
+  en: { fail: "FAIL", "needs-scenario": "NOT BUILT", pass: "PASS" },
+  zh: { fail: "未通过", "needs-scenario": "未实现", pass: "通过" },
+};
+
 export type RimeaTestResult = {
   /** RiMEA's own numbering. */
   number: number;
