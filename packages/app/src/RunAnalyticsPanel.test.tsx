@@ -136,6 +136,38 @@ describe("RunAnalyticsPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("draws a ranking chart once there is at least one stay or wait", () => {
+    const summary = createRunAnalytics().summary();
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={() => []}
+        language="en"
+        minuteFlows={() => []}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={{
+          ...summary,
+          places: [
+            {
+              kind: "browse",
+              p50Seconds: 12,
+              p90Seconds: 18,
+              peakConcurrent: 3,
+              placeId: "cafe",
+              visits: 20,
+            },
+          ],
+          samples: 1,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Stays and waits ranking" }),
+    ).toBeInTheDocument();
+  });
+
   it("draws the population strip from the live dashboard samples, not the measured summary", () => {
     render(
       <RunAnalyticsPanel

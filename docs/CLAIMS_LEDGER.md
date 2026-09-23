@@ -1841,3 +1841,23 @@ The pure-logic module was first named `journeyTimeHistogram.ts`, colliding case-
 ### A recurring test-run flake, investigated a second time, same conclusion
 
 A full-suite run again reported transient uncaught-exception counts (14, then 28) with zero code changes between reruns; an immediately-following clean, isolated rerun (no other concurrent background commands) passed at 923/925 both times it was tried. `tasklist` again showed ~22 concurrent node processes. Same conclusion as the prior slice's identical investigation: this session's own accumulated concurrent tool usage, not a code regression -- worth flagging as a standing hazard for the rest of this batch of work, not something to keep re-diagnosing from scratch each time it recurs.
+
+## 2026-09-24 (ninth entry): B2 fourth chart slice — stays/waits ranking bar
+
+The "停留与等待" (stays and waits) section listed up to 8 places (shop browsing, till queues) as a text-only list sorted by visit count. Added a horizontal ranking bar chart above that list, from the same already-sorted `summary.places` data `RunAnalyticsPanel.tsx` already had -- no new accessor needed this time, unlike the two prior slices.
+
+### What was built
+
+`placesRanking.ts` maps `{label, visits}[]` to an ECharts horizontal-bar option. `PlacesRankingChart.tsx` wires it into the same `EChart` wrapper the prior three slices established, with a height that scales with the place count (`Math.max(60, places.length * 22)`) rather than the fixed 110px the count-line and journey-time charts use -- a real, justified difference: those charts show a fixed time axis, this one's row count varies with how many shops a scene has, and a fixed height would either waste space or clip a long list. The existing text list (which carries P50/P90/peakConcurrent per place, not shown in the bar) was kept alongside the chart, the same "chart for shape, text for precision" pattern the count-line and journey-time slices already established -- not a new decision made without a stated reason.
+
+### ponytail-review caught a hand-rolled reimplementation of a library feature
+
+The first version reversed the input array with a code comment explaining that category axes draw index 0 at the bottom, so the busiest place would otherwise land at the bottom of a "ranking." ECharts already has a `yAxis.inverse: true` setting for exactly this. Fixed by using it directly: `series.data`/`yAxis.data` are now built straight from `places` with no reversal, no paired-array bookkeeping, no comment needed to explain a workaround for a problem the library already solves. Tests updated to match (input order preserved, `yAxis.inverse` asserted directly rather than inferring correctness from a reversed array).
+
+### The same Windows case-collision, a third time -- named upfront this time instead of caught after the fact
+
+Having hit this twice already this session (`countLineFlowChart.ts`/`CountLineFlowChart.tsx`, then `journeyTimeHistogram.ts`/`JourneyTimeHistogram.ts`), the pure-logic module was still first named `placesRankingChart.ts` against the component `PlacesRankingChart.tsx` -- caught immediately by the same `tsc` errors as before, fixed the same way (dropping "Chart" from the logic module's name: `placesRanking.ts`). Recorded plainly rather than glossed over: naming the logic module distinctly _before_ writing it, not just after `tsc` catches the collision, is the actual lesson from three repeats of the same mistake in one session.
+
+### Verified
+
+`pnpm typecheck`/`pnpm lint` clean. New tests: `placesRanking.test.ts` (input order preserved, axis inversion asserted, empty-array no-throw, visit counts stay paired with their own label), `RunAnalyticsPanel.test.tsx` gained a case constructing a summary via `{...createRunAnalytics().summary(), places: [...], samples: 1}` (ponytail-review confirmed this shape -- a single real `PlaceStat` the way `runAnalytics.ts` actually produces one -- isn't an impossible fixture, just a more direct way to reach this render path than driving `analytics.record()` through a full browse/queue/leave sequence). Full app suite: 927 passed, 2 skipped (was 923/2, +4). Live in the real dev server: ran the demo scene at 4x speed until shop visits accumulated, confirmed the ranking bar renders with two shops sized proportionally to their visit counts and zero console errors. ponytail-review (two passes): first found the unnecessary array-reversal; second not required, the fix was mechanical and re-covered by the updated tests.

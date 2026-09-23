@@ -4,6 +4,7 @@ import type { DashboardSample } from "./dashboardStats";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
 import { JourneyTimeHistogram } from "./JourneyTimeHistogram";
+import { PlacesRankingChart } from "./PlacesRankingChart";
 import { RealtimeStrip } from "./RealtimeStrip";
 import type {
   MinuteFlow,
@@ -223,6 +224,13 @@ export function RunAnalyticsPanel({
           {places.length > 0 ? (
             <>
               <h4>{text.places}</h4>
+              <PlacesRankingChart
+                language={language}
+                places={places.map((place) => ({
+                  label: `${text.kinds[place.kind]} · ${placeName(place.placeId)}`,
+                  visits: place.visits,
+                }))}
+              />
               <div className="biocity-status-list">
                 {places.map((place) => (
                   <div key={`${place.kind}:${place.placeId}`}>
