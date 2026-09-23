@@ -36,6 +36,8 @@ import {
   updateDocumentRoadDirection,
   updateDocumentRoadNumber,
   updateDocumentServiceNumber,
+  updateDocumentServicePointNextId,
+  updateDocumentServicePointOutageWindows,
   updateDocumentShopNumber,
   updateDocumentShopSize,
   updateDocumentEntranceKind,
@@ -263,6 +265,22 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedServicePoint || !Number.isFinite(value)) return;
       setDocument((current) =>
         updateDocumentServiceNumber(current, selectedServicePoint.id, field, value),
+      );
+    },
+    updateServiceNextId(nextServicePointId: string | undefined) {
+      if (!selectedServicePoint) return;
+      setDocument((current) =>
+        updateDocumentServicePointNextId(
+          current,
+          selectedServicePoint.id,
+          nextServicePointId,
+        ),
+      );
+    },
+    updateServiceOutageWindows(text: string) {
+      if (!selectedServicePoint) return;
+      setDocument((current) =>
+        updateDocumentServicePointOutageWindows(current, selectedServicePoint.id, text),
       );
     },
     updateShopNumber(field: ShopNumberField, value: number) {

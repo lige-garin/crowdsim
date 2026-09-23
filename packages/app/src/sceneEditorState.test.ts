@@ -34,6 +34,8 @@ import {
   updateDocumentCrosswalkRoadId,
   updateDocumentEntranceNumber,
   updateDocumentEntranceProfile,
+  updateDocumentServicePointNextId,
+  updateDocumentServicePointOutageWindows,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
   updateDocumentObstacleKind,
@@ -477,7 +479,7 @@ describe("editor round-trip of ADR-0008 fields", () => {
     expect(back.servicePoints[0]).toMatchObject({ name: "Main tills", servers: 4 });
   });
 
-  it("keeps a service point's checkpoint chain and outage windows through apply, even with no editor control for them yet (ADR-0017)", () => {
+  it("keeps a service point's checkpoint chain and outage windows through apply (ADR-0017)", () => {
     const scene = {
       ...demoScene,
       servicePoints: [
@@ -625,5 +627,55 @@ describe("editor round-trip of ADR-0008 fields", () => {
     expect(
       document.entrances.find((candidate) => candidate.id === gate.id)!.arrivalProfile,
     ).toBeUndefined();
+  });
+
+  it("chains a service point to another and can end the chain again (ADR-0021 editor control)", () => {
+    const scene = parseScene({
+      ...demoScene,
+      servicePoints: [
+        { id: "security", kind: "gate", position: { x: 4, y: 4 } },
+        { id: "ticket-gate", kind: "gate", position: { x: 8, y: 4 } },
+      ],
+    });
+    let document = createEditorDocumentFromScene(scene);
+    const security = document.servicePoints.find((point) => point.id === "security")!;
+
+    document = updateDocumentServicePointNextId(document, security.id, "ticket-gate");
+    expect(
+      document.servicePoints.find((point) => point.id === security.id)!
+        .nextServicePointId,
+    ).toBe("ticket-gate");
+
+    document = updateDocumentServicePointNextId(document, security.id, undefined);
+    expect(
+      document.servicePoints.find((point) => point.id === security.id)!
+        .nextServicePointId,
+    ).toBeUndefined();
+  });
+
+  it("parses outage-window text into windows, dropping malformed or inverted pairs (ADR-0021 editor control)", () => {
+    const scene = parseScene({
+      ...demoScene,
+      servicePoints: [{ id: "security", kind: "gate", position: { x: 4, y: 4 } }],
+    });
+    let document = createEditorDocumentFromScene(scene);
+    const security = document.servicePoints[0];
+
+    document = updateDocumentServicePointOutageWindows(
+      document,
+      security.id,
+      "600-900, garbage, 1800-2000, 500-500",
+    );
+
+    expect(document.servicePoints[0].outageWindows).toEqual([
+      { startsAtSeconds: 600, endsAtSeconds: 900 },
+      { startsAtSeconds: 1800, endsAtSeconds: 2000 },
+    ]);
+
+    document = updateDocumentServicePointOutageWindows(document, security.id, "");
+    expect(document.servicePoints[0].outageWindows).toEqual([]);
+
+    const applied = createSceneFromEditorDocument(scene, document);
+    expect(applied.servicePoints[0].outageWindows).toEqual([]);
   });
 });

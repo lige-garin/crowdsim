@@ -122,31 +122,91 @@ purpose, inside a module three ADRs have chosen to keep sealed.
   and are equally out of scope here: a service point's `nextServicePointId`
   is a single id, chains are linear, and an outage is still only a scripted
   time window.
-- **Not an editor control.** `EditorServicePoint.nextServicePointId`/
-  `outageWindows` were already round-tripped (ADR-0017), but there is still
-  no UI to set or correct them — a scene author can chain checkpoints today
-  only by hand-editing JSON. This mirrors exactly the gap ADR-0020 first
-  left open for crosswalks and then closed in a same-session follow-up; the
-  same follow-up for checkpoints was not attempted this pass.
-- **Not verified by clicking through the live app.** There is no editor
-  control to author a chain from, so there was nothing to click. What was
-  verified instead is the full production code path: `simulationCheckpointChain.test.ts`
-  builds a real scene via `parseScene` and steps a real engine built by
+- ~~Not an editor control.~~ **Closed same day, see the addendum below.**
+  `EditorServicePoint.nextServicePointId`/`outageWindows` were already
+  round-tripped (ADR-0017), but there was still no UI to set or correct
+  them — a scene author could chain checkpoints only by hand-editing JSON.
+- **Not verified by clicking through the live app, at the time this section
+  was first written.** There was no editor control to author a chain from,
+  so there was nothing to click. What was verified instead is the full
+  production code path: `simulationCheckpointChain.test.ts` builds a real
+  scene via `parseScene` and steps a real engine built by
   `createSimulationEngineFromScene` — the exact function both the worker and
   the main-thread controller call — and confirms a spawned agent physically
   walks from a shop to `security`, gets served, walks on to
   `boarding-gate`, gets served there too, and eventually exits. This is the
   production path, just driven by a test scene rather than a mouse click.
+  The addendum below adds the missing control and _does_ verify it live.
 
 ## Consequences
 
 - `docs/superpowers/plans/2026-09-21-gap-closure-plan.md` batch 5.2's
   "接引擎/决策后端/worker/视口/编辑器" gap is closed for the decision-backend
   and worker/viewport halves (both ride the existing `SimulationServicePoint`
-  plumbing with no further wiring needed); the editor half remains open,
-  named above rather than silently folded into "done."
+  plumbing with no further wiring needed); the editor half was closed the
+  same day too, see the addendum below.
 - 936 vitest tests (three in `checkoutCounters.test.ts` for outage gating on
   both admission paths, three in `mallCrowdDecisionBackend.test.ts` for the
   redirect/hop-cap-boundary/dangling-reference cases, two in the new
   `simulationCheckpointChain.test.ts` for the full engine path), cargo test,
   typecheck, lint and prettier all clean.
+
+## Addendum (2026-09-23, same day): the editor control
+
+Closes the one gap this ADR itself named as still open, the same pattern
+ADR-0020 set for crosswalks: build the correction UI a spatial/relational
+field like this always needs, on a service point's `ServiceParamGrid`
+(`SceneEditorRetailParamGrids.tsx`).
+
+- **`nextServicePointId` as a dropdown**, not a placeholder. Options are
+  every _other_ service point in the scene (never the selected one itself —
+  the dropdown cannot author a trivial one-hop self-loop; a longer cycle
+  through other stops is still possible, and still bounded by
+  `checkpointHopCount`'s cap, not by this list) plus a "no next stop"
+  sentinel that clears the field to `undefined`. New mutations
+  `updateDocumentServicePointNextId`/`updateDocumentServicePointOutageWindows`
+  (`sceneEditorMutations.ts`), wired through `SceneEditorParamActions.ts` →
+  `SceneEditorParamPanel.tsx` → `SceneEditorLayout.tsx` → `SceneEditor.tsx`
+  the same five-file chain every other param-grid control in this editor
+  already follows.
+- **`outageWindows` as `"start-end, start-end"` text**, not a dedicated
+  add/remove-row list UI — the same committed-on-blur text-field convention
+  `updateDocumentEntranceProfile` already established for a comma-separated
+  list (`arrivalProfile`), reused rather than inventing a second pattern for
+  what is usually zero or one window. A malformed or inverted pair is
+  silently dropped, the same tolerance a mistyped arrival-profile rate
+  already gets.
+- **A new `TextInput` primitive** (`SceneEditorParamInputs.tsx`), extracted
+  from what had been a single-purpose `ProfileInput` local to
+  `SceneEditorFacilityParamGrids.tsx` — the draft-on-blur mechanics
+  `outageWindows` needed were identical to `arrivalProfile`'s, just with a
+  different display format, so the specialised component was generalised
+  and reused rather than copied a second time. Net effect: one new generic
+  primitive, one fewer specialised one, the entrance call site now builds
+  its own display string (`(rates ?? []).join(", ")`) instead of a
+  component doing that internally.
+- **Verified decisive**: the outage-window text parser's inverted-pair
+  guard (`endsAtSeconds > startsAtSeconds`) was temporarily removed, and the
+  new "parses outage-window text... dropping malformed or inverted pairs"
+  test failed exactly as expected (a `500-500` pair that should have been
+  dropped showed up in the result); restored, all tests pass.
+- **Verified live**, working around the same browser-automation
+  click-registration issue the original vehicle-wiring section of this
+  session hit on a toggle button: real `PointerEvent` dispatch and
+  `HTMLSelectElement`/`HTMLInputElement`'s native value setters (needed here
+  because React tracks these elements' values through its own internal
+  property descriptor, which a plain `.value = ...` assignment does not
+  trigger a change event through) drove the dropdown and text field through
+  a real running dev server. Confirmed: the dropdown's options are exactly
+  the scene's other service points, excluding the selected one; selecting a
+  value and reading the panel back afterward shows the new selection
+  persisted; typing `"600-900, 1800-2000"` into the outage field, blurring,
+  and reading the input's `.value` back afterward shows the exact string
+  round-tripped through the mutation and back into the rendered control —
+  proof the state update and re-render both happened, not just that the
+  keystroke was accepted.
+
+3 new tests (two in `sceneEditorState.test.ts` for the chain dropdown's
+mutation and the outage-window parser, one in `SceneEditorParamPanel.test.tsx`
+for the rendered controls). 939 vitest tests, cargo test, typecheck, lint
+and prettier all clean.

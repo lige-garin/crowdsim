@@ -169,6 +169,41 @@ describe("SceneEditorParamPanel", () => {
     expect(onCrosswalkNumberChange).toHaveBeenCalledWith("widthMeters", 5);
   });
 
+  it("chains a service point to another and edits its outage windows (ADR-0021)", () => {
+    const onServiceNextIdChange = vi.fn();
+    const onServiceOutageWindowsChange = vi.fn();
+    const servicePoint = {
+      id: "security",
+      kind: "gate" as const,
+      position: { x: 5, y: 5 },
+      width: 3,
+      serviceMeanSeconds: 8,
+      capacityPerMinute: 60,
+      outageWindows: [],
+    };
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onServiceNextIdChange={onServiceNextIdChange}
+        onServiceOutageWindowsChange={onServiceOutageWindowsChange}
+        otherServicePointIds={["ticket-gate"]}
+        selectedServicePoint={servicePoint}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("nextServicePoint"), {
+      target: { value: "ticket-gate" },
+    });
+    expect(onServiceNextIdChange).toHaveBeenCalledWith("ticket-gate");
+
+    const outage = screen.getByLabelText("outageWindows");
+    fireEvent.change(outage, { target: { value: "600-900" } });
+    expect(onServiceOutageWindowsChange).not.toHaveBeenCalled();
+    fireEvent.blur(outage);
+    expect(onServiceOutageWindowsChange).toHaveBeenCalledWith("600-900");
+  });
+
   it("renders and wires hazard BioCity controls", () => {
     const document = createEditorDocumentFromScene(bioCityDemoScene);
     const onHazardKindChange = vi.fn();
@@ -221,6 +256,8 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onRoadDirectionChange: vi.fn(),
     onRoadNumberChange: vi.fn(),
     onServiceNumberChange: vi.fn(),
+    onServiceNextIdChange: vi.fn(),
+    onServiceOutageWindowsChange: vi.fn(),
     onShopNumberChange: vi.fn(),
     onShopSizeChange: vi.fn(),
     onToggleBasemapLocked: vi.fn(),
@@ -238,6 +275,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onZoneNumberChange: vi.fn(),
     pointsToSvg: (points) => points.map((point) => `${point.x},${point.y}`).join(" "),
     roadIds: [],
+    otherServicePointIds: [],
     selectedBuilding: undefined,
     selectedConnector: undefined,
     selectedCountLine: undefined,

@@ -39,6 +39,41 @@ export function NumberInput({
   );
 }
 
+/**
+ * A free-text field committed on blur, not per keystroke — the same
+ * draft-state reason `NumberInput` above keeps one: reporting every
+ * keystroke would fight a value the caller reformats (e.g. joining a rate
+ * list back with ", "), snapping the field back mid-edit.
+ */
+export function TextInput({
+  label,
+  onChange,
+  placeholder,
+  value,
+}: {
+  label: string;
+  onChange: (text: string) => void;
+  placeholder?: string;
+  value: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="editor-param-wide">
+      {label}
+      <input
+        type="text"
+        placeholder={placeholder}
+        value={draft ?? value}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          if (draft !== null) onChange(draft);
+          setDraft(null);
+        }}
+      />
+    </label>
+  );
+}
+
 export function SelectInput<TValue extends string>({
   label,
   onChange,

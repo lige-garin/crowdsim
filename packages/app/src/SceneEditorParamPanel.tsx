@@ -69,6 +69,8 @@ type SceneEditorParamPanelProps = {
     field: "capacityPerMinute" | "serviceMeanSeconds" | "width",
     value: number,
   ) => void;
+  onServiceNextIdChange: (nextServicePointId: string | undefined) => void;
+  onServiceOutageWindowsChange: (text: string) => void;
   onShopNumberChange: (
     field: "attraction" | "capacity" | "dwellMeanSeconds",
     value: number,
@@ -89,6 +91,10 @@ type SceneEditorParamPanelProps = {
   onZoneNumberChange: (field: ZoneNumberField, value: number) => void;
   pointsToSvg: (points: CountLine["points"]) => string;
   roadIds: readonly string[];
+  /** Every service point other than the one currently selected — for the
+   * "next stop" dropdown (ADR-0021). Computed by the caller since it
+   * depends on which service point is selected, unlike `roadIds`. */
+  otherServicePointIds: readonly string[];
   selectedBuilding: Building | undefined;
   selectedConnector: Connector | undefined;
   selectedCountLine: CountLine | undefined;
@@ -129,6 +135,8 @@ export function SceneEditorParamPanel({
   onRoadDirectionChange,
   onRoadNumberChange,
   onServiceNumberChange,
+  onServiceNextIdChange,
+  onServiceOutageWindowsChange,
   onShopNumberChange,
   onShopSizeChange,
   onToggleObstacleBlocksMovement,
@@ -146,6 +154,7 @@ export function SceneEditorParamPanel({
   onZoneNumberChange,
   pointsToSvg,
   roadIds,
+  otherServicePointIds,
   selectedBuilding,
   selectedConnector,
   selectedCountLine,
@@ -241,6 +250,9 @@ export function SceneEditorParamPanel({
       ) : selectedServicePoint ? (
         <ServiceParamGrid
           onNumberChange={onServiceNumberChange}
+          onNextServicePointIdChange={onServiceNextIdChange}
+          onOutageWindowsChange={onServiceOutageWindowsChange}
+          otherServicePointIds={otherServicePointIds}
           selectedServicePoint={selectedServicePoint}
           t={t}
         />

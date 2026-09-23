@@ -199,6 +199,10 @@ export const messages = {
   noEvacuationActive: { zh: "No evacuation active", en: "No evacuation active" },
   noEvents: { zh: "No events", en: "No events" },
   none: { zh: "无", en: "None" },
+  nextServicePoint: {
+    zh: "下一站 (链式服务点，ADR-0021)",
+    en: "Next stop (chained, ADR-0021)",
+  },
   noObjectSelected: { zh: "未选择对象", en: "No object selected" },
   noQueue: { zh: "No queue", en: "No queue" },
   noReadback: { zh: "No readback", en: "No readback" },
@@ -213,6 +217,10 @@ export const messages = {
   obstacleKind: { zh: "Obstacle type", en: "Obstacle type" },
   obstacles: { zh: "障碍物", en: "Obstacles" },
   obstacleShort: { zh: "OBS", en: "OBS" },
+  outageWindows: {
+    zh: "停摆时间窗 (秒，如 600-900, 1800-2000)",
+    en: "Outage windows (s, e.g. 600-900, 1800-2000)",
+  },
   parameters: { zh: "参数", en: "Parameters" },
   pause: { zh: "暂停", en: "Pause" },
   paused: { zh: "已暂停", en: "Paused" },

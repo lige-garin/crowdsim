@@ -352,6 +352,68 @@ export function updateDocumentServiceNumber(
   };
 }
 
+/**
+ * `nextServicePointId` (ADR-0017, wired into the live decision backend by
+ * ADR-0021) as an editable dropdown, not a placeholder — unlike a transit
+ * stop's or a hazard's own road/zone reference, which still have no
+ * correction UI (`sceneEditorAdders.ts`'s own doc comments name this gap).
+ * `undefined` ends the chain here, the same as a service point with no
+ * `nextServicePointId` set at all.
+ */
+export function updateDocumentServicePointNextId(
+  document: EditorDocument,
+  servicePointId: string,
+  nextServicePointId: string | undefined,
+) {
+  return {
+    ...document,
+    servicePoints: document.servicePoints.map((servicePoint) =>
+      servicePoint.id === servicePointId
+        ? { ...servicePoint, nextServicePointId }
+        : servicePoint,
+    ),
+  };
+}
+
+/**
+ * `outageWindows` as `"start-end, start-end"` text (seconds), the same
+ * committed-on-blur text-field convention `updateDocumentEntranceProfile`
+ * already uses for `arrivalProfile` — a list is not worth its own add/
+ * remove row UI for what is usually zero or one window. A malformed or
+ * inverted pair (end not after start) is silently dropped rather than
+ * rejected: the same tolerance a mistyped arrival-profile rate already
+ * gets, not a new leniency invented for this field.
+ */
+export function updateDocumentServicePointOutageWindows(
+  document: EditorDocument,
+  servicePointId: string,
+  text: string,
+) {
+  const outageWindows = text
+    .split(/[,，]+/)
+    .map((part) => part.trim())
+    .filter((part) => part !== "")
+    .flatMap((part) => {
+      const match = /^(-?[\d.]+)\s*-\s*(-?[\d.]+)$/.exec(part);
+      if (!match) return [];
+      const startsAtSeconds = Number(match[1]);
+      const endsAtSeconds = Number(match[2]);
+      return Number.isFinite(startsAtSeconds) &&
+        Number.isFinite(endsAtSeconds) &&
+        endsAtSeconds > startsAtSeconds
+        ? [{ startsAtSeconds, endsAtSeconds }]
+        : [];
+    });
+  return {
+    ...document,
+    servicePoints: document.servicePoints.map((servicePoint) =>
+      servicePoint.id === servicePointId
+        ? { ...servicePoint, outageWindows }
+        : servicePoint,
+    ),
+  };
+}
+
 export function updateDocumentZoneCategory(
   document: EditorDocument,
   zoneId: string,

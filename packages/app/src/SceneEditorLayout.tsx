@@ -110,6 +110,8 @@ type SceneEditorLayoutProps = {
     field: "capacityPerMinute" | "serviceMeanSeconds" | "width",
     value: number,
   ) => void;
+  onServiceNextIdChange: (nextServicePointId: string | undefined) => void;
+  onServiceOutageWindowsChange: (text: string) => void;
   onShopNumberChange: (
     field: "attraction" | "capacity" | "dwellMeanSeconds",
     value: number,
@@ -228,6 +230,8 @@ export function SceneEditorLayout({
   onSceneChange,
   onSelectFloor,
   onServiceNumberChange,
+  onServiceNextIdChange,
+  onServiceOutageWindowsChange,
   onShopNumberChange,
   onShopSizeChange,
   onToggleSnap,
@@ -393,6 +397,8 @@ export function SceneEditorLayout({
         onRoadDirectionChange={onRoadDirectionChange}
         onRoadNumberChange={onRoadNumberChange}
         onServiceNumberChange={onServiceNumberChange}
+        onServiceNextIdChange={onServiceNextIdChange}
+        onServiceOutageWindowsChange={onServiceOutageWindowsChange}
         onShopNumberChange={onShopNumberChange}
         onShopSizeChange={onShopSizeChange}
         onToggleObstacleBlocksMovement={onToggleObstacleBlocksMovement}
@@ -410,6 +416,9 @@ export function SceneEditorLayout({
         onZoneNumberChange={onZoneNumberChange}
         pointsToSvg={pointsToSvg}
         roadIds={document.roads.map((road) => road.id)}
+        otherServicePointIds={document.servicePoints
+          .filter((point) => point.id !== selectedServicePoint?.id)
+          .map((point) => point.id)}
         selectedBuilding={selectedBuilding}
         selectedConnector={selectedConnector}
         selectedCountLine={selectedCountLine}

@@ -1,7 +1,7 @@
 ﻿import type { TranslationKey } from "./i18n";
 import type { BasemapNumberField, EditorBasemap } from "./sceneEditorBasemap";
 import type { EditorDocument } from "./sceneEditorState";
-import { NumberInput } from "./SceneEditorParamInputs";
+import { NumberInput, SelectInput, TextInput } from "./SceneEditorParamInputs";
 
 type Shop = EditorDocument["shops"][number];
 type ServicePoint = EditorDocument["servicePoints"][number];
@@ -157,8 +157,15 @@ export function ShopParamGrid({
   );
 }
 
+/** No-next-stop sentinel: `SelectInput` needs a real string value, and "" is
+ * never a real service point id (`idSchema` requires non-empty). */
+const noNextServicePoint = "";
+
 export function ServiceParamGrid({
   onNumberChange,
+  onNextServicePointIdChange,
+  onOutageWindowsChange,
+  otherServicePointIds,
   selectedServicePoint,
   t,
 }: {
@@ -166,6 +173,14 @@ export function ServiceParamGrid({
     field: "capacityPerMinute" | "serviceMeanSeconds" | "width",
     value: number,
   ) => void;
+  /** ADR-0021's chain. `undefined` for the "ends the chain here" option. */
+  onNextServicePointIdChange: (nextServicePointId: string | undefined) => void;
+  onOutageWindowsChange: (text: string) => void;
+  /** Every other service point in the scene — never this one, so a scene
+   * author cannot chain a stop to itself from this dropdown (a longer cycle
+   * through other stops is still possible; `checkpointHopCount`'s safety cap
+   * is what actually bounds that, not this list). */
+  otherServicePointIds: readonly string[];
   selectedServicePoint: ServicePoint;
   t: (key: TranslationKey) => string;
 }) {
@@ -192,6 +207,22 @@ export function ServiceParamGrid({
         step={1}
         value={selectedServicePoint.capacityPerMinute}
         onChange={(value) => onNumberChange("capacityPerMinute", value)}
+      />
+      <SelectInput
+        label={t("nextServicePoint")}
+        options={[noNextServicePoint, ...otherServicePointIds]}
+        value={selectedServicePoint.nextServicePointId ?? noNextServicePoint}
+        onChange={(value) =>
+          onNextServicePointIdChange(value === noNextServicePoint ? undefined : value)
+        }
+      />
+      <TextInput
+        label={t("outageWindows")}
+        placeholder="600-900, 1800-2000"
+        value={selectedServicePoint.outageWindows
+          .map((window) => `${window.startsAtSeconds}-${window.endsAtSeconds}`)
+          .join(", ")}
+        onChange={onOutageWindowsChange}
       />
     </div>
   );

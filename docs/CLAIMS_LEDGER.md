@@ -1601,3 +1601,25 @@ The first version wrote its own private `isInOutage` inside `checkoutCounters.ts
 There is still no editor control for `nextServicePointId`/`outageWindows` — round-tripped since ADR-0017, but a scene author can only author a chain by hand-editing JSON. This is the identical shape of gap ADR-0020 left open for crosswalks and then closed in the very next entry; the same follow-up for checkpoints was not attempted this session. Because there is no UI to drive, there was nothing to click-verify in a live browser either — the decisive evidence for the positive path is `simulationCheckpointChain.test.ts` running the real production engine-creation path against a real scene, not a screenshot of a browser session, which is the honest description rather than an unearned "verified in browser" claim.
 
 7 new tests, 936 vitest tests, cargo test, typecheck, lint and prettier all clean. Full scope boundaries in `docs/adr/0021-checkpoint-chaining-in-decision-backend.md`.
+
+## 2026-09-23 (eleventh entry): the checkpoint editor control — and finally getting a real click to register in the browser-automation tool
+
+The tenth entry's own "what this does not close" section named the gap this entry closes: no editor control for `nextServicePointId`/`outageWindows`, round-tripped since ADR-0017 but only settable by hand-editing JSON.
+
+### The dropdown and the text field, not a new interaction pattern each
+
+`ServiceParamGrid` (`SceneEditorRetailParamGrids.tsx`) gained a `nextServicePointId` dropdown listing every other service point in the scene — never the selected one itself, so the dropdown alone cannot author a trivial one-hop self-loop, though a longer cycle through other stops remains possible and is bounded by `checkpointHopCount`'s cap, not by this list — plus a "no next stop" option that clears the field. `outageWindows` got a text field parsed as `"start-end, start-end"` (seconds), deliberately not a dedicated add/remove-row list UI: `updateDocumentEntranceProfile` had already established the committed-on-blur, comma-separated-text convention for exactly this shape of problem (`arrivalProfile`), and reusing it rather than inventing a second pattern was the more consistent choice for what is usually zero or one window.
+
+### A real, if small, component consolidation fell out of building this
+
+The text-field mechanics `outageWindows` needed — draft state while focused, commit on blur — turned out to be identical to what a single-purpose `ProfileInput`, local to `SceneEditorFacilityParamGrids.tsx`, already did for `arrivalProfile`; only the display format differed. Rather than write a second copy, `ProfileInput` was generalised into `TextInput` (`SceneEditorParamInputs.tsx`, alongside the existing `NumberInput`/`SelectInput`), with the specific "join rates into a display string" step moved to the entrance call site, where it always belonged. Net effect: one new generic input primitive, one fewer specialised one, both call sites slightly shorter.
+
+### Verified decisive
+
+The outage-window parser's inverted-pair guard (`endsAtSeconds > startsAtSeconds`) was temporarily removed, and the new "parses outage-window text into windows, dropping malformed or inverted pairs" test failed exactly as predicted — a deliberately inverted `500-500` pair that should have been dropped showed up in the result instead. Restored, all tests pass.
+
+### Verified live, and the earlier browser-automation blind spot finally has an explanation, not just a workaround
+
+The eighth and tenth entries both recorded that the browser-automation tool's synthetic clicks would not register on certain controls, and worked around it with `element.click()`/`PointerEvent` dispatch. This entry adds the missing piece: React tracks a controlled `<select>`/`<input>`'s value through its own internal property-descriptor hook, and a plain `element.value = "..."` assignment bypasses that hook entirely — React never sees the change, so no re-render follows and no `onChange` fires. The fix is to call the native setter directly (`Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, "value").set`) before dispatching the `change`/`input` event, which is what a real user's keystroke or click does under the hood but a naive scripted assignment does not. With that, verification was genuinely complete: the dropdown's options were confirmed to be exactly the scene's other service points, excluding the one selected; selecting a value and reading the panel back afterward showed the selection persisted; typing `"600-900, 1800-2000"` into the outage field, blurring, and reading the input's `.value` back afterward showed the exact string round-tripped through the mutation and back into the rendered control — proof the state update and re-render both happened, not just that a keystroke was accepted somewhere.
+
+3 new tests (two in `sceneEditorState.test.ts`, one in `SceneEditorParamPanel.test.tsx`). 939 vitest tests, cargo test, typecheck, lint and prettier all clean. Full scope boundaries in `docs/adr/0021-checkpoint-chaining-in-decision-backend.md`'s same-day addendum.

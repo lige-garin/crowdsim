@@ -1,4 +1,3 @@
-import { useState } from "react";
 import type { TranslationKey } from "./i18n";
 import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import { walkingGroupParameters } from "./walkingGroups";
@@ -13,7 +12,7 @@ import type {
   ZoneNumberField,
 } from "./sceneEditorMutations";
 import { populationLibrary } from "./populationSampling";
-import { NumberInput, SelectInput } from "./SceneEditorParamInputs";
+import { NumberInput, SelectInput, TextInput } from "./SceneEditorParamInputs";
 
 type Road = EditorDocument["roads"][number];
 type Building = EditorDocument["buildings"][number];
@@ -633,9 +632,10 @@ export function EntranceParamGrid({
             value={selectedEntrance.arrivalRatePerMinute}
             onChange={(value) => onNumberChange("arrivalRatePerMinute", value)}
           />
-          <ProfileInput
+          <TextInput
             label={t("arrivalProfile")}
-            rates={selectedEntrance.arrivalProfile?.ratesPerMinute}
+            placeholder="60, 120, 90"
+            value={(selectedEntrance.arrivalProfile?.ratesPerMinute ?? []).join(", ")}
             onChange={onProfileChange}
           />
           <NumberInput
@@ -665,37 +665,5 @@ export function EntranceParamGrid({
         onChange={(value) => onNumberChange("width", value)}
       />
     </div>
-  );
-}
-
-/**
- * A list typed as text: kept as typed while focused, so "60, " is not reformatted
- * under the cursor, and committed on blur.
- */
-function ProfileInput({
-  label,
-  onChange,
-  rates,
-}: {
-  label: string;
-  onChange: (text: string) => void;
-  rates?: readonly number[];
-}) {
-  const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <label className="editor-param-wide">
-      {label}
-      <input
-        type="text"
-        inputMode="decimal"
-        placeholder="60, 120, 90"
-        value={draft ?? (rates ?? []).join(", ")}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={() => {
-          if (draft !== null) onChange(draft);
-          setDraft(null);
-        }}
-      />
-    </label>
   );
 }

@@ -725,6 +725,8 @@ export function SceneEditor({
       onSceneChange={selectExampleScene}
       onSelectFloor={selectFloor}
       onServiceNumberChange={paramActions.updateServiceNumber}
+      onServiceNextIdChange={paramActions.updateServiceNextId}
+      onServiceOutageWindowsChange={paramActions.updateServiceOutageWindows}
       onShowTracingFixture={showTracingFixture}
       onShopNumberChange={paramActions.updateShopNumber}
       onShopSizeChange={paramActions.updateShopSize}
