@@ -44,6 +44,7 @@ describe("RunAnalyticsPanel", () => {
       <RunAnalyticsPanel
         dashboardSamples={[]}
         language="en"
+        minuteFlows={() => []}
         onExport={vi.fn()}
         scene={scene}
         summary={createRunAnalytics().summary()}
@@ -62,6 +63,7 @@ describe("RunAnalyticsPanel", () => {
       <RunAnalyticsPanel
         dashboardSamples={[]}
         language="zh"
+        minuteFlows={analytics.minuteFlows}
         onExport={onExport}
         scene={scene}
         summary={analytics.summary()}
@@ -73,6 +75,28 @@ describe("RunAnalyticsPanel", () => {
     expect(onExport).toHaveBeenCalledWith("journeys");
   });
 
+  it("draws a flow chart per count line, sized by that line's own minute flows", () => {
+    const analytics = createRunAnalytics();
+    analytics.record(scene, at(1, 19));
+    analytics.record(scene, at(2, 21));
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        language="en"
+        minuteFlows={analytics.minuteFlows}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={analytics.summary()}
+      />,
+    );
+
+    const chart = screen
+      .getByTestId("count-line-gate")
+      .querySelector(".echart-container");
+    expect(chart).not.toBeNull();
+    expect(chart).toHaveAttribute("aria-label", expect.stringContaining("Main gate"));
+  });
+
   it("draws the population strip from the live dashboard samples, not the measured summary", () => {
     render(
       <RunAnalyticsPanel
@@ -81,6 +105,7 @@ describe("RunAnalyticsPanel", () => {
           { agentCount: 18, elapsedSeconds: 2, exitedCount: 0 },
         ]}
         language="en"
+        minuteFlows={() => []}
         onExport={vi.fn()}
         scene={scene}
         summary={createRunAnalytics().summary()}
@@ -99,6 +124,7 @@ describe("what the measured numbers are", () => {
       <RunAnalyticsPanel
         dashboardSamples={[]}
         language="zh"
+        minuteFlows={() => []}
         onExport={vi.fn()}
         scene={scene}
         summary={createRunAnalytics().summary()}

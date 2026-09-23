@@ -1,9 +1,15 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { CountLineFlowChart } from "./CountLineFlowChart";
 import type { DashboardSample } from "./dashboardStats";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
 import { RealtimeStrip } from "./RealtimeStrip";
-import type { RunAnalytics, RunAnalyticsSummary, StayKind } from "./runAnalytics";
+import type {
+  MinuteFlow,
+  RunAnalytics,
+  RunAnalyticsSummary,
+  StayKind,
+} from "./runAnalytics";
 
 export type RunAnalyticsExport = keyof RunAnalytics["csv"];
 
@@ -90,12 +96,14 @@ const copy = {
 export function RunAnalyticsPanel({
   dashboardSamples,
   language,
+  minuteFlows,
   onExport,
   scene,
   summary,
 }: {
   dashboardSamples: readonly DashboardSample[];
   language: Language;
+  minuteFlows: () => MinuteFlow[];
   onExport: (kind: RunAnalyticsExport) => void;
   scene: CrowdSimScene;
   summary: RunAnalyticsSummary;
@@ -109,6 +117,16 @@ export function RunAnalyticsPanel({
     scene.servicePoints.find((point) => point.id === id)?.name ??
     id;
   const places = [...summary.places].sort((a, b) => b.visits - a.visits).slice(0, 8);
+  // Not memoized: `minuteFlows` (from useRunSeries.ts) is a fresh closure on
+  // every render, so a useMemo keyed on it would never actually skip this --
+  // it would just add a Map allocation and a dependency check on top of the
+  // same per-render grouping this does directly.
+  const flowsByLine = new Map<string, MinuteFlow[]>();
+  for (const flow of minuteFlows()) {
+    const bucket = flowsByLine.get(flow.id);
+    if (bucket) bucket.push(flow);
+    else flowsByLine.set(flow.id, [flow]);
+  }
 
   return (
     <section className="biocity-compact-panel run-analytics" aria-label={text.region}>
@@ -162,7 +180,7 @@ export function RunAnalyticsPanel({
           {summary.flows.length === 0 ? (
             <p className="run-analytics-empty">{text.noLines}</p>
           ) : (
-            <div className="biocity-status-list">
+            <div className="biocity-status-list run-analytics-lines">
               {summary.flows.map((flow) => (
                 <div key={flow.id} data-testid={`count-line-${flow.id}`}>
                   <span>{flow.name}</span>
@@ -170,6 +188,11 @@ export function RunAnalyticsPanel({
                     {text.forward} {flow.forward} · {text.backward} {flow.backward} ·{" "}
                     {flow.peakPerMinute} {text.peakLine}
                   </strong>
+                  <CountLineFlowChart
+                    flows={flowsByLine.get(flow.id) ?? []}
+                    language={language}
+                    name={flow.name}
+                  />
                 </div>
               ))}
             </div>

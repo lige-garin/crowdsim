@@ -335,6 +335,19 @@
   display: none;
 }
 
+/* Each count line's row grows a third cell (the flow chart) below its
+   label/value pair, spanning both grid columns rather than wrapping into
+   the next row's label column. */
+.run-analytics-lines div {
+  grid-template-rows: auto auto;
+  height: auto;
+  padding-bottom: 8px;
+}
+
+.run-analytics-lines .echart-container {
+  grid-column: 1 / -1;
+}
+
 .biocity-compact-list span {
   font-family: var(--lab-mono);
   font-weight: 820;

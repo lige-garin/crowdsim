@@ -65,6 +65,7 @@ export function AppInspector({
       <RunAnalyticsPanel
         dashboardSamples={dashboardSamples}
         language={language}
+        minuteFlows={minuteFlows}
         onExport={onExportRunAnalytics}
         scene={scene}
         summary={runSummary}
