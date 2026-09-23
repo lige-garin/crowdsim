@@ -81,7 +81,10 @@ export const panelRegistry: PanelRegistryEntry[] = [
     id: "validation-report",
     labelZh: "校验报告",
     labelEn: "Validation report",
-    render: ({ scene }) => <ValidationReportPanel scene={scene} />,
+    // Keyed by scene id: a fresh mount on scene change gives the panel's
+    // async benchmark state a clean reset for free, rather than an effect
+    // reaching back to reset it (see ValidationReportPanel.tsx's own note).
+    render: ({ scene }) => <ValidationReportPanel key={scene.id} scene={scene} />,
   },
   {
     dataSource: "live",

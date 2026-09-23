@@ -102,8 +102,23 @@ function populationNote(scene?: CrowdSimScene): string {
 export function createValidationReport(
   options: ValidationReportOptions = {},
 ): ValidationReport {
-  const generatedAtIso = options.generatedAtIso ?? new Date().toISOString();
   const benchmarkResults = runBenchmarkSuite(options.scenarios ?? rimeaCoreScenarios);
+  return createValidationReportFromBenchmarkResults(benchmarkResults, options);
+}
+
+/**
+ * Everything `createValidationReport` does except actually running the
+ * benchmark suite -- split out so a caller that can't afford to block (the
+ * benchmark suite steps four ~90-100s scenarios, thousands of physics
+ * steps, synchronously) can run `runBenchmarkSuite` in a worker first
+ * (`validationBenchmarkWorkerClient.ts`) and hand the results here, which
+ * is fast: scene-specific checks and formatting only.
+ */
+export function createValidationReportFromBenchmarkResults(
+  benchmarkResults: BenchmarkRunResult[],
+  options: ValidationReportOptions = {},
+): ValidationReport {
+  const generatedAtIso = options.generatedAtIso ?? new Date().toISOString();
   const passCount = benchmarkResults.filter((result) => result.pass).length;
   const failCount = benchmarkResults.length - passCount;
 
