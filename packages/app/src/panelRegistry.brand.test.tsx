@@ -16,8 +16,12 @@ const ctx = {
   },
 } as unknown as PanelDockContext;
 
-describe("brand + calibration panels are registered and render", () => {
-  for (const id of ["brand-intelligence", "scale-readiness"]) {
+describe("brand panel is registered and renders", () => {
+  // scale-readiness was deleted 2026-09-24: a fixture panel of projected
+  // capacity constants, not a measurement -- and the sole real consumer of
+  // demoMode.ts/photorealisticTiles.ts/visualAssets.ts/scaleBudget.ts, all
+  // deleted alongside it. See docs/CLAIMS_LEDGER.md.
+  for (const id of ["brand-intelligence"]) {
     it(`renders ${id}`, () => {
       const entry = panelRegistry.find((panel) => panel.id === id);
       expect(entry, `panel ${id} must be registered`).toBeDefined();

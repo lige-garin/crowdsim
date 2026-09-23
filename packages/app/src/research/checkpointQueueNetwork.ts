@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { sampleServiceSeconds } from "./behaviorDistributions";
+import { sampleServiceSeconds } from "../behaviorDistributions";
 
 /**
  * SP-3-adjacent stage 1 for gap-closure plan batch 5.2 ("多级排队网络" —

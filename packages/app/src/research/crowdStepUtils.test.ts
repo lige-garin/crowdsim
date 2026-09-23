@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { agentsWithinDistance, splitExitedAgents } from "./crowdStepUtils";
-import type { SimulationAgent } from "./simulationEngine";
+import type { SimulationAgent } from "../simulationEngine";
 
 function agent(overrides: Partial<SimulationAgent>): SimulationAgent {
   return {

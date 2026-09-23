@@ -2,7 +2,6 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
-import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ScenarioDiffPanel } from "./ScenarioDiffPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { SensitivityPanel } from "./SensitivityPanel";
@@ -10,7 +9,6 @@ import { RimeaReportPanel } from "./RimeaReportPanel";
 import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
-import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 
@@ -26,10 +24,10 @@ export type PanelDockContext = {
  *
  * `live` reads the running simulation. `fixture` builds its own hardcoded
  * scenario in a useMemo and is unrelated to whatever the user currently has
- * open -- ScaleReadiness, for instance, reports on `demoScene` (an atrium)
- * while the app runs the rainy high street. The dock labels every fixture
- * panel, because a panel that looks authoritative and describes someone
- * else's scene is worse than no panel.
+ * open -- RimeaReportPanel, for instance, always runs the RiMEA corridor
+ * fixtures, whatever scene the app is actually running. The dock labels
+ * every fixture panel, because a panel that looks authoritative and
+ * describes someone else's scene is worse than no panel.
  */
 export type PanelDataSource = "live" | "fixture";
 
@@ -43,13 +41,6 @@ export type PanelRegistryEntry = {
 
 // Panels are registered in SP-5a Tasks 2-5.
 export const panelRegistry: PanelRegistryEntry[] = [
-  {
-    dataSource: "fixture",
-    id: "scenario-comparison",
-    labelZh: "情景对比",
-    labelEn: "Scenario comparison",
-    render: () => <ScenarioComparisonPanel />,
-  },
   {
     dataSource: "fixture",
     id: "scenario-diff-report",
@@ -98,13 +89,6 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "品牌智能",
     labelEn: "Brand intelligence",
     render: (ctx) => <BrandIntelligencePanel insight={ctx.brandInsight} />,
-  },
-  {
-    dataSource: "fixture",
-    id: "scale-readiness",
-    labelZh: "规模投影",
-    labelEn: "Scale projection",
-    render: () => <ScaleReadinessPanel />,
   },
   {
     dataSource: "fixture",

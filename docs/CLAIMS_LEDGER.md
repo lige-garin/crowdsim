@@ -1733,3 +1733,21 @@ A second-pass ponytail-review, specifically asked to check for dangling referenc
 ### Verified
 
 `pnpm install` (full, not lockfile-only, to also prune `node_modules`) followed by `pnpm typecheck`/`pnpm lint`/`pnpm test`/`pnpm test:rust`/`pnpm build` all clean. Full app suite: 923 passed, 2 skipped (was 937/2 after B1a; the 14-test drop is the deleted backend-consumer test files, not a regression). `pnpm-lock.yaml` confirmed to have zero remaining `packages/backend`/`packages/collab`/`@crowdsim/backend`/`@crowdsim/collab` entries. Live in a real dev server: panel dock now lists 11 panels (was 13), no trace of "项目空间"/"协作状态", zero console errors; home screen confirmed reading "DATA local". README/CLAUDE.md/CONTRIBUTING.md/SECURITY.md updated to stop describing packages that no longer exist. ponytail-review (second pass, specifically asked to check beyond the directly-touched files): found the two `AppHome` dangling references above, otherwise clean.
+
+## 2026-09-24 (fourth entry): batch B1 remainder — two more low-value panels, and grouping the standalone research modules
+
+Closed out B1: deleted `ScaleReadinessPanel.tsx` (a fixture of projected, unmeasured capacity constants — not a real benchmark) and `ScenarioComparisonPanel.tsx` (ADR-0019 already documented this as a narrower, superseded predecessor of the still-live `ScenarioDiffPanel.tsx`), plus moved the five confirmed-standalone comparison/research modules into a new `packages/app/src/research/` directory so their standalone status is visible from the file tree, not just from a doc comment three ADRs deep.
+
+### What was checked before deleting
+
+`ScaleReadinessPanel.tsx` turned out to be the sole real consumer — directly or transitively — of four other modules: `demoMode.ts`, `photorealisticTiles.ts`, `visualAssets.ts`, `scaleBudget.ts`, none of which had any other non-test importer. All five went together. One near-miss the reconnaissance caught: `demoScene.ts`, also imported by `ScaleReadinessPanel.tsx`, is genuinely shared with `behaviorWasm.ts` — it stayed. `ScenarioComparisonPanel.tsx`'s only real dependency, `scenarioComparison.ts`, had zero other consumers — both deleted together, matching ADR-0019's own finding that nothing in the live app depends on it.
+
+### The research/ move
+
+`orcaComparison.ts`, `orcaAvoidance.ts`, `moussaidHeuristic.ts`, `trajectoryCalibration.ts`, `checkpointQueueNetwork.ts`, and `crowdStepUtils.ts` (a small helper shared only between `orcaAvoidance.ts`/`moussaidHeuristic.ts`) were confirmed to have zero non-test importers anywhere in `packages/app/src` before the move — these are real, tested, deliberately-standalone tools (ADR-0013, ADR-0014, ADR-0017, and two calibration ADRs each say so explicitly), not dead code, so they were relocated rather than deleted. Only relative import paths needed fixing (`./simulationEngine` → `../simulationEngine`, since the files now sit one directory deeper) — `tsc --noEmit` found every broken path in one pass, confirming nothing else in the move needed touching. No barrel file, no new build/lint/test config for the subdirectory — ponytail-review was asked directly whether a subdirectory with no config divergence from its parent counts as its own kind of speculative infrastructure, and concluded it doesn't: a plain directory grouping of already-standalone modules is a real, low-cost step against the 240-flat-files problem the open-source audit named, not a new abstraction.
+
+### Verified
+
+`pnpm typecheck` clean after the import-path fixes (only two additional errors remained after fixing the research/ moves — both in `panelRegistry.tsx`, both the two deleted panel imports, both then removed). `pnpm lint` clean. Full app suite: 902 passed, 2 skipped (was 923/2; the 21-test drop is exactly the deleted panels' and modules' own tests). Live dev server: panel dock now lists 9 panels (was 11), no trace of "情景对比"/"规模投影", zero console errors. ponytail-review: nothing to cut, confirmed via targeted `git diff` spot-checks that every moved file's diff is exclusively the import-path prefix change.
+
+**B1 is now closed.** Remaining from the original audit and not yet done: the `bioCity` legacy-name rename (534 occurrences, 83 files) — folded into B5's code-cleanup batch rather than B1, since it's a code-quality activity with no functional urgency, not a deletion.

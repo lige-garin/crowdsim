@@ -1,8 +1,8 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
 import { agentsWithinDistance, splitExitedAgents } from "./crowdStepUtils";
-import { constrainMovement, type SceneWorldBounds } from "./sceneGeometry";
-import type { SimulationAgent } from "./simulationEngine";
-import type { WallIndex } from "./wallIndex";
+import { constrainMovement, type SceneWorldBounds } from "../sceneGeometry";
+import type { SimulationAgent } from "../simulationEngine";
+import type { WallIndex } from "../wallIndex";
 
 /**
  * Moussaïd, Helbing & Theraulaz, "How simple rules determine pedestrian

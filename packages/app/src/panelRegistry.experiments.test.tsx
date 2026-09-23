@@ -17,8 +17,11 @@ const ctx = {
 } as unknown as PanelDockContext;
 
 describe("experiment + analytics panels are registered and render", () => {
+  // scenario-comparison was deleted 2026-09-24: ADR-0019 found it a
+  // narrower, superseded predecessor of scenario-diff-report (it only
+  // ranked parameter variants of one hardcoded fixture scene, never
+  // compared two real scenarios). See docs/CLAIMS_LEDGER.md.
   for (const id of [
-    "scenario-comparison",
     "scenario-diff-report",
     "experiment-sweep",
     "experiment-summary",

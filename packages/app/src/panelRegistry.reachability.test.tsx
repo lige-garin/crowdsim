@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { panelRegistry } from "./panelRegistry";
 
-// The SP-5a batch registered 13 previously-orphaned panels. Five of those
+// The SP-5a batch registered 13 previously-orphaned panels. Seven of those
 // were deleted 2026-09-24: ai-workflow, image-geometry, tiles-backdrop as
-// disclosed-fake fixtures, and project-workspace, collaboration-status
+// disclosed-fake fixtures; project-workspace, collaboration-status
 // alongside the entire optional backend/collab package they fronted
-// (undeployable as shipped, unreachable from the client -- see
-// docs/CLAIMS_LEDGER.md). The remaining 8 are still expected to be
-// reachable exactly once.
+// (undeployable as shipped, unreachable from the client); scenario-comparison
+// as a narrower, superseded predecessor of scenario-diff-report (ADR-0019);
+// and scale-readiness as a fixture of projected, unmeasured constants (see
+// docs/CLAIMS_LEDGER.md). The remaining 6 are still expected to be reachable
+// exactly once.
 const EXPECTED = [
-  "scenario-comparison",
   "experiment-sweep",
   "experiment-summary",
   "validation-report",
   "brand-intelligence",
-  "scale-readiness",
   "template-library",
   "trajectory-replay",
 ];

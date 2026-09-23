@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeOrcaVelocity, stepCrowdOrca } from "./orcaAvoidance";
-import { createWallIndex } from "./wallIndex";
-import type { SimulationAgent } from "./simulationEngine";
+import { createWallIndex } from "../wallIndex";
+import type { SimulationAgent } from "../simulationEngine";
 
 function agent(overrides: Partial<SimulationAgent> = {}): SimulationAgent {
   return {

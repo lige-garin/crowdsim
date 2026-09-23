@@ -1,4 +1,4 @@
-import type { SimulationAgent } from "./simulationEngine";
+import type { SimulationAgent } from "../simulationEngine";
 
 /**
  * Splits a population into who has already reached their own exit this
