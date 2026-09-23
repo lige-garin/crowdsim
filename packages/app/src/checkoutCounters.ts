@@ -1,5 +1,9 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
-import { hashUnit, sampleServiceSeconds } from "./behaviorDistributions";
+import {
+  hashUnit,
+  isWithinOutageWindow,
+  sampleServiceSeconds,
+} from "./behaviorDistributions";
 import type {
   SimulationAgentDecision,
   SimulationServicePoint,
@@ -82,6 +86,7 @@ export function createCounterTick(options: CounterTickOptions) {
   for (const state of states.values()) {
     state.line.sort(byLineOrder);
     if (options.evacuationActive) continue;
+    if (isWithinOutageWindow(state.counter.outageWindows, elapsedSeconds)) continue;
     while (state.line.length > 0 && state.inService < servers(state.counter)) {
       admitted.add(state.line.shift()!.id);
       state.inService++;
@@ -180,7 +185,11 @@ export function createCounterTick(options: CounterTickOptions) {
       ) {
         return undefined;
       }
-      if (state.line.length === 0 && state.inService < servers(counter)) {
+      if (
+        state.line.length === 0 &&
+        state.inService < servers(counter) &&
+        !isWithinOutageWindow(counter.outageWindows, elapsedSeconds)
+      ) {
         state.inService++;
         return serve(agent, state);
       }

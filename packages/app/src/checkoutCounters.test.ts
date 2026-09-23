@@ -82,4 +82,56 @@ describe("checkout counters", () => {
 
     expect(decisions.get(3)?.nextState).toBe("leave");
   });
+
+  it("admits nobody at a counter in its own outage window, even with an empty line and a free server (ADR-0021)", () => {
+    const down: SimulationServicePoint = {
+      ...till,
+      outageWindows: [{ startsAtSeconds: 50, endsAtSeconds: 150 }],
+    };
+    const counters = createCounterTick({
+      agents: [buyer({ id: 1 })],
+      elapsedSeconds: 100,
+      leave: (agent): SimulationAgentDecision => ({
+        agentId: agent.id,
+        nextState: "leave",
+      }),
+      patienceDeadline: () => 160,
+      seed: 1,
+      servicePoints: [down],
+      shops: [],
+    });
+
+    const decision = counters.decideCheckout(buyer({ id: 1 }));
+
+    // Joins the line rather than being served on the spot — the fast path
+    // for "line is empty, a server is free" must not bypass an outage.
+    expect(decision?.nextState).toBe("checkout");
+    expect(decision?.queueJoinedSeconds).toBe(100);
+  });
+
+  it("admits nobody from an already-formed line at a counter in outage, but keeps serving whoever it already had", () => {
+    const down: SimulationServicePoint = {
+      ...till,
+      outageWindows: [{ startsAtSeconds: 50, endsAtSeconds: 150 }],
+    };
+    const counters = createCounterTick({
+      agents: [
+        buyer({ id: 1, lifecycleState: "enterStore", browseUntilSeconds: 999 }),
+        buyer({ id: 2, queueJoinedSeconds: 20, queueUntilSeconds: 999 }),
+      ],
+      elapsedSeconds: 100,
+      leave: (agent): SimulationAgentDecision => ({
+        agentId: agent.id,
+        nextState: "leave",
+      }),
+      patienceDeadline: () => 999,
+      seed: 1,
+      servicePoints: [down],
+      shops: [],
+    });
+
+    expect(
+      counters.decideCheckout(buyer({ id: 2, queueJoinedSeconds: 20 }))?.nextState,
+    ).toBe("checkout");
+  });
 });

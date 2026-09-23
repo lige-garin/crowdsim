@@ -33,6 +33,16 @@ import { mulberry32 } from "./simulationEngineRandom";
 const evacuationExitCrowdingMeters = 4;
 
 /**
+ * The most service-point hops (ADR-0021, a service point's own
+ * `nextServicePointId`) one buyer's journey will follow before being sent to
+ * an exit regardless. Not a modelling number — a real chain ("security, then
+ * the gate") is two or three hops — but a bound against a scene author's
+ * authoring mistake (a cycle: A chains to B chains back to A), which would
+ * otherwise walk that buyer in circles for the rest of the run.
+ */
+const maxCheckpointHops = 8;
+
+/**
  * The exit to head for in an evacuation: the nearest, penalised by how many
  * people are already committed to it. Falls back to a straight-line distance
  * where no router is supplied, the same way the rest of the backend does.
@@ -214,6 +224,9 @@ export function createMallCrowdDecisionBackend(options: {
       const activeServicePoints = servicePoints ?? [];
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
+      const servicePointById = new Map(
+        activeServicePoints.map((servicePoint) => [servicePoint.id, servicePoint]),
+      );
 
       // Who is already committed to which exit. Without it "nearest exit" sends
       // everyone at one door and jams it while another stands empty.
@@ -318,6 +331,7 @@ export function createMallCrowdDecisionBackend(options: {
           queueUntilSeconds: null,
           queueJoinedSeconds: null,
           servicePointId: null,
+          checkpointHopCount: null,
           walkProgress: null,
         };
       };
@@ -516,13 +530,36 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
-        // Being served at a checkout: leave when the service completes.
+        // Being served at a checkout: leave once served, unless the service
+        // point just served at chains to another one (ADR-0021) — then walk
+        // there and queue again, reusing checkoutCounters.ts's own
+        // checkout/enterStore cycle a second time under a different id.
         if (state === "enterStore") {
           if (
             agent.browseUntilSeconds != null &&
             elapsedSeconds >= agent.browseUntilSeconds
           ) {
-            decisions.push(leaveDecision(agent));
+            const servedAt = agent.servicePointId
+              ? servicePointById.get(agent.servicePointId)
+              : undefined;
+            const next = servedAt?.nextServicePointId
+              ? servicePointById.get(servedAt.nextServicePointId)
+              : undefined;
+            const hops = agent.checkpointHopCount ?? 0;
+            decisions.push(
+              next && hops < maxCheckpointHops
+                ? {
+                    agentId: agent.id,
+                    nextState: "checkout",
+                    servicePointId: next.id,
+                    target: next.position,
+                    targetFloorId: next.floorId,
+                    checkpointHopCount: hops + 1,
+                    browseUntilSeconds: null,
+                    walkProgress: null,
+                  }
+                : leaveDecision(agent),
+            );
           }
           continue;
         }

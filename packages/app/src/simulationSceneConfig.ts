@@ -156,6 +156,10 @@ export function deriveSceneGeometry(
             (servicePoint.capacityPerMinute * servicePoint.serviceMeanSeconds) / 60,
           ),
         ),
+      // ADR-0021: these two fields were, until now, write-only — a scene
+      // author could set them and nothing downstream ever read them.
+      nextServicePointId: servicePoint.nextServicePointId,
+      outageWindows: servicePoint.outageWindows,
     })),
     shops,
     sinks:

@@ -406,6 +406,117 @@ describe("createMallCrowdDecisionBackend", () => {
     expect(d[0].targetSinkId).toBe("exit");
   });
 
+  it("chains a served buyer to the next service point instead of leaving (ADR-0021)", () => {
+    const chained: SimulationServicePoint[] = [
+      {
+        id: "security",
+        position: { x: 5, y: 5 },
+        radius: 2,
+        serviceSeconds: 3,
+        nextServicePointId: "gate",
+      },
+      { id: "gate", position: { x: 8, y: 8 }, radius: 2, serviceSeconds: 2 },
+    ];
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const serving = agent({
+      id: 1,
+      lifecycleState: "enterStore",
+      servicePointId: "security",
+      browseUntilSeconds: 3,
+      x: 5,
+      y: 5,
+    });
+    const d = backend.decideAgents({
+      agents: [serving],
+      decisionTick: 0,
+      elapsedSeconds: 4,
+      sinks,
+      shops,
+      servicePoints: chained,
+    });
+    expect(d[0].nextState).toBe("checkout");
+    expect(d[0].servicePointId).toBe("gate");
+    expect(d[0].target).toEqual({ x: 8, y: 8 });
+    expect(d[0].checkpointHopCount).toBe(1);
+  });
+
+  it("stops chaining exactly at the hop safety cap, rather than cycling forever", () => {
+    // A chains to B chains to A: a scene-authoring mistake, not a real
+    // journey. Tests both sides of the boundary — one hop under the cap
+    // still chains, so this cannot pass simply because chaining never
+    // happens at all; only right at the cap does it stop.
+    const cycle: SimulationServicePoint[] = [
+      {
+        id: "a",
+        position: { x: 5, y: 5 },
+        radius: 2,
+        serviceSeconds: 1,
+        nextServicePointId: "b",
+      },
+      {
+        id: "b",
+        position: { x: 6, y: 6 },
+        radius: 2,
+        serviceSeconds: 1,
+        nextServicePointId: "a",
+      },
+    ];
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const servingAt = (id: number, hopCount: number) =>
+      agent({
+        id,
+        lifecycleState: "enterStore",
+        servicePointId: "a",
+        browseUntilSeconds: 3,
+        checkpointHopCount: hopCount,
+        x: 5,
+        y: 5,
+      });
+    const d = backend.decideAgents({
+      agents: [servingAt(1, 7), servingAt(2, 8)],
+      decisionTick: 0,
+      elapsedSeconds: 4,
+      sinks,
+      shops,
+      servicePoints: cycle,
+    });
+    const byId = new Map(d.map((decision) => [decision.agentId, decision]));
+
+    expect(byId.get(1)?.nextState).toBe("checkout");
+    expect(byId.get(1)?.checkpointHopCount).toBe(8);
+    expect(byId.get(2)?.nextState).toBe("leave");
+  });
+
+  it("leaves when a service point's nextServicePointId points at nothing in the scene", () => {
+    const dangling: SimulationServicePoint[] = [
+      {
+        id: "security",
+        position: { x: 5, y: 5 },
+        radius: 2,
+        serviceSeconds: 3,
+        nextServicePointId: "does-not-exist",
+      },
+    ];
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const serving = agent({
+      id: 1,
+      lifecycleState: "enterStore",
+      servicePointId: "security",
+      browseUntilSeconds: 3,
+      x: 5,
+      y: 5,
+    });
+    const d = backend.decideAgents({
+      agents: [serving],
+      decisionTick: 0,
+      elapsedSeconds: 4,
+      sinks,
+      shops,
+      servicePoints: dangling,
+    });
+    expect(d[0].nextState).toBe("leave");
+  });
+
   it("a non-buyer leaves straight after browsing", () => {
     const noBuyShops = shops.map((s) => ({ ...s, conversionRate: 0 }));
     const backend = createMallCrowdDecisionBackend({ shops: noBuyShops, seed: 1 });

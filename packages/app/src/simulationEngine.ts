@@ -82,6 +82,16 @@ export type SimulationAgent = {
   exitIds?: readonly string[];
   /** The checkout counter a buyer is walking to, waiting at or served by. */
   servicePointId?: string;
+  /**
+   * How many service points this journey has already been chained through
+   * (ADR-0021), via a service point's own `nextServicePointId`. A safety
+   * counter, not a modelling choice: it exists only to cap a scene author's
+   * chain-authoring mistake (e.g. a cycle) at a bounded number of hops rather
+   * than an infinite one — see `maxCheckpointHops` in
+   * `mallCrowdDecisionBackend.ts`. Absent means zero, the same as every
+   * agent whose service point (if any) chains nowhere.
+   */
+  checkpointHopCount?: number;
   /** The anticipatory push last planned for this person, m/s² (crowdMovement). */
   avoidance?: readonly [number, number];
   /** People who arrived together share this: the id of the first of them. */

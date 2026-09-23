@@ -162,3 +162,28 @@ export function sampleBodyRadius(seed: number, agentId: number) {
   const [low, high] = bodyRadiusRangeMeters;
   return low + (high - low) * hashUnit(seed, agentId, "radius");
 }
+
+/**
+ * Not a random draw, unlike everything above — a scheduling predicate, used
+ * by `checkoutCounters.ts` (ADR-0021). Placed here rather than in
+ * `checkoutCounters.ts` itself because this file is the one both it and
+ * `checkpointQueueNetwork.ts` (ADR-0017) already depend on
+ * (`sampleServiceSeconds`) — a future production consumer of this check has
+ * a neutral place to import it from, without depending on
+ * `checkpointQueueNetwork.ts`, which keeps its own identical private copy of
+ * this exact logic (`isDown`) rather than being changed to call this one:
+ * that module's own repeated design intent (ADR-0013/0014/0017/0021) is to
+ * stay entirely self-contained, never imported from and importing as little
+ * as possible itself — changing it to depend on this file, even for three
+ * lines, would be a real if small crack in that boundary for a module three
+ * separate ADRs have chosen to keep sealed.
+ */
+export function isWithinOutageWindow(
+  windows: readonly { startsAtSeconds: number; endsAtSeconds: number }[] | undefined,
+  elapsedSeconds: number,
+): boolean {
+  return (windows ?? []).some(
+    (window) =>
+      elapsedSeconds >= window.startsAtSeconds && elapsedSeconds < window.endsAtSeconds,
+  );
+}

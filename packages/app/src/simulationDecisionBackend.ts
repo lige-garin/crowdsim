@@ -50,6 +50,16 @@ export type SimulationServicePoint = {
   serviceSeconds: number;
   /** People served at once; absent means no limit. */
   servers?: number;
+  /**
+   * The next service point a buyer is sent to once served here (ADR-0021,
+   * `servicePointSchema.nextServicePointId`) — "security, then the gate" as
+   * one journey. Absent: this is a network exit, same as every service point
+   * before this field existed.
+   */
+  nextServicePointId?: string;
+  /** Scripted time windows this service point admits nobody new (ADR-0021,
+   * `servicePointSchema.outageWindows`). Absent or empty: never down. */
+  outageWindows?: readonly { startsAtSeconds: number; endsAtSeconds: number }[];
 };
 
 export type SimulationAgentWalkProgress = {
@@ -71,6 +81,8 @@ export type SimulationAgentDecision = {
   queueJoinedSeconds?: number | null;
   /** The checkout counter the buyer is using; clears when explicitly null. */
   servicePointId?: string | null;
+  /** ADR-0021's chain-hop safety counter; clears when explicitly null. */
+  checkpointHopCount?: number | null;
   /** Clears the field when explicitly null (e.g. when the target changes). */
   walkProgress?: SimulationAgentWalkProgress | null;
   target?: ScenePoint;
@@ -262,6 +274,10 @@ export function applySimulationAgentDecisions(
         decision.servicePointId === null
           ? undefined
           : (decision.servicePointId ?? agent.servicePointId),
+      checkpointHopCount:
+        decision.checkpointHopCount === null
+          ? undefined
+          : (decision.checkpointHopCount ?? agent.checkpointHopCount),
       walkProgress:
         decision.walkProgress === null
           ? undefined
