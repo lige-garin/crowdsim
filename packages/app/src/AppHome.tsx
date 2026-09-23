@@ -98,15 +98,14 @@ export function AppHome({
     // fixtures, so the home screen no longer advertises a capability that
     // does not exist. See docs/CLAIMS_LEDGER.md.
     { label: "TRACE", value: "fixture" },
-    // Was "D1/R2", read as "connected to Cloudflare D1/R2" by anyone who
-    // doesn't already know otherwise. The backend's default (and only
-    // production-reachable) store is in-memory (`InMemoryProjectStore`);
-    // `D1DatabaseLike`/`R2BucketLike` are structural TypeScript interfaces
-    // with no wrangler.toml or worker entrypoint anywhere in the repo that
-    // ever constructs a real D1/R2-backed store. `CollaborationStatusPanel`
-    // already says this correctly ("local demo storage plus Cloudflare
-    // D1/R2 contracts"); this pulse just hadn't been updated to match.
-    { label: "DATA", value: "memory" },
+    // Was "D1/R2", then "memory" once the backend's own honesty note
+    // explained its default store was in-memory, not real Cloudflare D1/R2.
+    // Both readings described a backend that no longer exists:
+    // packages/backend was deleted 2026-09-24 (see docs/CLAIMS_LEDGER.md)
+    // because it was never deployable and never reachable from this
+    // client. The only real persistence left is what SceneEditor.tsx
+    // already does -- localStorage and file export/import.
+    { label: "DATA", value: "local" },
   ];
 
   return (

@@ -16,10 +16,14 @@ const ctx = {
   },
 } as unknown as PanelDockContext;
 
-describe("workspace + collaboration panels are registered and render", () => {
+describe("template library panel is registered and renders", () => {
   // ai-workflow was deleted 2026-09-24: a disclosed-fake panel whose own
-  // HONESTY NOTE said nothing in it called a model. See docs/CLAIMS_LEDGER.md.
-  for (const id of ["project-workspace", "collaboration-status", "template-library"]) {
+  // HONESTY NOTE said nothing in it called a model. project-workspace and
+  // collaboration-status were deleted the same day alongside the entire
+  // optional backend/collab package they existed to front -- undeployable
+  // as shipped, unreachable from the client, real code nobody would
+  // maintain. See docs/CLAIMS_LEDGER.md.
+  for (const id of ["template-library"]) {
     it(`renders ${id}`, () => {
       const entry = panelRegistry.find((panel) => panel.id === id);
       expect(entry, `panel ${id} must be registered`).toBeDefined();

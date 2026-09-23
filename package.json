@@ -6,18 +6,18 @@
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "scripts": {
-    "dev": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/app dev",
-    "dev:e2e": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/app dev -- --host 127.0.0.1 --port 5173",
+    "dev": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/app dev",
+    "dev:e2e": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/app dev -- --host 127.0.0.1 --port 5173",
     "build": "pnpm -r build",
     "build:wasm": "wasm-pack build packages/core-behavior --target web --out-dir ../app/src/wasm/core-behavior --release && node -e \"require('fs').rmSync('packages/app/src/wasm/core-behavior/.gitignore',{force:true})\"",
     "e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/backend build && pnpm -r test",
+    "test": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm -r test",
     "test:rust": "cargo test --manifest-path packages/core-behavior/Cargo.toml",
     "test:webgpu": "pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/core-gpu test:webgpu",
-    "typecheck": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm --filter @crowdsim/collab build && pnpm --filter @crowdsim/backend build && pnpm -r typecheck"
+    "typecheck": "pnpm --filter @crowdsim/scene-schema build && pnpm --filter @crowdsim/core-gpu build && pnpm -r typecheck"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

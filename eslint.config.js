@@ -49,8 +49,6 @@ export default tseslint.config(
         // unparsable for type-aware rules).
         project: [
           "./packages/app/tsconfig.json",
-          "./packages/backend/tsconfig.test.json",
-          "./packages/collab/tsconfig.test.json",
           "./packages/core-gpu/tsconfig.test.json",
           "./packages/scene-schema/tsconfig.test.json",
         ],

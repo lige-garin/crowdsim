@@ -45,12 +45,11 @@ and why.
   not decorative.
 - **There is no account system, and none is required.** The app persists
   your work to `localStorage` and to files you export/import
-  (`.csim.json`). An optional, self-hostable backend
-  (`packages/backend`, `packages/collab`) exists for projects/versions/
-  share links, but nothing in the client requires it, no network request
-  happens in a default build, and the backend is not currently deployable
-  as shipped (no hosting config included) — treat it as a reference
-  implementation.
+  (`.csim.json`). It makes no network requests in a default build. An
+  earlier optional backend for projects/versions/share links existed at
+  one point but was never deployable as shipped and was never reachable
+  from the client — it was removed rather than kept around unmaintained;
+  see `docs/CLAIMS_LEDGER.md` if you're looking for it.
 
 ## Quickstart
 
@@ -76,8 +75,6 @@ back to a slower per-frame-copy path rather than failing.
 | `packages/scene-schema`  | The `.csim.json` scene format (Zod schema), shared TS/Rust types.                                                                                                |
 | `packages/core-gpu`      | WGSL/WebGPU compute utilities (spatial hashing, flow fields, a full 100k-agent movement kernel that is benchmarked but not wired into the app).                  |
 | `packages/core-behavior` | A Rust→WASM discrete-event/state-machine behavior kernel. Real, tested (11 Rust tests), but not used by the shipping app's default decision backend — see below. |
-| `packages/backend`       | An optional, Fetch-compatible backend for projects/versions/share links/quota. Not required to run the app.                                                      |
-| `packages/collab`        | Data models shared by `backend` and the optional workspace panel.                                                                                                |
 
 ## Testing
 

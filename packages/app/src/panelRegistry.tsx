@@ -2,7 +2,6 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
-import type { BackendClient } from "./backendClient";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
 import { ScenarioDiffPanel } from "./ScenarioDiffPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
@@ -12,8 +11,6 @@ import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
-import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
-import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 
@@ -22,20 +19,17 @@ export type PanelDockContext = {
   scene: CrowdSimScene;
   trajectoryRecording: TrajectoryRecording;
   brandInsight?: BrandDecisionInsight;
-  // When provided, project-workspace lists live projects; otherwise it shows
-  // honestly-labeled sample data. Wired by the App once a backend is configured.
-  backendClient?: BackendClient;
 };
 
 /**
  * Where a panel's numbers come from.
  *
- * `live` reads the running simulation or a configured backend. `fixture` builds
- * its own hardcoded scenario in a useMemo and is unrelated to whatever the user
- * currently has open -- ScaleReadiness, for instance, reports on `demoScene`
- * (an atrium) while the app runs the rainy high street. Only ProjectWorkspace
- * used to say so; the dock now labels every fixture panel, because a panel that
- * looks authoritative and describes someone else's scene is worse than no panel.
+ * `live` reads the running simulation. `fixture` builds its own hardcoded
+ * scenario in a useMemo and is unrelated to whatever the user currently has
+ * open -- ScaleReadiness, for instance, reports on `demoScene` (an atrium)
+ * while the app runs the rainy high street. The dock labels every fixture
+ * panel, because a panel that looks authoritative and describes someone
+ * else's scene is worse than no panel.
  */
 export type PanelDataSource = "live" | "fixture";
 
@@ -111,20 +105,6 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "规模投影",
     labelEn: "Scale projection",
     render: () => <ScaleReadinessPanel />,
-  },
-  {
-    dataSource: "live",
-    id: "project-workspace",
-    labelZh: "项目空间",
-    labelEn: "Project workspace",
-    render: (ctx) => <ProjectWorkspacePanel client={ctx.backendClient} />,
-  },
-  {
-    dataSource: "fixture",
-    id: "collaboration-status",
-    labelZh: "协作状态",
-    labelEn: "Collaboration",
-    render: () => <CollaborationStatusPanel />,
   },
   {
     dataSource: "fixture",

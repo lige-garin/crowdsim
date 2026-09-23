@@ -35,9 +35,6 @@ importers:
 
   packages/app:
     dependencies:
-      '@crowdsim/collab':
-        specifier: workspace:*
-        version: link:../collab
       '@crowdsim/core-gpu':
         specifier: workspace:*
         version: link:../core-gpu
@@ -63,9 +60,6 @@ importers:
         specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
     devDependencies:
-      '@crowdsim/backend':
-        specifier: workspace:*
-        version: link:../backend
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -99,35 +93,6 @@ importers:
       vite:
         specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
-
-  packages/backend:
-    dependencies:
-      '@crowdsim/collab':
-        specifier: workspace:*
-        version: link:../collab
-      '@crowdsim/scene-schema':
-        specifier: workspace:*
-        version: link:../scene-schema
-    devDependencies:
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-      vitest:
-        specifier: ^4.1.8
-        version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
-
-  packages/collab:
-    dependencies:
-      '@crowdsim/scene-schema':
-        specifier: workspace:*
-        version: link:../scene-schema
-    devDependencies:
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
       vitest:
         specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))

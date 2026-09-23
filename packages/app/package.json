@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json"
   },
   "dependencies": {
-    "@crowdsim/collab": "workspace:*",
     "@crowdsim/core-gpu": "workspace:*",
     "@crowdsim/scene-schema": "workspace:*",
     "echarts": "^6.1.0",
@@ -23,7 +22,6 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@crowdsim/backend": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^25.9.3",

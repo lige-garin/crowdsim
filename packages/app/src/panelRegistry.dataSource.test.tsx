@@ -67,7 +67,6 @@ describe("panel dock data-source labelling", () => {
 
     expect(live).toEqual([
       "brand-intelligence",
-      "project-workspace",
       "trajectory-replay",
       // Reports on the open scene since the report panel was given it.
       "validation-report",

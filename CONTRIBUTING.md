@@ -2,9 +2,8 @@
 
 Thanks for your interest. This is a pnpm monorepo: a React/TypeScript
 pedestrian-simulation app (`packages/app`), a scene schema (`packages/scene-schema`),
-GPU/WGSL utilities (`packages/core-gpu`), a Rust→WASM behavior kernel
-(`packages/core-behavior`, not used at runtime by default — see below), and
-an optional self-hosted backend (`packages/backend`, `packages/collab`).
+GPU/WGSL utilities (`packages/core-gpu`), and a Rust→WASM behavior kernel
+(`packages/core-behavior`, not used at runtime by default — see below).
 
 ## Getting started
 

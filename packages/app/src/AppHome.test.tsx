@@ -18,14 +18,14 @@ function renderHome() {
 }
 
 describe("AppHome status pulses", () => {
-  it("never claims a live Cloudflare D1/R2 connection the backend doesn't have", () => {
+  it("describes real local persistence, not a backend that no longer exists", () => {
     renderHome();
-    // The backend's default (and only production-reachable) store is
-    // in-memory; D1/R2 are structural interfaces with no wrangler.toml or
-    // worker entrypoint anywhere that ever constructs a real D1/R2-backed
-    // store. See CollaborationStatusPanel's own "contracts" wording.
-    expect(screen.getByText("memory")).toBeInTheDocument();
+    // packages/backend was deleted 2026-09-24 (never deployable, never
+    // reachable from this client -- see docs/CLAIMS_LEDGER.md). The real
+    // persistence is localStorage/file export, not a database of any kind.
+    expect(screen.getByText("local")).toBeInTheDocument();
     expect(screen.queryByText("D1/R2")).not.toBeInTheDocument();
+    expect(screen.queryByText("memory")).not.toBeInTheDocument();
   });
 
   it("never claims image tracing has a model behind it", () => {
