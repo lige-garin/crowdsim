@@ -1,5 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import type { DashboardSample } from "./dashboardStats";
 import { RealObservationsPanel } from "./RealObservationsPanel";
 import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
 import type { MinuteFlow, RunAnalyticsSummary } from "./runAnalytics";
@@ -11,6 +12,7 @@ import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
 type AppInspectorProps = {
+  dashboardSamples: readonly DashboardSample[];
   elapsedSeconds: number;
   evacuation: EvacuationState;
   heatmapCells: readonly HeatmapCell[];
@@ -25,6 +27,7 @@ type AppInspectorProps = {
 };
 
 export function AppInspector({
+  dashboardSamples,
   elapsedSeconds,
   evacuation,
   heatmapCells,
@@ -60,6 +63,7 @@ export function AppInspector({
       */}
 
       <RunAnalyticsPanel
+        dashboardSamples={dashboardSamples}
         language={language}
         onExport={onExportRunAnalytics}
         scene={scene}

@@ -463,6 +463,7 @@ function AppContent() {
             timeScale: simulation.snapshot.timeScale,
           }}
           inspectorProps={{
+            dashboardSamples,
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
             minuteFlows,

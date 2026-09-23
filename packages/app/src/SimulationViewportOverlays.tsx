@@ -9,6 +9,42 @@ import {
 import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import type { ViewMode } from "./simulationViewportTypes";
 import { primitiveBounds } from "./simulationViewportGeometry";
+import { fruinColours, fruinDensityBreaks, fruinLevels } from "./fruinLevelOfService";
+
+/**
+ * What the heatmap layer's colours mean. The layer itself was drawn from
+ * launch with no key anywhere in the app -- a colour scale nobody could read.
+ * The bands and colours here are read straight from `fruinLevelOfService.ts`,
+ * the same module `bioCityViewportOverlayPlan.ts` uses to colour the cells,
+ * so the legend can never drift from what is actually painted.
+ */
+export function HeatmapLegendOverlay({ language }: { language: "zh" | "en" }) {
+  const breaks = fruinDensityBreaks("walkway");
+  const title = language === "zh" ? "密度（Fruin 服务水平）" : "Density (Fruin LOS)";
+
+  return (
+    <div className="render-heatmap-legend" aria-label={title}>
+      <span className="render-heatmap-legend-title">{title}</span>
+      <div className="render-heatmap-legend-scale">
+        {fruinLevels.map((level, index) => {
+          const upperBound = breaks[index];
+          const range =
+            upperBound === undefined
+              ? `> ${breaks[breaks.length - 1].toFixed(1)}`
+              : `≤ ${upperBound.toFixed(1)}`;
+
+          return (
+            <span key={level} className="render-heatmap-legend-item" title={range}>
+              <i style={{ background: fruinColours[level] }} />
+              {level}
+            </span>
+          );
+        })}
+      </div>
+      <span className="render-heatmap-legend-unit">P/m²</span>
+    </div>
+  );
+}
 
 export function ViewportUnsupportedNotice({
   detail,

@@ -42,6 +42,7 @@ describe("RunAnalyticsPanel", () => {
   it("says nothing is measured and disables export before the first sample", () => {
     render(
       <RunAnalyticsPanel
+        dashboardSamples={[]}
         language="en"
         onExport={vi.fn()}
         scene={scene}
@@ -59,6 +60,7 @@ describe("RunAnalyticsPanel", () => {
     const onExport = vi.fn();
     render(
       <RunAnalyticsPanel
+        dashboardSamples={[]}
         language="zh"
         onExport={onExport}
         scene={scene}
@@ -70,12 +72,32 @@ describe("RunAnalyticsPanel", () => {
     fireEvent.click(screen.getByTestId("export-journeys"));
     expect(onExport).toHaveBeenCalledWith("journeys");
   });
+
+  it("draws the population strip from the live dashboard samples, not the measured summary", () => {
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[
+          { agentCount: 12, elapsedSeconds: 1, exitedCount: 0 },
+          { agentCount: 18, elapsedSeconds: 2, exitedCount: 0 },
+        ]}
+        language="en"
+        onExport={vi.fn()}
+        scene={scene}
+        summary={createRunAnalytics().summary()}
+      />,
+    );
+
+    const strip = screen.getByTestId("realtime-strip");
+    expect(strip.querySelector("canvas")).not.toBeNull();
+    expect(strip).toHaveTextContent("18");
+  });
 });
 
 describe("what the measured numbers are", () => {
   it("says they come from one run and carry no interval", () => {
     render(
       <RunAnalyticsPanel
+        dashboardSamples={[]}
         language="zh"
         onExport={vi.fn()}
         scene={scene}

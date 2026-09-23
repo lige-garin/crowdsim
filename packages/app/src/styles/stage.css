@@ -243,6 +243,57 @@
   border-radius: 14px;
 }
 
+/*
+  Not a corner: all four are already taken by AppHudTop (name plate,
+  view controls, agent/exit counts, transport), which sits in a separate
+  z-index:30 overlay above this one and would hide anything placed under it.
+  Left-centre is the one edge the corner HUD never touches.
+*/
+.render-heatmap-legend {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 91, 255, 0.16);
+  border-radius: var(--product-radius-sm);
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+}
+
+.render-heatmap-legend-title {
+  color: var(--lab-muted);
+  white-space: nowrap;
+}
+
+.render-heatmap-legend-scale {
+  display: flex;
+  gap: 4px;
+}
+
+.render-heatmap-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+}
+
+.render-heatmap-legend-item i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.render-heatmap-legend-unit {
+  color: var(--lab-faint);
+  white-space: nowrap;
+}
+
 .render-agent-intent {
   position: absolute;
   bottom: 8px;
@@ -371,6 +422,14 @@
 }
 
 .workspace .render-city-label {
+  border-color: rgba(228, 234, 224, 0.14);
+  background: rgba(12, 16, 13, 0.82);
+  color: var(--lab-muted);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.workspace .render-heatmap-legend {
   border-color: rgba(228, 234, 224, 0.14);
   background: rgba(12, 16, 13, 0.82);
   color: var(--lab-muted);

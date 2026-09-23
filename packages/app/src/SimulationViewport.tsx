@@ -8,6 +8,7 @@ import { defaultViewportLayers, type ViewportLayers } from "./viewportLayers";
 import type { HeatmapCell } from "./heatmap";
 import { useSimulationViewportRenderer } from "./useSimulationViewportRenderer";
 import {
+  HeatmapLegendOverlay,
   ViewportCityLabelOverlay,
   ViewportLiveAgentOverlay,
   ViewportUnsupportedNotice,
@@ -119,6 +120,7 @@ export function SimulationViewport({
           {describeViewportRenderMode(renderMode, language)?.label}
         </div>
       )}
+      {!blocked && layers.heatmap && <HeatmapLegendOverlay language={language} />}
       {!blocked && viewMode === "3d" && pickedAgent && (
         <div className="render-selected-agent" aria-live="polite">
           <strong>Agent #{pickedAgent.id}</strong>

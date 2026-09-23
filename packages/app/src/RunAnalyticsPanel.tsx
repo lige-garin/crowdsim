@@ -1,6 +1,8 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import type { DashboardSample } from "./dashboardStats";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
+import { RealtimeStrip } from "./RealtimeStrip";
 import type { RunAnalytics, RunAnalyticsSummary, StayKind } from "./runAnalytics";
 
 export type RunAnalyticsExport = keyof RunAnalytics["csv"];
@@ -86,11 +88,13 @@ const copy = {
  * waits, each exportable as CSV for a report or a spreadsheet.
  */
 export function RunAnalyticsPanel({
+  dashboardSamples,
   language,
   onExport,
   scene,
   summary,
 }: {
+  dashboardSamples: readonly DashboardSample[];
   language: Language;
   onExport: (kind: RunAnalyticsExport) => void;
   scene: CrowdSimScene;
@@ -112,6 +116,8 @@ export function RunAnalyticsPanel({
         <span>{text.title}</span>
         <strong>{seconds(summary.elapsedSeconds)}</strong>
       </header>
+
+      <RealtimeStrip language={language} samples={dashboardSamples} />
 
       <p className="run-analytics-single-run" data-testid="run-analytics-single-run">
         {text.singleRun}
