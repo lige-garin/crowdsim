@@ -173,7 +173,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
         toggleDocumentObstacleBlocksMovement(current, selectedObstacle.id),
       );
     },
-    toggleRoadBoolean(field: "transitOnly" | "walkable") {
+    toggleRoadBoolean(field: "transitOnly" | "vehicleAccessible" | "walkable") {
       if (!selectedRoad) return;
       setDocument((current) =>
         toggleDocumentRoadBoolean(current, selectedRoad.id, field),

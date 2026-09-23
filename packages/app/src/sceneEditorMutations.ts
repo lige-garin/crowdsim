@@ -4,6 +4,8 @@ import type { EditorZoneCategory } from "./sceneEditorState";
 export type RoadNumberField =
   | "capacityPerMinute"
   | "speedLimitMetersPerSecond"
+  | "vehicleArrivalRatePerMinute"
+  | "vehicleSpeedLimitMetersPerSecond"
   | "widthMeters";
 export type BuildingNumberField =
   | "floors"
@@ -51,7 +53,8 @@ export function updateDocumentRoadNumber(
   field: RoadNumberField,
   value: number,
 ) {
-  const minValue = field === "capacityPerMinute" ? 0 : 0.1;
+  const minValue =
+    field === "capacityPerMinute" || field === "vehicleArrivalRatePerMinute" ? 0 : 0.1;
 
   return {
     ...document,
@@ -77,7 +80,7 @@ export function updateDocumentRoadDirection(
 export function toggleDocumentRoadBoolean(
   document: EditorDocument,
   roadId: string,
-  field: "transitOnly" | "walkable",
+  field: "transitOnly" | "vehicleAccessible" | "walkable",
 ) {
   return {
     ...document,

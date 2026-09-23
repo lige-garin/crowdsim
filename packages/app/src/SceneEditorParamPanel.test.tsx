@@ -69,6 +69,10 @@ describe("SceneEditorParamPanel", () => {
     const onRoadDirectionChange = vi.fn();
     const onRoadNumberChange = vi.fn();
     const onToggleRoadTransitOnly = vi.fn();
+    const onToggleRoadVehicleAccessible = vi.fn();
+    // The demo scene declares no vehicle-accessible roads (schema default
+    // false, ADR-0016/0020), so this road starts blocked to traffic.
+    expect(document.roads[0].vehicleAccessible).toBe(false);
 
     render(
       <SceneEditorParamPanel
@@ -76,6 +80,7 @@ describe("SceneEditorParamPanel", () => {
         onRoadDirectionChange={onRoadDirectionChange}
         onRoadNumberChange={onRoadNumberChange}
         onToggleRoadTransitOnly={onToggleRoadTransitOnly}
+        onToggleRoadVehicleAccessible={onToggleRoadVehicleAccessible}
         selectedRoad={document.roads[0]}
       />,
     );
@@ -87,10 +92,48 @@ describe("SceneEditorParamPanel", () => {
       target: { value: "14" },
     });
     fireEvent.click(screen.getByRole("button", { name: "mixedTraffic" }));
+    fireEvent.click(screen.getByRole("button", { name: "vehicleBlocked" }));
 
     expect(onRoadDirectionChange).toHaveBeenCalledWith("oneWayForward");
     expect(onRoadNumberChange).toHaveBeenCalledWith("widthMeters", 14);
     expect(onToggleRoadTransitOnly).toHaveBeenCalled();
+    expect(onToggleRoadVehicleAccessible).toHaveBeenCalled();
+    // Vehicle arrival-rate/speed-limit inputs only make sense once a road is
+    // vehicle-accessible — hidden here, covered by the next test.
+    expect(screen.queryByLabelText("vehicleArrivalRate")).not.toBeInTheDocument();
+  });
+
+  it("edits a vehicle-accessible road's traffic fields (ADR-0016/0020)", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const onRoadNumberChange = vi.fn();
+    const vehicleRoad = {
+      ...document.roads[0],
+      vehicleAccessible: true,
+      vehicleArrivalRatePerMinute: 6,
+      vehicleSpeedLimitMetersPerSecond: 8.33,
+    };
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onRoadNumberChange={onRoadNumberChange}
+        selectedRoad={vehicleRoad}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "vehicleAccessible" })).toBeVisible();
+    fireEvent.change(screen.getByLabelText("vehicleArrivalRate"), {
+      target: { value: "12" },
+    });
+    fireEvent.change(screen.getByLabelText("vehicleSpeedLimit"), {
+      target: { value: "10" },
+    });
+
+    expect(onRoadNumberChange).toHaveBeenCalledWith("vehicleArrivalRatePerMinute", 12);
+    expect(onRoadNumberChange).toHaveBeenCalledWith(
+      "vehicleSpeedLimitMetersPerSecond",
+      10,
+    );
   });
 
   it("renders and wires hazard BioCity controls", () => {
@@ -149,6 +192,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onToggleBasemapVisible: vi.fn(),
     onToggleObstacleBlocksMovement: vi.fn(),
     onToggleRoadTransitOnly: vi.fn(),
+    onToggleRoadVehicleAccessible: vi.fn(),
     onToggleRoadWalkable: vi.fn(),
     onToggleTransitStopActive: vi.fn(),
     onToggleZoneWalkable: vi.fn(),

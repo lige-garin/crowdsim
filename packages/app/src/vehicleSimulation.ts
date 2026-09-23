@@ -7,14 +7,14 @@ import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
  * transit stop on their road for a dwell computed from that stop's own
  * existing schema fields.
  *
- * Deliberately standalone, the same shape this session's ORCA and Moussaïd
- * comparison layers took (ADR-0013, ADR-0014): a real, tested model that is
- * NOT wired into `simulationEngine.ts`, the live worker, the viewport, or
- * the editor. Wiring a second, structurally different mover (not a
- * social-force pedestrian; no floor/queue/lifecycle semantics; moves along a
- * 1-D road coordinate, not a 2-D field) into the live pedestrian engine is
- * real additional work this pass did not attempt — see ADR-0016's own
- * "what this is not" section.
+ * Wired into `simulationEngine.ts`/the worker/the viewport/the editor as of
+ * ADR-0020 (2026-09-23): a `vehicleAccessible` road's traffic now actually
+ * drives, is visible, and is toggleable without hand-editing JSON. Before
+ * that it was standalone, the same shape this session's ORCA and Moussaïd
+ * comparison layers took (ADR-0013, ADR-0014). This module itself is
+ * unchanged by that wiring — it still has no notion of floors, decisions or
+ * pedestrian lifecycle of its own; the engine calls `stepVehicles` once per
+ * floor, the same way it steps a pedestrian crowd once per plane.
  *
  * Deliberately out of scope for stage 1, and not attempted here: a road
  * network (a vehicle only ever traverses the one road segment it spawned
@@ -35,6 +35,14 @@ export type VehicleKind = "car" | "bus";
 export type VehicleAgent = {
   id: string;
   roadId: string;
+  /**
+   * Copied from its road at spawn (`RoadRuntime.floorId`); absent on a
+   * floor-less scene, exactly like `SimulationAgent.floorId`. This module
+   * never reads it itself — it exists so the engine can bucket vehicles and
+   * their road's pedestrians onto the same plane before calling `stepVehicles`,
+   * and so the viewport can show only the vehicles on the floor being viewed.
+   */
+  floorId?: string;
   laneDirection: LaneDirection;
   kind: VehicleKind;
   /** 0 at spawn, `road.totalLengthMeters` at despawn — always increasing,
@@ -65,6 +73,8 @@ export type RoadRuntimeStop = {
 
 export type RoadRuntime = {
   id: string;
+  /** Copied onto every vehicle spawned on this road; see `VehicleAgent.floorId`. */
+  floorId?: string;
   points: readonly ScenePoint[];
   /** `cumulative[i]` = arclength from `points[0]` to `points[i]`. */
   cumulative: readonly number[];
@@ -111,6 +121,10 @@ export function buildRoadRuntime(
   road: CrowdSimScene["roads"][number],
   crosswalks: readonly CrowdSimScene["crosswalks"][number][],
   stops: readonly CrowdSimScene["transitStops"][number][],
+  /** Resolved by the caller (`resolveFloorId`), not read off `road` directly:
+   * a road with no `floorId` of its own still belongs to a scene's base
+   * floor once that scene declares floors at all. */
+  floorId?: string,
 ): RoadRuntime {
   const points = road.geometry.points;
   const cumulative: number[] = [0];
@@ -141,6 +155,7 @@ export function buildRoadRuntime(
       })),
     cumulative,
     directions,
+    floorId,
     id: road.id,
     points,
     speedLimitMetersPerSecond: road.vehicleSpeedLimitMetersPerSecond,
@@ -420,6 +435,7 @@ function spawnVehicles(
       spawned.push({
         dwellRemainingSeconds: 0,
         dwelledStopIds: [],
+        floorId: road.floorId,
         id: `${road.id}-${laneDirection}-${Math.floor(random() * 1e9)}`,
         kind: "car",
         laneDirection,

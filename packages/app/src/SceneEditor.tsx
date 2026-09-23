@@ -728,6 +728,9 @@ export function SceneEditor({
       onToggleEditorViewMode={paramActions.toggleViewMode}
       onToggleObstacleBlocksMovement={paramActions.toggleObstacleBlocksMovement}
       onToggleRoadTransitOnly={() => paramActions.toggleRoadBoolean("transitOnly")}
+      onToggleRoadVehicleAccessible={() =>
+        paramActions.toggleRoadBoolean("vehicleAccessible")
+      }
       onToggleRoadWalkable={() => paramActions.toggleRoadBoolean("walkable")}
       onToggleSnap={() => setSnapEnabled((value) => !value)}
       onToggleTransitStopActive={paramActions.toggleTransitStopActive}

@@ -26,6 +26,7 @@ import {
   type SimulationHazard,
 } from "./smokeHazards";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
+import { stepVehicles, type RoadRuntime, type VehicleAgent } from "./vehicleSimulation";
 import { createWallIndex, type WallIndex } from "./wallIndex";
 import { crowdBudget } from "./crowdBudget";
 import {
@@ -202,6 +203,10 @@ export type SimulationEngineConfig = {
   connectors?: ConnectorRuntime[];
   /** Fire/smoke that slows and can incapacitate a crowd (ADR-0012). */
   hazards?: SimulationHazard[];
+  /** `vehicleAccessible` roads, stepped once per floor alongside that floor's
+   * pedestrians (ADR-0016 stage 1, wired in by ADR-0020). Absent or empty —
+   * the overwhelming majority of scenes — means vehicle stepping is skipped. */
+  roads?: RoadRuntime[];
   /**
    * Overrides for the social-force model's own constants (calibration,
    * sensitivity analysis) — passed straight through to `stepCrowd`'s own
@@ -230,6 +235,15 @@ export type SimulationSnapshot = {
   spawnedCount: number;
   exitedCount: number;
   agents: SimulationAgent[];
+  /**
+   * `vehicleAccessible` road traffic (ADR-0016 stage 1, wired in by
+   * ADR-0020). Absent has the same meaning as `[]`: no vehicle-accessible
+   * road in the scene. Optional for the same reason `evacuationClearSeconds`
+   * is — the many callers building a snapshot-shaped object for a run with
+   * no vehicles need not invent one; the engine's own `makeSnapshot` always
+   * sets it.
+   */
+  vehicles?: VehicleAgent[];
   /**
    * Seconds from the alarm to the last person to leave during it, so a report
    * can say how long the building took to clear. 0 until someone leaves. It is
@@ -434,6 +448,8 @@ export function createSimulationEngine(
   let floors = buildFloors(config);
   let connectors = config.connectors ?? [];
   let hazards = config.hazards ?? [];
+  let roads = config.roads ?? [];
+  let vehicles: VehicleAgent[] = [];
   let flightFloors = buildFlightFloors(connectors);
   let floorGraph = createFloorGraph({
     connectors,
@@ -474,6 +490,7 @@ export function createSimulationEngine(
       spawnedCount,
       exitedCount,
       agents: agents.map((agent) => ({ ...agent })),
+      vehicles: vehicles.map((vehicle) => ({ ...vehicle })),
       evacuationClearSeconds,
       evacuationExits: Object.fromEntries(evacuationExits),
       incapacitatedCount: agents.reduce(
@@ -708,6 +725,42 @@ export function createSimulationEngine(
     });
   }
 
+  /**
+   * `vehicleAccessible` road traffic, one `stepVehicles` call per floor a
+   * road sits on (`RoadRuntime.floorId`) — the same "one plane, its own
+   * crowd" split `advanceAgentsCpu` already does for pedestrians, and for
+   * the same reason: a car on floor 2 and a pedestrian crossing at the same
+   * (x, y) on floor 1 are not near each other. No-ops when `roads` is empty,
+   * so a scene with no vehicle-accessible road pays nothing for this.
+   */
+  function stepVehiclesTick() {
+    if (roads.length === 0) {
+      return;
+    }
+    const stepped: VehicleAgent[] = [];
+    for (const floor of floors) {
+      const roadsOnFloor = roads.filter(
+        (road) => (road.floorId ?? baseFloor()) === floor.id,
+      );
+      if (roadsOnFloor.length === 0) {
+        continue;
+      }
+      const roadIds = new Set(roadsOnFloor.map((road) => road.id));
+      stepped.push(
+        ...stepVehicles({
+          dtSeconds: fixedDtSeconds,
+          pedestrians: agents.filter(
+            (agent) => (agent.floorId ?? baseFloor()) === floor.id,
+          ),
+          random: rng,
+          roads: roadsOnFloor,
+          vehicles: vehicles.filter((vehicle) => roadIds.has(vehicle.roadId)),
+        }),
+      );
+    }
+    vehicles = stepped;
+  }
+
   function advanceAgentsCpu() {
     applyHazardExposure();
     // Only handed over during an evacuation, so a normal step allocates
@@ -773,6 +826,7 @@ export function createSimulationEngine(
       nowSeconds: elapsedSeconds,
       sinks,
     });
+    stepVehiclesTick();
     if (evacuationActive && exitedSinkIds.length > 0) {
       for (const sinkId of exitedSinkIds) {
         evacuationExits.set(sinkId, (evacuationExits.get(sinkId) ?? 0) + 1);
@@ -824,6 +878,16 @@ export function createSimulationEngine(
       floors = buildFloors(geometry);
       connectors = geometry.connectors ?? [];
       hazards = geometry.hazards ?? [];
+      roads = geometry.roads ?? [];
+      // A road an edit deleted or made no longer vehicle-accessible cannot be
+      // driven on any more; its vehicles are dropped rather than left to
+      // reference a `roadId` `stepVehiclesTick` no longer groups by anything.
+      // Same choice this engine already makes for a pedestrian standing on a
+      // floor an edit removed (see `standing` below) — no `exitedCount`-style
+      // tally exists for vehicles to omit, since `stepVehicles` itself already
+      // despawns a car at its road's end with no counter (vehicleSimulation.ts).
+      const roadIds = new Set(roads.map((road) => road.id));
+      vehicles = vehicles.filter((vehicle) => roadIds.has(vehicle.roadId));
       flightFloors = buildFlightFloors(connectors);
       connectorTraffic = createConnectorTraffic(connectors);
       elevatorCars = createElevatorRuntime(connectors);
@@ -865,6 +929,7 @@ export function createSimulationEngine(
       exitedCount = 0;
       waitingOutside.clear();
       agents = [];
+      vehicles = [];
       evacuationActive = false;
       evacuationStartedSeconds = 0;
       return makeSnapshot();

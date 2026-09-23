@@ -118,6 +118,7 @@ type SceneEditorLayoutProps = {
   onToggleBasemapVisible: () => void;
   onToggleObstacleBlocksMovement: () => void;
   onToggleRoadTransitOnly: () => void;
+  onToggleRoadVehicleAccessible: () => void;
   onToggleRoadWalkable: () => void;
   onToggleZoneWalkable: () => void;
   onToggleTransitStopActive: () => void;
@@ -229,6 +230,7 @@ export function SceneEditorLayout({
   onToggleBasemapVisible,
   onToggleObstacleBlocksMovement,
   onToggleRoadTransitOnly,
+  onToggleRoadVehicleAccessible,
   onToggleRoadWalkable,
   onToggleZoneWalkable,
   onToggleTransitStopActive,
@@ -386,6 +388,7 @@ export function SceneEditorLayout({
         onShopSizeChange={onShopSizeChange}
         onToggleObstacleBlocksMovement={onToggleObstacleBlocksMovement}
         onToggleRoadTransitOnly={onToggleRoadTransitOnly}
+        onToggleRoadVehicleAccessible={onToggleRoadVehicleAccessible}
         onToggleRoadWalkable={onToggleRoadWalkable}
         onToggleBasemapLocked={onToggleBasemapLocked}
         onToggleBasemapVisible={onToggleBasemapVisible}

@@ -310,6 +310,13 @@ export const messages = {
   undo: { zh: "撤销", en: "Undo" },
   unknown: { zh: "未知", en: "Unknown" },
   valid: { zh: "有效", en: "valid" },
+  vehicleAccessible: { zh: "允许车辆", en: "Vehicle accessible" },
+  vehicleArrivalRate: {
+    zh: "车辆到达率 (辆/分)",
+    en: "Vehicle arrival rate (per min)",
+  },
+  vehicleBlocked: { zh: "禁止车辆", en: "No vehicles" },
+  vehicleSpeedLimit: { zh: "车辆限速", en: "Vehicle speed limit" },
   view2d: { zh: "2D 视图", en: "2D view" },
   view2d5: { zh: "2.5D view", en: "2.5D view" },
   view2dPlan: { zh: "2D 平面", en: "2D plan" },

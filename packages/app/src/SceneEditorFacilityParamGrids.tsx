@@ -90,6 +90,7 @@ export function RoadParamGrid({
   onDirectionChange,
   onNumberChange,
   onToggleTransitOnly,
+  onToggleVehicleAccessible,
   onToggleWalkable,
   selectedRoad,
   t,
@@ -97,6 +98,7 @@ export function RoadParamGrid({
   onDirectionChange: (direction: Road["direction"]) => void;
   onNumberChange: (field: RoadNumberField, value: number) => void;
   onToggleTransitOnly: () => void;
+  onToggleVehicleAccessible: () => void;
   onToggleWalkable: () => void;
   selectedRoad: Road;
   t: (key: TranslationKey) => string;
@@ -137,6 +139,29 @@ export function RoadParamGrid({
       <button type="button" onClick={onToggleTransitOnly}>
         {selectedRoad.transitOnly ? t("transitOnly") : t("mixedTraffic")}
       </button>
+      <button type="button" onClick={onToggleVehicleAccessible}>
+        {selectedRoad.vehicleAccessible ? t("vehicleAccessible") : t("vehicleBlocked")}
+      </button>
+      {selectedRoad.vehicleAccessible ? (
+        <>
+          <NumberInput
+            label={t("vehicleArrivalRate")}
+            min={0}
+            step={1}
+            value={selectedRoad.vehicleArrivalRatePerMinute}
+            onChange={(value) => onNumberChange("vehicleArrivalRatePerMinute", value)}
+          />
+          <NumberInput
+            label={t("vehicleSpeedLimit")}
+            min={0.1}
+            step={0.5}
+            value={selectedRoad.vehicleSpeedLimitMetersPerSecond}
+            onChange={(value) =>
+              onNumberChange("vehicleSpeedLimitMetersPerSecond", value)
+            }
+          />
+        </>
+      ) : null}
     </div>
   );
 }

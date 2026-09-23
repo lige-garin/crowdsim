@@ -73,6 +73,7 @@ type SceneEditorParamPanelProps = {
   onToggleBasemapVisible: () => void;
   onToggleObstacleBlocksMovement: () => void;
   onToggleRoadTransitOnly: () => void;
+  onToggleRoadVehicleAccessible: () => void;
   onToggleRoadWalkable: () => void;
   onToggleTransitStopActive: () => void;
   onToggleZoneWalkable: () => void;
@@ -123,6 +124,7 @@ export function SceneEditorParamPanel({
   onShopSizeChange,
   onToggleObstacleBlocksMovement,
   onToggleRoadTransitOnly,
+  onToggleRoadVehicleAccessible,
   onToggleRoadWalkable,
   onToggleBasemapLocked,
   onToggleBasemapVisible,
@@ -173,6 +175,7 @@ export function SceneEditorParamPanel({
           onDirectionChange={onRoadDirectionChange}
           onNumberChange={onRoadNumberChange}
           onToggleTransitOnly={onToggleRoadTransitOnly}
+          onToggleVehicleAccessible={onToggleRoadVehicleAccessible}
           onToggleWalkable={onToggleRoadWalkable}
           selectedRoad={selectedRoad}
           t={t}

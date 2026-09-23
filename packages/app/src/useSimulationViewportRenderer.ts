@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  BoxGeometry,
   Color,
   DynamicDrawUsage,
   Group,
@@ -64,6 +65,13 @@ import {
   createGpuViewportRenderer,
 } from "./simulationViewportRendererFactory";
 import { createViewportPostProcessing } from "./viewportPostProcessing";
+/**
+ * Vehicle boxes are a fixed, small pool — the project's own vehicle model has
+ * no road network (ADR-0016 stage 1: a car only ever traverses the single
+ * road it spawned on), so a scene's total vehicle count is bounded by its
+ * arrival rates, not its agent budget. Tens, not thousands; see ADR-0020.
+ */
+const vehicleViewportCapacity = 64;
 type RendererArgs = {
   crowdScene?: CrowdSimScene;
   /** The floor being watched; its crowd is the only one drawn (ADR-0010). */
@@ -177,6 +185,17 @@ export function useSimulationViewportRenderer({
           viewportAgentCapacity,
         );
     if (agents) agents.frustumCulled = false;
+    // A road-going vehicle is not a pedestrian: its own small InstancedMesh,
+    // not folded into `figures`/`agents` above. Un-oriented — it does not turn
+    // to face its direction of travel — the same disclosed simplification as
+    // the 2D pedestrian dot, kept for the same reason: this is a position
+    // update, not a vehicle model (ADR-0020).
+    const vehicles = new InstancedMesh(
+      new BoxGeometry(4, 1.8, 1.5),
+      new MeshBasicMaterial({ color: "#3b4a5a" }),
+      vehicleViewportCapacity,
+    );
+    vehicles.frustumCulled = false;
     const dynamicGroup = new Group();
     dynamicGroup.name = "biocity-dynamic";
     const lightRig =
@@ -227,7 +246,9 @@ export function useSimulationViewportRenderer({
     }
     scene.background = new Color("#f6f9fc");
     agents?.instanceMatrix.setUsage(DynamicDrawUsage);
+    vehicles.instanceMatrix.setUsage(DynamicDrawUsage);
     scene.add(figures?.group ?? agents!);
+    scene.add(vehicles);
     scene.add(dynamicGroup);
     lightRig?.attach(scene);
     function resize() {
@@ -257,16 +278,43 @@ export function useSimulationViewportRenderer({
       resizeObserver.observe(canvasElement.parentElement ?? canvasElement);
     }
     let renderedAgentCount = 0;
-    function seedAgents() {
-      if (!agents) return;
-      for (let index = 0; index < viewportAgentCapacity; index++) {
+    let renderedVehicleCount = 0;
+    /** Parks every instance off-screen and zeroes the drawn count — shared by
+     * `seedAgents`/`seedVehicles` below, which differ only in which mesh and
+     * capacity they seed. */
+    function seedMesh(mesh: InstancedMesh, capacity: number) {
+      for (let index = 0; index < capacity; index++) {
         dummy.scale.setScalar(0);
         dummy.position.set(0, 0, -1000);
         dummy.updateMatrix();
-        agents.setMatrixAt(index, dummy.matrix);
+        mesh.setMatrixAt(index, dummy.matrix);
       }
-      agents.count = 0;
-      agents.instanceMatrix.needsUpdate = true;
+      mesh.count = 0;
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    function seedAgents() {
+      if (agents) seedMesh(agents, viewportAgentCapacity);
+    }
+    function seedVehicles() {
+      seedMesh(vehicles, vehicleViewportCapacity);
+    }
+    /** Clears instances past `visible` and commits the mesh's drawn count —
+     * shared by `updateAgentInstances`'s 2D compat path and
+     * `updateVehicleInstances`, which differ only in how they compute each
+     * live entity's world position, not in how they commit to the mesh. */
+    function commitInstances(mesh: InstancedMesh, visible: number, rendered: number) {
+      for (let index = visible; index < rendered; index++) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(index, dummy.matrix);
+      }
+      const touched = Math.max(visible, rendered);
+      mesh.count = visible;
+      if (touched > 0) {
+        mesh.instanceMatrix.addUpdateRange(0, touched * 16);
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+      return visible;
     }
     function updateAgentInstances() {
       const live = selectCrowdAgents(
@@ -296,18 +344,31 @@ export function useSimulationViewportRenderer({
         dummy.updateMatrix();
         agents.setMatrixAt(index, dummy.matrix);
       }
-      for (let index = visible; index < renderedAgentCount; index++) {
-        dummy.scale.setScalar(0);
+      renderedAgentCount = commitInstances(agents, visible, renderedAgentCount);
+    }
+    /** A vehicle's own small InstancedMesh (ADR-0020) — same technique as
+     * `updateAgentInstances`'s 2D compat path, no shared-memory overlay since
+     * a scene's vehicle count is tens, not thousands (see B in its own
+     * reconnaissance). Floor-filtered the same way `selectCrowdAgents` filters
+     * pedestrians, by id (the snapshot carries no floor index for vehicles). */
+    function updateVehicleInstances() {
+      const floor = floorRef.current;
+      const live = (snapshotRef.current?.vehicles ?? []).filter(
+        (vehicle) => !floor || vehicle.floorId === floor.id,
+      );
+      const visible = visibleAgentCount(live.length, vehicleViewportCapacity);
+      for (let index = 0; index < visible; index++) {
+        const world = agentWorldPosition(
+          live[index],
+          { width: worldWidth, height: worldHeight },
+          viewMode,
+        );
+        dummy.position.set(world.x, world.y, viewMode === "3d" ? 0.75 : 0);
+        dummy.scale.setScalar(1);
         dummy.updateMatrix();
-        agents.setMatrixAt(index, dummy.matrix);
+        vehicles.setMatrixAt(index, dummy.matrix);
       }
-      const touched = Math.max(visible, renderedAgentCount);
-      agents.count = visible;
-      renderedAgentCount = visible;
-      if (touched > 0) {
-        agents.instanceMatrix.addUpdateRange(0, touched * 16);
-        agents.instanceMatrix.needsUpdate = true;
-      }
+      renderedVehicleCount = commitInstances(vehicles, visible, renderedVehicleCount);
     }
     function renderFrame(time: number) {
       if (disposed || renderHalted || !renderer) {
@@ -316,6 +377,7 @@ export function useSimulationViewportRenderer({
       const frameTime = Number.isFinite(time) ? time : performance.now();
       try {
         updateAgentInstances();
+        updateVehicleInstances();
         // Per-frame animation for dynamic objects that want it (falling rain).
         const frameSeconds = (frameTime - lastFrameAt) / 1000;
         for (const child of dynamicGroup.children) {
@@ -388,6 +450,7 @@ export function useSimulationViewportRenderer({
           renderer = createFallbackViewportRenderer(canvasElement);
           observeResize();
           seedAgents();
+          seedVehicles();
           startRenderLoop();
           return;
         }
@@ -421,6 +484,7 @@ export function useSimulationViewportRenderer({
         }
         observeResize();
         seedAgents();
+        seedVehicles();
         setStatus(localizedStatus("benchmarking"));
         const benchmarkFps = await benchmarkViewportRenderer(device, renderFrame);
         if (disposed) {
@@ -468,6 +532,8 @@ export function useSimulationViewportRenderer({
       figures?.dispose();
       agents?.geometry.dispose();
       agents?.material.dispose();
+      vehicles.geometry.dispose();
+      vehicles.material.dispose();
       lightRig?.dispose();
       dynamicGroup.children.slice().forEach(disposeRenderObject);
     };

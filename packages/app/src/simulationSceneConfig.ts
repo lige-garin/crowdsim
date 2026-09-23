@@ -24,6 +24,7 @@ import type {
 } from "./simulationDecisionBackend";
 import type { SimulationSink, SimulationSource } from "./simulationEngine";
 import type { SimulationHazard } from "./smokeHazards";
+import { buildRoadRuntime, type RoadRuntime } from "./vehicleSimulation";
 import { weatherCrowdImpact } from "./weatherCrowdImpact";
 
 // Weidmann free-flow speed. Was 8 m/s (~29 km/h, 6x a walking human): every UI
@@ -63,6 +64,10 @@ export type SceneGeometry = {
   connectors: ConnectorRuntime[];
   /** Fire/smoke that slows and can incapacitate a crowd (ADR-0012). */
   hazards: SimulationHazard[];
+  /** `vehicleAccessible` roads, ready for the engine to spawn and drive
+   * traffic on (ADR-0016 stage 1, wired in by ADR-0020). Empty on a scene
+   * with none — the overwhelming majority — so vehicle stepping is a no-op. */
+  roads: RoadRuntime[];
   servicePoints: SimulationServicePoint[];
   shops: SimulationShop[];
   sinks: SimulationSink[];
@@ -194,9 +199,30 @@ export function deriveSceneGeometry(
     floors: sceneFloorGeometries(scene, overrides),
     connectors: sceneConnectorRuntimes(scene),
     hazards: sceneHazardRuntimes(scene),
+    roads: sceneRoadRuntimes(scene),
     walls: overrides.walls ?? wallSegmentsFromScene(scene),
     world: overrides.world ?? scene.world,
   };
+}
+
+/**
+ * A scene's `vehicleAccessible` roads, ready to drive (ADR-0016 stage 1,
+ * wired in by ADR-0020). Every other road — the overwhelming majority, since
+ * `vehicleAccessible` defaults false — is left out here exactly as
+ * `sceneHazardRuntimes` leaves out hazard kinds this project has not modelled:
+ * still a shape on the map, never a simulated one.
+ */
+export function sceneRoadRuntimes(scene: CrowdSimScene): RoadRuntime[] {
+  return scene.roads
+    .filter((road) => road.vehicleAccessible)
+    .map((road) =>
+      buildRoadRuntime(
+        road,
+        scene.crosswalks,
+        scene.transitStops,
+        resolveFloorId(scene, road),
+      ),
+    );
 }
 
 /**
