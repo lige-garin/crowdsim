@@ -2,6 +2,7 @@
   "name": "@crowdsim/app",
   "version": "0.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -15,25 +16,25 @@
     "@crowdsim/core-gpu": "workspace:*",
     "@crowdsim/scene-schema": "workspace:*",
     "echarts": "^6.1.0",
-    "react": "latest",
-    "react-dom": "latest",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "three": "^0.184.0",
     "web-ifc": "0.0.78",
-    "zustand": "latest"
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@crowdsim/backend": "workspace:*",
-    "@testing-library/jest-dom": "latest",
-    "@testing-library/react": "latest",
-    "@types/node": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^25.9.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@types/three": "^0.184.1",
-    "@vitejs/plugin-react": "latest",
+    "@vitejs/plugin-react": "^6.0.2",
     "@webgpu/types": "^0.1.70",
-    "jsdom": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "vitest": "latest"
+    "jsdom": "^29.1.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
   }
 }

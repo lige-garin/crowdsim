@@ -5,7 +5,6 @@ playwright-report/
 test-results/
 .tmp/
 packages/core-behavior/target/
-packages/app/src/wasm/core-behavior/
 .DS_Store
 *.local
 .env
@@ -19,3 +18,7 @@ e2e-fs-patch.cjs
 output/
 dev-server.log
 .claude/
+# Third-party calibration dataset, fetched on demand -- see
+# docs/calibration/data/README.md. Not redistributed in this repo (its own
+# license terms were never independently verified for redistribution).
+docs/calibration/data/eth-biwi-eth.txt

@@ -1,0 +1,17 @@
+CrowdSim Web
+Copyright 2026 CrowdSim Web Contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This product includes the following third-party software distributed under a
+license other than Apache-2.0:
+
+- web-ifc (https://github.com/ThatOpen/engine_web-ifc), Mozilla Public
+  License 2.0. Used as an unmodified npm dependency (packages/app) to parse
+  IFC/BIM files in the scene editor's import path; no source of web-ifc is
+  copied into this repository. See the MPL 2.0 text at
+  https://www.mozilla.org/en-US/MPL/2.0/.
+
+All other third-party dependencies are used under their own permissive
+licenses (MIT, ISC, BSD, or Apache-2.0); see each package's own `package.json`
+under `node_modules` for its declared license.

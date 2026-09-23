@@ -1,0 +1,16 @@
+{
+  "name": "crowdsim_core_behavior",
+  "type": "module",
+  "description": "Rust/WASM behavior kernel for CrowdSim Web",
+  "version": "0.1.0",
+  "files": [
+    "crowdsim_core_behavior_bg.wasm",
+    "crowdsim_core_behavior.js",
+    "crowdsim_core_behavior.d.ts"
+  ],
+  "main": "crowdsim_core_behavior.js",
+  "types": "crowdsim_core_behavior.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

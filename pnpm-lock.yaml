@@ -9,28 +9,28 @@ importers:
   .:
     devDependencies:
       '@eslint/js':
-        specifier: latest
+        specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.1)
       '@playwright/test':
         specifier: ^1.61.0
         version: 1.61.0
       eslint:
-        specifier: latest
+        specifier: ^10.4.1
         version: 10.4.1
       eslint-plugin-react-hooks:
-        specifier: latest
+        specifier: ^7.1.1
         version: 7.1.1(eslint@10.4.1)
       eslint-plugin-react-refresh:
-        specifier: latest
+        specifier: ^0.5.2
         version: 0.5.2(eslint@10.4.1)
       globals:
-        specifier: latest
+        specifier: ^17.6.0
         version: 17.6.0
       prettier:
-        specifier: latest
+        specifier: ^3.8.4
         version: 3.8.4
       typescript-eslint:
-        specifier: latest
+        specifier: ^8.61.0
         version: 8.61.0(eslint@10.4.1)(typescript@6.0.3)
 
   packages/app:
@@ -48,10 +48,10 @@ importers:
         specifier: ^6.1.0
         version: 6.1.0
       react:
-        specifier: latest
+        specifier: ^19.2.7
         version: 19.2.7
       react-dom:
-        specifier: latest
+        specifier: ^19.2.7
         version: 19.2.7(react@19.2.7)
       three:
         specifier: ^0.184.0
@@ -60,47 +60,47 @@ importers:
         specifier: 0.0.78
         version: 0.0.78
       zustand:
-        specifier: latest
+        specifier: ^5.0.14
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
     devDependencies:
       '@crowdsim/backend':
         specifier: workspace:*
         version: link:../backend
       '@testing-library/jest-dom':
-        specifier: latest
+        specifier: ^6.9.1
         version: 6.9.1
       '@testing-library/react':
-        specifier: latest
+        specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
       '@types/node':
-        specifier: latest
+        specifier: ^25.9.3
         version: 25.9.3
       '@types/react':
-        specifier: latest
+        specifier: ^19.2.17
         version: 19.2.17
       '@types/react-dom':
-        specifier: latest
+        specifier: ^19.2.3
         version: 19.2.3(@types/react@19.2.17)
       '@types/three':
         specifier: ^0.184.1
         version: 0.184.1
       '@vitejs/plugin-react':
-        specifier: latest
+        specifier: ^6.0.2
         version: 6.0.2(vite@8.0.16(@types/node@25.9.3))
       '@webgpu/types':
         specifier: ^0.1.70
         version: 0.1.70
       jsdom:
-        specifier: latest
+        specifier: ^29.1.1
         version: 29.1.1
       typescript:
-        specifier: latest
+        specifier: ^6.0.3
         version: 6.0.3
       vite:
-        specifier: latest
+        specifier: ^8.0.16
         version: 8.0.16(@types/node@25.9.3)
       vitest:
-        specifier: latest
+        specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
 
   packages/backend:
@@ -113,10 +113,10 @@ importers:
         version: link:../scene-schema
     devDependencies:
       typescript:
-        specifier: latest
+        specifier: ^6.0.3
         version: 6.0.3
       vitest:
-        specifier: latest
+        specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
 
   packages/collab:
@@ -126,35 +126,35 @@ importers:
         version: link:../scene-schema
     devDependencies:
       typescript:
-        specifier: latest
+        specifier: ^6.0.3
         version: 6.0.3
       vitest:
-        specifier: latest
+        specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
 
   packages/core-gpu:
     devDependencies:
       '@webgpu/types':
-        specifier: latest
+        specifier: ^0.1.70
         version: 0.1.70
       typescript:
-        specifier: latest
+        specifier: ^6.0.3
         version: 6.0.3
       vitest:
-        specifier: latest
+        specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
 
   packages/scene-schema:
     dependencies:
       zod:
-        specifier: latest
+        specifier: ^4.4.3
         version: 4.4.3
     devDependencies:
       typescript:
-        specifier: latest
+        specifier: ^6.0.3
         version: 6.0.3
       vitest:
-        specifier: latest
+        specifier: ^4.1.8
         version: 4.1.8(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3))
 
 packages:

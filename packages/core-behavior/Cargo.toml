@@ -3,6 +3,7 @@ name = "crowdsim_core_behavior"
 version = "0.1.0"
 edition = "2024"
 description = "Rust/WASM behavior kernel for CrowdSim Web"
+license = "Apache-2.0"
 publish = false
 
 [lib]

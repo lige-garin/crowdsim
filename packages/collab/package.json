@@ -2,6 +2,7 @@
   "name": "@crowdsim/collab",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -20,7 +21,7 @@
     "@crowdsim/scene-schema": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "vitest": "latest"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   }
 }

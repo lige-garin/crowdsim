@@ -45,10 +45,20 @@ describe("social force calibration against real ETH trajectory data", () => {
   run(
     "fits observed pedestrian accelerations and compares against the fundamental-diagram fit",
     () => {
-      const raw = readFileSync(
-        resolve(process.cwd(), "../../docs/calibration/data/eth-biwi-eth.txt"),
-        "utf-8",
+      const dataPath = resolve(
+        process.cwd(),
+        "../../docs/calibration/data/eth-biwi-eth.txt",
       );
+      let raw: string;
+      try {
+        raw = readFileSync(dataPath, "utf-8");
+      } catch (error) {
+        throw new Error(
+          `Missing ${dataPath} -- this dataset is not committed to the repo. ` +
+            "See docs/calibration/data/README.md for the fetch command and checksum.",
+          { cause: error },
+        );
+      }
       const samples = buildCalibrationSamples(parseEthBiwiRows(raw));
       const stamp = new Date().toISOString().slice(0, 10);
       const log: string[] = [];

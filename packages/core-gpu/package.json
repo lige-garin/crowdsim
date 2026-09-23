@@ -2,6 +2,7 @@
   "name": "@crowdsim/core-gpu",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,8 +19,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "devDependencies": {
-    "@webgpu/types": "latest",
-    "typescript": "latest",
-    "vitest": "latest"
+    "@webgpu/types": "^0.1.70",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.8"
   }
 }

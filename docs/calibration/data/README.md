@@ -1,6 +1,35 @@
 # Trajectory data used for calibration
 
-## `eth-biwi-eth.txt`
+## `eth-biwi-eth.txt` — not committed to this repository
+
+**As of 2026-09-24, this file is no longer redistributed in the repo.** The
+"License note" below already flagged that the underlying ETH dataset's own
+original terms were never independently checked by this project — that is
+an acceptable risk for a one-time, locally-run calibration analysis, but not
+one this project wants to hand to every clone of an open-source repository.
+`docs/calibration/2026-09-22-trajectory-calibration.md` and
+`docs/CLAIMS_LEDGER.md` already record the calibration run's result (not
+adopted — see that report); this file is only needed if you want to
+reproduce or extend that run.
+
+**To fetch it yourself** (same source used for the original run):
+
+```bash
+curl -fsSL -o docs/calibration/data/eth-biwi-eth.txt \
+  https://raw.githubusercontent.com/StanfordASL/Trajectron-plus-plus/master/experiments/pedestrians/raw/raw/all_data/biwi_eth.txt
+```
+
+Then verify it's byte-identical to the copy this project's own calibration
+run used:
+
+```bash
+sha256sum docs/calibration/data/eth-biwi-eth.txt
+# expect: cf8d3fd342a15f409ebc2a1fc76b91a0f06390bd21f1e11410f3859331ab082b
+```
+
+The file is `.gitignore`d at that exact path, so fetching it locally will
+not accidentally get committed. `trajectoryCalibration.calibration.test.ts`
+(itself opt-in, `CALIBRATE=1`) reads it from there.
 
 **Source**: the ETH "Walking Pedestrians" dataset (Pellegrini, Ess, Tuytelaars
 & Van Gool, "You'll Never Walk Alone: Modeling Social Behavior for
