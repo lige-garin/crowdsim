@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { bioCityDemoScene } from "./bioCityDemoScene";
 import { SceneEditorParamPanel } from "./SceneEditorParamPanel";
+import { updateDocumentEntranceProfile } from "./sceneEditorMutations";
 import { createEditorDocumentFromScene } from "./sceneEditorState";
 
 afterEach(() => {
@@ -51,6 +52,45 @@ describe("SceneEditorParamPanel", () => {
     expect(onEntranceNumberChange).toHaveBeenCalledWith("width", 12);
     expect(onEntranceNumberChange).toHaveBeenCalledWith("groupShare", 0.5);
     expect(onEntranceKindChange).toHaveBeenCalledWith("bidirectional");
+  });
+
+  /**
+   * `intervalMinutes` genuinely drives the engine's spawn schedule
+   * (`simulationSceneConfig.ts` reads it to compute `intervalSeconds`), but
+   * only the schema's default (15) was ever written -- there was no control
+   * to change it once a profile existed.
+   */
+  it("shows the slot length once a profile has been entered, and commits changes to it", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const source = document.entrances.find((entrance) => entrance.kind === "source");
+    expect(source, "demo scene must have a source entrance").toBeDefined();
+    const withProfile = updateDocumentEntranceProfile(document, source!.id, "60, 120");
+    const entranceWithProfile = withProfile.entrances.find(
+      (entrance) => entrance.id === source!.id,
+    )!;
+    const onEntranceProfileIntervalChange = vi.fn();
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onEntranceProfileIntervalChange={onEntranceProfileIntervalChange}
+        selectedEntrance={entranceWithProfile}
+      />,
+    );
+
+    const interval = screen.getByLabelText("arrivalProfileIntervalMinutes");
+    expect((interval as HTMLInputElement).value).toBe("15");
+    fireEvent.change(interval, { target: { value: "5" } });
+    expect(onEntranceProfileIntervalChange).toHaveBeenCalledWith(5);
+  });
+
+  it("does not offer a slot length before any profile has been entered", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const source = document.entrances.find((entrance) => entrance.kind === "source");
+
+    render(<SceneEditorParamPanel {...baseProps()} selectedEntrance={source} />);
+
+    expect(screen.queryByLabelText("arrivalProfileIntervalMinutes")).toBeNull();
   });
 
   it("does not offer an arrival rate on an exit, which cannot spawn anyone", () => {
@@ -248,6 +288,7 @@ function baseProps(): Parameters<typeof SceneEditorParamPanel>[0] {
     onEntranceKindChange: vi.fn(),
     onEntrancePopulationChange: vi.fn(),
     onEntranceProfileChange: vi.fn(),
+    onEntranceProfileIntervalChange: vi.fn(),
     onEntranceNumberChange: vi.fn(),
     onHazardKindChange: vi.fn(),
     onHazardNumberChange: vi.fn(),

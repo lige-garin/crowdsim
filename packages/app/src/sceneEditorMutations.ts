@@ -507,6 +507,37 @@ export function updateDocumentEntranceProfile(
   };
 }
 
+/**
+ * Each demand-profile slot's length in minutes. `simulationSceneConfig.ts`
+ * reads this to compute `intervalSeconds` -- it genuinely drives when the
+ * engine advances to the next slot's rate, not just a label -- but the
+ * editor only ever wrote the schema's own default (15) when a profile was
+ * first created, with no control to change it afterward. A no-op on an
+ * entrance with no profile yet: the interval means nothing until there are
+ * slots for it to size, the same reason the rate-profile text field itself
+ * only appears once a kind other than "sink" is selected.
+ */
+export function updateDocumentEntranceProfileInterval(
+  document: EditorDocument,
+  entranceId: string,
+  minutes: number,
+) {
+  return {
+    ...document,
+    entrances: document.entrances.map((entrance) =>
+      entrance.id === entranceId && entrance.arrivalProfile
+        ? {
+            ...entrance,
+            arrivalProfile: {
+              ...entrance.arrivalProfile,
+              intervalMinutes: Math.max(1, minutes),
+            },
+          }
+        : entrance,
+    ),
+  };
+}
+
 export function updateDocumentEntranceKind(
   document: EditorDocument,
   entranceId: string,

@@ -74,6 +74,7 @@ type SceneEditorLayoutProps = {
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
   onEntrancePopulationChange: (populationId: string) => void;
   onEntranceProfileChange: (text: string) => void;
+  onEntranceProfileIntervalChange: (minutes: number) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onCountLineEndpointPointerDown: (
@@ -203,6 +204,7 @@ export function SceneEditorLayout({
   onEntranceKindChange,
   onEntrancePopulationChange,
   onEntranceProfileChange,
+  onEntranceProfileIntervalChange,
   onEntranceNumberChange,
   onCanvasPointerDown,
   onCountLineEndpointPointerDown,
@@ -389,6 +391,7 @@ export function SceneEditorLayout({
         onEntranceKindChange={onEntranceKindChange}
         onEntrancePopulationChange={onEntrancePopulationChange}
         onEntranceProfileChange={onEntranceProfileChange}
+        onEntranceProfileIntervalChange={onEntranceProfileIntervalChange}
         onEntranceNumberChange={onEntranceNumberChange}
         onHazardKindChange={onHazardKindChange}
         onHazardNumberChange={onHazardNumberChange}

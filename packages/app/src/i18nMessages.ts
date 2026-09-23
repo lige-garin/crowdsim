@@ -15,8 +15,12 @@ export const messages = {
   arrivalInterval: { zh: "Arrival interval", en: "Arrival interval" },
   arrivalRate: { zh: "到达率 (人/分)", en: "Arrival rate (per min)" },
   arrivalProfile: {
-    zh: "分时段到达 (每15分钟一段, 人/分, 逗号分隔; 空=恒定)",
-    en: "Arrivals by slot (15 min each, per min, comma-separated; empty = constant)",
+    zh: "分时段到达 (每段人/分, 逗号分隔; 空=恒定; 段长见下)",
+    en: "Arrivals by slot (per min, comma-separated; empty = constant; slot length below)",
+  },
+  arrivalProfileIntervalMinutes: {
+    zh: "每段时长 (分钟)",
+    en: "Slot length (minutes)",
   },
   groupShare: { zh: "结伴比例 (0–1)", en: "Share in groups (0–1)" },
   entranceKind: { zh: "出入口类型", en: "Entrance type" },

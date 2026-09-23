@@ -34,6 +34,7 @@ import {
   updateDocumentCrosswalkRoadId,
   updateDocumentEntranceNumber,
   updateDocumentEntranceProfile,
+  updateDocumentEntranceProfileInterval,
   updateDocumentServicePointNextId,
   updateDocumentServicePointOutageWindows,
   updateDocumentHazardKind,
@@ -627,6 +628,34 @@ describe("editor round-trip of ADR-0008 fields", () => {
     expect(
       document.entrances.find((candidate) => candidate.id === gate.id)!.arrivalProfile,
     ).toBeUndefined();
+  });
+
+  it("edits an entrance's demand-profile slot length, and ignores the edit before a profile exists", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    const gate = document.entrances.find((entrance) => entrance.kind !== "sink")!;
+
+    // No profile yet: the interval has nothing to size, so this is a no-op.
+    document = updateDocumentEntranceProfileInterval(document, gate.id, 5);
+    expect(
+      document.entrances.find((candidate) => candidate.id === gate.id)!.arrivalProfile,
+    ).toBeUndefined();
+
+    document = updateDocumentEntranceProfile(document, gate.id, "60, 120");
+    document = updateDocumentEntranceProfileInterval(document, gate.id, 5);
+
+    const scene = createSceneFromEditorDocument(demoScene, document);
+    const entrance = scene.entrances.find((candidate) => candidate.id === gate.id)!;
+    expect(entrance.arrivalProfile).toEqual({
+      intervalMinutes: 5,
+      ratesPerMinute: [60, 120],
+    });
+
+    // Clamped, not rejected, same tolerance every other number field here gets.
+    document = updateDocumentEntranceProfileInterval(document, gate.id, -3);
+    expect(
+      document.entrances.find((candidate) => candidate.id === gate.id)!.arrivalProfile
+        ?.intervalMinutes,
+    ).toBe(1);
   });
 
   it("chains a service point to another and can end the chain again (ADR-0021 editor control)", () => {

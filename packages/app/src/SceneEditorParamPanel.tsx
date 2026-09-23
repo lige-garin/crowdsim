@@ -48,6 +48,7 @@ type SceneEditorParamPanelProps = {
   onEntranceKindChange: (kind: Entrance["kind"]) => void;
   onEntrancePopulationChange: (populationId: string) => void;
   onEntranceProfileChange: (text: string) => void;
+  onEntranceProfileIntervalChange: (minutes: number) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
   onBuildingNumberChange: (field: BuildingNumberField, value: number) => void;
   onConnectorCapacityChange: (value: number) => void;
@@ -127,6 +128,7 @@ export function SceneEditorParamPanel({
   onEntranceKindChange,
   onEntrancePopulationChange,
   onEntranceProfileChange,
+  onEntranceProfileIntervalChange,
   onEntranceNumberChange,
   onHazardKindChange,
   onHazardNumberChange,
@@ -220,6 +222,7 @@ export function SceneEditorParamPanel({
           onKindChange={onEntranceKindChange}
           onPopulationChange={onEntrancePopulationChange}
           onProfileChange={onEntranceProfileChange}
+          onProfileIntervalChange={onEntranceProfileIntervalChange}
           onNumberChange={onEntranceNumberChange}
           selectedEntrance={selectedEntrance}
           t={t}

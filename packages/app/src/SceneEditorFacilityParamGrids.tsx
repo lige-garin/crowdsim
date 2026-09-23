@@ -603,12 +603,14 @@ export function EntranceParamGrid({
   onNumberChange,
   onPopulationChange,
   onProfileChange,
+  onProfileIntervalChange,
   selectedEntrance,
   t,
 }: {
   onKindChange: (kind: Entrance["kind"]) => void;
   onPopulationChange: (populationId: string) => void;
   onProfileChange: (text: string) => void;
+  onProfileIntervalChange: (minutes: number) => void;
   onNumberChange: (field: EntranceNumberField, value: number) => void;
   selectedEntrance: Entrance;
   t: (key: TranslationKey) => string;
@@ -638,6 +640,16 @@ export function EntranceParamGrid({
             value={(selectedEntrance.arrivalProfile?.ratesPerMinute ?? []).join(", ")}
             onChange={onProfileChange}
           />
+          {/* Only means something once there are slots for it to size. */}
+          {selectedEntrance.arrivalProfile ? (
+            <NumberInput
+              label={t("arrivalProfileIntervalMinutes")}
+              min={1}
+              step={1}
+              value={selectedEntrance.arrivalProfile.intervalMinutes}
+              onChange={onProfileIntervalChange}
+            />
+          ) : null}
           <NumberInput
             label={t("groupShare")}
             min={0}

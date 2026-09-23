@@ -42,6 +42,7 @@ import {
   updateDocumentShopSize,
   updateDocumentEntranceKind,
   updateDocumentEntranceProfile,
+  updateDocumentEntranceProfileInterval,
   updateDocumentEntranceNumber,
   updateDocumentTransitStopKind,
   updateDocumentTransitStopNumber,
@@ -305,6 +306,12 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedEntrance) return;
       setDocument((current) =>
         updateDocumentEntranceProfile(current, selectedEntrance.id, text),
+      );
+    },
+    updateEntranceProfileInterval(minutes: number) {
+      if (!selectedEntrance || !Number.isFinite(minutes)) return;
+      setDocument((current) =>
+        updateDocumentEntranceProfileInterval(current, selectedEntrance.id, minutes),
       );
     },
     updateEntranceNumber(field: EntranceNumberField, value: number) {

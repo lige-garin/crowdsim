@@ -746,6 +746,7 @@ export function SceneEditor({
       onEntranceKindChange={paramActions.updateEntranceKind}
       onEntrancePopulationChange={paramActions.updateEntrancePopulation}
       onEntranceProfileChange={paramActions.updateEntranceProfile}
+      onEntranceProfileIntervalChange={paramActions.updateEntranceProfileInterval}
       onEntranceNumberChange={paramActions.updateEntranceNumber}
       onTransitStopKindChange={paramActions.updateTransitStopKind}
       onTransitStopNumberChange={paramActions.updateTransitStopNumber}
