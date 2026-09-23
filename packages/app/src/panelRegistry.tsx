@@ -15,9 +15,6 @@ import { ScaleReadinessPanel } from "./ScaleReadinessPanel";
 import { ProjectWorkspacePanel } from "./ProjectWorkspacePanel";
 import { CollaborationStatusPanel } from "./CollaborationStatusPanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
-import { AiWorkflowPanel } from "./AiWorkflowPanel";
-import { ImageGeometryPanel } from "./ImageGeometryPanel";
-import { TilesBackdropPanel } from "./TilesBackdropPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 
 export type PanelDockContext = {
@@ -135,27 +132,6 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "模板库",
     labelEn: "Template library",
     render: () => <TemplateLibraryPanel />,
-  },
-  {
-    dataSource: "fixture",
-    id: "ai-workflow",
-    labelZh: "脚本与校验",
-    labelEn: "Script & validation",
-    render: () => <AiWorkflowPanel />,
-  },
-  {
-    dataSource: "fixture",
-    id: "image-geometry",
-    labelZh: "影像几何",
-    labelEn: "Image geometry",
-    render: () => <ImageGeometryPanel />,
-  },
-  {
-    dataSource: "fixture",
-    id: "tiles-backdrop",
-    labelZh: "瓦片底图",
-    labelEn: "Tiles backdrop",
-    render: () => <TilesBackdropPanel />,
   },
   {
     dataSource: "live",

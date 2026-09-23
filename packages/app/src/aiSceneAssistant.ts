@@ -7,7 +7,16 @@
 // identifiers, not capability claims; the user-facing wording says "template"
 // so the UI does not promise a model it does not have. Frozen 2026-08-30: do
 // not reintroduce "AI" into user-visible copy until a real model is wired up.
-import { parseScene, safeParseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
+//
+// The structured-output request builder and response validator
+// (`createClaudeSceneAssistantRequest`/`parseSceneAssistantResponse`/
+// `validateSceneAssistantResponses`) that used to live here were deleted
+// 2026-09-24 alongside `AiWorkflowPanel.tsx`, their only caller -- they were
+// never reached by anything else and had drifted to test-only code the
+// moment that panel was removed. What remains below,
+// `createNaturalLanguageScenePlanDraft` and its helpers, is the real,
+// live path: the scene editor's "模板草稿" button.
+import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 
 export type AiSceneEventDraft = {
   atSeconds: number;
@@ -21,127 +30,6 @@ export type AiScenePlanDraft = {
   scene: CrowdSimScene;
   summary: string;
 };
-
-export type SceneAssistantValidationAttempt = {
-  error?: string;
-  ok: boolean;
-  responseIndex: number;
-};
-
-export type SceneAssistantValidationResult =
-  | {
-      attempts: readonly SceneAssistantValidationAttempt[];
-      scene: CrowdSimScene;
-      status: "accepted";
-    }
-  | {
-      attempts: readonly SceneAssistantValidationAttempt[];
-      retryPrompt: string;
-      scene: null;
-      status: "retry-required";
-    };
-
-export const sceneAssistantJsonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["schemaVersion", "id", "name", "world"],
-  properties: {
-    schemaVersion: { type: "string", enum: ["1.0.0"] },
-    id: { type: "string" },
-    name: { type: "string" },
-    world: {
-      type: "object",
-      additionalProperties: false,
-      required: ["width", "height"],
-      properties: {
-        width: { type: "number" },
-        height: { type: "number" },
-      },
-    },
-    walls: { type: "array", items: { type: "object" } },
-    entrances: { type: "array", items: { type: "object" } },
-    areas: { type: "array", items: { type: "object" } },
-    targets: { type: "array", items: { type: "object" } },
-    shops: { type: "array", items: { type: "object" } },
-    servicePoints: { type: "array", items: { type: "object" } },
-    countLines: { type: "array", items: { type: "object" } },
-  },
-} as const;
-
-export function createClaudeSceneAssistantRequest(options: {
-  model?: string;
-  prompt: string;
-}) {
-  return {
-    model: options.model ?? "claude-sonnet-4-6",
-    max_tokens: 4096,
-    system:
-      "Generate one valid CrowdSim .csim.json scene. Use metric coordinates, concise ids, and realistic entrances, walls, shops, service points, and count lines.",
-    messages: [
-      {
-        role: "user",
-        content: options.prompt,
-      },
-    ],
-    output_config: {
-      format: {
-        type: "json_schema",
-        schema: sceneAssistantJsonSchema,
-      },
-    },
-  };
-}
-
-export function parseSceneAssistantResponse(text: string): CrowdSimScene {
-  return parseScene(JSON.parse(text));
-}
-
-export function validateSceneAssistantResponses(options: {
-  maxAttempts?: number;
-  prompt: string;
-  responses: readonly string[];
-}): SceneAssistantValidationResult {
-  const attempts: SceneAssistantValidationAttempt[] = [];
-  const maxAttempts = Math.max(1, options.maxAttempts ?? 3);
-
-  for (const [responseIndex, response] of options.responses
-    .slice(0, maxAttempts)
-    .entries()) {
-    const parsedJson = parseJsonResponse(response);
-
-    if (!parsedJson.ok) {
-      attempts.push({ error: parsedJson.error, ok: false, responseIndex });
-      continue;
-    }
-
-    const parsedScene = safeParseScene(parsedJson.value);
-
-    if (parsedScene.success) {
-      attempts.push({ ok: true, responseIndex });
-      return {
-        attempts,
-        scene: parsedScene.data,
-        status: "accepted",
-      };
-    }
-
-    attempts.push({
-      error: parsedScene.error.issues.map((issue) => issue.message).join("; "),
-      ok: false,
-      responseIndex,
-    });
-  }
-
-  return {
-    attempts,
-    retryPrompt: createSceneAssistantRetryPrompt(
-      options.prompt,
-      attempts.at(-1)?.error ?? "Unknown validation error",
-    ),
-    scene: null,
-    status: "retry-required",
-  };
-}
 
 export function createLocalSceneAssistantDraft(
   prompt: string,
@@ -285,28 +173,6 @@ function createHospitalDraft(baseScene: CrowdSimScene) {
       },
     ],
   });
-}
-
-function createSceneAssistantRetryPrompt(prompt: string, error: string) {
-  return [
-    "Regenerate one valid CrowdSim scene JSON.",
-    "Keep the original user intent.",
-    `Original prompt: ${prompt}`,
-    `Previous validation failed against the CrowdSim scene schema: ${error}`,
-  ].join("\n");
-}
-
-function parseJsonResponse(
-  response: string,
-): { ok: true; value: unknown } | { error: string; ok: false } {
-  try {
-    return { ok: true, value: JSON.parse(response) };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Invalid JSON",
-      ok: false,
-    };
-  }
 }
 
 function createStationDraft(baseScene: CrowdSimScene) {

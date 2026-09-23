@@ -21,8 +21,11 @@ const ctx: PanelDockContext = {
   }),
 };
 
-describe("imaging + tiles + trajectory panels are registered and render", () => {
-  for (const id of ["image-geometry", "tiles-backdrop", "trajectory-replay"]) {
+describe("trajectory panel is registered and renders", () => {
+  // image-geometry and tiles-backdrop were deleted 2026-09-24: both were
+  // disclosed-fake fixtures (a hand-written fixture repainted over any
+  // upload, and a stub 3D-tiles config), see docs/CLAIMS_LEDGER.md.
+  for (const id of ["trajectory-replay"]) {
     it(`renders ${id}`, () => {
       const entry = panelRegistry.find((panel) => panel.id === id);
       expect(entry, `panel ${id} must be registered`).toBeDefined();

@@ -1,17 +1,12 @@
 // HONESTY NOTE (see docs/CLAIMS_LEDGER.md): the fabricated "workload reduction %"
 // (projected from hardcoded per-entity minute constants, never measured) was
-// removed in P0 T2. This module now only exercises the real image->geometry
-// pipeline (in aiImageGeometry.ts) over demo fixtures and reports what it actually
-// produced: generated entities, low-confidence count, and the resulting scene id.
-import { demoScene } from "./demoScene";
-import {
-  calibrateImageScale,
-  createSceneFromImageGeometry,
-  findLowConfidenceGeometry,
-  mergeNearbyLineSegments,
-  type ImageGeometryDraft,
-  type ImageLineSegment,
-} from "./aiImageGeometry";
+// removed in P0 T2. `evaluateImageTracingFixtures`, the function that used to
+// score these fixtures through the real image->geometry pipeline
+// (aiImageGeometry.ts) and report what it produced, was deleted 2026-09-24
+// alongside `ImageGeometryPanel.tsx`, its only caller -- it had no other
+// consumer. `imageTracingFixtures` below is the real, live path: the scene
+// editor's own "描图示例" button (`SceneEditor.tsx`, `sceneEditorImageOverlay.ts`).
+import type { ImageGeometryDraft, ImageLineSegment } from "./aiImageGeometry";
 
 export type ImageTracingFixture = {
   draft: ImageGeometryDraft;
@@ -19,18 +14,6 @@ export type ImageTracingFixture = {
   knownDistanceMeters: number;
   name: string;
   pixelDistance: number;
-};
-
-export type ImageTracingFixtureResult = {
-  generatedEntities: number;
-  id: string;
-  lowConfidenceCount: number;
-  sceneId: string;
-};
-
-export type ImageTracingEvaluation = {
-  fixtureCount: number;
-  results: readonly ImageTracingFixtureResult[];
 };
 
 export const imageTracingFixtures: readonly ImageTracingFixture[] = [
@@ -88,40 +71,6 @@ export const imageTracingFixtures: readonly ImageTracingFixture[] = [
     pixelDistance: 320,
   },
 ];
-
-export function evaluateImageTracingFixtures(
-  fixtures: readonly ImageTracingFixture[] = imageTracingFixtures,
-): ImageTracingEvaluation {
-  const results = fixtures.map(evaluateFixture);
-
-  return {
-    fixtureCount: results.length,
-    results,
-  };
-}
-
-function evaluateFixture(fixture: ImageTracingFixture): ImageTracingFixtureResult {
-  const calibration = calibrateImageScale({
-    knownDistanceMeters: fixture.knownDistanceMeters,
-    pixelA: { x: 0, y: 0 },
-    pixelB: { x: fixture.pixelDistance, y: 0 },
-  });
-  const cleanedDraft = {
-    ...fixture.draft,
-    lines: mergeNearbyLineSegments(fixture.draft.lines, 3),
-  };
-  const scene = createSceneFromImageGeometry(demoScene, cleanedDraft, calibration);
-  const lowConfidenceCount = findLowConfidenceGeometry(cleanedDraft).length;
-  const generatedEntities =
-    cleanedDraft.lines.length + (cleanedDraft.entrances?.length ?? 0);
-
-  return {
-    generatedEntities,
-    id: fixture.id,
-    lowConfidenceCount,
-    sceneId: scene.id,
-  };
-}
 
 function entry(
   id: string,
