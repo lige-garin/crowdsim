@@ -3,6 +3,7 @@ import { CountLineFlowChart } from "./CountLineFlowChart";
 import type { DashboardSample } from "./dashboardStats";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
+import { JourneyTimeHistogram } from "./JourneyTimeHistogram";
 import { RealtimeStrip } from "./RealtimeStrip";
 import type {
   MinuteFlow,
@@ -95,6 +96,7 @@ const copy = {
  */
 export function RunAnalyticsPanel({
   dashboardSamples,
+  journeyDurations,
   language,
   minuteFlows,
   onExport,
@@ -102,6 +104,7 @@ export function RunAnalyticsPanel({
   summary,
 }: {
   dashboardSamples: readonly DashboardSample[];
+  journeyDurations: () => number[];
   language: Language;
   minuteFlows: () => MinuteFlow[];
   onExport: (kind: RunAnalyticsExport) => void;
@@ -208,6 +211,14 @@ export function RunAnalyticsPanel({
               </strong>
             </div>
           </div>
+          {summary.journeys.count > 0 ? (
+            <JourneyTimeHistogram
+              durations={journeyDurations()}
+              language={language}
+              p50Seconds={summary.journeys.p50Seconds}
+              p90Seconds={summary.journeys.p90Seconds}
+            />
+          ) : null}
 
           {places.length > 0 ? (
             <>

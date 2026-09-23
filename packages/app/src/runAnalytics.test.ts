@@ -135,6 +135,36 @@ describe("createRunAnalytics", () => {
     );
   });
 
+  it("exposes each completed journey's raw duration, matching the summary's percentiles", () => {
+    // Same record sequence as "measures journeys and stays" above: agent 1's
+    // last-seen sample is t=40 (gone by t=60, duration 40s), agent 2's is
+    // t=60 (gone by t=61, duration 60s) -- which is where that test's
+    // p50Seconds ≈ 50 (the median of [40, 60]) comes from.
+    const analytics = createRunAnalytics();
+    analytics.record(scene, at(0, [person({ id: 1 }), person({ id: 2 })]));
+    analytics.record(
+      scene,
+      at(10, [
+        person({ id: 1, lifecycleState: "browse", selectedStoreId: "cafe" }),
+        person({ id: 2, lifecycleState: "queue", selectedStoreId: "cafe" }),
+      ]),
+    );
+    analytics.record(
+      scene,
+      at(40, [
+        person({ id: 1, lifecycleState: "leave" }),
+        person({ id: 2, lifecycleState: "browse", selectedStoreId: "cafe" }),
+      ]),
+    );
+    analytics.record(scene, at(60, [person({ id: 2, lifecycleState: "leave" })]));
+    analytics.record(scene, at(61, []));
+
+    expect(analytics.journeyDurations().sort((a, b) => a - b)).toEqual([40, 60]);
+    expect(analytics.summary().journeys.count).toBe(
+      analytics.journeyDurations().length,
+    );
+  });
+
   it("rates crowding by Fruin level in 2 m cells", () => {
     const analytics = createRunAnalytics();
     // Three people in one 4 m² cell: 0.75 P/m², level D.

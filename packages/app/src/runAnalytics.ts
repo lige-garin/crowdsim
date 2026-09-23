@@ -299,6 +299,13 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
     );
   }
 
+  /** Every completed journey's duration in seconds -- the same numbers
+   * `summary().journeys`'s P50/P90 are computed from and `csv.journeys()`
+   * exports per-agent, as a plain array a chart can bin into a histogram. */
+  function journeyDurations(): number[] {
+    return journeys.map((journey) => journey.left - journey.entered);
+  }
+
   const csv = {
     flows: () =>
       toCsv(
@@ -361,7 +368,7 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
       ),
   };
 
-  return { csv, minuteFlows, record, summary };
+  return { csv, journeyDurations, minuteFlows, record, summary };
 }
 
 export type RunAnalytics = ReturnType<typeof createRunAnalytics>;

@@ -98,6 +98,7 @@ function AppContent() {
   const {
     dashboardSamples,
     heatmapSamples,
+    journeyDurations,
     minuteFlows,
     runSummary,
     trajectoryRecording,
@@ -466,6 +467,7 @@ function AppContent() {
             dashboardSamples,
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
+            journeyDurations,
             minuteFlows,
             onExportRunAnalytics: (kind: RunAnalyticsExport) =>
               downloadCsv(

@@ -111,6 +111,7 @@ export function useRunSeries({
     exportAnalyticsCsv: (kind: keyof RunAnalytics["csv"]) =>
       analyticsRef.current.csv[kind](),
     heatmapSamples,
+    journeyDurations: () => analyticsRef.current.journeyDurations(),
     minuteFlows: () => analyticsRef.current.minuteFlows(),
     runSummary,
     trajectoryRecording,

@@ -16,6 +16,7 @@ type AppInspectorProps = {
   elapsedSeconds: number;
   evacuation: EvacuationState;
   heatmapCells: readonly HeatmapCell[];
+  journeyDurations: () => number[];
   minuteFlows: () => MinuteFlow[];
   onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
   runSummary: RunAnalyticsSummary;
@@ -31,6 +32,7 @@ export function AppInspector({
   elapsedSeconds,
   evacuation,
   heatmapCells,
+  journeyDurations,
   minuteFlows,
   onExportRunAnalytics,
   runSummary,
@@ -64,6 +66,7 @@ export function AppInspector({
 
       <RunAnalyticsPanel
         dashboardSamples={dashboardSamples}
+        journeyDurations={journeyDurations}
         language={language}
         minuteFlows={minuteFlows}
         onExport={onExportRunAnalytics}

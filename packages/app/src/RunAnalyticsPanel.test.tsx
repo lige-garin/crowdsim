@@ -43,6 +43,7 @@ describe("RunAnalyticsPanel", () => {
     render(
       <RunAnalyticsPanel
         dashboardSamples={[]}
+        journeyDurations={() => []}
         language="en"
         minuteFlows={() => []}
         onExport={vi.fn()}
@@ -62,6 +63,7 @@ describe("RunAnalyticsPanel", () => {
     render(
       <RunAnalyticsPanel
         dashboardSamples={[]}
+        journeyDurations={analytics.journeyDurations}
         language="zh"
         minuteFlows={analytics.minuteFlows}
         onExport={onExport}
@@ -82,6 +84,7 @@ describe("RunAnalyticsPanel", () => {
     render(
       <RunAnalyticsPanel
         dashboardSamples={[]}
+        journeyDurations={analytics.journeyDurations}
         language="en"
         minuteFlows={analytics.minuteFlows}
         onExport={vi.fn()}
@@ -97,6 +100,42 @@ describe("RunAnalyticsPanel", () => {
     expect(chart).toHaveAttribute("aria-label", expect.stringContaining("Main gate"));
   });
 
+  it("draws a journey-time histogram once at least one journey has completed", () => {
+    const analytics = createRunAnalytics();
+    analytics.record(scene, at(1, 19));
+    analytics.record(scene, at(2, 21));
+    // The agent is absent from this sample: the journey it was tracking is
+    // now complete, which is what makes `summary().journeys.count > 0`.
+    analytics.record(scene, {
+      agentCount: 0,
+      agents: [],
+      elapsedSeconds: 3,
+      exitedCount: 1,
+      spawnedCount: 1,
+      status: "running",
+      stepCount: 0,
+      timeScale: 1,
+    });
+    const summary = analytics.summary();
+    expect(summary.journeys.count).toBeGreaterThan(0);
+
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={analytics.journeyDurations}
+        language="en"
+        minuteFlows={analytics.minuteFlows}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={summary}
+      />,
+    );
+
+    expect(
+      screen.getByRole("img", { name: "Journey time distribution" }),
+    ).toBeInTheDocument();
+  });
+
   it("draws the population strip from the live dashboard samples, not the measured summary", () => {
     render(
       <RunAnalyticsPanel
@@ -104,6 +143,7 @@ describe("RunAnalyticsPanel", () => {
           { agentCount: 12, elapsedSeconds: 1, exitedCount: 0 },
           { agentCount: 18, elapsedSeconds: 2, exitedCount: 0 },
         ]}
+        journeyDurations={() => []}
         language="en"
         minuteFlows={() => []}
         onExport={vi.fn()}
@@ -123,6 +163,7 @@ describe("what the measured numbers are", () => {
     render(
       <RunAnalyticsPanel
         dashboardSamples={[]}
+        journeyDurations={() => []}
         language="zh"
         minuteFlows={() => []}
         onExport={vi.fn()}
