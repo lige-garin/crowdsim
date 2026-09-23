@@ -19,6 +19,7 @@ const ctx = {
 describe("experiment + analytics panels are registered and render", () => {
   for (const id of [
     "scenario-comparison",
+    "scenario-diff-report",
     "experiment-sweep",
     "experiment-summary",
     "sensitivity-screening",

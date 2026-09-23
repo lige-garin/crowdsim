@@ -4,6 +4,7 @@ import type { TrajectoryRecording } from "./trajectoryRecording";
 import type { BrandDecisionInsight } from "./brandDecisionProbe";
 import type { BackendClient } from "./backendClient";
 import { ScenarioComparisonPanel } from "./ScenarioComparisonPanel";
+import { ScenarioDiffPanel } from "./ScenarioDiffPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { SensitivityPanel } from "./SensitivityPanel";
 import { RimeaReportPanel } from "./RimeaReportPanel";
@@ -57,6 +58,13 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "情景对比",
     labelEn: "Scenario comparison",
     render: () => <ScenarioComparisonPanel />,
+  },
+  {
+    dataSource: "fixture",
+    id: "scenario-diff-report",
+    labelZh: "情景对比报告",
+    labelEn: "Scenario diff report",
+    render: () => <ScenarioDiffPanel />,
   },
   {
     dataSource: "fixture",
