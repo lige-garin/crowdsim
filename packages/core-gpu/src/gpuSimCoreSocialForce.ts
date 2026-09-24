@@ -44,11 +44,30 @@ import type {
  *
  * Deliberately NOT ported here, left for a later stage per ADR-0015's own
  * order (base force first, since everything else assumes it's right):
- * sidestep, anticipation (Karamouzas time-to-collision), group formation/
- * following, hazard avoidance, holding-state speed easing, the
- * no-walking-backward clamp, and the no-overshoot-past-target clamp. This is
- * the base relaxation + repulsion + wall force only.
+ * sidestep, anticipation (Karamouzas time-to-collision), leader-following
+ * (a decision-layer target rewrite, not a 60Hz force — nothing to port),
+ * hazard avoidance, holding-state speed easing, the no-walking-backward
+ * clamp, and the no-overshoot-past-target clamp.
+ *
+ * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
+ * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
+ * side-by-side walking slot, gated by `!wallClose && strangersClose < 2`).
+ * `groupFormation()` itself — computing each group's centroid, heading, and
+ * per-member slot from the whole group every step — is a genuine group-level
+ * reduction, architecturally different from the per-agent, per-neighbour
+ * work this file's two functions already do; it stays CPU/JS-side and is
+ * passed in as `formationSlots`, exactly the way pathfinding targets already
+ * are (`targetPositions`) — a higher-level system's per-agent output, not
+ * computed in-kernel. `groupId`/`formationGain`/`formationRoomMeters` are
+ * NOT added to `GpuSimCoreSocialForceParams`: `crowdMovement.ts` itself
+ * hardcodes `formationGain = 1` and `formationRoomMeters = 1` as plain
+ * constants, not tunable calibration parameters (see `walkingGroups.ts`'s
+ * `walkingGroupParameters.formationGain` and this file's own
+ * `formationRoomMeters` below) — porting them as WGSL constants matches
+ * that, rather than inventing configurability the CPU model doesn't have.
  */
+const formationGain = 1;
+const formationRoomMeters = 1;
 export type GpuSimCoreSocialForceParams = SocialForceParams & {
   /** Weight of people behind relative to people ahead, 0..1 (λ, crowdMovement's anisotropy). */
   anisotropy: number;
@@ -110,6 +129,59 @@ function wallForce(
   return { x: forceX, y: forceY };
 }
 
+/**
+ * Whether any wall comes within `formationRoomMeters` — `crowdMovement.ts`'s
+ * own `wallClose` flag, which gates the formation force off near a wall so
+ * it never fights the (much stronger) wall push. A second, small loop over
+ * `walls` rather than folding into `wallForce()` above: the CPU original
+ * gates wallClose on a *different* radius (`formationRoomMeters`, 1m) than
+ * the wall push itself (`wallRepulsionRange`, ~0.2m) — two different
+ * questions ("is a wall nearby at all" vs. "close enough to push against"),
+ * kept as two small functions rather than one doing both.
+ */
+function isNearAnyWall(px: number, py: number, walls: WallSegment[]): boolean {
+  for (const wall of walls) {
+    const closest = closestPointOnSegment(px, py, wall);
+    const dx = px - closest.x;
+    const dy = py - closest.y;
+    const gap = Math.hypot(dx, dy);
+    if (gap > 0.000001 && gap < formationRoomMeters) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * `crowdMovement.ts`'s own formation spring: pull an agent toward its
+ * group's side-by-side slot, unless a wall is close (the crowd falls into
+ * file there) or two or more non-group "strangers" are within
+ * `formationRoomMeters` (holding a formation in a dense crowd of people not
+ * in it jams the very gap it is trying to walk through). `groupId < 0` is
+ * the "not in a group" sentinel (mirrors WGSL's `i32`, which has no
+ * `undefined`).
+ */
+function formationForce(
+  index: number,
+  px: number,
+  py: number,
+  strangersClose: number,
+  wallClose: boolean,
+  groupIds: Int32Array | undefined,
+  formationSlots: Float32Array | undefined,
+): { x: number; y: number } {
+  if (!groupIds || !formationSlots || groupIds[index] < 0) {
+    return { x: 0, y: 0 };
+  }
+  if (wallClose || strangersClose >= 2) {
+    return { x: 0, y: 0 };
+  }
+  return {
+    x: formationGain * (formationSlots[index * 2] - px),
+    y: formationGain * (formationSlots[index * 2 + 1] - py),
+  };
+}
+
 function integrate(
   vx: number,
   vy: number,
@@ -139,6 +211,8 @@ export function stepGpuSimCoreSocialForceCpu(
   targetPositions: Float32Array,
   walls: WallSegment[],
   params: GpuSimCoreSocialForceParams,
+  groupIds?: Int32Array,
+  formationSlots?: Float32Array,
 ): SocialForceStepResult {
   const nextPositions = agents.positions.slice(0, agents.count * 2);
   const nextVelocities = agents.velocities.slice(0, agents.count * 2);
@@ -156,12 +230,20 @@ export function stepGpuSimCoreSocialForceCpu(
     let forceX = (desired.x * desiredSpeed - vx) / params.relaxationTime;
     let forceY = (desired.y * desiredSpeed - vy) / params.relaxationTime;
 
+    let strangersClose = 0;
     for (let other = 0; other < agents.count; other++) {
       if (other === index) {
         continue;
       }
       const dx = px - agents.positions[other * 2];
       const dy = py - agents.positions[other * 2 + 1];
+      if (
+        groupIds &&
+        Math.hypot(dx, dy) < formationRoomMeters &&
+        groupIds[other] !== groupIds[index]
+      ) {
+        strangersClose++;
+      }
       const bodies = agents.radius[index] + agents.radius[other];
       const push = agentForce(desired, bodies, dx, dy, params);
       forceX += push.x;
@@ -171,6 +253,18 @@ export function stepGpuSimCoreSocialForceCpu(
     const wall = wallForce(px, py, walls, params);
     forceX += wall.x;
     forceY += wall.y;
+
+    const formation = formationForce(
+      index,
+      px,
+      py,
+      strangersClose,
+      isNearAnyWall(px, py, walls),
+      groupIds,
+      formationSlots,
+    );
+    forceX += formation.x;
+    forceY += formation.y;
 
     const result = integrate(vx, vy, forceX, forceY, params);
     nextVelocities[index * 2] = result.velocity.x;
@@ -200,10 +294,24 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
   walls: WallSegment[],
   params: GpuSimCoreSocialForceParams,
   layout: SpatialHashGridLayout,
+  groupIds?: Int32Array,
+  formationSlots?: Float32Array,
 ): SocialForceStepResult {
   if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
       "interactionRangeMeters must be <= cellSize for the 3x3 neighborhood to be lossless",
+    );
+  }
+  // strangersClose (the formation force's crowding gate) searches the same
+  // 3x3 neighbourhood as agent repulsion, restricted to formationRoomMeters
+  // instead of interactionRangeMeters — lossless only if that smaller
+  // radius is ALSO covered by the neighbourhood, which the check above does
+  // not guarantee on its own (a caller could set interactionRangeMeters
+  // below formationRoomMeters). Only enforced when groups are actually in
+  // play, since it is meaningless otherwise.
+  if (groupIds && formationRoomMeters > layout.cellSize) {
+    throw new Error(
+      "formationRoomMeters must be <= cellSize for the 3x3 neighborhood to be lossless",
     );
   }
 
@@ -228,6 +336,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     const column = cell % layout.columns;
     const row = Math.floor(cell / layout.columns);
 
+    let strangersClose = 0;
     for (let dr = -1; dr <= 1; dr++) {
       const nr = row + dr;
       if (nr < 0 || nr >= layout.rows) {
@@ -250,6 +359,13 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
           }
           const dx = px - agents.positions[other * 2];
           const dy = py - agents.positions[other * 2 + 1];
+          if (
+            groupIds &&
+            Math.hypot(dx, dy) < formationRoomMeters &&
+            groupIds[other] !== groupIds[index]
+          ) {
+            strangersClose++;
+          }
           const bodies = agents.radius[index] + agents.radius[other];
           const push = agentForce(desired, bodies, dx, dy, params);
           forceX += push.x;
@@ -261,6 +377,18 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     const wall = wallForce(px, py, walls, params);
     forceX += wall.x;
     forceY += wall.y;
+
+    const formation = formationForce(
+      index,
+      px,
+      py,
+      strangersClose,
+      isNearAnyWall(px, py, walls),
+      groupIds,
+      formationSlots,
+    );
+    forceX += formation.x;
+    forceY += formation.y;
 
     const result = integrate(vx, vy, forceX, forceY, params);
     nextVelocities[index * 2] = result.velocity.x;

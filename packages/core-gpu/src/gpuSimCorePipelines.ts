@@ -92,11 +92,12 @@ export function createMovePipeline(device: GPUDevice): {
   layout: GPUBindGroupLayout;
   pipeline: GPUComputePipeline;
 } {
-  // The fused move binds 11 storage buffers — above the WebGPU default of 8.
-  // Without this check the pipeline fails validation *silently* (async device
-  // error) and every step() becomes a no-op that still costs submission time,
-  // which is exactly how a benchmark measures a dead pipeline.
-  const needed = 11;
+  // The fused move binds 13 storage buffers (11 + ADR-0015 stage 2's
+  // groupIds/formationSlots) — above the WebGPU default of 8. Without this
+  // check the pipeline fails validation *silently* (async device error) and
+  // every step() becomes a no-op that still costs submission time, which is
+  // exactly how a benchmark measures a dead pipeline.
+  const needed = 13;
 
   if (device.limits.maxStorageBuffersPerShaderStage < needed) {
     throw new Error(
@@ -125,6 +126,8 @@ export function createMovePipeline(device: GPUDevice): {
       readOnlyStorageBinding(8), // walls
       storageBinding(9), // positionsOut
       storageBinding(10), // velocitiesOut
+      readOnlyStorageBinding(11), // groupIds
+      readOnlyStorageBinding(12), // formationSlots
     ],
   });
   return {

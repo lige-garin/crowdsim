@@ -1,10 +1,24 @@
 # ADR 0015: Scale-up path — GPU reconnection vs. multi-scale (comparison only)
 
-- Status: **Comparison written, path not started** — the gap-closure plan's
-  own gate for batch 3.3 ("两条路二选一，先写 ADR 比较后再动手") is this
-  document; it recommends a path but does not implement it. See this ADR's
-  own Decision section for why implementation is not attempted here.
-- Touches: nothing yet — no code changes in this ADR
+- Status: **GPU reconnection path started, two stages in** — this ADR
+  originally recommended path (a) without starting it (see the Decision
+  section below for why, as written at the time: no WebGPU adapter in that
+  session's sandbox). That blocker lifted in a later session with real
+  browser-tool GPU access. **Stage 1** (2026-09-24, commit `6365246`): the
+  fused-move kernel's agent/wall repulsion went from the old linear-falloff
+  model to `crowdMovement.ts`'s real exponential-falloff, anisotropic,
+  contact-stiffness force, verified against a CPU oracle on real hardware.
+  **Stage 2** (2026-09-25): the in-formation spring force (group formation),
+  same real-hardware verification discipline — see
+  `docs/CLAIMS_LEDGER.md`'s forty-fifth entry for the full record. Still not
+  wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"`
+  selection — this ADR authorizes behaviour-by-behaviour porting with
+  per-stage parity proof, not a claim of full parity yet. Remaining stages,
+  in this ADR's own order: sidestep, anticipation (Karamouzas
+  time-to-collision), hazard avoidance, holding-state speed easing, the
+  no-walking-backward clamp, the no-overshoot-past-target clamp.
+- Touches: `packages/core-gpu/src/gpuSimCoreSocialForce.ts`,
+  `gpuSimCoreShaders.ts`, `gpuSimCoreParity.ts`, `gpuSimCorePipelines.ts`
 - Related: ADR-0002 (100k GPU rewrite), ADR-0006 (WebGPU compute / WebGL
   render fallback, "no silent degradation"), `packages/core-gpu/BENCHMARKS.md`
 

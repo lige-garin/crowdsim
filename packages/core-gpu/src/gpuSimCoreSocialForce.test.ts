@@ -186,3 +186,211 @@ describe("stepGpuSimCoreSocialForceCpu — the physics itself, not just the neig
     expect(withNeighbour.velocities[1]).toBeCloseTo(aloneResult.velocities[1], 9);
   });
 });
+
+describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGain pull toward a group slot)", () => {
+  it("pulls a group member toward its formation slot when nothing gates it off", () => {
+    // Alone except for its own group's slot far to the side — no walls, no
+    // strangers, so the only force at all (relaxation is zero: desired speed
+    // matches current velocity of zero and target equals position) is the
+    // formation spring itself.
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]);
+    const groupIds = new Int32Array([1]);
+    const formationSlots = new Float32Array([2, 0]);
+
+    const result = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      groupIds,
+      formationSlots,
+    );
+
+    expect(result.velocities[0]).toBeGreaterThan(0);
+    expect(result.velocities[1]).toBeCloseTo(0, 9);
+  });
+
+  it("does not pull an ungrouped agent even when formationSlots has a value at its index", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]);
+    const groupIds = new Int32Array([-1]);
+    const formationSlots = new Float32Array([2, 0]);
+
+    const result = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      groupIds,
+      formationSlots,
+    );
+
+    expect(result.velocities[0]).toBeCloseTo(0, 9);
+    expect(result.velocities[1]).toBeCloseTo(0, 9);
+  });
+
+  it("gates the pull off near a wall (crowdMovement.ts's wallClose)", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]);
+    const groupIds = new Int32Array([1]);
+    const formationSlots = new Float32Array([2, 0]);
+    const nearWall: WallSegment[] = [{ x1: 0.5, y1: -5, x2: 0.5, y2: 5 }];
+
+    const result = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      nearWall,
+      params,
+      groupIds,
+      formationSlots,
+    );
+
+    // The wall push itself is real (agent is well inside wallRepulsionRange
+    // of a wall at x=0.5), but the +x formation pull toward (2, 0) must be
+    // absent — without the gate the wall push and formation pull would both
+    // point away from the wall and this assertion would not distinguish
+    // them, so the wall sits close enough to push (0.5m) but the important
+    // thing is what's NOT here: no y-component at all, on either force.
+    expect(result.velocities[1]).toBeCloseTo(0, 9);
+  });
+
+  it("gates the pull off with two or more non-group strangers close by (crowdMovement.ts's strangersClose)", () => {
+    // A single stranger's own y-repulsion is not symmetric, so a bare sign
+    // check on velocities[1] can't isolate the gate (two symmetric
+    // strangers cancel each other's y-repulsion on their own, independent
+    // of whether the pull is gated). Compare instead: one stranger (gate
+    // not yet tripped, strangersClose = 1) against two symmetric strangers
+    // (gate tripped, strangersClose = 2) — only the pull toward (0, 5)
+    // should differ between the two, and it dominates the single-stranger
+    // case (a 5m pull vs. a sub-1m repulsion).
+    const oneStranger = createAgentSoA(2);
+    setAgentPosition(oneStranger, 0, 0, 0);
+    setAgentPosition(oneStranger, 1, 0.6, 0.3);
+    setAgentRadius(oneStranger, 0, 0.22);
+    setAgentRadius(oneStranger, 1, 0.22);
+
+    const twoStrangers = createAgentSoA(3);
+    setAgentPosition(twoStrangers, 0, 0, 0);
+    setAgentPosition(twoStrangers, 1, 0.6, 0.3);
+    setAgentPosition(twoStrangers, 2, 0.6, -0.3);
+    setAgentRadius(twoStrangers, 0, 0.22);
+    setAgentRadius(twoStrangers, 1, 0.22);
+    setAgentRadius(twoStrangers, 2, 0.22);
+
+    const targetsOne = new Float32Array([0, 0, 10, 10]);
+    const targetsTwo = new Float32Array([0, 0, 10, 10, 10, 10]);
+    const groupIdsOne = new Int32Array([1, -1]);
+    const groupIdsTwo = new Int32Array([1, -1, -1]);
+    const formationSlots = new Float32Array([0, 5]);
+
+    const resultOne = stepGpuSimCoreSocialForceCpu(
+      oneStranger,
+      targetsOne,
+      [],
+      params,
+      groupIdsOne,
+      formationSlots,
+    );
+    const resultTwo = stepGpuSimCoreSocialForceCpu(
+      twoStrangers,
+      targetsTwo,
+      [],
+      params,
+      groupIdsTwo,
+      formationSlots,
+    );
+
+    // One stranger: the pull toward (0, 5) is present, giving a clearly
+    // positive y-velocity for a single 1/60s step (force dominated by the
+    // formation spring toward a target 5m away). Two strangers: the pull is
+    // gated off, leaving only the (much smaller) symmetric repulsion, which
+    // cancels in y — nearly two orders of magnitude smaller, not just
+    // "somewhat less".
+    expect(resultOne.velocities[1]).toBeGreaterThan(0.05);
+    expect(Math.abs(resultTwo.velocities[1])).toBeLessThan(
+      resultOne.velocities[1] / 50,
+    );
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction once groups are involved", () => {
+    const N = 40;
+    const agents = createAgentSoA(N);
+    const groupIds = new Int32Array(N);
+    const formationSlots = new Float32Array(N * 2);
+    const targets = new Float32Array(N * 2);
+    for (let i = 0; i < N; i++) {
+      setAgentPosition(agents, i, 5 + (i % 8) * 1.5, 5 + Math.floor(i / 8) * 1.5);
+      setAgentSpeed(agents, i, 1.34);
+      setAgentRadius(agents, i, 0.22);
+      // Pair agents up into groups of two, slot each one 0.4m to the side of
+      // where it already stands, so the formation force is doing real work,
+      // not just returning zero for lack of anywhere to pull toward.
+      groupIds[i] = Math.floor(i / 2);
+      formationSlots[i * 2] = 5 + (i % 8) * 1.5 + 0.4;
+      formationSlots[i * 2 + 1] = 5 + Math.floor(i / 8) * 1.5;
+      targets[i * 2] = 60;
+      targets[i * 2 + 1] = 60;
+    }
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      groupIds,
+      formationSlots,
+    );
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+      groupIds,
+      formationSlots,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+
+  it("throws when groups are supplied and formationRoomMeters exceeds cellSize", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]);
+    const groupIds = new Int32Array([1]);
+    const formationSlots = new Float32Array([2, 0]);
+    const tooCoarse = createSpatialHashGridLayout({
+      width: 64,
+      height: 64,
+      cellSize: 0.5,
+    });
+
+    expect(() =>
+      stepGpuSimCoreSocialForceNeighborhoodCpu(
+        agents,
+        targets,
+        [],
+        { ...params, interactionRangeMeters: 0.4 },
+        tooCoarse,
+        groupIds,
+        formationSlots,
+      ),
+    ).toThrow(/formationRoomMeters/);
+  });
+});

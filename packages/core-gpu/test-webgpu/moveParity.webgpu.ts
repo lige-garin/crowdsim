@@ -21,7 +21,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 11 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
       });
       expect(device).toBeDefined();
 
@@ -80,6 +80,89 @@ describe("fused move parity (real WebGPU)", () => {
         params,
         layout,
         20,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 2: in-formation spring force) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      });
+      expect(device).toBeDefined();
+
+      const N = 40;
+      const agents = createAgentSoA(N);
+      const groupIds = new Int32Array(N);
+      const formationSlots = new Float32Array(N * 2);
+      const targets = new Float32Array(N * 2);
+      for (let i = 0; i < N; i++) {
+        setAgentPosition(agents, i, 5 + (i % 8) * 1.5, 5 + Math.floor(i / 8) * 1.5);
+        setAgentSpeed(agents, i, 1.34);
+        setAgentRadius(agents, i, 0.22);
+        // Pairs of two, each slotted 0.4m to the side of its own start point
+        // — the formation force has real, non-zero work to do every step.
+        groupIds[i] = Math.floor(i / 2);
+        formationSlots[i * 2] = 5 + (i % 8) * 1.5 + 0.4;
+        formationSlots[i * 2 + 1] = 5 + Math.floor(i / 8) * 1.5;
+        targets[i * 2] = 60;
+        targets[i * 2 + 1] = 60;
+      }
+      const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 64,
+        height: 64,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          groupIds,
+          formationSlots,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        groupIds,
+        formationSlots,
       );
 
       for (let i = 0; i < N * 2; i++) {

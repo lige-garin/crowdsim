@@ -190,6 +190,8 @@ export async function stepForParity(
   params: GpuSimCoreSocialForceParams,
   layout: SpatialHashGridLayout,
   steps: number,
+  groupIds?: Int32Array,
+  formationSlots?: Float32Array,
 ): Promise<StepParityReadback> {
   const count = agents.count;
   if (count === 0) {
@@ -237,6 +239,22 @@ export async function stepForParity(
   const targetsBuffer = createStorageBuffer(
     device,
     "step-targets",
+    count * 2 * F32,
+    GPUBufferUsage.COPY_DST,
+  );
+  // ADR-0015 stage 2: always bound (the shader has no way to omit a
+  // binding), but harmless when nobody supplies them — group id -1 means
+  // "not in a group", which gates the formation force off before
+  // formationSlots is ever read, so its contents don't matter in that case.
+  const groupIdsBuffer = createStorageBuffer(
+    device,
+    "step-group-ids",
+    count * 4,
+    GPUBufferUsage.COPY_DST,
+  );
+  const formationSlotsBuffer = createStorageBuffer(
+    device,
+    "step-formation-slots",
     count * 2 * F32,
     GPUBufferUsage.COPY_DST,
   );
@@ -297,6 +315,16 @@ export async function stepForParity(
   device.queue.writeBuffer(speedBuffer, 0, agents.speed.slice(0, count));
   device.queue.writeBuffer(radiiBuffer, 0, agents.radius.slice(0, count));
   device.queue.writeBuffer(targetsBuffer, 0, targetPositions.slice(0, count * 2));
+  device.queue.writeBuffer(
+    groupIdsBuffer,
+    0,
+    groupIds ? groupIds.slice(0, count) : new Int32Array(count).fill(-1),
+  );
+  device.queue.writeBuffer(
+    formationSlotsBuffer,
+    0,
+    formationSlots ? formationSlots.slice(0, count * 2) : new Float32Array(count * 2),
+  );
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
   }
@@ -360,6 +388,8 @@ export async function stepForParity(
         { binding: 8, resource: { buffer: wallsBuffer } },
         { binding: 9, resource: { buffer: posBuffers[other] } },
         { binding: 10, resource: { buffer: velBuffers[other] } },
+        { binding: 11, resource: { buffer: groupIdsBuffer } },
+        { binding: 12, resource: { buffer: formationSlotsBuffer } },
       ],
     });
   });
@@ -425,6 +455,8 @@ export async function stepForParity(
     speedBuffer,
     radiiBuffer,
     targetsBuffer,
+    groupIdsBuffer,
+    formationSlotsBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,

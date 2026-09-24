@@ -97,6 +97,13 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // invariant than the old agentRepulsionRange <= cellSize one) + wall
 // repulsion + maxSpeed clamp + integrate. Reads positionsIn/velocitiesIn,
 // writes positionsOut/velocitiesOut (ping-pong).
+//
+// Stage 2 (same file's own doc comment for the full rationale): adds the
+// in-formation spring force, gated by wallClose/strangersClose computed in
+// the SAME wall and neighbour loops the base force already runs — no new
+// passes. groupId < 0 is "not in a group"; formationSlots is only read for
+// agents with a real group. formationGain/formationRoomMeters are WGSL
+// constants, not MoveParams fields — crowdMovement.ts hardcodes both too.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -129,6 +136,11 @@ struct MoveParams {
 @group(0) @binding(8) var<storage, read> walls: array<vec4<f32>>;
 @group(0) @binding(9) var<storage, read_write> positionsOut: array<vec2<f32>>;
 @group(0) @binding(10) var<storage, read_write> velocitiesOut: array<vec2<f32>>;
+@group(0) @binding(11) var<storage, read> groupIds: array<i32>;
+@group(0) @binding(12) var<storage, read> formationSlots: array<vec2<f32>>;
+
+const formationGain: f32 = 1.0;
+const formationRoomMeters: f32 = 1.0;
 
 fn cellOf(p: vec2<f32>) -> u32 {
   let c = min(u32(max(floor(p.x / params.cellSize), 0.0)), params.columns - 1u);
@@ -160,7 +172,11 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
 
   // agent repulsion over the sorted 3x3 neighborhood — exponential falloff,
   // anisotropic (weighted less from behind), plus a contact term once bodies
-  // overlap. Ports gpuSimCoreSocialForce.ts's agentForce() exactly.
+  // overlap. Ports gpuSimCoreSocialForce.ts's agentForce() exactly. Also
+  // counts strangersClose (formation force's crowding gate) in the same
+  // pass, exactly like the CPU's own single loop does.
+  let myGroup = groupIds[i];
+  var strangersClose = 0u;
   let cell = cellOf(p);
   let cu = i32(cell % params.columns);
   let ru = i32(cell / params.columns);
@@ -179,6 +195,9 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
         let d = p - positionsIn[other];
         let dist = max(length(d), 0.0001);
         if (dist < params.interactionRangeMeters) {
+          if (dist < formationRoomMeters && groupIds[other] != myGroup) {
+            strangersClose = strangersClose + 1u;
+          }
           let n = d / dist;
           let facing = -(desired.x * n.x + desired.y * n.y);
           let weight = params.anisotropy + (1.0 - params.anisotropy) * ((1.0 + facing) / 2.0);
@@ -194,16 +213,28 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
     }
   }
 
-  // wall repulsion
+  // wall repulsion, and wallClose (formation force's other gate: the crowd
+  // falls into single file near a wall instead of holding a side-by-side
+  // line) — a different, wider radius (formationRoomMeters) than the push
+  // itself (wallRepulsionRange), same as the CPU original.
+  var wallClose = false;
   for (var w = 0u; w < params.wallCount; w = w + 1u) {
     let closest = closestOnSegment(p, walls[w]);
     let d = p - closest;
     let dist = max(length(d), 0.0001);
+    if (dist > 0.000001 && dist < formationRoomMeters) { wallClose = true; }
     if (dist < params.wallRepulsionRange) {
       let strength = params.wallRepulsionStrength *
         ((params.wallRepulsionRange - dist) / params.wallRepulsionRange);
       force = force + (d / dist) * strength;
     }
+  }
+
+  // in-formation spring: pull toward the precomputed slot unless a wall is
+  // close or two-plus strangers are. formationSlots is meaningless (never
+  // read) for agents with no group.
+  if (myGroup >= 0 && !wallClose && strangersClose < 2u) {
+    force = force + formationGain * (formationSlots[i] - p);
   }
 
   // integrate + clamp to maxSpeed
