@@ -1,7 +1,7 @@
 import { PerspectiveCamera } from "three";
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "./defaultDemoScene";
-import { placeEditorTool, createEditorDocumentFromScene } from "./sceneEditorState";
+import { defaultDemoScene } from "../defaultDemoScene";
+import { placeEditorTool, createEditorDocumentFromScene } from "../sceneEditorState";
 import {
   placeInScene,
   placementConflict,

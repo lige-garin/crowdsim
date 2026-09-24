@@ -21,8 +21,12 @@ import {
   figureLook,
   type FigureArchetype,
   type FigureLook,
-} from "./crowdDemographics";
-import { agentStateColor, agentStateKey, type AgentStateKey } from "./agentStateColors";
+} from "../crowdDemographics";
+import {
+  agentStateColor,
+  agentStateKey,
+  type AgentStateKey,
+} from "../agentStateColors";
 import { createContactShadows } from "./contactShadows";
 
 /**

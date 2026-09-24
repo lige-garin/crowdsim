@@ -6,7 +6,7 @@ import { selectAgentIntentOverlay } from "./simulationViewportOverlay";
 import { noLiveCrowd, useLiveCrowd, type LiveCrowd } from "./liveCrowd";
 import { defaultViewportLayers, type ViewportLayers } from "./viewportLayers";
 import type { HeatmapCell } from "./heatmap";
-import { useSimulationViewportRenderer } from "./useSimulationViewportRenderer";
+import { useSimulationViewportRenderer } from "./renderer/useSimulationViewportRenderer";
 import {
   HeatmapLegendOverlay,
   ViewportCityLabelOverlay,

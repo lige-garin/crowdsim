@@ -1,8 +1,8 @@
 import { PerspectiveCamera, Scene } from "three";
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "./defaultDemoScene";
+import { defaultDemoScene } from "../defaultDemoScene";
 import { attachPlacementGhost } from "./placementGhost";
-import type { EditorTool } from "./sceneEditorState";
+import type { EditorTool } from "../sceneEditorState";
 
 function setup() {
   const canvas = document.createElement("canvas");

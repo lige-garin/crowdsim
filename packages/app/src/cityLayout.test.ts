@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultDemoScene } from "./defaultDemoScene";
 import { contains, createCityLayout, districtKeepOut, overlaps } from "./cityLayout";
-import { placeInScene } from "./worldPlacement";
+import { placeInScene } from "./renderer/worldPlacement";
 
 describe("city layout", () => {
   const layout = createCityLayout(defaultDemoScene);

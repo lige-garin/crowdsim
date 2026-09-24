@@ -1,8 +1,8 @@
 import { Color, InstancedMesh, Mesh, MeshStandardMaterial, type Object3D } from "three";
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "./defaultDemoScene";
+import { defaultDemoScene } from "../defaultDemoScene";
 import { BoxBatch } from "./boxBatch";
-import { createCityLayout } from "./cityLayout";
+import { createCityLayout } from "../cityLayout";
 import { createCityObjects } from "./cityMeshes";
 import { createDistrictObjects } from "./districtMeshes";
 

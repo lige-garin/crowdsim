@@ -1,5 +1,5 @@
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace, type Texture } from "three";
-import { mulberry32 } from "./simulationEngineRandom";
+import { mulberry32 } from "../simulationEngineRandom";
 
 /**
  * Tiling ground textures, painted once per session: stone paving for the plaza,

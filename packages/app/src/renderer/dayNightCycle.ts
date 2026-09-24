@@ -1,5 +1,5 @@
 import { MathUtils } from "three";
-import { lerp } from "./numberUtils";
+import { lerp } from "../numberUtils";
 
 /**
  * The city view's day. At 120 simulated seconds per day the whole viewport went

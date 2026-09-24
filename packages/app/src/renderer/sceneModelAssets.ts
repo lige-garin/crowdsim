@@ -1,6 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { Mesh, type Object3D } from "three";
-import type { SceneRenderAssetPlacement } from "./sceneRenderPlan";
+import type { SceneRenderAssetPlacement } from "../sceneRenderPlan";
 
 export type SceneAssetLod = "high" | "low" | "medium";
 

@@ -13,7 +13,7 @@ import {
   figureLook,
   figureMix,
   type FigureArchetype,
-} from "./crowdDemographics";
+} from "../crowdDemographics";
 import {
   createCrowdFigures,
   createFigureGeometry,

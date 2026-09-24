@@ -1,7 +1,7 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useEffect, useRef, useState } from "react";
 import type { EditorTool } from "./sceneEditorState";
-import { placeInScene } from "./worldPlacement";
+import { placeInScene } from "./renderer/worldPlacement";
 
 /**
  * Building straight into the 3D world: each click commits one placement to the

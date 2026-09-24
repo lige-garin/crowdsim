@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultDemoScene } from "./defaultDemoScene";
 import { createSimulationEngineFromScene, hotUpdateBlocker } from "./simulationEngine";
 import { reconcileAgentsWithScene } from "./simulationSceneReconcile";
-import { placeInScene } from "./worldPlacement";
+import { placeInScene } from "./renderer/worldPlacement";
 
 const scene = defaultDemoScene;
 

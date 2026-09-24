@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "./defaultDemoScene";
-import { createSceneRenderPlan } from "./sceneRenderPlan";
+import { defaultDemoScene } from "../defaultDemoScene";
+import { createSceneRenderPlan } from "../sceneRenderPlan";
 import { sceneAtmosphere } from "./simulationViewportSceneObjects";
 
 describe("sceneAtmosphere", () => {

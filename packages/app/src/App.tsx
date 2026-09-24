@@ -19,7 +19,7 @@ import { useSimulationWorkerController } from "./useSimulationWorkerController";
 import { usesWorkerSimulationPath } from "./simulationThread";
 import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
 import type { EditorTool } from "./sceneEditorState";
-import { placesInWorld } from "./worldPlacement";
+import { placesInWorld } from "./renderer/worldPlacement";
 import { useWorldBuilding } from "./useWorldBuilding";
 import { hotUpdateBlocker } from "./simulationEngine";
 import { createLiveCrowd } from "./liveCrowd";

@@ -17,36 +17,36 @@ import {
 import type { WebGLRenderer } from "three";
 import type { WebGPURenderer } from "three/webgpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import { viewportAgentCapacity } from "./renderBenchmark";
+import { viewportAgentCapacity } from "../renderBenchmark";
 import {
   agentWorldPosition,
   selectCrowdAgents,
   type ViewedFloor,
   visibleAgentCount,
-} from "./agentInstanceField";
-import { crowdBudget } from "./crowdBudget";
+} from "../agentInstanceField";
+import { crowdBudget } from "../crowdBudget";
 import { createCrowdFigures, type CrowdFigureAgent } from "./crowdFigures";
-import { screenToNdc } from "./agentPicking";
+import { screenToNdc } from "../agentPicking";
 import {
   attachCityCameraControls,
   initialCityCameraRig,
   type CityCameraRig,
 } from "./cityCameraControls";
 import { createCityObjects, type CityObjects } from "./cityMeshes";
-import { CITY_CAMERA_FOV_DEGREES } from "./orbitCamera";
-import { toRenderX, toRenderY } from "./simulationViewportGeometry";
+import { CITY_CAMERA_FOV_DEGREES } from "../orbitCamera";
+import { toRenderX, toRenderY } from "../simulationViewportGeometry";
 import { attachPlacementGhost } from "./placementGhost";
-import type { EditorTool } from "./sceneEditorState";
-import type { SimulationSnapshot } from "./simulationEngine";
-import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
-import { createSceneRenderPlan } from "./sceneRenderPlan";
-import { createViewportOverlayPlan } from "./viewportOverlayPlan";
+import type { EditorTool } from "../sceneEditorState";
+import type { SimulationSnapshot } from "../simulationEngine";
+import type { ViewportAgentOverlayFrame } from "../simulationViewportOverlay";
+import { createSceneRenderPlan } from "../sceneRenderPlan";
+import { createViewportOverlayPlan } from "../viewportOverlayPlan";
 import { loadSceneVisualAssetObject } from "./sceneModelAssets";
-import type { ViewportLayers } from "./viewportLayers";
-import type { HeatmapCell } from "./heatmap";
-import type { RenderStatus, ViewMode } from "./simulationViewportTypes";
-import type { ViewportRenderMode } from "./viewportRenderMode";
-import { localizedStatus, rawStatus } from "./simulationViewportStatus";
+import type { ViewportLayers } from "../viewportLayers";
+import type { HeatmapCell } from "../heatmap";
+import type { RenderStatus, ViewMode } from "../simulationViewportTypes";
+import type { ViewportRenderMode } from "../viewportRenderMode";
+import { localizedStatus, rawStatus } from "../simulationViewportStatus";
 import { applyViewportLayers } from "./simulationViewportLayerVisibility";
 import {
   applySceneAtmosphere,

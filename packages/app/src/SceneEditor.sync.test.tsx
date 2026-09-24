@@ -6,7 +6,7 @@ import { I18nProvider } from "./i18n";
 import { templateScenes } from "./industryTemplates";
 import { SceneEditor } from "./SceneEditor";
 import { NumberInput } from "./SceneEditorParamInputs";
-import { placeInScene } from "./worldPlacement";
+import { placeInScene } from "./renderer/worldPlacement";
 
 beforeEach(() => {
   // jsdom has no pointer capture; the editor calls it when an entity is picked.

@@ -28,11 +28,11 @@ import {
   skyColoursFor,
   skyEnvironmentRotation,
 } from "./skyEnvironment";
-import { shadowCameraFrustum } from "./shadowConfig";
-import { partitionRenderPrimitives } from "./renderLayerPartition";
-import type { SceneRenderPlan } from "./sceneRenderPlan";
-import type { ViewportOverlayPlan } from "./viewportOverlayPlan";
-import type { ViewMode } from "./simulationViewportTypes";
+import { shadowCameraFrustum } from "../shadowConfig";
+import { partitionRenderPrimitives } from "../renderLayerPartition";
+import type { SceneRenderPlan } from "../sceneRenderPlan";
+import type { ViewportOverlayPlan } from "../viewportOverlayPlan";
+import type { ViewMode } from "../simulationViewportTypes";
 import {
   createSceneAssetPlaceholder,
   createRenderPrimitiveMesh,
