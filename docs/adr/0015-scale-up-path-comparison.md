@@ -1,6 +1,6 @@
 # ADR 0015: Scale-up path — GPU reconnection vs. multi-scale (comparison only)
 
-- Status: **GPU reconnection path started, six stages in** — this ADR
+- Status: **GPU reconnection path started, seven stages in** — this ADR
   originally recommended path (a) without starting it (see the Decision
   section below for why, as written at the time: no WebGPU adapter in that
   session's sandbox). That blocker lifted in a later session with real
@@ -20,12 +20,16 @@
   deeper gap in stage 1's own base relaxation force (distance-based speed
   easing and the exact exponential integration `crowdMovement.ts` itself
   uses, neither of which stages 1-5 had) — see `docs/CLAIMS_LEDGER.md`'s
-  forty-fifth through forty-ninth entries for the full record. Still not
+  forty-fifth through forty-ninth entries for the full record. **Stage 7**
+  (2026-09-25): the no-walking-backward clamp — zeroing only the
+  along-heading component of velocity when it points backward, applied
+  right after relaxation and before the `maxSpeedRatio` clamp, skipped for
+  holding agents, exactly `crowdMovement.ts`'s own gate and order. Still not
   wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"`
   selection — this ADR authorizes behaviour-by-behaviour porting with
   per-stage parity proof, not a claim of full parity yet. Remaining stages,
-  in this ADR's own order: the no-walking-backward clamp, the
-  no-overshoot-past-target clamp.
+  in this ADR's own order: the no-overshoot-past-target clamp — the last
+  one.
 - Touches: `packages/core-gpu/src/gpuSimCoreSocialForce.ts`,
   `gpuSimCoreShaders.ts`, `gpuSimCoreParity.ts`, `gpuSimCorePipelines.ts`
 - Related: ADR-0002 (100k GPU rewrite), ADR-0006 (WebGPU compute / WebGL

@@ -562,4 +562,110 @@ describe("fused move parity (real WebGPU)", () => {
       device!.destroy();
     },
   );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 7: no-walking-backward clamp) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+      });
+      expect(device).toBeDefined();
+
+      // Opposing pairs packed close (0.15m apart, well inside both
+      // interactionRangeMeters and contact range) with targets on opposite
+      // ends of a corridor — strong forward-pushing repulsion from directly
+      // ahead is exactly the scenario that drives a non-holding agent's
+      // velocity backward along its own heading without this stage's clamp.
+      // Every third agent holds (stage 6's own mixing pattern), which must
+      // NOT get the clamp.
+      const N = 12;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      const holding = new Uint32Array(N);
+      for (let pair = 0; pair < N / 2; pair++) {
+        const y = 5 + pair * 1.5;
+        const a = pair * 2;
+        const b = pair * 2 + 1;
+        setAgentPosition(agents, a, 10, y);
+        setAgentPosition(agents, b, 10.15, y);
+        setAgentSpeed(agents, a, 1.34);
+        setAgentSpeed(agents, b, 1.34);
+        setAgentRadius(agents, a, 0.22);
+        setAgentRadius(agents, b, 0.22);
+        targets[a * 2] = 60;
+        targets[a * 2 + 1] = y;
+        targets[b * 2] = -40;
+        targets[b * 2 + 1] = y;
+        holding[a] = a % 3 === 0 ? 1 : 0;
+        holding[b] = b % 3 === 0 ? 1 : 0;
+      }
+      const walls: WallSegment[] = [];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 96,
+        height: 32,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          undefined,
+          undefined,
+          undefined,
+          holding,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        holding,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
 });

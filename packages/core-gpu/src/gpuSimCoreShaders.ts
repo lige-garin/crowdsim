@@ -142,6 +142,14 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // integrated into velocity first; relaxation toward the desired heading is
 // then solved exactly as a linear ODE over dt, not approximated by folding
 // it into the same Euler step as the pushes.
+//
+// Stage 7: the no-walking-backward clamp. crowdMovement.ts zeroes only the
+// along-heading component of velocity when it points backward relative to
+// desired, right after relaxation and BEFORE the maxSpeedRatio clamp —
+// never for a holding agent (reuses the same holding buffer stage 6 already
+// added, no new binding). Sideways motion is untouched; this only stops a
+// dense corridor's forward-pushing repulsion from driving someone backward
+// along their own route.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -368,6 +376,15 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
   let relax = exp(-params.dt / params.relaxationTime);
   let targetV = desired * desiredSpeed;
   var cv = targetV + (v + force * params.dt - targetV) * relax;
+  // Stage 7: zero only the along-heading component when it points
+  // backward, never for a holding agent. Ports
+  // gpuSimCoreSocialForce.ts's integrateWithRelaxation() exactly.
+  if (!isHolding) {
+    let along = cv.x * desired.x + cv.y * desired.y;
+    if (along < 0.0) {
+      cv = cv - along * desired;
+    }
+  }
   // freeSpeed * maxSpeedRatio is the real, per-agent clamp — NOT
   // params.maxSpeed (stages 1-5's flat clamp, unused by this integration).
   let len = length(cv);

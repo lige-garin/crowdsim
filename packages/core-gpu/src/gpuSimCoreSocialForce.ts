@@ -44,9 +44,8 @@ import type {
  *
  * Deliberately NOT ported here, left for a later stage per ADR-0015's own
  * order (base force first, since everything else assumes it's right): the
- * no-walking-backward clamp and the no-overshoot-past-target clamp.
- * Leader-following is a decision-layer target rewrite, not a 60Hz force —
- * nothing to port.
+ * no-overshoot-past-target clamp. Leader-following is a decision-layer
+ * target rewrite, not a 60Hz force — nothing to port.
  *
  * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
  * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
@@ -350,6 +349,19 @@ function clampAnticipation(
  * `params.maxSpeed`) are both computed by the caller and passed in here,
  * since both need `distance`/`freeSpeed`, already computed there for the
  * neighbour loop's own desired-direction/facing math.
+ *
+ * Stage 7: the no-walking-backward clamp, applied right after relaxation
+ * and BEFORE the maxSpeedRatio clamp — exactly `crowdMovement.ts`'s own
+ * order. A walker squeezed by the crowd ahead stops; it does not walk
+ * backwards — forces from people in front outweigh those from behind
+ * (anisotropy), so without this clamp a dense corridor's unclipped model
+ * drifts the whole crowd in reverse. Only the component of velocity ALONG
+ * the desired heading is zeroed when negative; the sideways component is
+ * untouched, so a sidestep is never cancelled by this. Skipped for holding
+ * agents, matching `crowdMovement.ts`'s own `if (!holding)` gate — a
+ * holding agent's "heading" is just the direction to its own spot, and
+ * walking "backward" relative to that has no meaning the CPU original
+ * assigns a rule to either.
  */
 function integrateWithRelaxation(
   vx: number,
@@ -359,6 +371,7 @@ function integrateWithRelaxation(
   desired: { x: number; y: number },
   desiredSpeed: number,
   freeSpeed: number,
+  isHolding: boolean,
   params: GpuSimCoreSocialForceParams,
 ): { position: { x: number; y: number }; velocity: { x: number; y: number } } {
   const dt = params.dt;
@@ -367,6 +380,13 @@ function integrateWithRelaxation(
   const targetVy = desired.y * desiredSpeed;
   let vxNew = targetVx + (vx + ax * dt - targetVx) * relax;
   let vyNew = targetVy + (vy + ay * dt - targetVy) * relax;
+  if (!isHolding) {
+    const along = vxNew * desired.x + vyNew * desired.y;
+    if (along < 0) {
+      vxNew -= along * desired.x;
+      vyNew -= along * desired.y;
+    }
+  }
   const clamped = clampMagnitude(vxNew, vyNew, freeSpeed * params.maxSpeedRatio);
   vxNew = clamped.x;
   vyNew = clamped.y;
@@ -497,6 +517,7 @@ export function stepGpuSimCoreSocialForceCpu(
       desired,
       desiredSpeed,
       freeSpeed,
+      isHolding,
       params,
     );
     nextVelocities[index * 2] = result.velocity.x;
@@ -678,6 +699,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       desired,
       desiredSpeed,
       freeSpeed,
+      isHolding,
       params,
     );
     nextVelocities[index * 2] = result.velocity.x;

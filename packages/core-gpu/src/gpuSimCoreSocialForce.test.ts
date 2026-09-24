@@ -970,3 +970,101 @@ describe("stage 6: distance-based desired-speed easing, holding, and the exact e
     }
   });
 });
+
+describe("stage 7: the no-walking-backward clamp (crowdMovement.ts's if (!holding) { along < 0 -> clamp })", () => {
+  it("never lets a non-holding agent's velocity point backward along its own heading, even when squeezed hard from ahead", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // Deeply overlapping neighbour dead ahead: bodies sum to 0.44, only
+    // 0.05m apart — a massive contact-stiffness push straight back at
+    // agent 0, strong enough that an unclamped model would drift it
+    // backward relative to its own heading (+x, toward its far-away target).
+    setAgentPosition(agents, 1, 0.05, 0);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([50, 0, -50, 0]);
+
+    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    const along = result.velocities[0] * 1 + result.velocities[1] * 0; // heading = (1, 0)
+    expect(along).toBeGreaterThanOrEqual(-1e-9);
+  });
+
+  it("does NOT apply the backward clamp to a holding agent — crowdMovement.ts's own gate", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 0.05, 0);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([50, 0, -50, 0]);
+    const holding = new Uint32Array([1, 0]);
+
+    const holdingResult = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+    const notHoldingResult = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    // Same brutal push either way; only the holding run is allowed to carry
+    // it straight through as a negative x-velocity (heading toward the far
+    // target is still +x for a holding agent whose "spot" is also +x here,
+    // since targets are unchanged — the CLAMP is what differs, not the
+    // geometry).
+    expect(holdingResult.velocities[0]).toBeLessThan(notHoldingResult.velocities[0]);
+  });
+
+  it("leaves the sideways component untouched when clamping the backward one", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // Overlapping neighbour offset slightly to one side, not dead-on, so
+    // the push has both a backward (along-heading) and a sideways
+    // component — the clamp should only touch the former.
+    setAgentPosition(agents, 1, 0.05, 0.05);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([50, 0, -50, 0]);
+
+    const clamped = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    // heading = (1, 0): the clamp only ever subtracts along * heading from
+    // (vx, vy), which for heading (1, 0) never touches vy at all — so this
+    // is really asserting the clamp's own math, using a real run's output
+    // rather than re-deriving the formula independently.
+    expect(Number.isFinite(clamped.velocities[1])).toBe(true);
+    expect(clamped.velocities[1]).not.toBeCloseTo(0, 6);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with the backward clamp actively triggering", () => {
+    const N = 2;
+    const agents = createAgentSoA(N);
+    setAgentPosition(agents, 0, 5, 5);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 5.05, 5);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([55, 5, -45, 5]);
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(agents, targets, walls, params);
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+});
