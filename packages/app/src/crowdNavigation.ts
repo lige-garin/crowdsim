@@ -18,15 +18,104 @@ import { createWallIndex, forEachCellOnSegment, type WallIndex } from "./wallInd
  * and kept, least recently used first out, up to a fixed number.
  */
 
-/** Finest routing cell, metres. */
-export const routeCellSizeMeters = 1;
-/** Cells per field at most; bigger worlds get coarser cells instead of more memory. */
-export const maxRouteCells = 40_000;
+/**
+ * Finest routing cell, metres. A cell this size or larger that a wall so
+ * much as touches is marked fully blocked (see `createGrid`); a gap between
+ * two walls narrower than this can end up sealed on both sides even though
+ * physically passable. This used to be 1 m, which sealed any gap under
+ * ~2 m — verified directly (a 1 m gap let nobody through a 60 s check; 2.4 m
+ * did), and several RiMEA test scenes (8, 9, 11, 12, 15) widen their doors
+ * past the guideline's own numbers to route around it, each declaring the
+ * substitution in its own criterion string. Lowered to resolve literature
+ * door widths down to 0.8 m with margin (0.8 / 0.2 = 4 cells across).
+ *
+ * `createGrid`'s actual cell size is `max(routeCellSizeMeters,
+ * sqrt(area / maxRouteCells))`, so a small floor alone does not guarantee a
+ * fine grid on a big world -- the `maxRouteCells` cap can still coarsen it
+ * back past the point an 0.8 m door stays resolvable. This floor and
+ * `maxRouteCells` were raised together and are meant to be read together;
+ * see `maxRouteCells`'s own comment for the actual cell size this produces
+ * on realistic scene sizes and where that guarantee stops holding.
+ */
+export const routeCellSizeMeters = 0.2;
+/**
+ * Cells per field at most; bigger worlds get coarser cells instead of more
+ * memory. This used to be 40,000, sized for the old 1 m floor (cell size hit
+ * 1 m below 40,000 m^2, so the cap rarely mattered for scenes this project
+ * actually ships). Lowering the floor to resolve narrow doors, without
+ * raising this, left the cap doing most of the work on ordinary scenes: at
+ * 40,000 it coarsened this project's own example scenes (5,376-6,800 m^2,
+ * `exampleScenes.ts`) to 0.37-0.41 m cells -- verified directly against
+ * `forEachCellOnSegment`'s real rasterisation, an 0.8 m door at that cell
+ * size is *not* reliably resolvable (it fails at some door-centre
+ * alignments, though not all), undoing this file's whole reason for
+ * existing on exactly the scenes it is meant to serve.
+ *
+ * Raised to 80,000, chosen by measurement rather than guesswork: it holds
+ * those same example scenes at 0.26-0.29 m (verified robust for an 0.8 m
+ * door at every alignment scanned), costs ~0.34 ms to rasterise walls into
+ * (`createGrid` itself, run on every scene edit) and ~20-23 ms for one
+ * `buildDistanceField` Dijkstra solve on a scene that size (a one-off per
+ * distinct target, cached below by `maxRouteFields` -- not a per-frame
+ * cost), and holds each cached field to ~390 KB (`distances` + `sight`),
+ * ~25 MB for a full 64-field cache in the worst case.
+ *
+ * This is calibrated against this project's own known scene sizes, not
+ * against an unbounded one: a scene large enough to still get coarsened
+ * past ~0.37 m cells at this cap can still have an 0.8 m door sealed. No
+ * scene shipped in this repository is that large today.
+ */
+export const maxRouteCells = 80_000;
 /** Fields kept at once. */
 export const maxRouteFields = 64;
 
 const diagonalCost = Math.SQRT2;
 const wallClearanceTollMeters = 0.5;
+/**
+ * How far from a wall the toll reaches, metres — not cells. `createGrid`
+ * used to hardcode a 1-cell neighbourhood, which was fine by coincidence
+ * while `routeCellSizeMeters` was 1 m (1 cell = 1 m) but silently shrank to
+ * ~0.245 m of real toll once the grid got finer to resolve narrow doors —
+ * agents started hugging walls far closer than intended, changing route
+ * geometry in cheap, low-density scenes enough to flip RiMEA test 12d's
+ * width-vs-clear-time monotonicity (verified: reverting to a fixed 1-cell
+ * radius reproduces the flip; this fixed-metres radius does not).
+ *
+ * 1 m, matching the old grid's incidental radius, turned out to be too wide
+ * on its own: test 1's own 2 m corridor has its centre line exactly 1 m from
+ * either wall, so a 1 m radius tolled *every* cell in the corridor, everyone
+ * generated inside a wall cell (about half of them, symmetric around the
+ * centre line) found the toll-free open world outside the corridor's own
+ * end cheaper than the tolled walk down it, and RiMEA test 7's population
+ * lost several people to a corridor they physically could have walked
+ * (verified directly: 6 of 50 never arrived, each one frozen from birth with
+ * a routed heading pointing straight into the near wall). The coarse 1 m
+ * grid never exposed this — one step off a wall cell there already crossed
+ * most of a 2 m corridor's width, so `bestNeighbour` escaped the toll zone
+ * in a single hop regardless of its radius; the finer grid needed to resolve
+ * narrow doors no longer has that accident to hide behind.
+ *
+ * 0.3 m leaves most of a 2 m corridor's width genuinely untolled (verified:
+ * `distance()` down its centre line comes back at exactly 40 m, the true
+ * straight-line length, meaning no toll was ever added). Whether it leaves
+ * an untolled cell in the narrowest 0.8 m literature door this project now
+ * routes depends on exactly where the door sits on the grid, not just its
+ * width: at the small-world floor `cellSize` (0.2 m), `Math.round` rounds
+ * 0.3 / 0.2 down to a 1-cell radius rather than up to 2 (`0.3 / 0.2` is
+ * `1.4999999999999998` in float64, not `1.5`), and a 1-cell radius from each
+ * jamb happens to cover both of an 0.8 m gap's open cells when the door sits
+ * exactly on a cell boundary (this file's own regression test uses that
+ * alignment) -- but shift the same door by even a fraction of a cell and one
+ * open cell escapes both jambs' radius untolled (verified directly against
+ * `forEachCellOnSegment`'s real rasterisation at several offsets). Either
+ * way the toll is a soft cost, not a block -- the door always routes, at
+ * worst with a small (~0.1 m per cell here) preference against it that
+ * widens as the door does -- so this
+ * does not reopen the door-sealing bug this file exists to fix; it is a
+ * narrower guarantee than the name suggests, recorded here rather than
+ * papered over.
+ */
+const wallClearanceRadiusMeters = 0.3;
 /** Room for a body beside a straight line to the target, metres. */
 const bodyClearanceMeters = 0.35;
 
@@ -168,18 +257,31 @@ function createGrid(world: SceneWorldBounds, walls: readonly WallSegment[]): Gri
   }
   // Shortest paths hug corners; people do not, and a path through the cell next
   // to a wall end has walkers fighting the wall's push. A small toll on cells
-  // touching a wall keeps routes a cell off walls where there is room, and still
-  // lets them through a doorway where there is not.
+  // within `wallClearanceRadiusMeters` of a wall keeps routes off walls where
+  // there is room, and still lets them through a doorway where there is not.
+  // `clearance[]` is added once per cell in `buildDistanceField`'s
+  // `candidate`, alongside `cost * cellSize` (the true metres for that step)
+  // — so the per-cell toll must scale with `cellSize` too, or a finer grid
+  // silently charges it far more often per metre walked. Verified directly:
+  // an unscaled flat 0.5 toll made a 2 m corridor's Dijkstra field prefer a
+  // detour through open space with no wall in it at all over walking straight
+  // down the corridor (58 m "cost" for the detour vs. 143 for the 41 m direct
+  // walk) once the grid got fine enough that ~4 cells span a metre — each one
+  // separately taxed. Scaling by `cellSize` keeps the toll's real-world
+  // strength (about `wallClearanceTollMeters` per metre spent within
+  // `wallClearanceRadiusMeters` of a wall) constant regardless of resolution.
+  const radiusCells = Math.max(1, Math.round(wallClearanceRadiusMeters / cellSize));
+  const clearancePerCell = wallClearanceTollMeters * cellSize;
   for (let cell = 0; cell < blocked.length; cell++) {
     if (!blocked[cell]) continue;
     const column = cell % columns;
     const row = Math.floor(cell / columns);
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
+    for (let dr = -radiusCells; dr <= radiusCells; dr++) {
+      for (let dc = -radiusCells; dc <= radiusCells; dc++) {
         const c = column + dc;
         const r = row + dr;
         if (c < 0 || r < 0 || c >= columns || r >= rows) continue;
-        clearance[r * columns + c] = wallClearanceTollMeters;
+        clearance[r * columns + c] = clearancePerCell;
       }
     }
   }
@@ -278,6 +380,17 @@ function neighbourCell(
 /** Walking distance (metres) from every cell to `targetCell`; Infinity if cut off. */
 function buildDistanceField(grid: Grid, targetCell: number): Float32Array {
   const field = new Float32Array(grid.columns * grid.rows).fill(Infinity);
+  // Once a cell is popped off the heap its distance is final (no negative
+  // edges): re-relaxing it, or a neighbour that is already settled too, is
+  // always wasted work. Below a few thousand cells that waste was cheap
+  // enough to be invisible; on the tens-of-thousands-of-cells grids a small
+  // `routeCellSizeMeters` can now produce, lazy deletion without this bitmap
+  // let float32 rounding noise re-trigger "improvements" between neighbours
+  // in a loop that never terminated on its own — verified directly (an open
+  // 40,000-cell grid ran tens of millions of heap pushes without converging
+  // and was killed; with `settled` it converges in roughly one push per
+  // cell, same order of magnitude as the grid itself).
+  const settled = new Uint8Array(grid.columns * grid.rows);
   const heap = new MinHeap(grid.columns * grid.rows);
   // The target stays reachable even when it sits on a wall line (a shop door
   // marked on its facade): it is where the walk ends, not a place to cross.
@@ -285,12 +398,14 @@ function buildDistanceField(grid: Grid, targetCell: number): Float32Array {
   heap.push(targetCell, 0);
   while (heap.size > 0) {
     const cell = heap.pop();
+    if (settled[cell]) continue;
+    settled[cell] = 1;
     const value = field[cell];
     const column = cell % grid.columns;
     const row = Math.floor(cell / grid.columns);
     for (const [dc, dr, cost] of neighbourOffsets) {
       const next = neighbourCell(grid, column, row, dc, dr);
-      if (next < 0) continue;
+      if (next < 0 || settled[next]) continue;
       const candidate = value + cost * grid.cellSize + grid.clearance[next];
       if (candidate < field[next]) {
         field[next] = candidate;

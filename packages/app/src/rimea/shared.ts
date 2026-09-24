@@ -63,15 +63,26 @@ export type RimeaTestResult = {
 
 /**
  * A door or exit opening, wider than the guideline's own — a router
- * workaround, not a claim about the door. This project's routing grid never
- * goes finer than 1 m (`routeCellSizeMeters`), and a wall segment marks every
- * cell it so much as touches; two segments bounding a ~1 m gap can between
- * them mark both of the gap's own cells, sealing it regardless of where
- * exactly it sits. Verified directly: a 1 m gap on this grid let nobody
- * through in a 60 s check; 2.4 m did. Sinks are not throughput-gated in this
- * engine (only sources are — ADR-0008), so widening a wall opening changes
- * nothing being measured by tests 8, 9 and 11, which all share this
- * substitution; each says so in its own criterion string.
+ * workaround, not a claim about the door. `crowdNavigation.ts`'s routing
+ * grid floor (`routeCellSizeMeters`) was 1 m when this substitution was
+ * introduced, and a wall segment marks every cell it so much as touches; two
+ * segments bounding a ~1 m gap can between them mark both of the gap's own
+ * cells, sealing it regardless of where exactly it sits. Verified directly:
+ * a 1 m gap on this grid let nobody through in a 60 s check; 2.4 m did.
+ *
+ * The floor has since been lowered to 0.2 m (`crowdNavigation.ts`'s own
+ * comment on `routeCellSizeMeters`/`maxRouteCells`), verified to resolve
+ * doors down to 0.8 m — but only on small worlds; on a world large enough to
+ * hit the `maxRouteCells` cap the cell size coarsens back past the point an
+ * 0.8 m door stays reliably resolvable, and these RiMEA scenes have not been
+ * individually re-measured against that cap to say which side of it they
+ * fall on. Reverting to the guideline's own door widths here is therefore
+ * left as separate, explicit follow-up work — re-measuring and re-tuning
+ * each test's own pass criterion against real literature widths, not a
+ * one-line substitution to undo alongside a router fix. Sinks are not
+ * throughput-gated in this engine (only sources are — ADR-0008), so widening
+ * a wall opening changes nothing being measured by tests 8, 9 and 11, which
+ * all share this substitution; each says so in its own criterion string.
  */
 export const routingGapMeters = 2.4;
 

@@ -18,20 +18,33 @@ import { corridorTest } from "./test01Corridor";
  * departs from; declared here rather than in each sub-test.
  *
  * **The bottleneck's width could not be built at the guideline's own
- * number.** This project's routing grid never goes finer than 1 m
- * (`routeCellSizeMeters`), and a wall segment marks every cell it touches;
- * two segments bounding a gap at or near that size can between them mark
- * both of the gap's own cells, sealing it regardless of where it sits.
- * Verified directly on this exact shape: bottleneck widths 0.8, 1.0 and
- * 1.2 m — the guideline's own three values, used for test 12d — let
- * nobody through at all, for the full length of a 60 s check; 1.4-1.8 m
- * were the same; 2.0 m was the first that worked. So `defaultBottleneckWidthMeters`
- * below is 2.4 m, not the guideline's 1 m, in every sub-test — including
- * 12a-c, where width is held constant and is not what is being measured,
- * and 12d, where it is: 12d's own widths are moved out to 2.0-3.2 m, still
- * three points testing the same claim (flow rises with width) but not at
- * the values RiMEA asks for. This is a limit of this project's router, not
- * a choice about the physics, and nothing here claims otherwise.
+ * number, at the time this substitution was introduced.**
+ * `crowdNavigation.ts`'s routing grid floor (`routeCellSizeMeters`) was 1 m
+ * then, and a wall segment marks every cell it touches; two segments
+ * bounding a gap at or near that size can between them mark both of the
+ * gap's own cells, sealing it regardless of where it sits. Verified directly
+ * on this exact shape: bottleneck widths 0.8, 1.0 and 1.2 m — the
+ * guideline's own three values, used for test 12d — let nobody through at
+ * all, for the full length of a 60 s check; 1.4-1.8 m were the same; 2.0 m
+ * was the first that worked. So `defaultBottleneckWidthMeters` below is
+ * 2.4 m, not the guideline's 1 m, in every sub-test — including 12a-c, where
+ * width is held constant and is not what is being measured, and 12d, where
+ * it is: 12d's own widths are moved out to 2.0-3.2 m, still three points
+ * testing the same claim (flow rises with width) but not at the values
+ * RiMEA asks for. This was a limit of this project's router, not a choice
+ * about the physics, and nothing here claims otherwise.
+ *
+ * The floor has since been lowered to 0.2 m, verified to resolve door widths
+ * down to 0.8 m on small worlds (`crowdNavigation.ts`'s own comment). This
+ * scene's world is small enough (well under the `maxRouteCells` cap's
+ * crossover area) that the floor should apply here too, unlike on larger
+ * RiMEA scenes — but that only re-opens whether the *routing* geometry
+ * resolves the guideline's own widths, not whether 150 people can actually
+ * clear a real 0.8-1.2 m bottleneck without jamming under this engine's
+ * social force (a separate question this router fix does not answer).
+ * Reverting to the guideline's own widths and re-measuring is left as
+ * explicit follow-up work, not folded into the router fix that made it
+ * newly plausible.
  */
 export const bottleneckTest = {
   room1SizeMeters: 10,
