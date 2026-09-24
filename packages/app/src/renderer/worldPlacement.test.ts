@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { defaultDemoScene } from "../defaultDemoScene";
 import { placeEditorTool, createEditorDocumentFromScene } from "../sceneEditorState";
 import {
+  placeCountLineBetween,
   placeInScene,
   placementConflict,
   placementFootprint,
@@ -98,6 +99,37 @@ describe("placeInScene", () => {
     expect(placesInWorld("wall")).toBe(false);
     expect(placeInScene(defaultDemoScene, "wall", at)).toBeNull();
     expect(placesInWorld("road")).toBe(true);
+  });
+});
+
+describe("placeCountLineBetween (ADR-0031)", () => {
+  const start = { x: 30, y: 40 };
+  const end = { x: 70, y: 55 };
+
+  it("adds a count line with both real endpoints, not the fixed east-west segment", () => {
+    const next = placeCountLineBetween(defaultDemoScene, start, end);
+    expect(next.countLines).toHaveLength(defaultDemoScene.countLines.length + 1);
+    const added = next.countLines.at(-1)!;
+    expect(added.geometry.points).toEqual([start, end]);
+  });
+
+  it("matches what the 2D editor's own two-point drag tool would add for the same drag", () => {
+    const next = placeCountLineBetween(defaultDemoScene, start, end);
+    const expected = createEditorDocumentFromScene(defaultDemoScene).countLines.length;
+    expect(next.countLines).toHaveLength(expected + 1);
+  });
+
+  it("keeps the rest of the scene intact", () => {
+    const next = placeCountLineBetween(defaultDemoScene, start, end);
+    expect(next.shops).toHaveLength(defaultDemoScene.shops.length);
+    expect(next.world).toEqual(defaultDemoScene.world);
+  });
+
+  it("never reuses an existing id across repeated drags", () => {
+    const once = placeCountLineBetween(defaultDemoScene, start, end);
+    const twice = placeCountLineBetween(once, { x: 10, y: 10 }, { x: 20, y: 20 });
+    const ids = twice.countLines.map((line) => line.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
 

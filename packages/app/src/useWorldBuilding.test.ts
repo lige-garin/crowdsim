@@ -106,3 +106,39 @@ describe("useWorldBuilding outside the 3D run view", () => {
     expect(hook.result.current.canUndo).toBe(true);
   });
 });
+
+describe("useWorldBuilding: placeLine (ADR-0031)", () => {
+  it("commits a count line between two real points, and undoes it like any other placement", () => {
+    const { applied, hook } = setup();
+
+    act(() => hook.result.current.placeLine({ x: 30, y: 40 }, { x: 70, y: 55 }));
+
+    expect(applied.at(-1)!.countLines).toHaveLength(
+      defaultDemoScene.countLines.length + 1,
+    );
+    expect(applied.at(-1)!.countLines.at(-1)!.geometry.points).toEqual([
+      { x: 30, y: 40 },
+      { x: 70, y: 55 },
+    ]);
+    expect(hook.result.current.canUndo).toBe(true);
+
+    act(() => hook.result.current.undo());
+    expect(applied.at(-1)).toBe(defaultDemoScene);
+    expect(hook.result.current.canUndo).toBe(false);
+  });
+
+  it("shares the same undo stack as single-point placements", () => {
+    const { applied, hook } = setup();
+
+    act(() => hook.result.current.place("shop", { x: 40, y: 86 }));
+    act(() => hook.result.current.placeLine({ x: 30, y: 40 }, { x: 70, y: 55 }));
+    expect(applied.at(-1)!.shops).toHaveLength(defaultDemoScene.shops.length + 1);
+    expect(applied.at(-1)!.countLines).toHaveLength(
+      defaultDemoScene.countLines.length + 1,
+    );
+
+    act(() => hook.result.current.undo());
+    expect(applied.at(-1)!.countLines).toHaveLength(defaultDemoScene.countLines.length);
+    expect(applied.at(-1)!.shops).toHaveLength(defaultDemoScene.shops.length + 1);
+  });
+});

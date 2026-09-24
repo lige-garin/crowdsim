@@ -37,6 +37,8 @@ import { createCityObjects, type CityObjects } from "./cityMeshes";
 import { CITY_CAMERA_FOV_DEGREES } from "../orbitCamera";
 import { toRenderX, toRenderY } from "../simulationViewportGeometry";
 import { attachPlacementGhost } from "./placementGhost";
+import { attachCountLineDraft } from "./countLineDragTool";
+import { scenePointAtScreen } from "./worldPlacement";
 import type { EditorTool } from "../sceneEditorState";
 import type { SimulationSnapshot } from "../simulationEngine";
 import type { ViewportAgentOverlayFrame } from "../simulationViewportOverlay";
@@ -80,6 +82,8 @@ type RendererArgs = {
   heatmapCells: readonly HeatmapCell[];
   layers: ViewportLayers;
   onPlace?: (tool: EditorTool, point: ScenePoint) => void;
+  /** A count line dragged out between two points (ADR-0031). */
+  onPlaceLine?: (start: ScenePoint, end: ScenePoint) => void;
   placementTool?: EditorTool;
   sharedAgentOverlay?: ViewportAgentOverlayFrame;
   snapshot?: SimulationSnapshot;
@@ -91,6 +95,7 @@ export function useSimulationViewportRenderer({
   heatmapCells,
   layers,
   onPlace,
+  onPlaceLine,
   placementTool,
   sharedAgentOverlay,
   snapshot,
@@ -104,15 +109,17 @@ export function useSimulationViewportRenderer({
   // Read through refs so picking a tool or a new callback never rebuilds the scene.
   const placementToolRef = useRef(placementTool);
   const onPlaceRef = useRef(onPlace);
+  const onPlaceLineRef = useRef(onPlaceLine);
   const placementRef = useRef<ReturnType<typeof attachPlacementGhost> | null>(null);
   useEffect(() => {
     placementToolRef.current = placementTool;
     onPlaceRef.current = onPlace;
+    onPlaceLineRef.current = onPlaceLine;
     // Dropping the tool (Escape) must clear the ghost now, not on the next
     // mouse move — a click in between would pick an agent under a ghost that
     // still promised a placement.
     placementRef.current?.refresh();
-  }, [placementTool, onPlace]);
+  }, [placementTool, onPlace, onPlaceLine]);
   const sharedOverlayRef = useRef(sharedAgentOverlay);
   useEffect(() => {
     sharedOverlayRef.current = sharedAgentOverlay;
@@ -220,6 +227,7 @@ export function useSimulationViewportRenderer({
     }
     let detachCameraControls: (() => void) | undefined;
     let placement: ReturnType<typeof attachPlacementGhost> | undefined;
+    let countLineDraft: ReturnType<typeof attachCountLineDraft> | undefined;
     if (viewMode === "3d") {
       placement = hasScene
         ? attachPlacementGhost({
@@ -231,7 +239,24 @@ export function useSimulationViewportRenderer({
             parent: scene,
           })
         : undefined;
+      countLineDraft = attachCountLineDraft(scene);
       camera.up.set(0, 0, 1);
+      // A count-line drag's own start point, live only between the tool's
+      // onDown and onUp (ADR-0031) — not a ref, since nothing outside this
+      // effect's closure ever needs it.
+      let dragStart: ScenePoint | null = null;
+      const pointAt = (clientX: number, clientY: number) => {
+        const activeScene = crowdSceneRef.current;
+        return activeScene
+          ? scenePointAtScreen(
+              camera,
+              canvasElement.getBoundingClientRect(),
+              clientX,
+              clientY,
+              activeScene.world,
+            )
+          : null;
+      };
       detachCameraControls = attachCityCameraControls({
         camera: camera as PerspectiveCamera,
         canvas: canvasElement,
@@ -245,6 +270,41 @@ export function useSimulationViewportRenderer({
           if (!placement?.handleClick(clientX, clientY)) pickAgentAt(clientX, clientY);
         },
         rig: rigRef.current,
+        tool: {
+          isActive: () => placementToolRef.current === "countLine",
+          onDown: (clientX, clientY) => {
+            const point = pointAt(clientX, clientY);
+            if (!point) return;
+            dragStart = point;
+            const activeScene = crowdSceneRef.current;
+            if (activeScene) countLineDraft?.show(point, point, activeScene.world);
+          },
+          onMove: (clientX, clientY) => {
+            if (!dragStart) return;
+            const point = pointAt(clientX, clientY);
+            const activeScene = crowdSceneRef.current;
+            if (point && activeScene) {
+              countLineDraft?.show(dragStart, point, activeScene.world);
+            }
+          },
+          onUp: (clientX, clientY) => {
+            countLineDraft?.hide();
+            const start = dragStart;
+            dragStart = null;
+            if (!start) return;
+            const end = pointAt(clientX, clientY) ?? start;
+            const draggedMeters = Math.hypot(end.x - start.x, end.y - start.y);
+            // Shorter than a real drag: fall back to the fixed-segment
+            // single-point tool "so the tool never leaves someone with
+            // nothing" — the same threshold and the same phrase the 2D
+            // editor's own fallback already uses (SceneEditor.tsx).
+            if (draggedMeters < 1) {
+              onPlaceRef.current?.("countLine", start);
+            } else {
+              onPlaceLineRef.current?.(start, end);
+            }
+          },
+        },
       });
       placementRef.current = placement ?? null;
     } else {
@@ -545,6 +605,7 @@ export function useSimulationViewportRenderer({
       detachCameraControls?.();
       if (placementRef.current === placement) placementRef.current = null;
       placement?.dispose();
+      countLineDraft?.dispose();
       window.cancelAnimationFrame(animationFrameId);
       window.clearInterval(watchdogTimerId);
       resizeObserver?.disconnect();

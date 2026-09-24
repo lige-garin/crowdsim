@@ -33,16 +33,36 @@ export type CityCameraRig = {
  * city. Rig state lives in a caller-owned object so it survives the renderer
  * being rebuilt for a scene change.
  */
+/**
+ * Lets a drawing tool (currently only the 3D count-line tool, ADR-0031)
+ * claim a left-button drag for its own two-point gesture instead of the
+ * camera's own pan. `isActive` is polled fresh on every `pointerdown`
+ * rather than latched, so a tool switch mid-hover (no pointer held) is
+ * picked up the same way `placementGhost.ts`'s own `getTool` already is.
+ */
+export type CityCameraToolHook = {
+  isActive: () => boolean;
+  onDown: (clientX: number, clientY: number) => void;
+  onMove: (clientX: number, clientY: number) => void;
+  onUp: (clientX: number, clientY: number) => void;
+};
+
 export function attachCityCameraControls(options: {
   camera: PerspectiveCamera;
   canvas: HTMLCanvasElement;
   limit: Limit;
   onClick: (clientX: number, clientY: number) => void;
   rig: CityCameraRig;
+  tool?: CityCameraToolHook;
 }) {
-  const { camera, canvas, limit, onClick, rig } = options;
+  const { camera, canvas, limit, onClick, rig, tool } = options;
   const pressed = new Set<string>();
   const drag = { button: -1, downX: 0, downY: 0, lastX: 0, lastY: 0 };
+  // Set only while a tool (not the camera) owns the current pointer
+  // sequence — `drag.button` is deliberately left at -1 for the whole of
+  // that sequence, so the ordinary pan/orbit/click logic below never runs
+  // for it.
+  let toolDragging = false;
   let lastTick = performance.now();
   let frame = 0;
 
@@ -57,6 +77,12 @@ export function attachCityCameraControls(options: {
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    if (event.button === 0 && !event.shiftKey && tool?.isActive()) {
+      toolDragging = true;
+      canvas.setPointerCapture(event.pointerId);
+      tool.onDown(event.clientX, event.clientY);
+      return;
+    }
     drag.button = event.button === 0 && event.shiftKey ? 2 : event.button;
     drag.downX = drag.lastX = event.clientX;
     drag.downY = drag.lastY = event.clientY;
@@ -64,6 +90,10 @@ export function attachCityCameraControls(options: {
   };
 
   const onPointerMove = (event: PointerEvent) => {
+    if (toolDragging) {
+      tool!.onMove(event.clientX, event.clientY);
+      return;
+    }
     if (drag.button < 0) return;
     const dx = event.clientX - drag.lastX;
     const dy = event.clientY - drag.lastY;
@@ -78,6 +108,13 @@ export function attachCityCameraControls(options: {
   };
 
   const onPointerUp = (event: PointerEvent) => {
+    if (toolDragging) {
+      toolDragging = false;
+      if (canvas.hasPointerCapture(event.pointerId))
+        canvas.releasePointerCapture(event.pointerId);
+      tool!.onUp(event.clientX, event.clientY);
+      return;
+    }
     const wasLeftClick =
       drag.button === 0 &&
       isClick(event.clientX - drag.downX, event.clientY - drag.downY);
@@ -92,11 +129,13 @@ export function attachCityCameraControls(options: {
   // the next hover panned or orbited the camera with no button held.
   const onPointerCancel = (event: PointerEvent) => {
     drag.button = -1;
+    toolDragging = false;
     if (canvas.hasPointerCapture(event.pointerId))
       canvas.releasePointerCapture(event.pointerId);
   };
   const onLostPointerCapture = () => {
     drag.button = -1;
+    toolDragging = false;
   };
 
   const onWheel = (event: WheelEvent) => {

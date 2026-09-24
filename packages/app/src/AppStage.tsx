@@ -39,6 +39,8 @@ type AppStageProps = {
   onApplyScene: (scene: CrowdSimScene) => void;
   onEditorToolChange: (tool: EditorTool) => void;
   onPlaceInWorld: (tool: EditorTool, point: ScenePoint) => void;
+  /** A count line dragged out between two points (ADR-0031). */
+  onPlaceLineInWorld: (start: ScenePoint, end: ScenePoint) => void;
   /** The live crowd, read by subscription rather than passed down (liveCrowd). */
   crowd: LiveCrowd;
   scene: CrowdSimScene;
@@ -60,6 +62,7 @@ export function AppStage({
   onApplyScene,
   onEditorToolChange,
   onPlaceInWorld,
+  onPlaceLineInWorld,
   scene,
   stageTab,
   t,
@@ -126,6 +129,7 @@ export function AppStage({
                 heatmapCells={heatmapCells}
                 layers={layers}
                 onPlace={onPlaceInWorld}
+                onPlaceLine={onPlaceLineInWorld}
                 placementTool={viewMode === "3d" ? editorTool : undefined}
                 scene={viewScene}
                 crowd={crowd}

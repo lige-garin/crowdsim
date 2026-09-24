@@ -516,6 +516,7 @@ function AppContent() {
             onApplyScene: applyScene,
             onEditorToolChange: selectEditorTool,
             onPlaceInWorld: worldBuilding.place,
+            onPlaceLineInWorld: worldBuilding.placeLine,
             floors,
             viewFloor,
             onSelectViewFloor: setWatchedFloorId,

@@ -24,6 +24,7 @@ export function SimulationViewport({
   heatmapCells = [],
   layers = defaultViewportLayers,
   onPlace,
+  onPlaceLine,
   placementTool,
   scene: crowdScene,
   viewMode = "2d",
@@ -35,6 +36,8 @@ export function SimulationViewport({
   heatmapCells?: readonly HeatmapCell[];
   layers?: ViewportLayers;
   onPlace?: (tool: EditorTool, point: ScenePoint) => void;
+  /** A count line dragged out between two points (ADR-0031). */
+  onPlaceLine?: (start: ScenePoint, end: ScenePoint) => void;
   placementTool?: EditorTool;
   scene?: CrowdSimScene;
   viewMode?: ViewMode;
@@ -48,6 +51,7 @@ export function SimulationViewport({
       heatmapCells,
       layers,
       onPlace,
+      onPlaceLine,
       placementTool,
       sharedAgentOverlay,
       snapshot,

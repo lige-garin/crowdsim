@@ -4,6 +4,7 @@ import { screenToNdc } from "../agentPicking";
 import { overlaps, rectOf, type Rect } from "../cityLayout";
 import { pointInPolygon } from "../routeCostMap";
 import { distanceToSegment } from "../sceneEditorGeometry";
+import { addCountLineBetween } from "../sceneEditorAdders";
 import {
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
@@ -67,6 +68,24 @@ export function placeInScene(
   if (placementConflict(scene, tool, point)) return null;
   const placed = placeEditorTool(createEditorDocumentFromScene(scene), tool, point);
   return placed ? createSceneFromEditorDocument(scene, placed) : null;
+}
+
+/**
+ * A count line between two chosen points, dragged out in the 3D world
+ * (ADR-0031) — the same `addCountLineBetween` constructor the 2D editor's
+ * own drag tool already uses, through the same scene round trip
+ * `placeInScene` uses for every other 3D placement, so it swaps into the
+ * running simulation the same way (ADR-0007). No conflict check: a count
+ * line is an annotation, the same reason `placementConflict` already
+ * returns null for the single-click `countLine` tool.
+ */
+export function placeCountLineBetween(
+  scene: CrowdSimScene,
+  start: ScenePoint,
+  end: ScenePoint,
+): CrowdSimScene {
+  const placed = addCountLineBetween(createEditorDocumentFromScene(scene), start, end);
+  return createSceneFromEditorDocument(scene, placed);
 }
 
 /**

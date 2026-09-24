@@ -1,7 +1,7 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { useEffect, useRef, useState } from "react";
 import type { EditorTool } from "./sceneEditorState";
-import { placeInScene } from "./renderer/worldPlacement";
+import { placeCountLineBetween, placeInScene } from "./renderer/worldPlacement";
 
 /**
  * Building straight into the 3D world: each click commits one placement to the
@@ -30,12 +30,22 @@ export function useWorldBuilding(options: {
   // "apply" then silently put the building back.
   const canUndo = enabled && history.before.length > 0 && history.after === scene;
 
-  function place(tool: EditorTool, point: ScenePoint) {
-    const next = placeInScene(scene, tool, point);
+  function commit(next: CrowdSimScene | null) {
     if (!next) return;
     const before = history.after === scene ? history.before : [];
     setHistory({ after: next, before: [...before, scene] });
     applyScene(next);
+  }
+
+  function place(tool: EditorTool, point: ScenePoint) {
+    commit(placeInScene(scene, tool, point));
+  }
+
+  /** A count line dragged out between two points (ADR-0031) — the same
+   * undo-history stack `place` already uses, so it undoes with Ctrl+Z the
+   * same way any other 3D placement does. */
+  function placeLine(start: ScenePoint, end: ScenePoint) {
+    commit(placeCountLineBetween(scene, start, end));
   }
 
   function undo() {
@@ -71,5 +81,5 @@ export function useWorldBuilding(options: {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [enabled]);
 
-  return { canUndo, place, undo };
+  return { canUndo, place, placeLine, undo };
 }
