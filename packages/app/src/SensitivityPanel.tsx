@@ -12,6 +12,8 @@ import {
   runExperimentInBackgroundWorker,
   type ExperimentWorkerLike,
 } from "./experimentWorkerClient";
+import { SensitivityScatterChart } from "./SensitivityScatterChart";
+import { SensitivityTornadoChart } from "./SensitivityTornadoChart";
 import { useI18n } from "./i18n";
 
 /**
@@ -115,14 +117,18 @@ export function SensitivityPanel({
         <code data-testid="sensitivity-error">{state.message}</code>
       ) : null}
       {state.kind === "done" ? (
-        <ol className="sensitivity-ranking">
-          {state.summary.map((entry, index) => (
-            <li key={entry.parameterId} data-testid={`sensitivity-rank-${index}`}>
-              {entry.parameterId}: μ*={entry.meanAbsoluteEffect.toFixed(3)}, σ=
-              {entry.stdDevEffect.toFixed(3)}
-            </li>
-          ))}
-        </ol>
+        <>
+          <SensitivityTornadoChart language={language} summary={state.summary} />
+          <SensitivityScatterChart language={language} summary={state.summary} />
+          <ol className="sensitivity-ranking">
+            {state.summary.map((entry, index) => (
+              <li key={entry.parameterId} data-testid={`sensitivity-rank-${index}`}>
+                {entry.parameterId}: μ*={entry.meanAbsoluteEffect.toFixed(3)}, σ=
+                {entry.stdDevEffect.toFixed(3)}
+              </li>
+            ))}
+          </ol>
+        </>
       ) : null}
     </section>
   );
