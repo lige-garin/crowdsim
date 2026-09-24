@@ -12,21 +12,29 @@ import type { ScenePoint } from "@crowdsim/scene-schema";
 import type { SimulationAgent, SimulationSink } from "./simulationEngine";
 
 /**
- * A lift's cars (ADR-0010, stage 6): a queue with a batch service, not a
+ * A lift's cars (ADR-0010 stage 6; continuous boarding and multi-car load
+ * balancing added in ADR-0029): a queue with a batch service, not a
  * walkable lane — people wait at a hall point, a car with room opens its
  * doors, some number board, it travels, they get out.
  *
- * **The dispatch is the simplest rule that is still a rule.** An idle car
- * already at the calling floor answers it for free; otherwise the first idle
- * car (by `carCount` order) still at the other floor is sent to fetch them.
- * On a shaft with only two floors that is the whole of "nearest idle car" —
+ * **The dispatch is the simplest rule that is still a rule.** Every idle
+ * car already at the calling floor answers it for free, and a car already
+ * boarding keeps accepting new arrivals until its own doors close, not just
+ * whoever was there the instant it started (ADR-0029) — so a queue larger
+ * than one car's capacity spreads across every idle car at that floor
+ * before anyone is left waiting. Otherwise, enough idle cars (by
+ * `carCount` order) still at the other floor are sent to cover the
+ * remaining queue there, one per `capacity`'s worth of people
+ * (ADR-0029) — not just one car regardless of how many are waiting. On a
+ * shaft with only two floors that is the whole of "nearest idle car" —
  * every idle car not already at the calling floor is equally near it, there
- * being only the one other floor to be near from — and it does not look
- * ahead the way a real controller does (predicting who else is worth
- * picking up along the way, balancing idle cars across a whole bank). A
- * three-floor bank is not one car skipping a floor either: it is declared as
- * two independent shafts (`connectorSchema`'s own doc comment), each run by
- * this same two-floor rule.
+ * being only the one other floor to be near from — and it still does not
+ * look ahead the way a real controller does (predicting who else is worth
+ * picking up along the way at a floor it merely passes), because a
+ * two-floor shaft has no floor to pass by unpicked. A three-floor bank is
+ * not one car skipping a floor either: it is declared as two independent
+ * shafts (`connectorSchema`'s own doc comment), each run by this same
+ * two-floor rule.
  */
 
 export type ElevatorCarPhase = "idle" | "boarding" | "moving";
@@ -218,7 +226,16 @@ export function stepElevatorTravel({
       return boarding.length > 0;
     }
 
-    const claimedFloors = new Set<string>();
+    // Pass 0: a car already boarding keeps its doors' own open window
+    // working for it — anyone who reaches the hall point before
+    // `readyAtSeconds` boards the car that is already loading rather than
+    // being left for its next trip (ADR-0029; doorSeconds itself is
+    // unchanged, only who gets to use that same window).
+    for (const car of shaftCars) {
+      if (car.phase === "boarding" && nowSeconds < car.readyAtSeconds) {
+        board(car, car.atFloorId);
+      }
+    }
 
     // Pass 1: finish whatever phase each car is already in.
     for (const car of shaftCars) {
@@ -266,43 +283,50 @@ export function stepElevatorTravel({
       } else {
         car.phase = "idle";
       }
-      claimedFloors.add(arrivedFloorId);
     }
 
-    // Pass 2: an idle car answers a call at its own floor first — free, no
-    // travel needed.
+    // Pass 2: every idle car already at a floor with a call answers it —
+    // free, no travel needed. Not just the first: `board()` re-reads the
+    // floor's own waiting list net of `boardedThisTick`, so a second idle
+    // car at the same floor naturally picks up whatever the first could
+    // not fit (ADR-0029's load-balancing half), with no extra bookkeeping.
     for (const car of shaftCars) {
-      if (car.phase !== "idle" || claimedFloors.has(car.atFloorId)) {
+      if (car.phase !== "idle") {
         continue;
       }
       if (board(car, car.atFloorId)) {
         car.phase = "boarding";
         car.readyAtSeconds = nowSeconds + info.doorSeconds;
-        claimedFloors.add(car.atFloorId);
       }
     }
 
-    // Pass 3: whichever idle car remains is sent empty for a call at the
-    // other floor — the "nearest idle car" rule this module's own doc
-    // comment describes.
-    for (const car of shaftCars) {
-      if (car.phase !== "idle") {
-        continue;
-      }
-      const target = otherFloor(car.atFloorId);
-      if (claimedFloors.has(target)) {
-        continue;
-      }
-      const waiting = (waitingByFloor.get(target) ?? []).filter(
+    // Pass 3: send enough of whichever idle cars remain to cover a call at
+    // the other floor — not just one, if the queue there outgrows a single
+    // car's capacity and more than one idle car is free to help
+    // (ADR-0029). This is still not floor-passing lookahead: a shaft is
+    // always exactly two floors (this module's own doc comment), so
+    // "nearest idle car" is every idle car not already there.
+    for (const floorId of info.floors) {
+      const stillWaiting = (waitingByFloor.get(floorId) ?? []).filter(
         (agent) => !boardedThisTick.has(agent.id),
       );
-      if (waiting.length === 0) {
+      if (stillWaiting.length === 0) {
         continue;
       }
-      car.phase = "moving";
-      car.headingToFloorId = target;
-      car.readyAtSeconds = nowSeconds + info.rideSeconds;
-      claimedFloors.add(target);
+      const carsNeeded = Math.ceil(stillWaiting.length / info.capacity);
+      let dispatched = 0;
+      for (const car of shaftCars) {
+        if (dispatched >= carsNeeded) {
+          break;
+        }
+        if (car.phase !== "idle") {
+          continue;
+        }
+        car.phase = "moving";
+        car.headingToFloorId = floorId;
+        car.readyAtSeconds = nowSeconds + info.rideSeconds;
+        dispatched++;
+      }
     }
   }
 

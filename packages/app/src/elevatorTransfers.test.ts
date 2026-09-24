@@ -325,6 +325,124 @@ describe("stepElevatorTravel", () => {
 
     expect(stepped[0]).toBe(agent);
   });
+
+  it("keeps boarding new arrivals while its doors are still open, not leaving them for the next trip (ADR-0029)", () => {
+    const cars = createElevatorRuntime(connectors); // 2 s doors, capacity 2
+    let agents: SimulationAgent[] = [waitingAgent(1, "ground", "lift-1", "upper")];
+
+    // t=0: doors open, agent 1 boards.
+    agents = stepElevatorTravel({
+      agents,
+      cars,
+      connectors,
+      graph,
+      nowSeconds: 0,
+      sinks: [groundExit, upperExit],
+    });
+    expect(cars.get("lift-1")![0].phase).toBe("boarding");
+
+    // t=1: still within the 2 s door window — a second person arrives at
+    // the same hall point and must board the car already loading, not wait
+    // for it to come back around.
+    agents = [...agents, waitingAgent(2, "ground", "lift-1", "upper")];
+    agents = stepElevatorTravel({
+      agents,
+      cars,
+      connectors,
+      graph,
+      nowSeconds: 1,
+      sinks: [groundExit, upperExit],
+    });
+
+    const car = cars.get("lift-1")![0];
+    expect(car.phase).toBe("boarding"); // doors have not closed yet
+    expect(car.passengers).toEqual([1, 2]);
+    expect(isRiding(agents.find((a) => a.id === 2)!)).toBe(true);
+  });
+
+  it("does not keep boarding once its doors have closed (regression: the window is still bounded)", () => {
+    const cars = createElevatorRuntime(connectors);
+    let agents: SimulationAgent[] = [waitingAgent(1, "ground", "lift-1", "upper")];
+
+    agents = stepElevatorTravel({
+      agents,
+      cars,
+      connectors,
+      graph,
+      nowSeconds: 0,
+      sinks: [groundExit, upperExit],
+    });
+
+    // t=2: readyAtSeconds has passed — the car departs this same tick
+    // (Pass 1), so a brand-new arrival at t=2 cannot board it.
+    agents = [...agents, waitingAgent(2, "ground", "lift-1", "upper")];
+    agents = stepElevatorTravel({
+      agents,
+      cars,
+      connectors,
+      graph,
+      nowSeconds: 2,
+      sinks: [groundExit, upperExit],
+    });
+
+    const car = cars.get("lift-1")![0];
+    expect(car.phase).toBe("moving");
+    expect(car.passengers).toEqual([1]);
+    expect(isRiding(agents.find((a) => a.id === 2)!)).toBe(false);
+  });
+
+  it("splits a queue larger than one car's capacity across every idle car at that floor, not just one (ADR-0029)", () => {
+    const twoCar = shaftConnectors({ carCount: 2 }); // capacity 2 each
+    const cars = createElevatorRuntime(twoCar);
+    const graphTwoCar = graphFor(twoCar);
+    const agents: SimulationAgent[] = [
+      waitingAgent(1, "ground", "lift-1", "upper"),
+      waitingAgent(2, "ground", "lift-1", "upper"),
+      waitingAgent(3, "ground", "lift-1", "upper"),
+    ];
+
+    const stepped = stepElevatorTravel({
+      agents,
+      cars,
+      connectors: twoCar,
+      graph: graphTwoCar,
+      nowSeconds: 0,
+      sinks: [groundExit, upperExit],
+    });
+
+    // 3 people, capacity 2 per car, two idle cars both at ground: car 0
+    // takes 2, car 1 takes the overflow of 1, rather than car 1 sitting
+    // idle while agent 3 waits for car 0's next trip.
+    expect(cars.get("lift-1")![0].passengers).toHaveLength(2);
+    expect(cars.get("lift-1")![1].passengers).toHaveLength(1);
+    expect(stepped.filter((agent) => isRiding(agent))).toHaveLength(3);
+  });
+
+  it("dispatches enough idle cars from the other floor to cover an overflowing call, not just one (ADR-0029)", () => {
+    const twoCar = shaftConnectors({ carCount: 2 }); // both cars idle at ground
+    const cars = createElevatorRuntime(twoCar);
+    const graphTwoCar = graphFor(twoCar);
+    const agents: SimulationAgent[] = [
+      waitingAgent(1, "upper", "lift-1", "ground"),
+      waitingAgent(2, "upper", "lift-1", "ground"),
+      waitingAgent(3, "upper", "lift-1", "ground"),
+    ];
+
+    stepElevatorTravel({
+      agents,
+      cars,
+      connectors: twoCar,
+      graph: graphTwoCar,
+      nowSeconds: 0,
+      sinks: [groundExit, upperExit],
+    });
+
+    // 3 people at "upper", capacity 2 per car: ceil(3/2) = 2 cars needed,
+    // and both idle cars are sent, not just one left to make two trips.
+    const shaftCars = cars.get("lift-1")!;
+    expect(shaftCars.filter((car) => car.phase === "moving")).toHaveLength(2);
+    expect(shaftCars.every((car) => car.headingToFloorId === "upper")).toBe(true);
+  });
 });
 
 describe("planFloorLegs routes onto a lift the same way as a stair", () => {

@@ -2519,3 +2519,19 @@ Not continuous live polling inside a running simulation — a one-shot conversio
 ### Verified
 
 `pnpm typecheck` (all packages) clean. Full test suite: 1083 app tests (1069 baseline + 14 new: real-shaped response parsing, correct endpoint/coordinate construction, fail-loud on a non-OK response and on a missing field, every WMO code mapping, threshold behavior for heat/cold/wind, precipitation-intensity scaling, multi-factor output, and stable ids across repeated conversions) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. Decisively confirmed: temporarily disabling the storm-code mapping reproduced the expected test failure before the fix was restored.
+
+## 2026-09-24 (thirty-eighth entry): elevator continuous boarding and multi-car load balancing (ADR-0029)
+
+Item 7 of the same ten-item backlog. ADR-0010 stage 6's own record, carried into CLAUDE.md, disclosed two specific gaps: dispatch does not look ahead or balance load; a call is only re-evaluated the instant a car's phase ends, so someone arriving while doors are already open waits for the car's next trip rather than boarding the one currently loading.
+
+### What was built
+
+Two real, narrow fixes to `elevatorTransfers.ts`'s `stepElevatorTravel`, both scoped to what actually applies at a shaft's fixed two floors (floor-passing lookahead stays moot — the module's own doc comment already explains why). **Continuous boarding**: a new pass lets any car still in its door-open window call `board()` again every tick, not just once at the moment boarding started — anyone reaching the hall point before `readyAtSeconds` boards the car already loading instead of waiting for its next trip. **Multi-car load balancing**: the free-boarding pass now loops over every idle car at a calling floor (not just the first), and the dispatch pass computes `carsNeeded = ceil(waiting / capacity)` and sends that many idle cars from the other floor, not always exactly one — so a queue larger than one car's capacity spreads across every available car instead of stranding overflow for a later trip while a second car sits idle.
+
+### A real dead-code finding, caught mid-implementation
+
+Restructuring the dispatch passes made the `claimedFloors` bookkeeping set write-only — every `.add()` call remained but nothing ever read it again once the passes no longer needed to skip an already-answered floor. Removed entirely rather than left as inert bookkeeping.
+
+### Verified
+
+`pnpm typecheck` (all packages) clean. Full test suite: 1087 app tests (1083 baseline + 4 new, 2 of which were independently confirmed decisive by reverting each fix and rerunning — a door-window boarding test with an explicit bounded-window regression alongside it, and two load-balancing tests covering both the same-floor-overflow and dispatch-from-the-other-floor cases) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. All pre-existing elevator tests (single-car, single-caller scenarios) pass unchanged, confirming the two fixes only add behavior in the overflow/continuous-arrival cases they target.
