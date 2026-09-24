@@ -662,3 +662,85 @@ function createTargetDecisionBackend() {
 
   return backend;
 }
+
+describe("real data assimilation (ADR-0026)", () => {
+  it("no-ops for an entrance id that does not name a current source", () => {
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      seed: 1,
+      sources: [source],
+      sinks: [sink],
+    });
+    expect(engine.assimilateEntranceArrivalRate("nowhere", 50)).toBeUndefined();
+  });
+
+  it("returns a posterior estimate that has moved toward the observation", () => {
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      seed: 1,
+      // 60/min authored by the scene.
+      sources: [{ ...source, arrivalRatePerSecond: 1 }],
+      sinks: [sink],
+    });
+    const result = engine.assimilateEntranceArrivalRate(source.id, 20);
+    expect(result).toBeDefined();
+    expect(result!.arrivalRatePerMinute).toBeLessThan(60);
+    expect(result!.arrivalRatePerMinute).toBeGreaterThan(20);
+    expect(result!.spread).toBeGreaterThan(0);
+  });
+
+  it("actually changes how fast people spawn afterwards — real feedback, not just a returned number", () => {
+    const baseline = () =>
+      createSimulationEngine({
+        fixedDtSeconds: 1,
+        seed: 5,
+        sources: [{ ...source, arrivalRatePerSecond: 10 }],
+        sinks: [sink],
+        speedMetersPerSecond: 0,
+      });
+
+    const untouched = baseline();
+    untouched.start();
+    const untouchedSnapshot = untouched.step(5);
+
+    const corrected = baseline();
+    // Drive the estimate far down before a single tick runs, with enough
+    // repeated observations that the ensemble actually commits to it
+    // (a single update only partway closes the gap — see the pure EnKF
+    // tests — so one call alone would leave this decisive test flaky).
+    for (let i = 0; i < 15; i++) {
+      corrected.assimilateEntranceArrivalRate(source.id, 0.1, {
+        observationNoiseStdPerMinute: 0.5,
+      });
+    }
+    corrected.start();
+    const correctedSnapshot = corrected.step(5);
+
+    expect(correctedSnapshot.spawnedCount).toBeLessThan(untouchedSnapshot.spawnedCount);
+  });
+
+  it("clears the ensemble on reset, so the next call starts from a fresh, wide prior again", () => {
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1,
+      seed: 1,
+      sources: [{ ...source, arrivalRatePerSecond: 1 }],
+      sinks: [sink],
+    });
+    // Many repeated observations narrow the ensemble's own uncertainty a
+    // lot — see enkfUpdate's "shrinks ensemble spread" unit test.
+    let converged;
+    for (let i = 0; i < 20; i++) {
+      converged = engine.assimilateEntranceArrivalRate(source.id, 5, {
+        observationNoiseStdPerMinute: 1,
+      });
+    }
+    engine.reset();
+    const afterReset = engine.assimilateEntranceArrivalRate(source.id, 5, {
+      observationNoiseStdPerMinute: 1,
+    });
+    // If reset() had left the ensemble in place, this call would narrow an
+    // already-narrow ensemble further; instead it should be back to
+    // (roughly) as wide as a single correction of a fresh prior leaves it.
+    expect(afterReset!.spread).toBeGreaterThan(converged!.spread * 3);
+  });
+});

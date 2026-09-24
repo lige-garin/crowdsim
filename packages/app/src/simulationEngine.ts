@@ -19,6 +19,14 @@ import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
 import { riderDisplayPosition } from "./floorTransferDisplay";
 import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
 import {
+  createAssimilationRandom,
+  createEnkfEnsemble,
+  enkfMean,
+  enkfSpread,
+  enkfUpdate,
+  type EnkfEnsemble,
+} from "./dataAssimilation";
+import {
   exposureSpeedFactor,
   fedDoseThisTick,
   fedIncapacitationDose,
@@ -312,6 +320,19 @@ export type SimulationEngine = {
   tick: (realDeltaSeconds: number) => SimulationSnapshot;
   /** Swap scene-derived geometry in place; agents, clock and counters carry on. */
   replaceGeometry: (geometry: SceneGeometry) => SimulationSnapshot;
+  /**
+   * One EnKF assimilation step (ADR-0026): corrects `entranceId`'s live
+   * arrival rate toward `observedRatePerMinute` and applies the result to
+   * this tick's own `sources`, so the very next spawn draw uses it. Returns
+   * the posterior estimate and the ensemble's remaining spread (its own
+   * uncertainty in that estimate); a no-op returning `undefined` if
+   * `entranceId` does not name a current source.
+   */
+  assimilateEntranceArrivalRate: (
+    entranceId: string,
+    observedRatePerMinute: number,
+    options?: { ensembleSize?: number; observationNoiseStdPerMinute?: number },
+  ) => { arrivalRatePerMinute: number; spread: number } | undefined;
 };
 /** An engine built from a scene, which can take a hot scene update (ADR-0007). */
 export type SceneSimulationEngine = SimulationEngine & {
@@ -413,11 +434,19 @@ export function createSimulationEngine(
   // Scene-derived: replaced as a set by replaceGeometry (ADR-0007).
   let speedMetersPerSecond = config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
   let sources = config.sources;
+  /** One EnKF ensemble per entrance ever assimilated against (ADR-0026),
+   * seeded lazily from that source's own current rate on first use. */
+  const assimilationEnsembles = new Map<string, EnkfEnsemble>();
   let sinks = config.sinks;
   let shops = config.shops ?? [];
   let servicePoints = config.servicePoints ?? [];
   let transitStops = config.transitStops ?? [];
   const seed = config.seed ?? 1;
+  /** A stream of its own (ADR-0026), so calling `assimilateEntranceArrivalRate`
+   * never perturbs — or is perturbed by — the timing of spawn/decision draws
+   * on the engine's own `rng` stream; an assimilation caller's own timing
+   * (when it happens to call, how often) would otherwise change replay. */
+  let assimilationRandom = createAssimilationRandom(seed + 104_729);
   /**
    * One routable plane per floor. A scene with no floors has exactly one, with
    * an undefined id, so stepping a crowd is the same code either way.
@@ -989,6 +1018,14 @@ export function createSimulationEngine(
       transitStops = geometry.transitStops ?? [];
       sinks = geometry.sinks;
       sources = geometry.sources;
+      // An entrance an edit removed takes its ensemble with it (ADR-0026) —
+      // nothing left to apply a correction to.
+      const sourceIds = new Set(sources.map((source) => source.id));
+      for (const entranceId of assimilationEnsembles.keys()) {
+        if (!sourceIds.has(entranceId)) {
+          assimilationEnsembles.delete(entranceId);
+        }
+      }
       speedMetersPerSecond = geometry.speedMetersPerSecond;
       floors = buildFloors(geometry);
       connectors = geometry.connectors ?? [];
@@ -1032,6 +1069,39 @@ export function createSimulationEngine(
       );
       return makeSnapshot();
     },
+    assimilateEntranceArrivalRate(entranceId, observedRatePerMinute, options) {
+      const index = sources.findIndex((source) => source.id === entranceId);
+      if (index === -1) {
+        return undefined;
+      }
+      const existing = assimilationEnsembles.get(entranceId);
+      const ensemble =
+        existing ??
+        createEnkfEnsemble(
+          sources[index].arrivalRatePerSecond * 60,
+          // A scene author's own number, assumed uncertain by a third of
+          // itself before any real count corrects it — self-chosen, not
+          // fitted (ADR-0026).
+          Math.max(1, sources[index].arrivalRatePerSecond * 60 * 0.3),
+          options?.ensembleSize ?? 30,
+          assimilationRandom,
+        );
+      const updated = enkfUpdate(
+        ensemble,
+        observedRatePerMinute,
+        options?.observationNoiseStdPerMinute ??
+          Math.max(1, observedRatePerMinute * 0.1),
+        assimilationRandom,
+      );
+      assimilationEnsembles.set(entranceId, updated);
+      const arrivalRatePerMinute = enkfMean(updated);
+      sources = sources.map((source, i) =>
+        i === index
+          ? { ...source, arrivalRatePerSecond: arrivalRatePerMinute / 60 }
+          : source,
+      );
+      return { arrivalRatePerMinute, spread: enkfSpread(updated) };
+    },
     reset() {
       rng = mulberry32(seed);
       status = "paused";
@@ -1043,6 +1113,12 @@ export function createSimulationEngine(
       spawnedCount = 0;
       exitedCount = 0;
       waitingOutside.clear();
+      assimilationEnsembles.clear();
+      // Reproducible the same way `rng` is: a run reset and replayed with
+      // the same assimilation calls in the same order gets the same
+      // ensembles, not a continuation of whatever the stream's position
+      // happened to be before the reset.
+      assimilationRandom = createAssimilationRandom(seed + 104_729);
       agents = [];
       vehicles = [];
       evacuationActive = false;
