@@ -237,11 +237,41 @@ describe("SceneEditorParamPanel", () => {
     });
     expect(onServiceNextIdChange).toHaveBeenCalledWith("ticket-gate");
 
+    expect(screen.queryByTestId("outage-window-start-0")).not.toBeInTheDocument();
+
     const outage = screen.getByLabelText("outageWindows");
     fireEvent.change(outage, { target: { value: "600-900" } });
     expect(onServiceOutageWindowsChange).not.toHaveBeenCalled();
     fireEvent.blur(outage);
     expect(onServiceOutageWindowsChange).toHaveBeenCalledWith("600-900");
+  });
+
+  it("shows the outage-window timeline once a window exists, and dragging its handle re-serializes back to the same text format", () => {
+    const onServiceOutageWindowsChange = vi.fn();
+    const servicePoint = {
+      id: "security",
+      kind: "gate" as const,
+      position: { x: 5, y: 5 },
+      width: 3,
+      serviceMeanSeconds: 8,
+      capacityPerMinute: 60,
+      outageWindows: [{ startsAtSeconds: 600, endsAtSeconds: 900 }],
+    };
+
+    render(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        onServiceOutageWindowsChange={onServiceOutageWindowsChange}
+        otherServicePointIds={[]}
+        selectedServicePoint={servicePoint}
+      />,
+    );
+
+    fireEvent.keyDown(screen.getByTestId("outage-window-start-0"), {
+      key: "ArrowRight",
+    });
+
+    expect(onServiceOutageWindowsChange).toHaveBeenCalledWith("630-900");
   });
 
   it("renders and wires hazard BioCity controls", () => {

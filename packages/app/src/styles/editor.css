@@ -684,6 +684,36 @@
   text-anchor: middle;
 }
 
+.outage-window-timeline {
+  grid-column: 1 / -1;
+}
+
+.outage-window-timeline svg {
+  width: 100%;
+  touch-action: none;
+}
+
+.outage-window-bar {
+  fill: #ff8a3d;
+  fill-opacity: 0.5;
+}
+
+.outage-window-handle {
+  fill: #ff8a3d;
+  cursor: ew-resize;
+}
+
+.outage-window-handle:focus-visible {
+  outline: 2px solid var(--lab-blue);
+  outline-offset: 1px;
+}
+
+.outage-window-label {
+  fill: var(--lab-faint);
+  font-family: var(--lab-mono);
+  font-size: 7px;
+}
+
 .editor-param-grid label {
   display: grid;
   gap: 4px;

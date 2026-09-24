@@ -2,6 +2,7 @@
 import type { BasemapNumberField, EditorBasemap } from "./sceneEditorBasemap";
 import type { EditorDocument } from "./sceneEditorState";
 import { NumberInput, SelectInput, TextInput } from "./SceneEditorParamInputs";
+import { OutageWindowTimeline } from "./OutageWindowTimeline";
 
 type Shop = EditorDocument["shops"][number];
 type ServicePoint = EditorDocument["servicePoints"][number];
@@ -216,6 +217,19 @@ export function ServiceParamGrid({
           onNextServicePointIdChange(value === noNextServicePoint ? undefined : value)
         }
       />
+      {selectedServicePoint.outageWindows.length > 0 ? (
+        <OutageWindowTimeline
+          windows={selectedServicePoint.outageWindows}
+          t={t}
+          onChange={(windows) =>
+            onOutageWindowsChange(
+              windows
+                .map((window) => `${window.startsAtSeconds}-${window.endsAtSeconds}`)
+                .join(", "),
+            )
+          }
+        />
+      ) : null}
       <TextInput
         label={t("outageWindows")}
         placeholder="600-900, 1800-2000"

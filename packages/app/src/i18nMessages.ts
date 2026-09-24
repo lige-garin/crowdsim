@@ -227,6 +227,12 @@ export const messages = {
   obstacleKind: { zh: "Obstacle type", en: "Obstacle type" },
   obstacles: { zh: "障碍物", en: "Obstacles" },
   obstacleShort: { zh: "OBS", en: "OBS" },
+  outageTimelineLabel: {
+    zh: "停摆时间轴（可拖动调整）",
+    en: "Outage timeline (drag to adjust)",
+  },
+  outageWindowEndLabel: { zh: "结束", en: "end" },
+  outageWindowStartLabel: { zh: "开始", en: "start" },
   outageWindows: {
     zh: "停摆时间窗 (秒，如 600-900, 1800-2000)",
     en: "Outage windows (s, e.g. 600-900, 1800-2000)",
