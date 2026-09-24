@@ -93,6 +93,27 @@ describe("SceneEditorParamPanel", () => {
     expect(screen.queryByLabelText("arrivalProfileIntervalMinutes")).toBeNull();
   });
 
+  it("shows the population's composition once a named population is picked, and hides it for the default", () => {
+    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const source = document.entrances.find((entrance) => entrance.kind === "source");
+    expect(source, "demo scene must have a source entrance").toBeDefined();
+
+    const { rerender } = render(
+      <SceneEditorParamPanel {...baseProps()} selectedEntrance={source} />,
+    );
+    expect(screen.queryByTestId("population-mix-segment-female-under-30")).toBeNull();
+
+    rerender(
+      <SceneEditorParamPanel
+        {...baseProps()}
+        selectedEntrance={{ ...source!, populationId: "imo-ship-passengers" }}
+      />,
+    );
+    expect(
+      screen.getByTestId("population-mix-segment-female-under-30"),
+    ).toBeInTheDocument();
+  });
+
   it("does not offer an arrival rate on an exit, which cannot spawn anyone", () => {
     const document = createEditorDocumentFromScene(bioCityDemoScene);
     const sink = document.entrances.find((entrance) => entrance.kind === "sink");

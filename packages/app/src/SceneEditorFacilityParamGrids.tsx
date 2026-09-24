@@ -12,7 +12,8 @@ import type {
   TransitStopNumberField,
   ZoneNumberField,
 } from "./sceneEditorMutations";
-import { populationLibrary } from "./populationSampling";
+import { populationLibrary, populationLibraryEntry } from "./populationSampling";
+import { PopulationMixBar } from "./PopulationMixBar";
 import { NumberInput, SelectInput, TextInput } from "./SceneEditorParamInputs";
 
 type Road = EditorDocument["roads"][number];
@@ -675,6 +676,12 @@ export function EntranceParamGrid({
             options={populationChoices}
             value={selectedEntrance.populationId ?? "default"}
             onChange={onPopulationChange}
+          />
+          {/* PopulationMixBar renders nothing itself for an empty mix, so no
+              populationId → no library match → mix=[] already hides it. */}
+          <PopulationMixBar
+            mix={populationLibraryEntry(selectedEntrance.populationId ?? "")?.mix ?? []}
+            t={t}
           />
         </>
       )}

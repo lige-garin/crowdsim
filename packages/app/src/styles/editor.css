@@ -714,6 +714,43 @@
   font-size: 7px;
 }
 
+.population-mix-bar {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+}
+
+.population-mix-track {
+  display: flex;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.population-mix-segment {
+  height: 100%;
+}
+
+.population-mix-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--lab-faint);
+  font-family: var(--lab-mono);
+  font-size: 0.75em;
+}
+
+.population-mix-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
 .editor-param-grid label {
   display: grid;
   gap: 4px;
