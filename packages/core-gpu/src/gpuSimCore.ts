@@ -10,7 +10,8 @@ import {
   SORT_WORKGROUP,
 } from "./gpuSimCoreShaders";
 import { maxUint32 } from "./mathUtils";
-import type { SocialForceParams, SpatialHashGridLayout, WallSegment } from "./types";
+import type { SpatialHashGridLayout, WallSegment } from "./types";
+import type { GpuSimCoreSocialForceParams } from "./gpuSimCoreSocialForce";
 import {
   F32,
   U32,
@@ -28,12 +29,14 @@ export type AgentSpawn = {
   speed: number;
   targetX: number;
   targetY: number;
+  /** Body radius, m — feeds the contact-stiffness term (`gpuSimCoreSocialForce.ts`). */
+  radius: number;
 };
 export type GpuSimCoreOptions = {
   capacity: number;
   layout: SpatialHashGridLayout;
   walls: WallSegment[];
-  params: SocialForceParams;
+  params: GpuSimCoreSocialForceParams;
 };
 export type GpuSimCore = {
   uploadSpawns(spawns: AgentSpawn[]): void;
@@ -48,9 +51,9 @@ export function createGpuSimCore(
   opts: GpuSimCoreOptions,
 ): GpuSimCore {
   const { capacity, layout, walls, params } = opts;
-  if (params.agentRepulsionRange > layout.cellSize) {
+  if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
-      "agentRepulsionRange must be <= cellSize for the 3x3 neighborhood to be exact",
+      "interactionRangeMeters must be <= cellSize for the 3x3 neighborhood to be exact",
     );
   }
   const cellCount = layout.cellCount;
@@ -78,6 +81,12 @@ export function createGpuSimCore(
     capacity * F32,
     GPUBufferUsage.COPY_DST,
   );
+  const radiiBuffer = createStorageBuffer(
+    device,
+    "core-radii",
+    capacity * F32,
+    GPUBufferUsage.COPY_DST,
+  );
   const targetsBuffer = createStorageBuffer(
     device,
     "core-targets",
@@ -97,7 +106,7 @@ export function createGpuSimCore(
   });
   const moveParamsBuffer = device.createBuffer({
     label: "core-move-params",
-    size: 56,
+    size: 68,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const cellCountsBuffer = createStorageBuffer(
@@ -192,11 +201,12 @@ export function createGpuSimCore(
         { binding: 2, resource: { buffer: velBuffers[side] } },
         { binding: 3, resource: { buffer: targetsBuffer } },
         { binding: 4, resource: { buffer: speedBuffer } },
-        { binding: 5, resource: { buffer: cellOffsetsBuffer } },
-        { binding: 6, resource: { buffer: sortedAgentIdsBuffer } },
-        { binding: 7, resource: { buffer: wallsBuffer } },
-        { binding: 8, resource: { buffer: posBuffers[other] } },
-        { binding: 9, resource: { buffer: velBuffers[other] } },
+        { binding: 5, resource: { buffer: radiiBuffer } },
+        { binding: 6, resource: { buffer: cellOffsetsBuffer } },
+        { binding: 7, resource: { buffer: sortedAgentIdsBuffer } },
+        { binding: 8, resource: { buffer: wallsBuffer } },
+        { binding: 9, resource: { buffer: posBuffers[other] } },
+        { binding: 10, resource: { buffer: velBuffers[other] } },
       ],
     });
   });
@@ -212,6 +222,7 @@ export function createGpuSimCore(
     ...posBuffers,
     ...velBuffers,
     speedBuffer,
+    radiiBuffer,
     targetsBuffer,
     wallsBuffer,
     gridParamsBuffer,
@@ -247,18 +258,21 @@ export function createGpuSimCore(
         const pos = new Float32Array(len * 2);
         const vel = new Float32Array(len * 2);
         const spd = new Float32Array(len);
+        const rad = new Float32Array(len);
         const tgt = new Float32Array(len * 2);
         for (let k = 0; k < len; k++) {
           const spawn = sorted[runStart + k];
           pos[k * 2] = spawn.x;
           pos[k * 2 + 1] = spawn.y;
           spd[k] = spawn.speed;
+          rad[k] = spawn.radius;
           tgt[k * 2] = spawn.targetX;
           tgt[k * 2 + 1] = spawn.targetY;
         }
         device.queue.writeBuffer(posBuffers[cur], startIndex * 2 * F32, pos);
         device.queue.writeBuffer(velBuffers[cur], startIndex * 2 * F32, vel);
         device.queue.writeBuffer(speedBuffer, startIndex * F32, spd);
+        device.queue.writeBuffer(radiiBuffer, startIndex * F32, rad);
         device.queue.writeBuffer(targetsBuffer, startIndex * 2 * F32, tgt);
         runStart = runEnd + 1;
       }

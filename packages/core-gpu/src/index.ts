@@ -26,6 +26,11 @@ export { sampleFlowFieldGpu, stepSocialForceGpu } from "./motionGpu";
 export { createGpuSimCore } from "./gpuSimCore";
 export type { AgentSpawn, GpuSimCore, GpuSimCoreOptions } from "./gpuSimCore";
 export {
+  stepGpuSimCoreSocialForceCpu,
+  stepGpuSimCoreSocialForceNeighborhoodCpu,
+} from "./gpuSimCoreSocialForce";
+export type { GpuSimCoreSocialForceParams } from "./gpuSimCoreSocialForce";
+export {
   createNeuralResidualFeatureBufferData,
   createNeuralResidualWeightBufferData,
   describeNeuralResidualGpuContract,

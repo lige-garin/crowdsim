@@ -88,11 +88,15 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
   if (i == n - 1u) { offsets[n] = offsets[i] + counts[i]; }
 }`;
 
-// Fused movement step. Ports stepSocialForceCpu (socialForceCpu.ts) exactly:
-// desired-velocity relaxation + linear-falloff agent repulsion over the sorted
-// 3x3 neighborhood (valid because agentRepulsionRange <= cellSize, asserted on
-// the host) + wall repulsion + maxSpeed clamp + integrate. Reads positionsIn/
-// velocitiesIn, writes positionsOut/velocitiesOut (ping-pong).
+// Fused movement step. ADR-0015 stage 1: ports stepGpuSimCoreSocialForceCpu
+// (gpuSimCoreSocialForce.ts) exactly — desired-velocity relaxation +
+// exponential-falloff, anisotropic agent repulsion with a contact-stiffness
+// term over the sorted 3x3 neighborhood (valid because
+// interactionRangeMeters <= cellSize, asserted on the host — see
+// gpuSimCoreSocialForce.ts's own doc comment for why that's a different
+// invariant than the old agentRepulsionRange <= cellSize one) + wall
+// repulsion + maxSpeed clamp + integrate. Reads positionsIn/velocitiesIn,
+// writes positionsOut/velocitiesOut (ping-pong).
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -110,17 +114,21 @@ struct MoveParams {
   wallRepulsionRange: f32,
   maxSpeed: f32,
   wallCount: u32,
+  anisotropy: f32,
+  contactStiffness: f32,
+  interactionRangeMeters: f32,
 };
 @group(0) @binding(0) var<storage, read> params: MoveParams;
 @group(0) @binding(1) var<storage, read> positionsIn: array<vec2<f32>>;
 @group(0) @binding(2) var<storage, read> velocitiesIn: array<vec2<f32>>;
 @group(0) @binding(3) var<storage, read> targets: array<vec2<f32>>;
 @group(0) @binding(4) var<storage, read> speed: array<f32>;
-@group(0) @binding(5) var<storage, read> cellOffsets: array<u32>;
-@group(0) @binding(6) var<storage, read> sortedAgentIds: array<u32>;
-@group(0) @binding(7) var<storage, read> walls: array<vec4<f32>>;
-@group(0) @binding(8) var<storage, read_write> positionsOut: array<vec2<f32>>;
-@group(0) @binding(9) var<storage, read_write> velocitiesOut: array<vec2<f32>>;
+@group(0) @binding(5) var<storage, read> radii: array<f32>;
+@group(0) @binding(6) var<storage, read> cellOffsets: array<u32>;
+@group(0) @binding(7) var<storage, read> sortedAgentIds: array<u32>;
+@group(0) @binding(8) var<storage, read> walls: array<vec4<f32>>;
+@group(0) @binding(9) var<storage, read_write> positionsOut: array<vec2<f32>>;
+@group(0) @binding(10) var<storage, read_write> velocitiesOut: array<vec2<f32>>;
 
 fn cellOf(p: vec2<f32>) -> u32 {
   let c = min(u32(max(floor(p.x / params.cellSize), 0.0)), params.columns - 1u);
@@ -150,7 +158,9 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
   if (tlen > 0.0001) { desired = toTarget / tlen; }
   var force = (desired * ds - v) / params.relaxationTime;
 
-  // agent repulsion over the sorted 3x3 neighborhood
+  // agent repulsion over the sorted 3x3 neighborhood — exponential falloff,
+  // anisotropic (weighted less from behind), plus a contact term once bodies
+  // overlap. Ports gpuSimCoreSocialForce.ts's agentForce() exactly.
   let cell = cellOf(p);
   let cu = i32(cell % params.columns);
   let ru = i32(cell / params.columns);
@@ -168,10 +178,17 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
         if (other == i) { continue; }
         let d = p - positionsIn[other];
         let dist = max(length(d), 0.0001);
-        if (dist < params.agentRepulsionRange) {
-          let strength = params.agentRepulsionStrength *
-            ((params.agentRepulsionRange - dist) / params.agentRepulsionRange);
-          force = force + (d / dist) * strength;
+        if (dist < params.interactionRangeMeters) {
+          let n = d / dist;
+          let facing = -(desired.x * n.x + desired.y * n.y);
+          let weight = params.anisotropy + (1.0 - params.anisotropy) * ((1.0 + facing) / 2.0);
+          let bodies = radii[i] + radii[other];
+          var strength = params.agentRepulsionStrength *
+            exp((bodies - dist) / params.agentRepulsionRange) * weight;
+          if (dist < bodies) {
+            strength = strength + params.contactStiffness * (bodies - dist);
+          }
+          force = force + n * strength;
         }
       }
     }

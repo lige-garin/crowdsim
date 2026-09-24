@@ -4,7 +4,7 @@ import {
   createSpatialHashGridLayout,
   type AgentSpawn,
   type GpuSimCore,
-  type SocialForceParams,
+  type GpuSimCoreSocialForceParams,
 } from "../src/index";
 import { enqueueCopyToReadbackBuffer, readFloat32Array } from "../src/gpuUtils";
 
@@ -14,21 +14,25 @@ const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 const N = 256;
 const layout = createSpatialHashGridLayout({ width: 128, height: 128, cellSize: 4 });
-const params: SocialForceParams = {
+const params: GpuSimCoreSocialForceParams = {
   dt: 1 / 60,
-  desiredSpeed: 1.3,
-  relaxationTime: 0.5,
-  agentRepulsionStrength: 2,
-  agentRepulsionRange: 1.5,
-  wallRepulsionStrength: 2,
-  wallRepulsionRange: 1.0,
-  maxSpeed: 2.0,
+  desiredSpeed: 1.34,
+  relaxationTime: 0.644,
+  agentRepulsionStrength: 1.966,
+  agentRepulsionRange: 0.307,
+  wallRepulsionStrength: 3,
+  wallRepulsionRange: 0.2,
+  maxSpeed: 1.7,
+  anisotropy: 0.287,
+  contactStiffness: 1500,
+  interactionRangeMeters: 2,
 };
 const spawns: AgentSpawn[] = Array.from({ length: N }, (_, i) => ({
   index: i,
   x: 4 + (i % 16) * 2,
   y: 4 + Math.floor(i / 16) * 2,
-  speed: 1.3,
+  speed: 1.34,
+  radius: 0.22,
   targetX: 100,
   targetY: 100,
 }));
@@ -54,7 +58,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("step() performs no buffer mapping; only readAggregates maps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 10 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 11 },
     });
     expect(device).toBeDefined();
 
@@ -89,7 +93,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("identical cores produce identical results after 40 steps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 10 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 11 },
     });
     expect(device).toBeDefined();
 

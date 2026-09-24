@@ -11,12 +11,8 @@ import {
   SCAN_WORKGROUP,
   SORT_WORKGROUP,
 } from "./gpuSimCoreShaders";
-import type {
-  AgentSoA,
-  SocialForceParams,
-  SpatialHashGridLayout,
-  WallSegment,
-} from "./types";
+import type { AgentSoA, SpatialHashGridLayout, WallSegment } from "./types";
+import type { GpuSimCoreSocialForceParams } from "./gpuSimCoreSocialForce";
 import {
   F32,
   U32,
@@ -191,7 +187,7 @@ export async function stepForParity(
   agents: AgentSoA,
   targetPositions: Float32Array,
   walls: WallSegment[],
-  params: SocialForceParams,
+  params: GpuSimCoreSocialForceParams,
   layout: SpatialHashGridLayout,
   steps: number,
 ): Promise<StepParityReadback> {
@@ -199,9 +195,9 @@ export async function stepForParity(
   if (count === 0) {
     return { positions: new Float32Array(), velocities: new Float32Array() };
   }
-  if (params.agentRepulsionRange > layout.cellSize) {
+  if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
-      "agentRepulsionRange must be <= cellSize for the 3x3 neighborhood to be exact",
+      "interactionRangeMeters must be <= cellSize for the 3x3 neighborhood to be exact",
     );
   }
   device.pushErrorScope("validation");
@@ -232,6 +228,12 @@ export async function stepForParity(
     count * F32,
     GPUBufferUsage.COPY_DST,
   );
+  const radiiBuffer = createStorageBuffer(
+    device,
+    "step-radii",
+    count * F32,
+    GPUBufferUsage.COPY_DST,
+  );
   const targetsBuffer = createStorageBuffer(
     device,
     "step-targets",
@@ -251,7 +253,7 @@ export async function stepForParity(
   });
   const moveParamsBuffer = device.createBuffer({
     label: "step-move-params",
-    size: 56,
+    size: 68,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const cellCountsBuffer = createStorageBuffer(
@@ -293,6 +295,7 @@ export async function stepForParity(
   device.queue.writeBuffer(posBuffers[0], 0, agents.positions.slice(0, count * 2));
   device.queue.writeBuffer(velBuffers[0], 0, agents.velocities.slice(0, count * 2));
   device.queue.writeBuffer(speedBuffer, 0, agents.speed.slice(0, count));
+  device.queue.writeBuffer(radiiBuffer, 0, agents.radius.slice(0, count));
   device.queue.writeBuffer(targetsBuffer, 0, targetPositions.slice(0, count * 2));
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
@@ -351,11 +354,12 @@ export async function stepForParity(
         { binding: 2, resource: { buffer: velBuffers[side] } },
         { binding: 3, resource: { buffer: targetsBuffer } },
         { binding: 4, resource: { buffer: speedBuffer } },
-        { binding: 5, resource: { buffer: cellOffsetsBuffer } },
-        { binding: 6, resource: { buffer: sortedAgentIdsBuffer } },
-        { binding: 7, resource: { buffer: wallsBuffer } },
-        { binding: 8, resource: { buffer: posBuffers[other] } },
-        { binding: 9, resource: { buffer: velBuffers[other] } },
+        { binding: 5, resource: { buffer: radiiBuffer } },
+        { binding: 6, resource: { buffer: cellOffsetsBuffer } },
+        { binding: 7, resource: { buffer: sortedAgentIdsBuffer } },
+        { binding: 8, resource: { buffer: wallsBuffer } },
+        { binding: 9, resource: { buffer: posBuffers[other] } },
+        { binding: 10, resource: { buffer: velBuffers[other] } },
       ],
     });
   });
@@ -419,6 +423,7 @@ export async function stepForParity(
     ...posBuffers,
     ...velBuffers,
     speedBuffer,
+    radiiBuffer,
     targetsBuffer,
     wallsBuffer,
     gridParamsBuffer,

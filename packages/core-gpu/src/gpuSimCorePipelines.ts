@@ -5,7 +5,8 @@ import {
   scanShader,
   scatterShader,
 } from "./gpuSimCoreShaders";
-import type { SocialForceParams, SpatialHashGridLayout } from "./types";
+import type { SpatialHashGridLayout } from "./types";
+import type { GpuSimCoreSocialForceParams } from "./gpuSimCoreSocialForce";
 export const U32 = Uint32Array.BYTES_PER_ELEMENT;
 export const F32 = Float32Array.BYTES_PER_ELEMENT;
 export type SortParityReadback = {
@@ -91,11 +92,11 @@ export function createMovePipeline(device: GPUDevice): {
   layout: GPUBindGroupLayout;
   pipeline: GPUComputePipeline;
 } {
-  // The fused move binds 10 storage buffers — above the WebGPU default of 8.
+  // The fused move binds 11 storage buffers — above the WebGPU default of 8.
   // Without this check the pipeline fails validation *silently* (async device
   // error) and every step() becomes a no-op that still costs submission time,
   // which is exactly how a benchmark measures a dead pipeline.
-  const needed = 10;
+  const needed = 11;
 
   if (device.limits.maxStorageBuffersPerShaderStage < needed) {
     throw new Error(
@@ -118,11 +119,12 @@ export function createMovePipeline(device: GPUDevice): {
       readOnlyStorageBinding(2), // velocitiesIn
       readOnlyStorageBinding(3), // targets
       readOnlyStorageBinding(4), // speed
-      readOnlyStorageBinding(5), // cellOffsets
-      readOnlyStorageBinding(6), // sortedAgentIds
-      readOnlyStorageBinding(7), // walls
-      storageBinding(8), // positionsOut
-      storageBinding(9), // velocitiesOut
+      readOnlyStorageBinding(5), // radii
+      readOnlyStorageBinding(6), // cellOffsets
+      readOnlyStorageBinding(7), // sortedAgentIds
+      readOnlyStorageBinding(8), // walls
+      storageBinding(9), // positionsOut
+      storageBinding(10), // velocitiesOut
     ],
   });
   return {
@@ -137,10 +139,10 @@ export function createMovePipeline(device: GPUDevice): {
 export function buildMoveParamsData(
   count: number,
   layout: SpatialHashGridLayout,
-  params: SocialForceParams,
+  params: GpuSimCoreSocialForceParams,
   wallCount: number,
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(56);
+  const buffer = new ArrayBuffer(68);
   const view = new DataView(buffer);
   view.setUint32(0, count, true);
   view.setUint32(4, layout.columns, true);
@@ -156,6 +158,9 @@ export function buildMoveParamsData(
   view.setFloat32(44, params.wallRepulsionRange, true);
   view.setFloat32(48, params.maxSpeed, true);
   view.setUint32(52, wallCount, true);
+  view.setFloat32(56, params.anisotropy, true);
+  view.setFloat32(60, params.contactStiffness, true);
+  view.setFloat32(64, params.interactionRangeMeters, true);
   return buffer;
 }
 export function buildGridParamsData(

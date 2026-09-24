@@ -3,7 +3,7 @@ import {
   createGpuSimCore,
   createSpatialHashGridLayout,
   type AgentSpawn,
-  type SocialForceParams,
+  type GpuSimCoreSocialForceParams,
 } from "../src/index";
 import { enqueueCopyToReadbackBuffer, readFloat32Array } from "../src/gpuUtils";
 
@@ -37,7 +37,7 @@ describe("createGpuSimCore (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 10 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 11 },
       });
       expect(device).toBeDefined();
 
@@ -47,15 +47,18 @@ describe("createGpuSimCore (real WebGPU)", () => {
         height: 128,
         cellSize: 4,
       });
-      const params: SocialForceParams = {
+      const params: GpuSimCoreSocialForceParams = {
         dt: 1 / 60,
-        desiredSpeed: 1.3,
-        relaxationTime: 0.5,
-        agentRepulsionStrength: 2,
-        agentRepulsionRange: 1.5,
-        wallRepulsionStrength: 2,
-        wallRepulsionRange: 1.0,
-        maxSpeed: 2.0,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
       };
       const target = { x: 110, y: 110 };
 
@@ -69,7 +72,8 @@ describe("createGpuSimCore (real WebGPU)", () => {
         index: i,
         x: 4 + (i % 32) * 2,
         y: 4 + Math.floor(i / 32) * 2,
-        speed: 1.3,
+        speed: 1.34,
+        radius: 0.22,
         targetX: target.x,
         targetY: target.y,
       }));
