@@ -53,6 +53,8 @@ describe("fused move parity (real WebGPU)", () => {
         anisotropy: 0.287,
         contactStiffness: 1500,
         interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
       };
       // cellSize >= interactionRangeMeters so the GPU 3x3 neighborhood is exact.
       const layout = createSpatialHashGridLayout({
@@ -129,6 +131,104 @@ describe("fused move parity (real WebGPU)", () => {
         anisotropy: 0.287,
         contactStiffness: 1500,
         interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 64,
+        height: 64,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          groupIds,
+          formationSlots,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        groupIds,
+        formationSlots,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 3: sidestep + group-gated repulsion) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      });
+      expect(device).toBeDefined();
+
+      const N = 40;
+      const agents = createAgentSoA(N);
+      const groupIds = new Int32Array(N);
+      const formationSlots = new Float32Array(N * 2);
+      const targets = new Float32Array(N * 2);
+      for (let i = 0; i < N; i++) {
+        // Tighter spacing than the stage 1/2 fixtures (0.8m vs 1.2-2m) so
+        // agents actually interact and trigger sidestep — the stage 2
+        // fixture's 1.2-1.5m spacing barely exercised repulsion at all.
+        setAgentPosition(agents, i, 5 + (i % 8) * 0.8, 5 + Math.floor(i / 8) * 0.8);
+        setAgentSpeed(agents, i, 1.34);
+        setAgentRadius(agents, i, 0.22);
+        // Adjacent pairs (0,1), (2,3), ... are 0.8m apart, well within
+        // interactionRangeMeters — every third such pair shares a group, so
+        // some near pairs are "together" (repulsion zeroed, sidestep
+        // zeroed) and most are strangers (both active): a mix, not an
+        // all-or-nothing fixture. The earlier version of this fixture
+        // (i % 3 === 0 grouped by floor(i / 6)) put group-mates 2.4m
+        // apart — further than interactionRangeMeters — so it never
+        // actually exercised the together gate at all; caught by this
+        // test's own sanity check (togetherPairsFoundClose) logged in the
+        // temporary verification harness, not by this assertion itself.
+        groupIds[i] = Math.floor(i / 2) % 3 === 0 ? Math.floor(i / 2) : -1;
+        formationSlots[i * 2] = 5 + (i % 8) * 0.8 + 0.3;
+        formationSlots[i * 2 + 1] = 5 + Math.floor(i / 8) * 0.8;
+        targets[i * 2] = 60;
+        targets[i * 2 + 1] = 60;
+      }
+      const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,

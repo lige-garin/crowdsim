@@ -25,6 +25,8 @@ const params: GpuSimCoreSocialForceParams = {
   anisotropy: 0.287,
   contactStiffness: 1500,
   interactionRangeMeters: 2,
+  sidestep: 0.6,
+  sidestepCone: 0.7,
 };
 const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
 
@@ -392,5 +394,146 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
         formationSlots,
       ),
     ).toThrow(/formationRoomMeters/);
+  });
+});
+
+describe("stage 3: the together fix and the sidestep nudge (crowdMovement.ts's push/sidestep code block)", () => {
+  it("nudges sideways, away from someone roughly ahead and not in the same group", () => {
+    const withSidestep = createAgentSoA(2);
+    setAgentPosition(withSidestep, 0, 0, 0);
+    setAgentPosition(withSidestep, 1, 0.5, 0.1);
+    setAgentRadius(withSidestep, 0, 0.22);
+    setAgentRadius(withSidestep, 1, 0.22);
+    const targets = new Float32Array([10, 0, -10, 0]);
+    const groupIds = new Int32Array([1, 2]); // different groups: not "together"
+
+    const withResult = stepGpuSimCoreSocialForceCpu(
+      withSidestep,
+      targets,
+      [],
+      params,
+      groupIds,
+      new Float32Array(4),
+    );
+    const withoutResult = stepGpuSimCoreSocialForceCpu(
+      withSidestep,
+      targets,
+      [],
+      { ...params, sidestep: 0 },
+      groupIds,
+      new Float32Array(4),
+    );
+
+    // Same repulsion either way (same geometry); only the perpendicular
+    // sidestep term should differ between the two runs.
+    expect(withResult.velocities[1]).not.toBeCloseTo(withoutResult.velocities[1], 6);
+  });
+
+  it("does not sidestep, and does not repel beyond contact range, between two members of the same group", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentPosition(agents, 1, 0.5, 0.1); // within interactionRangeMeters, not overlapping bodies
+    setAgentRadius(agents, 0, 0.22);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([10, 0, -10, 0]);
+    const groupIds = new Int32Array([1, 1]); // same group: "together"
+
+    const result = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      groupIds,
+      new Float32Array(4),
+    );
+
+    // No repulsion (bodies don't overlap at this distance) and no sidestep:
+    // velocity should relax cleanly toward the desired +x speed with zero
+    // y-component, exactly as if agent 1 were not there at all.
+    const alone = createAgentSoA(1);
+    setAgentPosition(alone, 0, 0, 0);
+    setAgentRadius(alone, 0, 0.22);
+    const aloneResult = stepGpuSimCoreSocialForceCpu(
+      alone,
+      new Float32Array([10, 0]),
+      [],
+      params,
+      undefined,
+      undefined,
+    );
+
+    expect(result.velocities[0]).toBeCloseTo(aloneResult.velocities[0], 9);
+    expect(result.velocities[1]).toBeCloseTo(aloneResult.velocities[1], 9);
+  });
+
+  it("still applies the contact-overlap push between overlapping group members, even though the exponential repulsion is zeroed", () => {
+    const overlapping = createAgentSoA(2);
+    setAgentPosition(overlapping, 0, 0, 0);
+    setAgentPosition(overlapping, 1, 0.3, 0); // overlapping: 0.3 < 0.22+0.22
+    setAgentRadius(overlapping, 0, 0.22);
+    setAgentRadius(overlapping, 1, 0.22);
+    const targets = new Float32Array([0, 0, 0, 0]);
+    const sameGroup = new Int32Array([1, 1]);
+
+    const together = stepGpuSimCoreSocialForceCpu(
+      overlapping,
+      targets,
+      [],
+      params,
+      sameGroup,
+      new Float32Array(4),
+    );
+
+    // Agent 0 is still pushed away (negative x-velocity) from the
+    // overlapping neighbour, purely from the contact-stiffness term, even
+    // though both agents share a group and the exponential repulsion term
+    // is zero.
+    expect(together.velocities[0]).toBeLessThan(0);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with sidestep and group-gated repulsion both active", () => {
+    const N = 40;
+    const agents = createAgentSoA(N);
+    const groupIds = new Int32Array(N);
+    const formationSlots = new Float32Array(N * 2);
+    const targets = new Float32Array(N * 2);
+    for (let i = 0; i < N; i++) {
+      setAgentPosition(agents, i, 5 + (i % 8) * 1.2, 5 + Math.floor(i / 8) * 1.2);
+      setAgentSpeed(agents, i, 1.34);
+      setAgentRadius(agents, i, 0.22);
+      groupIds[i] = Math.floor(i / 2);
+      formationSlots[i * 2] = 5 + (i % 8) * 1.2 + 0.4;
+      formationSlots[i * 2 + 1] = 5 + Math.floor(i / 8) * 1.2;
+      targets[i * 2] = 60;
+      targets[i * 2 + 1] = 60;
+    }
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      groupIds,
+      formationSlots,
+    );
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+      groupIds,
+      formationSlots,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
   });
 });

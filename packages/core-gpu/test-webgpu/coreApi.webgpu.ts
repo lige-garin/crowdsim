@@ -37,7 +37,7 @@ describe("createGpuSimCore (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 11 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
       });
       expect(device).toBeDefined();
 
@@ -59,6 +59,8 @@ describe("createGpuSimCore (real WebGPU)", () => {
         anisotropy: 0.287,
         contactStiffness: 1500,
         interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
       };
       const target = { x: 110, y: 110 };
 

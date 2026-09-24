@@ -1,6 +1,6 @@
 # ADR 0015: Scale-up path — GPU reconnection vs. multi-scale (comparison only)
 
-- Status: **GPU reconnection path started, two stages in** — this ADR
+- Status: **GPU reconnection path started, three stages in** — this ADR
   originally recommended path (a) without starting it (see the Decision
   section below for why, as written at the time: no WebGPU adapter in that
   session's sandbox). That blocker lifted in a later session with real
@@ -8,15 +8,17 @@
   fused-move kernel's agent/wall repulsion went from the old linear-falloff
   model to `crowdMovement.ts`'s real exponential-falloff, anisotropic,
   contact-stiffness force, verified against a CPU oracle on real hardware.
-  **Stage 2** (2026-09-25): the in-formation spring force (group formation),
-  same real-hardware verification discipline — see
-  `docs/CLAIMS_LEDGER.md`'s forty-fifth entry for the full record. Still not
-  wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"`
-  selection — this ADR authorizes behaviour-by-behaviour porting with
-  per-stage parity proof, not a claim of full parity yet. Remaining stages,
-  in this ADR's own order: sidestep, anticipation (Karamouzas
-  time-to-collision), hazard avoidance, holding-state speed easing, the
-  no-walking-backward clamp, the no-overshoot-past-target clamp.
+  **Stage 2** (2026-09-25): the in-formation spring force (group formation).
+  **Stage 3** (2026-09-25): sidestep, plus fixing a real stage 1/2 parity gap
+  (agent repulsion was never actually zeroed between group members, contrary
+  to `crowdMovement.ts`'s own behaviour) — see `docs/CLAIMS_LEDGER.md`'s
+  forty-fifth and forty-sixth entries for the full record. Still not wired
+  into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection —
+  this ADR authorizes behaviour-by-behaviour porting with per-stage parity
+  proof, not a claim of full parity yet. Remaining stages, in this ADR's own
+  order: anticipation (Karamouzas time-to-collision), hazard avoidance,
+  holding-state speed easing, the no-walking-backward clamp, the
+  no-overshoot-past-target clamp.
 - Touches: `packages/core-gpu/src/gpuSimCoreSocialForce.ts`,
   `gpuSimCoreShaders.ts`, `gpuSimCoreParity.ts`, `gpuSimCorePipelines.ts`
 - Related: ADR-0002 (100k GPU rewrite), ADR-0006 (WebGPU compute / WebGL

@@ -77,13 +77,41 @@ export type GpuSimCoreSocialForceParams = SocialForceParams & {
    * (crowdMovement's interactionRangeMeters) — see this module's own doc
    * comment for why this differs from `agentRepulsionRange` now. */
   interactionRangeMeters: number;
+  /** Perpendicular nudge strength for someone roughly ahead, 0..1 (crowdMovement's
+   * `sidestep`) — unlike `formationGain`/`formationRoomMeters`, this one IS a
+   * calibrated `socialForceParameters` field (part of the six the Morris
+   * sensitivity screen already names), so it lives in this params type rather
+   * than as a hardcoded constant. */
+  sidestep: number;
+  /** Cosine-of-facing-angle threshold above which sidestep triggers, ≈45°
+   * (crowdMovement's `sidestepCone`) — same reasoning as `sidestep`. */
+  sidestepCone: number;
 };
 
-function agentForce(
+/**
+ * One neighbour's full contribution to the force sum: agent repulsion —
+ * zeroed between group members, exactly like `crowdMovement.ts`'s own
+ * `push = together ? 0 : ...` (the contact-overlap term still applies even
+ * then, matching `if (gap < bodies) push += contactStiffness * ...` running
+ * unconditionally right after) — plus, for anyone roughly ahead and not in
+ * the same group, a perpendicular sidestep nudge using that same push
+ * magnitude. Combined into one function (rather than `agentForce` +
+ * a separate `sidestepForce`) because that is how `crowdMovement.ts` itself
+ * computes them: one `push` scalar, reused for both the radial and the
+ * perpendicular contribution in the same per-neighbour code block.
+ *
+ * `together` was NOT threaded through stage 1's original `agentForce` —
+ * groups did not exist in this module yet at the time, so its absence
+ * could not have mattered. Discovered and fixed here, while scoping stage
+ * 3, rather than left as a latent parity gap between the group-repulsion
+ * behaviour this module claims to port and what it was actually computing.
+ */
+function agentInteractionForce(
   desired: { x: number; y: number },
   bodies: number,
   dx: number,
   dy: number,
+  together: boolean,
   params: GpuSimCoreSocialForceParams,
 ): { x: number; y: number } {
   const distance = Math.max(Math.hypot(dx, dy), 0.0001);
@@ -95,14 +123,27 @@ function agentForce(
   // -1 dead ahead of the walker's own desired heading, +1 dead behind.
   const facing = -(desired.x * nx + desired.y * ny);
   const weight = params.anisotropy + (1 - params.anisotropy) * ((1 + facing) / 2);
-  let strength =
-    params.agentRepulsionStrength *
-    Math.exp((bodies - distance) / params.agentRepulsionRange) *
-    weight;
+  let push = together
+    ? 0
+    : params.agentRepulsionStrength *
+      Math.exp((bodies - distance) / params.agentRepulsionRange) *
+      weight;
   if (distance < bodies) {
-    strength += params.contactStiffness * (bodies - distance);
+    push += params.contactStiffness * (bodies - distance);
   }
-  return { x: nx * strength, y: ny * strength };
+  let x = nx * push;
+  let y = ny * push;
+  if (!together && facing > params.sidestepCone) {
+    // Which side the neighbour is on, relative to the walker's own heading
+    // — a small dead zone (0.05) around dead-ahead avoids flip-flopping
+    // which way to dodge when the sign of a near-zero cross product is
+    // essentially noise.
+    const side = nx * desired.y - ny * desired.x;
+    const away = side > 0.05 ? -1 : 1;
+    x += push * params.sidestep * away * -desired.y;
+    y += push * params.sidestep * away * desired.x;
+  }
+  return { x, y };
 }
 
 function wallForce(
@@ -245,7 +286,11 @@ export function stepGpuSimCoreSocialForceCpu(
         strangersClose++;
       }
       const bodies = agents.radius[index] + agents.radius[other];
-      const push = agentForce(desired, bodies, dx, dy, params);
+      const together =
+        groupIds !== undefined &&
+        groupIds[index] >= 0 &&
+        groupIds[index] === groupIds[other];
+      const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
       forceX += push.x;
       forceY += push.y;
     }
@@ -367,7 +412,11 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
             strangersClose++;
           }
           const bodies = agents.radius[index] + agents.radius[other];
-          const push = agentForce(desired, bodies, dx, dy, params);
+          const together =
+            groupIds !== undefined &&
+            groupIds[index] >= 0 &&
+            groupIds[index] === groupIds[other];
+          const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
           forceX += push.x;
           forceY += push.y;
         }

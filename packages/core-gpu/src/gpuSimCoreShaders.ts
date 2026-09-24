@@ -104,6 +104,14 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // passes. groupId < 0 is "not in a group"; formationSlots is only read for
 // agents with a real group. formationGain/formationRoomMeters are WGSL
 // constants, not MoveParams fields — crowdMovement.ts hardcodes both too.
+//
+// Stage 3: agent repulsion now zeroes (but the contact-overlap term still
+// applies) between two agents in the same group — a real parity gap in
+// stage 1/2 fixed here, not present before because groups didn't exist yet
+// when stage 1 landed. Adds the perpendicular sidestep nudge for anyone
+// roughly ahead and not in the same group, reusing the same push magnitude
+// — `sidestep`/`sidestepCone` ARE calibrated `socialForceParameters` fields
+// (unlike formation's constants), so they're MoveParams fields.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -124,6 +132,8 @@ struct MoveParams {
   anisotropy: f32,
   contactStiffness: f32,
   interactionRangeMeters: f32,
+  sidestep: f32,
+  sidestepCone: f32,
 };
 @group(0) @binding(0) var<storage, read> params: MoveParams;
 @group(0) @binding(1) var<storage, read> positionsIn: array<vec2<f32>>;
@@ -198,16 +208,27 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
           if (dist < formationRoomMeters && groupIds[other] != myGroup) {
             strangersClose = strangersClose + 1u;
           }
+          let together = myGroup >= 0 && groupIds[other] == myGroup;
           let n = d / dist;
           let facing = -(desired.x * n.x + desired.y * n.y);
           let weight = params.anisotropy + (1.0 - params.anisotropy) * ((1.0 + facing) / 2.0);
           let bodies = radii[i] + radii[other];
-          var strength = params.agentRepulsionStrength *
-            exp((bodies - dist) / params.agentRepulsionRange) * weight;
-          if (dist < bodies) {
-            strength = strength + params.contactStiffness * (bodies - dist);
+          var push = 0.0;
+          if (!together) {
+            push = params.agentRepulsionStrength *
+              exp((bodies - dist) / params.agentRepulsionRange) * weight;
           }
-          force = force + n * strength;
+          if (dist < bodies) {
+            push = push + params.contactStiffness * (bodies - dist);
+          }
+          force = force + n * push;
+          if (!together && facing > params.sidestepCone) {
+            let side = n.x * desired.y - n.y * desired.x;
+            var away = 1.0;
+            if (side > 0.05) { away = -1.0; }
+            force.x = force.x + push * params.sidestep * away * -desired.y;
+            force.y = force.y + push * params.sidestep * away * desired.x;
+          }
         }
       }
     }
