@@ -33,6 +33,14 @@ and why.
   zero importers from `packages/app`. See `docs/adr/0015-scale-up-path-comparison.md`.
   Do not read "100k" anywhere else in this project as a claim about the
   running application.
+- **Pedestrians nearest the camera can be real skinned, animated 3D
+  characters (CC0 assets, ADR-0032), not a claim about the whole crowd.**
+  Only the closest 12 agents within 20 m of the camera get one; everyone
+  else — the vast majority of a real crowd — is still the procedural
+  low-poly figure `crowdFigures.ts` has always drawn. A skinned mesh can't
+  be batched into an `InstancedMesh` the way those figures are, which is
+  exactly why this stays a small, bounded, always-on tier rather than a
+  crowd-wide swap.
 - **"AI" surfaces are template/keyword logic, not a model call.** Scene
   drafting and the image-tracing example button construct text or run a
   fixed pipeline over three hardcoded fixtures; no LLM is ever invoked
@@ -85,7 +93,7 @@ back to a slower per-frame-copy path rather than failing.
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test        # vitest across every package, ~1,060 tests
+pnpm test        # vitest across every package, ~1,200 tests
 pnpm e2e         # Playwright smoke tests
 ```
 
@@ -111,17 +119,27 @@ pnpm test:rust    # cargo test
 A partial list — see `docs/adr/` (each ADR's "What this is not" section) and
 `docs/CLAIMS_LEDGER.md` for the complete, dated record:
 
-- No real intersections, traffic signals, or road network — vehicles drive
-  the one road they spawn on and stop.
-- Elevator dispatch is "first idle car," no lookahead or load balancing.
-- Evacuation is whole-building; there is no phased or zone-limited
-  evacuation model.
+- Vehicles turn at intersections and stop for traffic signals
+  (ADR-0023), but there is no route planning — every turn is a random,
+  uniformly-weighted choice among the geometrically possible ones, and
+  signals have no editor placement tool (JSON-only for now).
+- Elevator dispatch boards continuously and balances load across multiple
+  cars at a shaft's two floors (ADR-0029), but still does not look ahead
+  or coordinate across a shaft serving more than two floors.
+- Evacuation only routes people on a floor with an actually active hazard
+  to the exits; a floor with no live hazard is unaffected (ADR-0025) — but
+  there is still no adjacent-floor buffer evacuation, and a floor's
+  evacuation cannot be cancelled once a hazard on it ends.
 - Smoke/fire is a disclosed, non-CFD approximation (growing circle,
   self-authored dose model), not a validated hazard simulation.
 - Social-force parameters are fitted to the Weidmann density-speed curve,
   not to real pedestrian trajectories — a real-trajectory fit was attempted
   and is documented as **not adopted**, because it made the density fit
   worse (`docs/calibration/`).
+- Skinned, animated pedestrian characters (ADR-0032) only ever cover the
+  closest 12 people to the camera, within 20 m — everyone else in the
+  crowd is still the procedural low-poly figure, and every near-camera
+  character currently looks like the same one person.
 
 ## License
 

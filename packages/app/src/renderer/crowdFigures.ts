@@ -403,6 +403,12 @@ export function createCrowdFigures(capacity: number) {
       colourByBehaviour?: boolean;
       /** Camera position in render space, for level of detail. */
       camera?: { x: number; y: number; z: number };
+      /**
+       * Agent ids drawn instead by the skeletal near-camera tier
+       * (`skeletalCharacters.ts`) this frame — skipped here so the two
+       * layers never draw the same person twice.
+       */
+      hidden?: ReadonlySet<number>;
     } = {},
   ) {
     frame++;
@@ -416,6 +422,7 @@ export function createCrowdFigures(capacity: number) {
     const detailSq = FIGURE_DETAIL_DISTANCE * FIGURE_DETAIL_DISTANCE;
 
     for (const agent of agents) {
+      if (options.hidden?.has(agent.id)) continue;
       const look = lookFor(agent.id, seed);
       const set = meshes.get(look.archetype)!;
       const b = set.build;

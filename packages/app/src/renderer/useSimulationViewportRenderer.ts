@@ -26,6 +26,7 @@ import {
 } from "../agentInstanceField";
 import { crowdBudget } from "../crowdBudget";
 import { createCrowdFigures, type CrowdFigureAgent } from "./crowdFigures";
+import { createSkeletalCharacters } from "./skeletalCharacters";
 import { screenToNdc } from "../agentPicking";
 import { sceneHeadingToRenderRotationZ } from "./sceneHeading";
 import {
@@ -189,6 +190,10 @@ export function useSimulationViewportRenderer({
     // 3D draws people (heads, limbs, five builds); 2D keeps flat top-down dots.
     const figures =
       viewMode === "3d" ? createCrowdFigures(crowdBudget.maxAgents) : undefined;
+    // Close-up realism for whoever the camera is nearest to, on top of
+    // `figures` rather than instead of it — see skeletalCharacters.ts for
+    // why this stays a small bounded layer, not a crowd-wide swap.
+    const skeletalCharacters = figures ? createSkeletalCharacters() : undefined;
     // 2D draws each person as a flat square dot. Mutually exclusive with
     // `figures` by construction (exactly one of the two is ever defined for
     // a given render) -- every `figures!`/`agents!` non-null assertion
@@ -316,6 +321,10 @@ export function useSimulationViewportRenderer({
     agents?.instanceMatrix.setUsage(DynamicDrawUsage);
     vehicles.instanceMatrix.setUsage(DynamicDrawUsage);
     scene.add(figures?.group ?? agents!);
+    // A child of `figures.group`, not the scene, so the "crowd" layer
+    // toggle (`applyViewportLayers`, keyed off `crowdMeshRef`) hides both
+    // layers together instead of only the procedural one.
+    if (skeletalCharacters) figures!.group.add(skeletalCharacters.group);
     scene.add(vehicles);
     scene.add(dynamicGroup);
     lightRig?.attach(scene);
@@ -384,18 +393,27 @@ export function useSimulationViewportRenderer({
       }
       return visible;
     }
-    function updateAgentInstances() {
+    function updateAgentInstances(deltaSeconds: number) {
       const live = selectCrowdAgents(
         snapshotRef.current?.agents,
         sharedOverlayRef.current?.agents,
         floorRef.current,
       );
       if (figures) {
+        const hidden = skeletalCharacters?.update(
+          live as readonly CrowdFigureAgent[],
+          { height: worldHeight, width: worldWidth },
+          { camera: camera.position, deltaSeconds },
+        );
         figures.update(
           live as readonly CrowdFigureAgent[],
           { height: worldHeight, width: worldWidth },
           crowdSceneRef.current?.seed ?? 1,
-          { camera: camera.position, colourByBehaviour: layersRef.current.behaviour },
+          {
+            camera: camera.position,
+            colourByBehaviour: layersRef.current.behaviour,
+            hidden,
+          },
         );
         return;
       }
@@ -458,10 +476,13 @@ export function useSimulationViewportRenderer({
       }
       const frameTime = Number.isFinite(time) ? time : performance.now();
       try {
-        updateAgentInstances();
-        updateVehicleInstances();
-        // Per-frame animation for dynamic objects that want it (falling rain).
+        // Per-frame animation for dynamic objects that want it (falling
+        // rain, skeletal character walk cycles) — computed before
+        // `updateAgentInstances` so it can drive the skeletal layer's
+        // AnimationMixer with the same delta.
         const frameSeconds = (frameTime - lastFrameAt) / 1000;
+        updateAgentInstances(frameSeconds);
+        updateVehicleInstances();
         for (const child of dynamicGroup.children) {
           (child.userData.tick as ((dt: number) => void) | undefined)?.(frameSeconds);
         }
@@ -613,6 +634,7 @@ export function useSimulationViewportRenderer({
       renderer?.dispose();
       gpuDevice?.destroy();
       figures?.dispose();
+      skeletalCharacters?.dispose();
       agents?.geometry.dispose();
       agents?.material.dispose();
       vehicles.geometry.dispose();

@@ -219,6 +219,47 @@ describe("crowd figures", () => {
   });
 });
 
+describe("crowd figures: hidden (skeletalCharacters.ts handoff)", () => {
+  it("draws nobody in the hidden set, and everyone not in it, unchanged", () => {
+    const figures = createCrowdFigures(64);
+    const agents: CrowdFigureAgent[] = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      vx: 1,
+      vy: 0,
+      x: 10 + i,
+      y: 50,
+    }));
+    figures.update(agents, world, 5, { hidden: new Set([3, 7]) });
+    const meshes = meshesOf(figures);
+    let bodies = 0;
+    for (const archetype of figureArchetypes) {
+      bodies += meshes.get(`figure-${archetype}-bodies`)!.count;
+    }
+    // Two of the ten agents were withheld for the skeletal layer to draw.
+    expect(bodies).toBe(8);
+    figures.dispose();
+  });
+
+  it("with no hidden set at all, behaves exactly as before (regression)", () => {
+    const figures = createCrowdFigures(64);
+    const agents: CrowdFigureAgent[] = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      vx: 1,
+      vy: 0,
+      x: 10 + i,
+      y: 50,
+    }));
+    figures.update(agents, world, 5);
+    const meshes = meshesOf(figures);
+    let bodies = 0;
+    for (const archetype of figureArchetypes) {
+      bodies += meshes.get(`figure-${archetype}-bodies`)!.count;
+    }
+    expect(bodies).toBe(10);
+    figures.dispose();
+  });
+});
+
 describe("crowd level of detail", () => {
   it("draws far-away people as one silhouette each, and they can still be picked", () => {
     const figures = createCrowdFigures(16);

@@ -8,6 +8,9 @@ pnpm-lock.yaml
 projectplan.md
 packages/core-behavior/target/
 packages/app/src/wasm/
+# Downloaded/vendored assets (fonts, models) — not hand-authored, reformatting
+# them would just be gratuitous diffs against upstream.
+packages/app/public/assets/
 .workbuddy
 .pnpm-store
 _to_delete
