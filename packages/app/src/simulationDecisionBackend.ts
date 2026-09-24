@@ -60,6 +60,20 @@ export type SimulationServicePoint = {
   /** Scripted time windows this service point admits nobody new (ADR-0021,
    * `servicePointSchema.outageWindows`). Absent or empty: never down. */
   outageWindows?: readonly { startsAtSeconds: number; endsAtSeconds: number }[];
+  /**
+   * "transit" (ADR-0024) marks a service point synthesized fresh each tick
+   * from a `transitStop`, not a scene-authored checkout counter — the only
+   * thing `mallCrowdDecisionBackend.ts` reads this for is to know a served
+   * rider should vanish here (they boarded) rather than chain onward or walk
+   * to a door. `createCounterTick` itself never inspects this field; the
+   * queueing/admission/service-time machinery is identical either way.
+   * Absent means an ordinary checkout counter, as it always has.
+   */
+  kind?: "checkout" | "transit";
+  /** Only set on a `kind: "transit"` entry (ADR-0024): the share of departing
+   * shoppers who choose to ride from here, copied straight from
+   * `transitStopSchema.pedestrianDemandShare`. */
+  pedestrianDemandShare?: number;
 };
 
 export type SimulationAgentWalkProgress = {

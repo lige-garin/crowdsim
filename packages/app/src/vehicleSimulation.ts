@@ -620,7 +620,12 @@ function spawnVehicles(
         floorId: road.floorId,
         headingRadians,
         id: `${road.id}-${laneDirection}-${Math.floor(random() * 1e9)}`,
-        kind: "car",
+        // A road that carries a transit stop spawns buses on it; every other
+        // road spawns cars, as it always has. Not a scene-authored choice —
+        // inferred from the road's own stops, the same "a fact about the
+        // geometry, not a new field" instinct ADR-0023 already used for
+        // inferring a junction from where roads happen to meet.
+        kind: road.stops.length > 0 ? "bus" : "car",
         laneDirection,
         progressMeters: 0,
         roadId: road.id,

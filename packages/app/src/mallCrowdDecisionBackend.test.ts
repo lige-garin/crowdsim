@@ -832,3 +832,147 @@ describe("lines and shop floors", () => {
     expect(browseSpot(lineShop, 3, 7)).toEqual(browseSpot(lineShop, 3, 7));
   });
 });
+
+describe("transit ridership (ADR-0024)", () => {
+  const openStop: SimulationServicePoint = {
+    id: "stop-open",
+    position: { x: 20, y: 20 },
+    radius: 3,
+    serviceSeconds: 2,
+    servers: 1,
+    kind: "transit",
+    pedestrianDemandShare: 1,
+  };
+  const closedStop: SimulationServicePoint = {
+    ...openStop,
+    id: "stop-closed",
+    servers: 0,
+  };
+
+  it("sends a non-buying browser to the nearest transit stop instead of a door when demand share is 1", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const browser = agent({
+      lifecycleState: "browse",
+      selectedStoreId: "a",
+      browseUntilSeconds: 5,
+      x: 10,
+      y: 10,
+    });
+    const d = backend.decideAgents({
+      agents: [browser],
+      decisionTick: 0,
+      elapsedSeconds: 6,
+      sinks,
+      shops: shops.map((shop) => ({ ...shop, conversionRate: 0 })),
+      servicePoints: [openStop],
+    });
+    expect(d[0].nextState).toBe("checkout");
+    expect(d[0].servicePointId).toBe("stop-open");
+    expect(d[0].target).toEqual(openStop.position);
+  });
+
+  it("still walks a departing shopper to a door when no transit stop is declared (pedestrianDemandShare absent, default 0)", () => {
+    // Regression: a scene with no transitStops at all must behave exactly as
+    // before this feature existed.
+    const d = decide(
+      [
+        agent({
+          lifecycleState: "browse",
+          selectedStoreId: "a",
+          browseUntilSeconds: 5,
+        }),
+      ],
+      6,
+    );
+    expect(d[0].nextState).toBe("leave");
+    expect(d[0].targetSinkId).toBe("exit");
+  });
+
+  it("still walks a departing shopper to a door when the transit stop's own demand share is 0", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const noShareStop: SimulationServicePoint = {
+      ...openStop,
+      pedestrianDemandShare: 0,
+    };
+    const browser = agent({
+      lifecycleState: "browse",
+      selectedStoreId: "a",
+      browseUntilSeconds: 5,
+    });
+    const d = backend.decideAgents({
+      agents: [browser],
+      decisionTick: 0,
+      elapsedSeconds: 6,
+      sinks,
+      shops: shops.map((shop) => ({ ...shop, conversionRate: 0 })),
+      servicePoints: [noShareStop],
+    });
+    expect(d[0].nextState).toBe("leave");
+    expect(d[0].targetSinkId).toBe("exit");
+  });
+
+  it("boards a rider the instant it is served, vanishing at the stop rather than chaining or walking to a door", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const boarding = agent({
+      lifecycleState: "enterStore",
+      servicePointId: "stop-open",
+      browseUntilSeconds: 5,
+      x: 20,
+      y: 20,
+    });
+    const d = backend.decideAgents({
+      agents: [boarding],
+      decisionTick: 0,
+      elapsedSeconds: 6,
+      sinks,
+      shops,
+      servicePoints: [openStop],
+    });
+    expect(d[0].nextState).toBe("leave");
+    expect(d[0].targetSinkId).toBe("stop-open");
+    expect(d[0].target).toEqual(openStop.position);
+  });
+
+  it("keeps a rider waiting at a transit stop with no vehicle dwelling (servers 0) instead of boarding", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const waiting = agent({
+      lifecycleState: "checkout",
+      servicePointId: "stop-closed",
+      x: 20,
+      y: 20,
+    });
+    const d = backend.decideAgents({
+      agents: [waiting],
+      decisionTick: 0,
+      elapsedSeconds: 6,
+      sinks,
+      shops,
+      servicePoints: [closedStop],
+    });
+    expect(d).toHaveLength(1);
+    expect(d[0].nextState).toBe("checkout");
+    expect(d[0].queueJoinedSeconds).toBe(6);
+  });
+
+  it("sends a rider who gave up waiting for the bus out through a door, not back into another transit queue", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const reneging = agent({
+      lifecycleState: "checkout",
+      servicePointId: "stop-closed",
+      queueJoinedSeconds: 0,
+      queueUntilSeconds: 10,
+      x: 20,
+      y: 20,
+    });
+    const d = backend.decideAgents({
+      agents: [reneging],
+      decisionTick: 0,
+      elapsedSeconds: 20,
+      sinks,
+      shops,
+      servicePoints: [closedStop],
+    });
+    expect(d[0].nextState).toBe("leave");
+    expect(d[0].targetSinkId).toBe("exit");
+  });
+});

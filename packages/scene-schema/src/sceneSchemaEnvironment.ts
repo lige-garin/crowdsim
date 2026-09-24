@@ -120,6 +120,13 @@ export const transitStopSchema = z.object({
   alightingPerArrival: z.number().int().nonnegative().default(24),
   boardingCapacityPerMinute: z.number().nonnegative().default(60),
   delayFactor: z.number().positive().default(1),
+  /**
+   * Share (0..1) of departing shoppers who ride transit from here instead of
+   * walking out a door (ADR-0024) — drawn per person, not a hard cap. 0 (the
+   * default): every scene written before this field existed sees no
+   * pedestrian ridership change, the same as it always has.
+   */
+  pedestrianDemandShare: z.number().min(0).max(1).default(0),
   active: z.boolean().default(true),
   customParameters: customParametersSchema,
   visual: visual2d5Schema,

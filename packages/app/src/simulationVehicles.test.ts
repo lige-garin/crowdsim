@@ -211,3 +211,106 @@ describe("vehicle-accessible roads (ADR-0016 stage 1, wired in by ADR-0020)", ()
     expect(engine.snapshot().vehicles).toEqual([]);
   });
 });
+
+describe("real transit ridership (ADR-0024)", () => {
+  function transitStopScene(
+    overrides: Partial<CrowdSimScene["transitStops"][number]> = {},
+  ) {
+    return parseScene({
+      ...demoScene,
+      id: "transit-stop-demo",
+      shops: [],
+      servicePoints: [],
+      world: { width: 320, height: 40 },
+      walls: [],
+      entrances: [
+        {
+          id: "door",
+          kind: "source",
+          position: { x: 5, y: 12 },
+          width: 4,
+          arrivalRatePerMinute: 300,
+          // Isolates the assertions below to each arrival's own decision:
+          // a companion never queues or checks out on its own account
+          // (CLAUDE.md's own "同伴不占队位不结账"), so with the default
+          // non-zero group share some arrivals would legitimately sit in
+          // "walk" (following a boarding leader) rather than "checkout".
+          groupShare: 0,
+        },
+        { id: "exit", kind: "sink", position: { x: 5, y: 40 }, width: 6 },
+      ],
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 10 },
+              { x: 300, y: 10 },
+            ],
+          },
+          direction: "oneWayForward",
+          vehicleAccessible: true,
+          vehicleArrivalRatePerMinute: 3600,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+      ],
+      transitStops: [
+        {
+          id: "stop-1",
+          kind: "bus",
+          roadId: "main-street",
+          position: { x: 5, y: 10 },
+          alightingPerArrival: 10,
+          boardingCapacityPerMinute: 600,
+          pedestrianDemandShare: 1,
+          ...overrides,
+        },
+      ],
+    });
+  }
+
+  it("walks a departing pedestrian to a real transit stop, waits for a real bus, and only then removes them", () => {
+    const engine = run(transitStopScene(), 2400, 60);
+    const snapshot = engine.snapshot();
+
+    expect(snapshot.exitedCount).toBeGreaterThan(0);
+    // Every departure in this scene has pedestrianDemandShare 1 and no
+    // shops, so anyone who has reached "leave" must be doing so via the
+    // transit stop (the last few metres of the walk to vanish there, the
+    // same brief multi-tick approach any "leave" toward any sink takes) —
+    // never toward the far door instead.
+    expect(
+      snapshot.agents
+        .filter((agent) => agent.lifecycleState === "leave")
+        .every((agent) => agent.targetSinkId === "stop-1"),
+    ).toBe(true);
+  });
+
+  it("never boards anyone at a stop with no vehicle dwelling there (regression: no roads means no buses at all)", () => {
+    const scene = transitStopScene();
+    const noRoads = { ...scene, roads: [] };
+    const engine = run(noRoads, 2400, 60);
+    const snapshot = engine.snapshot();
+
+    // Riders can still walk to and queue at the stop (pedestrianDemandShare
+    // is unconditional on a real bus existing), but with no road to drive
+    // on, no bus ever dwells there, so nobody is ever admitted to board.
+    expect(snapshot.exitedCount).toBe(0);
+    expect(snapshot.agents.some((agent) => agent.servicePointId === "stop-1")).toBe(
+      true,
+    );
+  });
+
+  it("does not offer transit when the scene declares no stop (regression: unaffected by this feature)", () => {
+    const scene = transitStopScene();
+    const noStops = { ...scene, transitStops: [] };
+    const engine = run(noStops, 2400, 60);
+    const snapshot = engine.snapshot();
+
+    expect(snapshot.exitedCount).toBeGreaterThan(0);
+    expect(snapshot.agents.every((agent) => agent.servicePointId !== "stop-1")).toBe(
+      true,
+    );
+  });
+});

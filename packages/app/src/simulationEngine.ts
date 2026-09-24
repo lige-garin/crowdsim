@@ -216,6 +216,15 @@ export type SimulationSink = {
   position: ScenePoint;
   radius: number;
 };
+/** A transit stop's static facts (ADR-0024) — everything about it that does
+ * not depend on whether a vehicle happens to be there this tick. Shaped like
+ * `SimulationSink` plus the two fields boarding demand/rate need, since the
+ * engine uses one as a sink (for the "just boarded, vanish here" exit) and
+ * the other as a synthesized service point (for the queue itself). */
+export type SimulationTransitStopGeometry = SimulationSink & {
+  boardingCapacityPerMinute: number;
+  pedestrianDemandShare: number;
+};
 export type SimulationEngineConfig = {
   decisionBackend?: SimulationDecisionBackend;
   /** Every floor's plane. A config without it is one floor: `walls` + `world`. */
@@ -242,6 +251,10 @@ export type SimulationEngineConfig = {
   speedMetersPerSecond?: number;
   shops?: readonly SimulationShop[];
   servicePoints?: readonly SimulationServicePoint[];
+  /** Boardable transit stops (ADR-0024). Absent or empty — the overwhelming
+   * majority of scenes — means no synthesized boarding service point is ever
+   * added and `exitRadius` never needs the fallback lookup. */
+  transitStops?: readonly SimulationTransitStopGeometry[];
   sources: SimulationSource[];
   sinks: SimulationSink[];
   walls?: WallSegment[];
@@ -315,6 +328,12 @@ const defaultMaxAgents = crowdBudget.maxAgents;
 const maxRealDeltaSeconds = 0.25;
 /** Steps between anticipation replans: 20 Hz at the 60 Hz default step. */
 const anticipationReplanSteps = 3;
+/** Boarding "doors" a transit stop's synthesized service point offers while a
+ * vehicle is dwelling there (ADR-0024) — one, so `boardingCapacityPerMinute`
+ * (via `serviceSeconds`) is a real one-at-a-time rate rather than every
+ * queued rider being admitted at once and merely delayed. A self-chosen
+ * constant, not read from any schema field. */
+const transitBoardingDoors = 1;
 export const simulationRuntimeProfile = {
   decisionBackend: "rule-ts",
   decisionHz: 10,
@@ -396,6 +415,7 @@ export function createSimulationEngine(
   let sinks = config.sinks;
   let shops = config.shops ?? [];
   let servicePoints = config.servicePoints ?? [];
+  let transitStops = config.transitStops ?? [];
   const seed = config.seed ?? 1;
   /**
    * One routable plane per floor. A scene with no floors has exactly one, with
@@ -668,7 +688,7 @@ export function createSimulationEngine(
         elapsedSeconds,
         sinks,
         shops,
-        servicePoints,
+        servicePoints: withTransitBoardingServicePoints(),
         evacuationActive,
         evacuationStartedSeconds,
         routeDistance: floorGraph.distance,
@@ -679,6 +699,38 @@ export function createSimulationEngine(
     // A decision can send someone to another floor; this turns that into the
     // leg they walk now (floorTransfers).
     agents = planFloorLegs(agents, floorGraph, sinks);
+  }
+  /**
+   * `servicePoints`, plus one synthesized entry per transit stop (ADR-0024).
+   * Rebuilt every decision tick, not cached — a stop's door is open only
+   * while a real vehicle is dwelling there, which changes tick to tick, and
+   * `transitStops` itself is small (a handful per scene, not per agent).
+   * Reads `vehicles` as of the end of the previous `stepVehiclesTick()` call
+   * (that call happens later in the same `runFixedStep`, inside
+   * `advanceAgentsCpu`) — the same one-tick lag every other vehicle/pedestrian
+   * interaction in this engine already carries.
+   */
+  function withTransitBoardingServicePoints(): readonly SimulationServicePoint[] {
+    if (transitStops.length === 0) {
+      return servicePoints;
+    }
+    const doorOpenStopIds = new Set(
+      vehicles
+        .filter((vehicle) => vehicle.dwellRemainingSeconds > 0)
+        .map((vehicle) => vehicle.dwelledStopIds.at(-1))
+        .filter((stopId): stopId is string => stopId !== undefined),
+    );
+    const boardingPoints: SimulationServicePoint[] = transitStops.map((stop) => ({
+      floorId: stop.floorId,
+      id: stop.id,
+      kind: "transit",
+      pedestrianDemandShare: stop.pedestrianDemandShare,
+      position: stop.position,
+      radius: stop.radius,
+      serviceSeconds: 60 / stop.boardingCapacityPerMinute,
+      servers: doorOpenStopIds.has(stop.id) ? transitBoardingDoors : 0,
+    }));
+    return [...servicePoints, ...boardingPoints];
   }
   /**
    * Arrivals enter through their entrance no faster than it can pass people:
@@ -826,9 +878,14 @@ export function createSimulationEngine(
         replanAnticipation: stepCount % anticipationReplanSteps === 0,
         // Every agent is spawned with an exit, and reconciliation re-points it
         // whenever that exit is removed. Never read for a rider: isExitBound
-        // is always false while `transfer` is set.
+        // is always false while `transfer` is set. A boarded transit rider's
+        // `targetSinkId` names a transit stop (ADR-0024), never a `sinks`
+        // entry — deliberately, so ordinary door-exit and evacuation choice
+        // never see a bus stop as a candidate exit — so the lookup falls
+        // back to `transitStops` for that one case.
         exitRadius: (agent) =>
-          sinks.find((sink) => sink.id === agent.targetSinkId)!.radius,
+          (sinks.find((sink) => sink.id === agent.targetSinkId) ??
+            transitStops.find((stop) => stop.id === agent.targetSinkId))!.radius,
         exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
         isExitBound,
         meanSpeedMetersPerSecond: speedMetersPerSecond,
@@ -905,6 +962,7 @@ export function createSimulationEngine(
       decisionBackend = geometry.decisionBackend;
       servicePoints = geometry.servicePoints;
       shops = geometry.shops;
+      transitStops = geometry.transitStops ?? [];
       sinks = geometry.sinks;
       sources = geometry.sources;
       speedMetersPerSecond = geometry.speedMetersPerSecond;

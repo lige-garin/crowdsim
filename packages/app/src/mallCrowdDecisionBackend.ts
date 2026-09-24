@@ -1,6 +1,7 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
 import type { FloorPlace } from "./floorRouting";
 import {
+  nearest,
   nearestSinkByRoute,
   placeOf,
   type SimulationAgentDecision,
@@ -342,11 +343,54 @@ export function createMallCrowdDecisionBackend(options: {
         queuePatienceMinSeconds +
         createAgentMindset({ agentId: agent.id, seed: mindsetSeed }).traits.patience *
           queuePatienceRangeSeconds;
+      const transitStops = activeServicePoints.filter(
+        (point) => point.kind === "transit",
+      );
+      /**
+       * The nearest transit stop this shopper would ride from, if any (ADR-0024)
+       * — a per-agent deterministic draw against that stop's own
+       * `pedestrianDemandShare`, undefined (walk to a door instead) otherwise.
+       */
+      const chooseTransitStop = (agent: SimulationAgent) => {
+        if (transitStops.length === 0) return undefined;
+        const stop = nearest(agent, transitStops);
+        const draw = hashUnit(mindsetSeed, agent.id, stop.id, "transit-demand");
+        return draw < (stop.pedestrianDemandShare ?? 0) ? stop : undefined;
+      };
+      /** A departing shopper's fate: ride transit if the draw picks it,
+       * otherwise walk to the nearest door exactly as before this field
+       * existed (ADR-0024). */
+      const departDecision = (agent: SimulationAgent): SimulationAgentDecision => {
+        const stop = chooseTransitStop(agent);
+        if (!stop) return leaveDecision(agent);
+        return {
+          agentId: agent.id,
+          nextState: "checkout",
+          servicePointId: stop.id,
+          target: stop.position,
+          targetFloorId: stop.floorId,
+          selectedStoreId: undefined,
+          browseUntilSeconds: null,
+          queueUntilSeconds: null,
+          queueJoinedSeconds: null,
+          walkProgress: null,
+        };
+      };
       const counters = createCounterTick({
         agents,
         elapsedSeconds,
         evacuationActive,
-        leave: leaveDecision,
+        // Giving up on a bus (patience ran out in its line) sends someone out
+        // on foot, not back into another transit queue — otherwise a rider
+        // who reneges could be offered the very same stop again and again.
+        leave: (agent) => {
+          const leftPoint = agent.servicePointId
+            ? servicePointById.get(agent.servicePointId)
+            : undefined;
+          return leftPoint?.kind === "transit"
+            ? leaveDecision(agent)
+            : departDecision(agent);
+        },
         patienceDeadline,
         seed: mindsetSeed,
         servicePoints: activeServicePoints,
@@ -416,7 +460,7 @@ export function createMallCrowdDecisionBackend(options: {
       const divertOrLeave = (agent: SimulationAgent, excludedShopId: string) => {
         const alternative = fallbackShop(agent, excludedShopId);
         decisions.push(
-          alternative ? walkDecision(agent, alternative) : leaveDecision(agent),
+          alternative ? walkDecision(agent, alternative) : departDecision(agent),
         );
       };
 
@@ -485,8 +529,23 @@ export function createMallCrowdDecisionBackend(options: {
           continue;
         }
 
-        if (activeShops.length === 0) {
-          decisions.push(leaveDecision(agent));
+        // Bug found while proving ADR-0024 end to end, not in review: before
+        // transit existed, "no shops" could only ever route someone into
+        // `leaveDecision`, which sets `nextState: "leave"` — caught by the
+        // guard just above on every later tick, so this branch only ever
+        // fired once per agent. `departDecision` can now also set
+        // `nextState: "checkout"` (walking to, or queued at, a transit
+        // stop) — a state with no such early-exit guard — so without
+        // excluding it here, a rider's queue position was wiped and
+        // re-issued this same "walk to the stop" decision every single
+        // decision tick forever, never accumulating the queueJoinedSeconds
+        // a checkout counter's admission loop needs to ever let them board.
+        if (
+          activeShops.length === 0 &&
+          state !== "checkout" &&
+          state !== "enterStore"
+        ) {
+          decisions.push(departDecision(agent));
           continue;
         }
 
@@ -517,7 +576,7 @@ export function createMallCrowdDecisionBackend(options: {
                 walkProgress: null,
               });
             } else {
-              decisions.push(leaveDecision(agent));
+              decisions.push(departDecision(agent));
             }
           }
           continue;
@@ -542,6 +601,27 @@ export function createMallCrowdDecisionBackend(options: {
             const servedAt = agent.servicePointId
               ? servicePointById.get(agent.servicePointId)
               : undefined;
+            // Just boarded (ADR-0024): vanish right here, the same way
+            // reaching a door does — chaining onward or walking to the
+            // nearest door would send someone who is already on the bus
+            // back across the map on foot.
+            if (servedAt?.kind === "transit") {
+              decisions.push({
+                agentId: agent.id,
+                nextState: "leave",
+                target: servedAt.position,
+                targetFloorId: servedAt.floorId,
+                targetSinkId: servedAt.id,
+                selectedStoreId: undefined,
+                browseUntilSeconds: null,
+                queueUntilSeconds: null,
+                queueJoinedSeconds: null,
+                servicePointId: null,
+                checkpointHopCount: null,
+                walkProgress: null,
+              });
+              continue;
+            }
             const next = servedAt?.nextServicePointId
               ? servicePointById.get(servedAt.nextServicePointId)
               : undefined;
@@ -558,7 +638,7 @@ export function createMallCrowdDecisionBackend(options: {
                     browseUntilSeconds: null,
                     walkProgress: null,
                   }
-                : leaveDecision(agent),
+                : departDecision(agent),
             );
           }
           continue;
@@ -671,7 +751,7 @@ export function createMallCrowdDecisionBackend(options: {
             // Head for an exit rather than another shop: the shopper has proven
             // it cannot reach this target, and re-picking shops could bounce it
             // between equally unreachable ones forever.
-            decisions.push(leaveDecision(agent));
+            decisions.push(departDecision(agent));
           }
           continue;
         }

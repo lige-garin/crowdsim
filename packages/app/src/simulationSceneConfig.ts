@@ -22,7 +22,11 @@ import type {
   SimulationServicePoint,
   SimulationShop,
 } from "./simulationDecisionBackend";
-import type { SimulationSink, SimulationSource } from "./simulationEngine";
+import type {
+  SimulationSink,
+  SimulationSource,
+  SimulationTransitStopGeometry,
+} from "./simulationEngine";
 import type { SimulationHazard } from "./smokeHazards";
 import { buildRoadRuntime, type RoadRuntime } from "./vehicleSimulation";
 import { weatherCrowdImpact } from "./weatherCrowdImpact";
@@ -35,6 +39,15 @@ export const defaultSpeedMetersPerSecond = 1.34;
 
 /** Browsers keep this far in from a shop's outline, clear of its walls. */
 const browseInsetMeters = 0.6;
+
+/**
+ * How close a rider must walk before counting as "at" a transit stop
+ * (ADR-0024) — schema has no platform width to derive this from the way a
+ * checkout counter's arrival radius comes from `servicePoint.width`, so it
+ * is a self-chosen constant, the same class `evacuationExitCrowdingMeters`
+ * already is.
+ */
+const transitStopArrivalRadiusMeters = 3;
 
 function unitVector(from: { x: number; y: number }, to: { x: number; y: number }) {
   const dx = to.x - from.x;
@@ -73,6 +86,13 @@ export type SceneGeometry = {
   sinks: SimulationSink[];
   sources: SimulationSource[];
   speedMetersPerSecond: number;
+  /** `transitStops` a rider can actually queue and board at (ADR-0024).
+   * Static per-stop facts only — whether a stop's door is open right now
+   * depends on live vehicle state, which `simulationEngine.ts` computes
+   * itself each tick, the same way it already infers the road network fresh
+   * from `roads` rather than storing it here (ADR-0023). Empty on the
+   * overwhelming majority of scenes, which declare no transit stops at all. */
+  transitStops: SimulationTransitStopGeometry[];
   walls: WallSegment[];
   world?: SceneWorldBounds;
 };
@@ -204,6 +224,21 @@ export function deriveSceneGeometry(
     connectors: sceneConnectorRuntimes(scene),
     hazards: sceneHazardRuntimes(scene),
     roads: sceneRoadRuntimes(scene),
+    // Only a stop still declared active can attract riders — matches every
+    // other "active" gate this project already respects (a servicePoint's
+    // outageWindows, a hazard's own lifecycle). vehicleSimulation.ts itself
+    // does not yet read `active` (out of this item's scope; a bus still
+    // dwells at an inactive stop), so this only affects the pedestrian side.
+    transitStops: scene.transitStops
+      .filter((stop) => stop.active)
+      .map((stop) => ({
+        boardingCapacityPerMinute: stop.boardingCapacityPerMinute,
+        floorId: floorOf(stop),
+        id: stop.id,
+        pedestrianDemandShare: stop.pedestrianDemandShare,
+        position: stop.position,
+        radius: transitStopArrivalRadiusMeters,
+      })),
     walls: overrides.walls ?? wallSegmentsFromScene(scene),
     world: overrides.world ?? scene.world,
   };
