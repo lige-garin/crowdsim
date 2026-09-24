@@ -1,6 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useEffect, useRef, useState } from "react";
 import type { DashboardSample } from "./dashboardStats";
+import { resolveDisplayPosition } from "./floorTransferDisplay";
 import type { HeatmapSample } from "./heatmap";
 import { createRunAnalytics, type RunAnalytics } from "./runAnalytics";
 import type { SimulationSnapshot } from "./simulationEngine";
@@ -63,11 +64,15 @@ export function useRunSeries({
         [
           ...samples,
           {
-            agents: snapshot.agents.map(({ floorId, id, x, y }) => ({
-              floorId,
-              id,
-              x,
-              y,
+            // A rider's own floorId/x/y are the flight's own synthetic id
+            // and lane-local coordinates (ADR-0010 stage 5/6); `display`,
+            // when set, is where a stair/escalator/lift rider actually
+            // belongs for a density read — same resolution the crowd
+            // renderer (`agentInstanceField.selectCrowdAgents`) and
+            // `runAnalytics` both do off the same snapshot field.
+            agents: snapshot.agents.map((agent) => ({
+              id: agent.id,
+              ...resolveDisplayPosition(agent),
             })),
             elapsedSeconds: snapshot.elapsedSeconds,
           },

@@ -288,4 +288,105 @@ describe("measuring a building with floors", () => {
     // floor, not two in one cell.
     expect(analytics.summary().levelOfService.peakDensity).toBeCloseTo(1 / 4, 6);
   });
+
+  it("counts a stair rider in their `display` floor's density cell, not nowhere", () => {
+    const analytics = createRunAnalytics();
+    const riding = {
+      agentCount: 1,
+      agents: [
+        {
+          id: 1,
+          floorId: "flight:stair-1",
+          display: { floorId: "upper", x: 4, y: 4 },
+          x: 3,
+          y: 0.8,
+          vx: 0,
+          vy: 0,
+          targetX: 9,
+          targetY: 0.8,
+        },
+      ],
+      elapsedSeconds: 0,
+      exitedCount: 0,
+      spawnedCount: 1,
+      status: "running" as const,
+      stepCount: 0,
+      timeScale: 1,
+    };
+
+    analytics.record(stacked, riding);
+
+    // Their own floorId/x/y are the flight's own synthetic id and
+    // lane-local coordinates — reading those directly instead of `display`
+    // would still produce a non-empty density cell (this test's own bug
+    // history), just one keyed to a "floor" no real floor view can select,
+    // which `peakDensity` alone cannot tell apart from a correctly-attributed
+    // cell. The CSV's own `floor_id` column can.
+    const cells = analytics.csv.densityCells();
+
+    expect(cells).toContain("upper");
+    expect(cells).not.toContain("flight:");
+  });
+
+  it("does not tally the mid-flight display switch (departure floor to arrival floor) as a count-line crossing", () => {
+    const analytics = createRunAnalytics();
+    // Same rider, mid-flight, sampled on both sides of the display's own
+    // midpoint switch — display.x jumps from 25 to 35, either side of the
+    // count line's own x=30. Checked (by reverting the fix and confirming
+    // this one test alone stays green either way) that `onSameFloor`'s own
+    // raw-vs-resolved floorId mismatch already keeps this at 0 with the fix
+    // fully reverted, same as the density test above catches on its own —
+    // this test's own distinct value is as a spec for `crossedFloors`, not
+    // as an isolated regression guard for it: if a future change ever made
+    // `onSameFloor` line up on both floorId forms while `crossedFloors`
+    // still compared the wrong one, this is the test that would catch it.
+    analytics.record(stacked, {
+      agentCount: 1,
+      agents: [
+        {
+          id: 1,
+          floorId: "flight:stair-1",
+          display: { floorId: "upper", x: 25, y: 20 },
+          x: 3,
+          y: 0.8,
+          vx: 0,
+          vy: 0,
+          targetX: 9,
+          targetY: 0.8,
+        },
+      ],
+      elapsedSeconds: 0,
+      exitedCount: 0,
+      spawnedCount: 1,
+      status: "running",
+      stepCount: 0,
+      timeScale: 1,
+    });
+    analytics.record(stacked, {
+      agentCount: 1,
+      agents: [
+        {
+          id: 1,
+          floorId: "flight:stair-1",
+          display: { floorId: "ground", x: 35, y: 20 },
+          x: 8,
+          y: 0.8,
+          vx: 0,
+          vy: 0,
+          targetX: 9,
+          targetY: 0.8,
+        },
+      ],
+      elapsedSeconds: 1,
+      exitedCount: 0,
+      spawnedCount: 1,
+      status: "running",
+      stepCount: 1,
+      timeScale: 1,
+    });
+
+    const counts = analytics.summary().flows[0];
+
+    expect(counts.forward + counts.backward).toBe(0);
+  });
 });

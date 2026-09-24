@@ -65,6 +65,28 @@ describe("selectCrowdAgents", () => {
   it("keeps agent ids so a picked instance can be identified", () => {
     expect(selectCrowdAgents(snap, overlay)[0].id).toBe(1);
   });
+
+  it("draws a rider (floorTransferDisplay) at their `display` position and floor, not their own flight-lane floorId/x/y", () => {
+    const rider = {
+      id: 9,
+      x: 999,
+      y: 999,
+      floorId: "flight:stair-1",
+      display: { floorId: "upper", x: 12, y: 34 },
+    };
+
+    const result = selectCrowdAgents([rider], undefined, { id: "upper", index: 0 });
+
+    expect(result).toEqual([
+      { id: 9, x: 12, y: 34, floorId: "upper", display: rider.display },
+    ]);
+  });
+
+  it("does not allocate a new array when nobody in the frame has a `display` override", () => {
+    // `.toBe`, not `.toEqual`: the whole point is no per-frame copy on the
+    // overwhelmingly common frame where nobody is riding anything.
+    expect(selectCrowdAgents(snap, overlay)).toBe(overlay);
+  });
 });
 
 describe("visibleAgentCount", () => {

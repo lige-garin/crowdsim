@@ -110,6 +110,57 @@ describe("simulation worker client", () => {
     ]);
   });
 
+  it("writes a rider's `display` floor/position instead of their own flight-lane floorId/x/y", () => {
+    // `positionX`/`positionY`/`floorIndex` are the only lanes carrying "where
+    // is this one shown, on which floor" — this buffer has no room for a
+    // rider's real floorId/x/y (the flight's own synthetic id and
+    // lane-local coordinates) alongside a separate display position, unlike
+    // the snapshot path's own `agents[].display`. So the one this writes has
+    // to already be the resolved one, or the worker-path renderer (which
+    // always prefers this buffer when it has data) never sees a rider at all.
+    const sharedMemory = createSimulationSharedMemory(
+      {
+        Atomics,
+        SharedArrayBuffer,
+        crossOriginIsolated: true,
+      } as typeof globalThis,
+      1,
+    )!;
+
+    writeSimulationSharedMemory(
+      sharedMemory,
+      {
+        agentCount: 1,
+        agents: [
+          {
+            id: 21,
+            lifecycleState: "walk",
+            floorId: "flight:stair-1",
+            display: { floorId: "upper", x: 30, y: 20 },
+            targetX: 0,
+            targetY: 0,
+            vx: 0,
+            vy: 0,
+            x: 4.5,
+            y: 0.8,
+          },
+        ],
+        elapsedSeconds: 0,
+        exitedCount: 0,
+        spawnedCount: 1,
+        status: "running",
+        stepCount: 1,
+        timeScale: 1,
+      },
+      ["ground", "upper"],
+    );
+
+    const agent = readSimulationSharedAgents(sharedMemory).agents[0];
+    expect(agent.floorIndex).toBe(1);
+    expect(agent.x).toBe(30);
+    expect(agent.y).toBe(20);
+  });
+
   it("falls back to inline simulation when Worker is unavailable", async () => {
     const sharedMemory = createSimulationSharedMemory({
       Atomics,

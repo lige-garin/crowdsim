@@ -1,5 +1,6 @@
 import { agentStateCode } from "./agentStateColors";
 import { crowdBudget } from "./crowdBudget";
+import { resolveDisplayPosition } from "./floorTransferDisplay";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createWasmSimulationDecisionBackend } from "./behaviorWasm";
 import {
@@ -279,6 +280,12 @@ function writeSimulationSharedAgents(
       continue;
     }
     const agent = agents[index];
+    // A rider (floorTransferDisplay) has a real `display` floor/position to
+    // show them on, since their own floorId/x/y are the flight's own
+    // synthetic id and lane-local coordinates (ADR-0010 stage 5/6) — this
+    // shared buffer has no way to carry both, unlike the snapshot's own
+    // `agents[].display`, so the one it writes IS the one this path draws.
+    const shown = resolveDisplayPosition(agent);
     Atomics.store(
       sharedMemory.view,
       intLaneOffset("agentId", index, sharedMemory.capacity),
@@ -297,10 +304,10 @@ function writeSimulationSharedAgents(
     Atomics.store(
       sharedMemory.view,
       intLaneOffset("floorIndex", index, sharedMemory.capacity),
-      agent.floorId === undefined ? -1 : floorIds.indexOf(agent.floorId),
+      shown.floorId === undefined ? -1 : floorIds.indexOf(shown.floorId),
     );
-    floatView[floatLaneOffset("positionX", index, sharedMemory.capacity)] = agent.x;
-    floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)] = agent.y;
+    floatView[floatLaneOffset("positionX", index, sharedMemory.capacity)] = shown.x;
+    floatView[floatLaneOffset("positionY", index, sharedMemory.capacity)] = shown.y;
     floatView[floatLaneOffset("velocityX", index, sharedMemory.capacity)] = agent.vx;
     floatView[floatLaneOffset("velocityY", index, sharedMemory.capacity)] = agent.vy;
     floatView[floatLaneOffset("targetX", index, sharedMemory.capacity)] = agent.targetX;

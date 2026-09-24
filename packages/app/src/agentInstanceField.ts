@@ -1,3 +1,4 @@
+import { resolveDisplayPosition } from "./floorTransferDisplay";
 import type { SimulationAgent } from "./simulationEngine";
 
 export type ViewportWorld = { width: number; height: number };
@@ -49,10 +50,30 @@ export type CrowdAgent = Pick<SimulationAgent, "id" | "x" | "y"> & {
   floorId?: string;
   /** From the shared-memory path, where a floor is an index (ADR-0010). */
   floorIndex?: number;
+  /**
+   * Where to actually draw this one instead, snapshot-path only (the
+   * shared-memory path resolves the same override before it ever reaches
+   * this module — `simulationWorkerClient.writeSimulationSharedAgents` —
+   * since that buffer has no room to carry two positions). Set for someone
+   * riding a stair/escalator/lift (`floorTransferDisplay`), whose own
+   * floorId/x/y are the flight's own synthetic id and lane-local
+   * coordinates, not a real floor's.
+   */
+  display?: { floorId: string; x: number; y: number };
 };
 
 /** Which floor the stage is showing, in both the forms a crowd arrives in. */
 export type ViewedFloor = { id: string; index: number };
+
+/** `agent.display` when set, otherwise `agent` itself unchanged — the one
+ * place both paths' "where do I actually draw this" resolves to, so a
+ * caller never has to check `display` itself. */
+function resolveDisplay(agent: CrowdAgent): CrowdAgent {
+  if (agent.display === undefined) {
+    return agent;
+  }
+  return { ...agent, ...resolveDisplayPosition(agent) };
+}
 
 export function selectCrowdAgents(
   snapshotAgents: readonly CrowdAgent[] | undefined,
@@ -63,8 +84,14 @@ export function selectCrowdAgents(
    */
   floor?: ViewedFloor,
 ): readonly CrowdAgent[] {
-  const live =
+  const chosen =
     overlayAgents && overlayAgents.length > 0 ? overlayAgents : (snapshotAgents ?? []);
+  // No allocation on the (overwhelmingly common) frame where nobody is
+  // riding a stair/escalator/lift — only `.map()`s, building new objects for
+  // the few real riders, when this snapshot actually has one.
+  const live = chosen.some((agent) => agent.display !== undefined)
+    ? chosen.map(resolveDisplay)
+    : chosen;
 
   if (!floor) {
     return live;

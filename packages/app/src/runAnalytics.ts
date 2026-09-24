@@ -3,6 +3,7 @@ import {
   type CrowdSimScene,
   type ScenePoint,
 } from "@crowdsim/scene-schema";
+import { resolveDisplayPosition } from "./floorTransferDisplay";
 import { fruinLevel, fruinLevels, type FruinLevel } from "./fruinLevelOfService";
 import type { SimulationAgent, SimulationSnapshot } from "./simulationEngine";
 
@@ -139,7 +140,17 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
         lines.set(line.id, { minutes: new Map(), name: line.name ?? line.id });
     }
 
-    for (const agent of snapshot.agents) {
+    for (const rawAgent of snapshot.agents) {
+      // A rider's own floorId/x/y are the flight's own synthetic id and
+      // lane-local coordinates (ADR-0010 stage 5/6, floorTransferDisplay) —
+      // resolved once here so density, count lines and dwell tracking below
+      // all see the same real floor and door-point position a renderer
+      // would, instead of counting them nowhere. This also means the
+      // mid-flight switch from the departure floor's display to the
+      // arrival floor's counts as a `crossedFloors` jump below, the same as
+      // stepping off the connector always did — correct, since it is the
+      // same kind of non-walked jump a count line must not tally.
+      const agent = { ...rawAgent, ...resolveDisplayPosition(rawAgent) };
       seen.add(agent.id);
       const key = stayKeyOf(agent);
       if (key) concurrent.set(key, (concurrent.get(key) ?? 0) + 1);

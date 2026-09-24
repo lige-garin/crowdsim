@@ -16,6 +16,7 @@ import {
   stepConnectorTravel,
 } from "./floorTransfers";
 import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
+import { riderDisplayPosition } from "./floorTransferDisplay";
 import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
 import {
   exposureSpeedFactor,
@@ -178,6 +179,16 @@ export type SimulationAgent = {
     finalY: number;
     floorId: string;
   };
+  /**
+   * Where to draw/count this person while `isRiding` (floorTransferDisplay),
+   * set only in a snapshot's own copy of `agents`, never on the engine's
+   * internal state: `floorId`/`x`/`y` above stay the flight's own synthetic
+   * id and lane-local coordinates, which `isRiding` and anything timing a
+   * flight (the RiMEA stair-speed tests) still need unchanged. A renderer or
+   * report that wants "which real floor, and where on it" reads this instead
+   * — undefined for anyone not riding, meaning "use floorId/x/y as-is".
+   */
+  display?: { floorId: string; x: number; y: number };
 };
 export type SimulationSource = {
   id: string;
@@ -491,6 +502,9 @@ export function createSimulationEngine(
   /** Departures per exit since the alarm, for "which doors did the work". */
   const evacuationExits = new Map<string, number>();
   function makeSnapshot(): SimulationSnapshot {
+    const connectorsById = new Map(
+      connectors.map((connector) => [connector.id, connector]),
+    );
     return {
       status,
       elapsedSeconds,
@@ -499,7 +513,15 @@ export function createSimulationEngine(
       agentCount: agents.length,
       spawnedCount,
       exitedCount,
-      agents: agents.map((agent) => ({ ...agent })),
+      // A rider's floorId is a flight's own synthetic id, and its x/y the
+      // flight lane's own coordinates, not any real floor's (ADR-0010 stage
+      // 5/6) — `display` carries where to draw/count them instead, leaving
+      // floorId/x/y themselves unchanged so `isRiding` and anything timing a
+      // flight (the RiMEA stair-speed tests) still work off them directly.
+      agents: agents.map((agent) => ({
+        ...agent,
+        display: riderDisplayPosition(agent, connectorsById, elevatorCars),
+      })),
       vehicles: vehicles.map((vehicle) => ({ ...vehicle })),
       evacuationClearSeconds,
       evacuationExits: Object.fromEntries(evacuationExits),

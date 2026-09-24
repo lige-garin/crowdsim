@@ -33,14 +33,17 @@ and why.
   zero importers from `packages/app`. See `docs/adr/0015-scale-up-path-comparison.md`.
   Do not read "100k" anywhere else in this project as a claim about the
   running application.
-- **"AI" surfaces are template/keyword logic, not a model call.** Scene and
-  report drafting, image tracing, and the AI workflow panel construct text
-  or a request object; no LLM is ever invoked from the client, and the
-  server-side proxy that could call one is never reached by the shipping
-  app. Each of these modules carries its own `HONESTY NOTE` explaining what
-  it actually does.
+- **"AI" surfaces are template/keyword logic, not a model call.** Scene
+  drafting and the image-tracing example button construct text or run a
+  fixed pipeline over three hardcoded fixtures; no LLM is ever invoked
+  from the client. The three panels that once wrapped this in an "AI"
+  label (a workflow panel, an image-geometry panel, a tiles-backdrop
+  panel) were removed entirely in 2026-09 rather than kept around with a
+  disclosure banner, once it was clear their surrounding surface added
+  no real capability over the two buttons that survived. Each surviving
+  module carries its own `HONESTY NOTE` explaining what it actually does.
 - **Most of the analysis panel dock reports on built-in sample scenarios,
-  not your project.** 12 of 16 panels are labeled `dataSource: "fixture"`
+  not your project.** 6 of 9 panels are labeled `dataSource: "fixture"`
   in the UI itself, not just in this README — the label is load-bearing,
   not decorative.
 - **There is no account system, and none is required.** The app persists
@@ -82,7 +85,7 @@ back to a slower per-frame-copy path rather than failing.
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test        # vitest across every package, ~957 tests
+pnpm test        # vitest across every package, ~1,060 tests
 pnpm e2e         # Playwright smoke tests
 ```
 
@@ -119,8 +122,6 @@ A partial list — see `docs/adr/` (each ADR's "What this is not" section) and
   not to real pedestrian trajectories — a real-trajectory fit was attempted
   and is documented as **not adopted**, because it made the density fit
   worse (`docs/calibration/`).
-- `3d-tiles-renderer` / photorealistic basemap tiles: referenced in code,
-  the dependency is not installed, nothing has run against it.
 
 ## License
 

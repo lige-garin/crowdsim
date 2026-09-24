@@ -255,3 +255,95 @@ describe("an edit that deletes a floor people are on", () => {
     expect(swapped.exitedCount).toBe(before.exitedCount);
   });
 });
+
+describe("a stair rider's display position", () => {
+  /** Same building as `stacked`, but the stair's two mouths sit at visibly
+   * different points — `stacked` itself happens to reuse {30, 20} for both,
+   * which cannot distinguish "shown at the departure door" from "shown at
+   * the arrival door" by coordinate alone. */
+  const stackedDistinctStairPoints: CrowdSimScene = parseScene({
+    ...stacked,
+    id: "stacked-distinct-stair-points",
+    connectors: [
+      {
+        id: "stair-1",
+        kind: "stair",
+        from: { floorId: "upper", point: { x: 30, y: 20 } },
+        to: { floorId: "ground", point: { x: 30, y: 25 } },
+        width: 1.6,
+        bidirectional: true,
+      },
+    ],
+  });
+
+  /** Steps a fresh engine, sampling a snapshot after every step — unlike
+   * `run()`, which only returns the final state after stepping silently — so
+   * a rider who is only mid-flight for a handful of steps is not missed. */
+  function stepAndSampleEvery(scene: CrowdSimScene, steps: number, maxAgents: number) {
+    const engine = createSimulationEngineFromScene(scene, { maxAgents });
+    engine.start();
+    const snapshots = [];
+    for (let step = 0; step < steps; step += 1) {
+      snapshots.push(engine.step(1 / 60));
+    }
+    return snapshots;
+  }
+
+  it("still carries the flight's own synthetic floorId, untouched, for anything timing the flight itself", () => {
+    const snapshots = stepAndSampleEvery(stackedDistinctStairPoints, 60 * 20, 200);
+
+    const sawFlightFloorId = snapshots.some((snapshot) =>
+      snapshot.agents.some((agent) => agent.floorId === flightFloorId("stair-1")),
+    );
+
+    // The RiMEA stair-speed tests (test02_03StairSpeed) time a crossing by
+    // watching exactly this transition — `display` must be additive, not a
+    // replacement, or those tests silently stop measuring anything.
+    expect(sawFlightFloorId).toBe(true);
+  });
+
+  it("gives every agent a `display` that resolves to a real floor, never undefined for someone off any real floor and never the flight's own id", () => {
+    const snapshots = stepAndSampleEvery(stackedDistinctStairPoints, 60 * 20, 200);
+
+    const seenDisplayFloorIds = new Set<string | undefined>();
+    for (const snapshot of snapshots) {
+      for (const agent of snapshot.agents) {
+        if (agent.display !== undefined) {
+          seenDisplayFloorIds.add(agent.display.floorId);
+        }
+      }
+    }
+
+    // At least one rider was seen with a resolved display, and every one of
+    // them resolved to a real floor.
+    expect(seenDisplayFloorIds.size).toBeGreaterThan(0);
+    for (const floorId of seenDisplayFloorIds) {
+      expect(floorId === "upper" || floorId === "ground").toBe(true);
+    }
+  });
+
+  it("shows someone genuinely mid-flight at one of the stair's own door points via `display`", () => {
+    const snapshots = stepAndSampleEvery(stackedDistinctStairPoints, 60 * 20, 200);
+
+    let sawDeparturePoint = false;
+    let sawArrivalPoint = false;
+    for (const snapshot of snapshots) {
+      for (const agent of snapshot.agents) {
+        if (agent.display === undefined) {
+          continue;
+        }
+        if (agent.display.x === 30 && agent.display.y === 20) {
+          sawDeparturePoint = true;
+        }
+        if (agent.display.x === 30 && agent.display.y === 25) {
+          sawArrivalPoint = true;
+        }
+      }
+    }
+
+    // Both ends seen proves the override fires for a real rider on both
+    // sides of the midpoint, not just that nobody ever boarded the stairs.
+    expect(sawDeparturePoint).toBe(true);
+    expect(sawArrivalPoint).toBe(true);
+  });
+});
