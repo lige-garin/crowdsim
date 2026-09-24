@@ -45,7 +45,9 @@ export type ParameterPoint = Readonly<Record<string, number>>;
  * correspondence once, in one named place, instead of casting through
  * `unknown` at each call site.
  */
-function toSocialForceOverrides(point: ParameterPoint): Partial<SocialForceParameters> {
+export function toSocialForceOverrides(
+  point: ParameterPoint,
+): Partial<SocialForceParameters> {
   return point as Partial<Record<keyof SocialForceParameters, number>>;
 }
 

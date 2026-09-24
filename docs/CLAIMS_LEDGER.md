@@ -2483,3 +2483,23 @@ A textbook EnKF for a full crowd would need an ensemble of complete running simu
 ### Verified
 
 `pnpm typecheck` (all packages) clean. Full test suite: 1059 app tests (1048 baseline + 11 new: 7 pure EnKF-math unit tests in `dataAssimilation.test.ts` — a converging mean, a shrinking spread, a near-zero-gain response to an enormous observation noise, a clamp against negative rates — plus 4 engine-level tests, two of which were independently confirmed decisive by reverting the actual `sources` mutation and rerunning) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. A real bug surfaced and fixed while writing the reset-behaviour test: `assimilationRandom` was a `const` random stream never reseeded by `reset()`, unlike the engine's own `rng` — meaning a reset run replayed with the same assimilation calls would not have reproduced the same ensembles, breaking this project's "fixed seed, fixed step ⇒ reproducible" invariant for this one new code path. Fixed by reseeding it in `reset()` the same way `rng` already is.
+
+## 2026-09-24 (thirty-sixth entry): Sobol variance decomposition alongside Morris screening (ADR-0027)
+
+Item 5 of the same ten-item backlog. `sensitivityAnalysis.ts`'s own module doc had said since it was written: "It does not decompose _how much_ of the output's variance each parameter explains — that is Sobol indices, a different and much more expensive method, not built here."
+
+### What was built
+
+`sobolAnalysis.ts` implements the real Saltelli (2002) sampling design: two independent sample matrices A and B, and one AB[i] matrix per parameter (A with that one column replaced by B's), evaluated at `sampleCount * (parameters.length + 2)` points — a real and substantially larger cost than Morris's `trajectoryCount * (parameters.length + 1)`, disclosed rather than hidden (`defaultSampleCount = 64` chosen for tractability against this project's real-simulation evaluation cost, not claimed as statistically adequate). First-order and total-order indices use the estimators in general use for this design (Saltelli et al. 2010's improved first-order formula; Jansen 1999's numerically stable total-order estimator). `buildSobolExperiment`/`summarizeSobolExperimentResults` mirror the existing Morris worker-experiment shape exactly, for the same reason (real simulation time belongs off the main thread).
+
+### Verified against known analytical results, not just internal consistency
+
+A purely linear test function (`Y = x1`) gives x1 first-order and total-order indices both above 0.9 and the untouched `x2` both near 0. A pure-interaction test function (`Y = x1 * x2` with zero-mean `U(-1,1)` inputs — chosen because a product of zero-mean independent variables has zero marginal/first-order effect by construction) gives both parameters near-zero first order but total order above 0.85, correctly isolating an interaction-only effect that a first-order-only reading would completely miss. Decisively confirmed: temporarily zeroing the first-order estimator's summation term reproduced the expected failure (the linear test's x1 first-order dropped to exactly 0) before the fix was restored.
+
+### What this deliberately is not (see ADR-0027)
+
+Not wired into `SensitivityPanel.tsx` — a Sobol results section is real additional UI work, left for a later pass, the same two-stage split ADR-0016/ADR-0020 already took for vehicles. Not a replacement for Morris — the two answer different questions at very different cost, and Morris remains the cheap first pass. Not calibrated sample adequacy — `defaultSampleCount` is an engineering placeholder for this project's own evaluation cost.
+
+### Verified
+
+`pnpm typecheck` (all packages) clean. Full test suite: 1069 app tests (1059 baseline + 10 new: 3 sample-matrix structure tests, 2 tests against known analytical Sobol results, 1 divide-by-zero guard test, 4 social-force/worker-parity tests) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. ponytail-review (self-applied): one real finding — a hand-rolled `mean` helper duplicating `numberUtils.ts`'s already-exported one — fixed by importing it instead; `toSocialForceOverrides` was exported from `sensitivityAnalysis.ts` rather than duplicated, for the same reason.
