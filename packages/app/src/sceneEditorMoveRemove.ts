@@ -81,6 +81,14 @@ export function moveEntity(
           }
         : crosswalk,
     ),
+    trafficSignals: document.trafficSignals.map((signal) =>
+      signal.id === id
+        ? {
+            ...signal,
+            position: translatePoint(signal.position, delta),
+          }
+        : signal,
+    ),
     servicePoints: document.servicePoints.map((servicePoint) =>
       servicePoint.id === id
         ? {
@@ -173,6 +181,7 @@ export function removeEntity(document: EditorDocument, id: string): EditorDocume
     ),
     shops: document.shops.filter((shop) => shop.id !== id),
     targets: document.targets.filter((target) => target.id !== id),
+    trafficSignals: document.trafficSignals.filter((signal) => signal.id !== id),
     transitStops: document.transitStops.filter((stop) => stop.id !== id),
     walls: document.walls.filter((wall) => wall.id !== id),
     zones: document.zones.filter((zone) => zone.id !== id),

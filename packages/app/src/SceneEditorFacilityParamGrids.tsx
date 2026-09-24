@@ -9,6 +9,7 @@ import type {
   HazardNumberField,
   ObstacleNumberField,
   RoadNumberField,
+  TrafficSignalNumberField,
   TransitStopNumberField,
   ZoneNumberField,
 } from "./sceneEditorMutations";
@@ -20,6 +21,7 @@ type Road = EditorDocument["roads"][number];
 type Building = EditorDocument["buildings"][number];
 type TransitStop = EditorDocument["transitStops"][number];
 type Crosswalk = EditorDocument["crosswalks"][number];
+type TrafficSignal = EditorDocument["trafficSignals"][number];
 type Obstacle = EditorDocument["obstacles"][number];
 type Hazard = EditorDocument["hazards"][number];
 type Zone = EditorDocument["zones"][number];
@@ -327,6 +329,60 @@ export function CrosswalkParamGrid({
         step={0.5}
         value={selectedCrosswalk.widthMeters}
         onChange={(value) => onNumberChange("widthMeters", value)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Same road-correction dropdown as `CrosswalkParamGrid`, for the same
+ * reason — `addTrafficSignal`'s nearest-road guess at placement time can be
+ * wrong, and this is the only way to fix it short of hand-editing JSON.
+ * Phase lengths mirror `trafficSignalSchema`'s own bounds (green/red must
+ * stay positive; offset only needs to stay nonnegative).
+ */
+export function TrafficSignalParamGrid({
+  onNumberChange,
+  onRoadIdChange,
+  roadIds,
+  selectedTrafficSignal,
+  t,
+}: {
+  onNumberChange: (field: TrafficSignalNumberField, value: number) => void;
+  onRoadIdChange: (roadId: string) => void;
+  roadIds: readonly string[];
+  selectedTrafficSignal: TrafficSignal;
+  t: (key: TranslationKey) => string;
+}) {
+  return (
+    <div className="editor-param-grid">
+      <span>{selectedTrafficSignal.id}</span>
+      <SelectInput
+        label={t("trafficSignalRoad")}
+        options={roadIds}
+        value={selectedTrafficSignal.roadId}
+        onChange={onRoadIdChange}
+      />
+      <NumberInput
+        label={t("trafficSignalGreenSeconds")}
+        min={1}
+        step={1}
+        value={selectedTrafficSignal.greenSeconds}
+        onChange={(value) => onNumberChange("greenSeconds", value)}
+      />
+      <NumberInput
+        label={t("trafficSignalRedSeconds")}
+        min={1}
+        step={1}
+        value={selectedTrafficSignal.redSeconds}
+        onChange={(value) => onNumberChange("redSeconds", value)}
+      />
+      <NumberInput
+        label={t("trafficSignalOffsetSeconds")}
+        min={0}
+        step={1}
+        value={selectedTrafficSignal.offsetSeconds}
+        onChange={(value) => onNumberChange("offsetSeconds", value)}
       />
     </div>
   );

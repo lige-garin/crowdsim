@@ -53,6 +53,13 @@ export type SceneRenderPrimitive =
        * instead of a zero-size mesh.
        */
       roadWidthMeters: number;
+    }
+  | {
+      color: string;
+      id: string;
+      kind: "trafficSignal";
+      position: ScenePoint;
+      radiusMeters: number;
     };
 
 export type SceneWeatherVisualState = {
@@ -160,6 +167,13 @@ export function createSceneRenderPlan(
         roadWidthMeters: road?.widthMeters ?? crosswalk.widthMeters,
       };
     }),
+    ...scene.trafficSignals.map((signal) => ({
+      color: "#f97316",
+      id: `traffic-signal-${signal.id}`,
+      kind: "trafficSignal" as const,
+      position: copyPoint(signal.position),
+      radiusMeters: 1,
+    })),
     ...scene.obstacles.flatMap((obstacle) =>
       obstacle.geometry.points.slice(1).map((point, index) => ({
         color: obstacle.blocksMovement ? "#475569" : "#94a3b8",

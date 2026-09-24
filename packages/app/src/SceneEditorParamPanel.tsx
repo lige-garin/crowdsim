@@ -4,6 +4,7 @@ import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import type {
   BuildingNumberField,
   CrosswalkNumberField,
+  TrafficSignalNumberField,
   EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
@@ -15,6 +16,7 @@ import {
   BuildingParamGrid,
   ConnectorParamGrid,
   CrosswalkParamGrid,
+  TrafficSignalParamGrid,
   EntranceParamGrid,
   HazardParamGrid,
   ObstacleParamGrid,
@@ -32,6 +34,7 @@ type Road = EditorDocument["roads"][number];
 type Building = EditorDocument["buildings"][number];
 type TransitStop = EditorDocument["transitStops"][number];
 type Crosswalk = EditorDocument["crosswalks"][number];
+type TrafficSignal = EditorDocument["trafficSignals"][number];
 type Obstacle = EditorDocument["obstacles"][number];
 type Hazard = EditorDocument["hazards"][number];
 type Shop = EditorDocument["shops"][number];
@@ -60,6 +63,8 @@ type SceneEditorParamPanelProps = {
   onCountLineNameChange: (name: string) => void;
   onCrosswalkNumberChange: (field: CrosswalkNumberField, value: number) => void;
   onCrosswalkRoadIdChange: (roadId: string) => void;
+  onTrafficSignalNumberChange: (field: TrafficSignalNumberField, value: number) => void;
+  onTrafficSignalRoadIdChange: (roadId: string) => void;
   onHazardKindChange: (kind: Hazard["kind"]) => void;
   onHazardNumberChange: (field: HazardNumberField, value: number) => void;
   onObstacleKindChange: (kind: Obstacle["kind"]) => void;
@@ -100,6 +105,7 @@ type SceneEditorParamPanelProps = {
   selectedConnector: Connector | undefined;
   selectedCountLine: CountLine | undefined;
   selectedCrosswalk: Crosswalk | undefined;
+  selectedTrafficSignal: TrafficSignal | undefined;
   selectedEntrance: Entrance | undefined;
   selectedHazard: Hazard | undefined;
   selectedObstacle: Obstacle | undefined;
@@ -125,6 +131,8 @@ export function SceneEditorParamPanel({
   onCountLineNameChange,
   onCrosswalkNumberChange,
   onCrosswalkRoadIdChange,
+  onTrafficSignalNumberChange,
+  onTrafficSignalRoadIdChange,
   onEntranceKindChange,
   onEntrancePopulationChange,
   onEntranceProfileChange,
@@ -161,6 +169,7 @@ export function SceneEditorParamPanel({
   selectedConnector,
   selectedCountLine,
   selectedCrosswalk,
+  selectedTrafficSignal,
   selectedEntrance,
   selectedHazard,
   selectedObstacle,
@@ -208,6 +217,14 @@ export function SceneEditorParamPanel({
           onRoadIdChange={onCrosswalkRoadIdChange}
           roadIds={roadIds}
           selectedCrosswalk={selectedCrosswalk}
+          t={t}
+        />
+      ) : selectedTrafficSignal ? (
+        <TrafficSignalParamGrid
+          onNumberChange={onTrafficSignalNumberChange}
+          onRoadIdChange={onTrafficSignalRoadIdChange}
+          roadIds={roadIds}
+          selectedTrafficSignal={selectedTrafficSignal}
           t={t}
         />
       ) : selectedBuilding ? (

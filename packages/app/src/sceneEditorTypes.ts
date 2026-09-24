@@ -14,6 +14,7 @@ export type EditorTool =
   | "shop"
   | "transitStop"
   | "crosswalk"
+  | "trafficSignal"
   | "counter"
   | "gate"
   | "obstacle"
@@ -33,6 +34,7 @@ export const editorTools: readonly EditorTool[] = [
   "shop",
   "transitStop",
   "crosswalk",
+  "trafficSignal",
   "counter",
   "gate",
   "obstacle",
@@ -195,6 +197,32 @@ export type EditorCrosswalk = {
   widthMeters: number;
 };
 
+/**
+ * A traffic signal on a road (ADR-0023: vehicles stop for it in
+ * `vehicleSimulation.ts`). `roadId` is required for the same reason
+ * `EditorCrosswalk`'s is — `signalIsRed` is only ever checked against the
+ * one road it belongs to. Until this type existed, a scene's
+ * `trafficSignals` were JSON-only: no placement tool, and — worse —
+ * `createSceneFromEditorDocument` silently dropped them on every editor
+ * round trip (load a scene with signals, edit anything, click Apply, the
+ * signals are gone), because neither this document nor that conversion
+ * knew the field existed. Fixed alongside adding the placement tool, not
+ * as a separate pass, since leaving the drop in place while adding a way
+ * to place new signals would have made the bug harder to notice, not
+ * easier.
+ */
+export type EditorTrafficSignal = {
+  id: string;
+  /** The floor this is on; absent means the scene's only floor. */
+  floorId?: string;
+  name?: string;
+  roadId: string;
+  position: ScenePoint;
+  greenSeconds: number;
+  redSeconds: number;
+  offsetSeconds: number;
+};
+
 export type EditorTransitStop = {
   id: string;
   /** The floor this is on; absent means the scene's only floor. */
@@ -302,6 +330,7 @@ export type EditorDocument = {
   servicePoints: EditorServicePoint[];
   shops: EditorShop[];
   targets: EditorTarget[];
+  trafficSignals: EditorTrafficSignal[];
   transitStops: EditorTransitStop[];
   walls: EditorWall[];
   zones: EditorZone[];

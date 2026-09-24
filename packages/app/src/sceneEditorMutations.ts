@@ -21,6 +21,7 @@ export type TransitStopNumberField =
   | "delayFactor";
 export type ObstacleNumberField = "routeCostMultiplier";
 export type CrosswalkNumberField = "widthMeters";
+export type TrafficSignalNumberField = "greenSeconds" | "offsetSeconds" | "redSeconds";
 /**
  * Entrances were the one drawable object with no parameter editor at all: you
  * could place a door and then had no way to say how many people come through
@@ -90,6 +91,39 @@ export function updateDocumentCrosswalkRoadId(
     ...document,
     crosswalks: document.crosswalks.map((crosswalk) =>
       crosswalk.id === crosswalkId ? { ...crosswalk, roadId } : crosswalk,
+    ),
+  };
+}
+
+export function updateDocumentTrafficSignalNumber(
+  document: EditorDocument,
+  signalId: string,
+  field: TrafficSignalNumberField,
+  value: number,
+) {
+  // greenSeconds/redSeconds must stay positive (trafficSignalSchema's own
+  // .positive()) or the signal would never change phase; offsetSeconds only
+  // needs to stay nonnegative (.nonnegative()).
+  const minValue = field === "offsetSeconds" ? 0 : 1;
+  return {
+    ...document,
+    trafficSignals: document.trafficSignals.map((signal) =>
+      signal.id === signalId
+        ? { ...signal, [field]: Math.max(minValue, value) }
+        : signal,
+    ),
+  };
+}
+
+export function updateDocumentTrafficSignalRoadId(
+  document: EditorDocument,
+  signalId: string,
+  roadId: string,
+) {
+  return {
+    ...document,
+    trafficSignals: document.trafficSignals.map((signal) =>
+      signal.id === signalId ? { ...signal, roadId } : signal,
     ),
   };
 }

@@ -147,6 +147,33 @@ describe("sceneRenderPlan", () => {
     });
   });
 
+  it("produces a traffic signal primitive from scene.trafficSignals (ADR-0023, previously produced nothing at all)", () => {
+    const scene = parseScene({
+      ...defaultDemoScene,
+      trafficSignals: [
+        {
+          id: "signal-test",
+          roadId: defaultDemoScene.roads[0].id,
+          position: { x: 12, y: 3 },
+          greenSeconds: 25,
+          redSeconds: 15,
+          offsetSeconds: 5,
+        },
+      ],
+    });
+
+    const plan = createSceneRenderPlan(scene, 0);
+
+    expect(plan.primitives).toContainEqual(
+      expect.objectContaining({
+        id: "traffic-signal-signal-test",
+        kind: "trafficSignal",
+        position: { x: 12, y: 3 },
+        radiusMeters: 1,
+      }),
+    );
+  });
+
   it("marks active hazard visuals more strongly than inactive hazards", () => {
     const inactive = createSceneRenderPlan(defaultDemoScene, 300).primitives.find(
       (primitive) => primitive.id === "hazard-curbside-pooling",

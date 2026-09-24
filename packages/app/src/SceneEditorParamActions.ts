@@ -28,6 +28,8 @@ import {
   updateDocumentCountLineName,
   updateDocumentCrosswalkNumber,
   updateDocumentCrosswalkRoadId,
+  updateDocumentTrafficSignalNumber,
+  updateDocumentTrafficSignalRoadId,
   updateDocumentEntrancePopulation,
   updateDocumentHazardKind,
   updateDocumentHazardNumber,
@@ -57,6 +59,7 @@ import {
   type ShopSizeField,
   type EntranceNumberField,
   type CrosswalkNumberField,
+  type TrafficSignalNumberField,
   type TransitStopNumberField,
   type ZoneNumberField,
 } from "./sceneEditorMutations";
@@ -73,6 +76,7 @@ type SceneEditorParamActionInput = {
   selectedConnector?: EditorDocument["connectors"][number];
   selectedCountLine?: EditorDocument["countLines"][number];
   selectedCrosswalk?: EditorDocument["crosswalks"][number];
+  selectedTrafficSignal?: EditorDocument["trafficSignals"][number];
   selectedHazard?: EditorDocument["hazards"][number];
   selectedObstacle?: EditorDocument["obstacles"][number];
   selectedRoad?: EditorDocument["roads"][number];
@@ -95,6 +99,7 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
     selectedConnector,
     selectedCountLine,
     selectedCrosswalk,
+    selectedTrafficSignal,
     selectedHazard,
     selectedObstacle,
     selectedRoad,
@@ -185,6 +190,23 @@ export function createSceneEditorParamActions(input: SceneEditorParamActionInput
       if (!selectedCrosswalk) return;
       setDocument((current) =>
         updateDocumentCrosswalkRoadId(current, selectedCrosswalk.id, roadId),
+      );
+    },
+    updateTrafficSignalNumber(field: TrafficSignalNumberField, value: number) {
+      if (!selectedTrafficSignal || !Number.isFinite(value)) return;
+      setDocument((current) =>
+        updateDocumentTrafficSignalNumber(
+          current,
+          selectedTrafficSignal.id,
+          field,
+          value,
+        ),
+      );
+    },
+    updateTrafficSignalRoadId(roadId: string) {
+      if (!selectedTrafficSignal) return;
+      setDocument((current) =>
+        updateDocumentTrafficSignalRoadId(current, selectedTrafficSignal.id, roadId),
       );
     },
     toggleObstacleBlocksMovement() {

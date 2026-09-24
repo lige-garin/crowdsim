@@ -207,10 +207,16 @@ export function addTransitStop(
  * inventing a `roadId` the simulation would read as pointing at a road that
  * does not exist.
  */
-export function addCrosswalk(
+/**
+ * The nearest road on the active floor to `position`, or `undefined` if
+ * there is none — shared by every road-anchored entity that picks its
+ * `roadId` by spatial search at placement time (`addCrosswalk`,
+ * `addTrafficSignal`) rather than a placeholder like "the last road drawn".
+ */
+function nearestRoadId(
   document: EditorDocument,
   position: ScenePoint,
-): EditorDocument {
+): string | undefined {
   const candidates = document.roads.filter(
     (road) => road.floorId === document.activeFloorId,
   );
@@ -223,6 +229,14 @@ export function addCrosswalk(
       nearestId = road.id;
     }
   }
+  return nearestId;
+}
+
+export function addCrosswalk(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  const nearestId = nearestRoadId(document, position);
 
   if (!nearestId) {
     return document;
@@ -239,6 +253,42 @@ export function addCrosswalk(
         roadId: nearestId,
         position: { ...position },
         widthMeters: 3,
+      },
+    ],
+  };
+}
+
+/**
+ * A traffic signal, placed with the same nearest-road spatial search as
+ * `addCrosswalk` — see `EditorTrafficSignal`'s own doc comment for why this
+ * type needed to exist at all (editor round trips were silently dropping
+ * signals before it did). Default phase lengths match `trafficSignalSchema`'s
+ * own schema defaults (20s green, 20s red, no offset) rather than inventing
+ * different ones here.
+ */
+export function addTrafficSignal(
+  document: EditorDocument,
+  position: ScenePoint,
+): EditorDocument {
+  const nearestId = nearestRoadId(document, position);
+
+  if (!nearestId) {
+    return document;
+  }
+
+  return {
+    ...document,
+    nextId: document.nextId + 1,
+    trafficSignals: [
+      ...document.trafficSignals,
+      {
+        id: `trafficSignal-${document.nextId}`,
+        floorId: document.activeFloorId,
+        roadId: nearestId,
+        position: { ...position },
+        greenSeconds: 20,
+        redSeconds: 20,
+        offsetSeconds: 0,
       },
     ],
   };
@@ -443,6 +493,8 @@ export function placeEditorTool(
       return addTransitStop(document, point);
     case "crosswalk":
       return addCrosswalk(document, point);
+    case "trafficSignal":
+      return addTrafficSignal(document, point);
     case "counter":
     case "gate":
       return addServicePoint(document, tool, point);

@@ -274,6 +274,24 @@
   stroke-width: 0.18;
 }
 
+.editor-traffic-signal circle {
+  fill: #f97316;
+  pointer-events: all;
+  stroke: rgba(124, 45, 18, 0.76);
+  stroke-width: 0.2;
+}
+
+.editor-traffic-signal text {
+  fill: var(--lab-ink);
+  font-size: 1.15px;
+  font-weight: 900;
+  paint-order: stroke;
+  pointer-events: none;
+  stroke: rgba(8, 14, 28, 0.86);
+  stroke-width: 0.24;
+  text-anchor: middle;
+}
+
 .editor-hazard circle {
   fill: rgba(255, 77, 61, 0.14);
   pointer-events: all;
@@ -603,6 +621,12 @@
 }
 
 .editor-crosswalk.selected rect {
+  outline: none;
+  stroke: var(--lab-blue);
+  stroke-width: 0.75;
+}
+
+.editor-traffic-signal.selected circle {
   outline: none;
   stroke: var(--lab-blue);
   stroke-width: 0.75;

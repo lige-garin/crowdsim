@@ -5,6 +5,7 @@ import {
   addCountLine,
   addCountLineBetween,
   addCrosswalk,
+  addTrafficSignal,
   addEntrance,
   addHazard,
   addObstacle,
@@ -32,6 +33,8 @@ import {
   updateDocumentCountLineName,
   updateDocumentCrosswalkNumber,
   updateDocumentCrosswalkRoadId,
+  updateDocumentTrafficSignalNumber,
+  updateDocumentTrafficSignalRoadId,
   updateDocumentEntranceNumber,
   updateDocumentEntranceProfile,
   updateDocumentEntranceProfileInterval,
@@ -603,6 +606,89 @@ describe("editor round-trip of ADR-0008 fields", () => {
     document = removeEntity(document, crosswalk.id);
     expect(document.crosswalks).toHaveLength(0);
   });
+
+  it("places a traffic signal on the nearest road, not just the last one drawn (same guard as addCrosswalk)", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 0, y: 0 }); // -10..10 on y=0
+    document = addRoad(document, { x: 0, y: 40 }); // -10..10 on y=40, drawn last
+    const nearFirstRoad = { x: 0, y: 1 };
+
+    document = addTrafficSignal(document, nearFirstRoad);
+    const signal = document.trafficSignals.at(-1)!;
+
+    expect(signal.roadId).toBe(document.roads.at(-2)!.id);
+    expect(signal.roadId).not.toBe(document.roads.at(-1)!.id);
+    expect(signal.greenSeconds).toBe(20);
+    expect(signal.redSeconds).toBe(20);
+    expect(signal.offsetSeconds).toBe(0);
+  });
+
+  it("does not place a traffic signal with no road to attach it to", () => {
+    const document = createEditorDocumentFromScene(
+      parseScene({ ...demoScene, roads: [] }),
+    );
+
+    expect(addTrafficSignal(document, { x: 5, y: 5 }).trafficSignals).toHaveLength(0);
+  });
+
+  it("edits a traffic signal's road and phase lengths, and keeps them through apply", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 20, y: 20 });
+    document = addTrafficSignal(document, { x: 20, y: 20 });
+    const signal = document.trafficSignals[0];
+    const otherRoad = document.roads[0];
+
+    document = updateDocumentTrafficSignalRoadId(document, signal.id, otherRoad.id);
+    document = updateDocumentTrafficSignalNumber(
+      document,
+      signal.id,
+      "greenSeconds",
+      35,
+    );
+    document = updateDocumentTrafficSignalNumber(
+      document,
+      signal.id,
+      "offsetSeconds",
+      10,
+    );
+
+    expect(document.trafficSignals[0].roadId).toBe(otherRoad.id);
+    expect(document.trafficSignals[0].greenSeconds).toBe(35);
+    expect(document.trafficSignals[0].offsetSeconds).toBe(10);
+
+    const back = createSceneFromEditorDocument(demoScene, document);
+    expect(back.trafficSignals[0]).toMatchObject({
+      roadId: otherRoad.id,
+      greenSeconds: 35,
+      offsetSeconds: 10,
+    });
+  });
+
+  it("moves and deletes a traffic signal the same way every other point entity does", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addRoad(document, { x: 0, y: 0 });
+    document = addTrafficSignal(document, { x: 0, y: 1 });
+    const signal = document.trafficSignals[0];
+
+    document = moveEntity(document, signal.id, { x: 3, y: 4 });
+    expect(document.trafficSignals[0].position).toEqual({ x: 3, y: 5 });
+
+    document = removeEntity(document, signal.id);
+    expect(document.trafficSignals).toHaveLength(0);
+  });
+
+  // A test that loads a scene with a signal, edits nothing about it, and
+  // asserts the round trip still has it would NOT be decisive here:
+  // createSceneFromEditorDocument spreads `...baseScene` before overriding
+  // individual keys, so even with the `trafficSignals` override entirely
+  // removed, the original scene's value survives untouched through that
+  // spread as long as nothing about the signal changed. Confirmed by
+  // temporarily deleting the override during development — that scenario
+  // stayed green while "edits a traffic signal's road and phase lengths,
+  // and keeps them through apply" (above) correctly went red, because it
+  // asserts on *edited* values that only exist if `EditorDocument` actually
+  // carries a `trafficSignals` field through to the rebuilt scene. That test
+  // is the real regression guard for ADR-0023's silent-drop gap.
 
   it("edits an entrance's demand profile and group share and keeps them through apply", () => {
     let document = createEditorDocumentFromScene(demoScene);

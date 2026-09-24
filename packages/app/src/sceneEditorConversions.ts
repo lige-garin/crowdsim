@@ -27,6 +27,7 @@ function nextFreeIdNumber(scene: CrowdSimScene) {
     scene.servicePoints,
     scene.shops,
     scene.targets,
+    scene.trafficSignals,
     scene.transitStops,
     scene.walls,
     scene.zones,
@@ -193,6 +194,16 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       floorId: target.floorId,
       position: { ...target.position },
       radius: target.radius,
+    })),
+    trafficSignals: scene.trafficSignals.map((signal) => ({
+      id: signal.id,
+      floorId: signal.floorId,
+      name: signal.name,
+      roadId: signal.roadId,
+      position: { ...signal.position },
+      greenSeconds: signal.greenSeconds,
+      redSeconds: signal.redSeconds,
+      offsetSeconds: signal.offsetSeconds,
     })),
     transitStops: scene.transitStops.map((stop) => ({
       id: stop.id,
@@ -408,6 +419,16 @@ export function createSceneFromEditorDocument(
       roadId: crosswalk.roadId,
       position: { ...crosswalk.position },
       widthMeters: crosswalk.widthMeters,
+    })),
+    trafficSignals: document.trafficSignals.map((signal) => ({
+      id: signal.id,
+      floorId: signal.floorId,
+      name: signal.name,
+      roadId: signal.roadId,
+      position: { ...signal.position },
+      greenSeconds: signal.greenSeconds,
+      redSeconds: signal.redSeconds,
+      offsetSeconds: signal.offsetSeconds,
     })),
   });
 }

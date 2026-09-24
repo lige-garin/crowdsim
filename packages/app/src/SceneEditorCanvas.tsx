@@ -262,6 +262,21 @@ function EditorEnvironmentObjects({
           <text y={0.45}>{t("crosswalkShort")}</text>
         </g>
       ))}
+      {document.trafficSignals.map((signal) => (
+        <g
+          key={signal.id}
+          className={
+            signal.id === selectedId
+              ? "editor-traffic-signal selected"
+              : "editor-traffic-signal"
+          }
+          transform={`translate(${signal.position.x} ${signal.position.y})`}
+          onPointerDown={(event) => onEntityPointerDown(event, signal.id)}
+        >
+          <circle r={1.4} />
+          <text y={0.45}>{t("trafficSignalShort")}</text>
+        </g>
+      ))}
       {document.hazards.map((hazard) => (
         <g
           key={hazard.id}

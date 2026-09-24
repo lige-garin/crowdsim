@@ -16,6 +16,7 @@ import type {
 import type {
   BuildingNumberField,
   CrosswalkNumberField,
+  TrafficSignalNumberField,
   EntranceNumberField,
   HazardNumberField,
   ObstacleNumberField,
@@ -71,6 +72,8 @@ type SceneEditorLayoutProps = {
   onCountLineNameChange: (name: string) => void;
   onCrosswalkNumberChange: (field: CrosswalkNumberField, value: number) => void;
   onCrosswalkRoadIdChange: (roadId: string) => void;
+  onTrafficSignalNumberChange: (field: TrafficSignalNumberField, value: number) => void;
+  onTrafficSignalRoadIdChange: (roadId: string) => void;
   onEntranceKindChange: (kind: EditorDocument["entrances"][number]["kind"]) => void;
   onEntrancePopulationChange: (populationId: string) => void;
   onEntranceProfileChange: (text: string) => void;
@@ -142,6 +145,7 @@ type SceneEditorLayoutProps = {
   selectedConnector: EditorDocument["connectors"][number] | undefined;
   selectedCountLine: EditorDocument["countLines"][number] | undefined;
   selectedCrosswalk: EditorDocument["crosswalks"][number] | undefined;
+  selectedTrafficSignal: EditorDocument["trafficSignals"][number] | undefined;
   selectedEntrance: EditorDocument["entrances"][number] | undefined;
   selectedHazard: EditorDocument["hazards"][number] | undefined;
   selectedId: string | null;
@@ -201,6 +205,8 @@ export function SceneEditorLayout({
   onCountLineNameChange,
   onCrosswalkNumberChange,
   onCrosswalkRoadIdChange,
+  onTrafficSignalNumberChange,
+  onTrafficSignalRoadIdChange,
   onEntranceKindChange,
   onEntrancePopulationChange,
   onEntranceProfileChange,
@@ -258,6 +264,7 @@ export function SceneEditorLayout({
   selectedConnector,
   selectedCountLine,
   selectedCrosswalk,
+  selectedTrafficSignal,
   selectedEntrance,
   selectedHazard,
   selectedId,
@@ -388,6 +395,8 @@ export function SceneEditorLayout({
         onCountLineNameChange={onCountLineNameChange}
         onCrosswalkNumberChange={onCrosswalkNumberChange}
         onCrosswalkRoadIdChange={onCrosswalkRoadIdChange}
+        onTrafficSignalNumberChange={onTrafficSignalNumberChange}
+        onTrafficSignalRoadIdChange={onTrafficSignalRoadIdChange}
         onEntranceKindChange={onEntranceKindChange}
         onEntrancePopulationChange={onEntrancePopulationChange}
         onEntranceProfileChange={onEntranceProfileChange}
@@ -426,6 +435,7 @@ export function SceneEditorLayout({
         selectedConnector={selectedConnector}
         selectedCountLine={selectedCountLine}
         selectedCrosswalk={selectedCrosswalk}
+        selectedTrafficSignal={selectedTrafficSignal}
         selectedEntrance={selectedEntrance}
         selectedHazard={selectedHazard}
         selectedObstacle={selectedObstacle}
@@ -460,6 +470,7 @@ function countDocumentObjects(document: EditorDocument) {
     servicePoints: document.servicePoints.length,
     shops: document.shops.length,
     targets: document.targets.length,
+    trafficSignals: document.trafficSignals.length,
     transitStops: document.transitStops.length,
     walls: document.walls.length,
     zones: document.zones.length,

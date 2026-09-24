@@ -163,6 +163,37 @@ export function createRenderPrimitiveMesh(
     return mesh;
   }
 
+  if (primitive.kind === "trafficSignal") {
+    // A pole with a coloured head — a placement/parameter marker, not a
+    // live phase indicator: this scene-render pipeline builds primitives
+    // once from the static scene, so it has no access to the running
+    // simulation's clock to know whether the light is actually red or
+    // green right now (`vehicleSimulation.ts`'s `signalIsRed` is what
+    // reads that live). Real-time colour is a real, separate feature, not
+    // attempted here.
+    const height = viewMode === "3d" ? 2.4 : 0.1;
+    const group = new Group();
+    const pole = new Mesh(
+      new CylinderGeometry(0.08, 0.08, height, 8),
+      new MeshBasicMaterial({ color: "#475569" }),
+    );
+    const head = new Mesh(
+      new BoxGeometry(primitive.radiusMeters * 0.6, primitive.radiusMeters * 0.6, 0.5),
+      new MeshBasicMaterial({ color: primitive.color }),
+    );
+
+    pole.position.set(0, 0, height / 2);
+    head.position.set(0, 0, height * 0.92);
+    group.add(pole, head);
+    group.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      0,
+    );
+
+    return group;
+  }
+
   if (primitive.kind === "hazard") {
     const mesh = new Mesh(
       new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, 0.06, 32),
