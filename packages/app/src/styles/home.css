@@ -291,7 +291,13 @@
   stroke-width: 1.5;
 }
 
-.template-card-thumbnail rect {
+.template-card-thumbnail rect.thumbnail-building {
+  fill: rgba(126, 200, 224, 0.35);
+  stroke: rgba(126, 200, 224, 0.7);
+  stroke-width: 1;
+}
+
+.template-card-thumbnail rect.thumbnail-shop {
   fill: rgba(242, 169, 59, 0.5);
 }
 

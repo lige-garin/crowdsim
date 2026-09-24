@@ -8,6 +8,7 @@ export type ThumbnailPoint = { x: number; y: number };
 export type ThumbnailRect = { x: number; y: number; width: number; height: number };
 
 export type SceneThumbnail = {
+  buildings: ThumbnailRect[];
   entrances: ThumbnailPoint[];
   shops: ThumbnailRect[];
   viewBoxSize: number;
@@ -16,11 +17,14 @@ export type SceneThumbnail = {
 
 /**
  * A schematic floor-plan thumbnail for a template card: walls as lines,
- * entrances as points, shops as rectangles, scaled from the scene's own
- * `world` bounding box into a fixed square viewBox. This is not the real
- * geometry engine (`sceneGeometry.ts`) -- a glance-sized preview only needs
- * raw coordinates, not collision resolution or floor routing, so it stays a
- * small pure mapping rather than reusing that heavier machinery.
+ * entrances as points, shops and building footprints as rectangles, scaled
+ * from the scene's own `world` bounding box into a fixed square viewBox.
+ * This is not the real geometry engine (`sceneGeometry.ts`) -- a
+ * glance-sized preview only needs raw coordinates, not collision resolution
+ * or floor routing, so it stays a small pure mapping rather than reusing
+ * that heavier machinery. `buildings` is the footprint's own bounding box,
+ * not the polygon itself, for the same reason -- a thumbnail this small
+ * cannot show a footprint's exact silhouette anyway.
  *
  * Only the scene's default floor is drawn (entities with no `floorId`, or
  * whose `floorId` matches the first floor) -- a multi-floor scene's upper
@@ -78,5 +82,21 @@ export function buildSceneThumbnail(scene: CrowdSimScene): SceneThumbnail {
     y: toY(shop.position.y - shop.size.height / 2),
   }));
 
-  return { entrances, shops, viewBoxSize, walls };
+  const buildings: ThumbnailRect[] = scene.buildings
+    .filter(onBaseFloor)
+    .map((building) => {
+      const points = building.footprint.points;
+      const minX = Math.min(...points.map((point) => point.x));
+      const maxX = Math.max(...points.map((point) => point.x));
+      const minY = Math.min(...points.map((point) => point.y));
+      const maxY = Math.max(...points.map((point) => point.y));
+      return {
+        height: (maxY - minY) * scale,
+        width: (maxX - minX) * scale,
+        x: toX(minX),
+        y: toY(minY),
+      };
+    });
+
+  return { buildings, entrances, shops, viewBoxSize, walls };
 }

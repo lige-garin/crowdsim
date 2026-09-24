@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { defaultDemoScene } from "./defaultDemoScene";
-import { contains, createCityLayout, districtKeepOut, overlaps } from "./cityLayout";
+import { exampleScenes } from "./exampleScenes";
+import {
+  characterOffsetFor,
+  contains,
+  createCityLayout,
+  districtKeepOut,
+  overlaps,
+} from "./cityLayout";
 import { placeInScene } from "./renderer/worldPlacement";
 
 describe("city layout", () => {
@@ -78,6 +85,58 @@ describe("city layout", () => {
       expect(building.rect.maxY - building.rect.minY).toBeGreaterThanOrEqual(6);
       expect(building.heightMeters).toBeGreaterThan(3);
     }
+  });
+});
+
+describe("dominant building character", () => {
+  it("is a no-op with no buildings, matching the layout's long-standing default", () => {
+    expect(characterOffsetFor({ ...defaultDemoScene, buildings: [] })).toBe(0);
+  });
+
+  it("is a no-op for a retail/mixedUse-majority scene", () => {
+    // mall-atrium's two anchor stores are both kind "retail".
+    expect(characterOffsetFor(exampleScenes[1])).toBe(0);
+  });
+
+  it("skews denser for a transit-majority scene", () => {
+    // metro-station-hall's one building is kind "transit".
+    expect(characterOffsetFor(exampleScenes[0])).toBeGreaterThan(0);
+  });
+
+  it("skews lower for a civic-majority scene", () => {
+    // performance-venue's backstage block is kind "civic".
+    expect(characterOffsetFor(exampleScenes[2])).toBeLessThan(0);
+  });
+
+  it("breaks an exact tie by array order, not some other rule", () => {
+    // One "civic" and one "transit" building is a genuine tie (1 vs 1).
+    // The function's own doc comment says this resolves to whichever kind
+    // was declared first -- this is the decisive check for that claim, not
+    // just a description of it.
+    const civicFirst = characterOffsetFor({
+      ...defaultDemoScene,
+      buildings: [...exampleScenes[2].buildings, ...exampleScenes[0].buildings],
+    });
+    const transitFirst = characterOffsetFor({
+      ...defaultDemoScene,
+      buildings: [...exampleScenes[0].buildings, ...exampleScenes[2].buildings],
+    });
+
+    expect(civicFirst).toBeLessThan(0);
+    expect(transitFirst).toBeGreaterThan(0);
+  });
+
+  it("actually changes the generated skyline, not just the offset value", () => {
+    // Two scenes that differ only in their one declared building's kind
+    // (and therefore only in characterOffsetFor's output) must produce a
+    // different generated city under the same seed -- proving the bias
+    // reaches `pickStyle`/`floorsFor`, not just the pure helper above.
+    const transitScene = { ...defaultDemoScene, buildings: exampleScenes[0].buildings };
+    const civicScene = { ...defaultDemoScene, buildings: exampleScenes[2].buildings };
+    const transitStyles = createCityLayout(transitScene).buildings.map((b) => b.style);
+    const civicStyles = createCityLayout(civicScene).buildings.map((b) => b.style);
+
+    expect(transitStyles).not.toEqual(civicStyles);
   });
 });
 

@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { defaultDemoScene } from "./defaultDemoScene";
+import { industryTemplates } from "./industryTemplates";
 import { buildSceneThumbnail } from "./templateThumbnail";
 
 describe("buildSceneThumbnail", () => {
-  it("scales walls, entrances, and shops into the fixed viewBox", () => {
+  it("scales walls, entrances, shops, and buildings into the fixed viewBox", () => {
     const thumbnail = buildSceneThumbnail(defaultDemoScene);
 
     expect(thumbnail.entrances.length).toBe(defaultDemoScene.entrances.length);
     expect(thumbnail.shops.length).toBe(defaultDemoScene.shops.length);
+    expect(thumbnail.buildings.length).toBe(defaultDemoScene.buildings.length);
 
-    for (const point of [...thumbnail.entrances, ...thumbnail.shops]) {
-      expect(point.x).toBeGreaterThanOrEqual(0);
-      expect(point.x).toBeLessThanOrEqual(thumbnail.viewBoxSize);
-      expect(point.y).toBeGreaterThanOrEqual(0);
-      expect(point.y).toBeLessThanOrEqual(thumbnail.viewBoxSize);
+    for (const rect of [
+      ...thumbnail.entrances,
+      ...thumbnail.shops,
+      ...thumbnail.buildings,
+    ]) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.x).toBeLessThanOrEqual(thumbnail.viewBoxSize);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeLessThanOrEqual(thumbnail.viewBoxSize);
     }
 
     for (const line of thumbnail.walls) {
@@ -21,6 +27,20 @@ describe("buildSceneThumbnail", () => {
         expect(coordinate).toBeGreaterThanOrEqual(0);
         expect(coordinate).toBeLessThanOrEqual(thumbnail.viewBoxSize);
       }
+    }
+  });
+
+  it("gives every industry template a distinguishable thumbnail, not the same empty floor", () => {
+    // The point of adding buildings/shops to the six templates
+    // (2026-09-24) was exactly this: template cards on the home screen
+    // should no longer look like the same bare floor plan. This is the
+    // decisive check for the gallery, not just the 3D view.
+    for (const template of industryTemplates) {
+      const thumbnail = buildSceneThumbnail(template.scene);
+      expect(
+        thumbnail.buildings.length + thumbnail.shops.length,
+        `${template.id}: thumbnail has no buildings or shops to distinguish it`,
+      ).toBeGreaterThan(0);
     }
   });
 

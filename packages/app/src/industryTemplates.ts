@@ -120,6 +120,44 @@ export const industryTemplates: readonly IndustryTemplate[] = [
           capacityPerMinute: 95,
         },
       ],
+      // Admin block in the top-left corner, clear of both queue rails
+      // (x starts at 18) and both entrances. Kind "transit" biases the
+      // generated city toward a denser interchange skyline.
+      buildings: [
+        {
+          id: "check-in-hall",
+          name: "Check-in Hall",
+          kind: "transit",
+          footprint: {
+            type: "polygon",
+            points: [
+              { x: 2, y: 2 },
+              { x: 16, y: 2 },
+              { x: 16, y: 16 },
+              { x: 2, y: 16 },
+            ],
+          },
+          floors: 2,
+          heightMeters: 9,
+          visual: { style: "transit-office" },
+        },
+      ],
+      shops: [
+        {
+          id: "duty-free-kiosk",
+          name: "Duty-Free Kiosk",
+          position: { x: 90, y: 40 },
+          entrancePosition: { x: 90, y: 36 },
+          size: { width: 8, height: 7 },
+          attraction: 1.0,
+          dwellMeanSeconds: 120,
+          brand: {
+            profileId: "duty-free-kiosk",
+            category: "luxury",
+            visibility: 0.6,
+          },
+        },
+      ],
     }),
   },
   {
@@ -179,6 +217,29 @@ export const industryTemplates: readonly IndustryTemplate[] = [
         },
       ],
       targets: [{ id: "waiting", position: { x: 42, y: 38 }, radius: 3 }],
+      // Ward wing tucked into the bottom-right corner, clear of the
+      // clinic-corridor wall, the entry/exit pair, and triage/waiting. Kind
+      // "civic" biases the generated city toward a calmer institutional
+      // skyline rather than a downtown mall's towers.
+      buildings: [
+        {
+          id: "ward-wing",
+          name: "Ward Wing",
+          kind: "civic",
+          footprint: {
+            type: "polygon",
+            points: [
+              { x: 66, y: 40 },
+              { x: 80, y: 40 },
+              { x: 80, y: 52 },
+              { x: 66, y: 52 },
+            ],
+          },
+          floors: 3,
+          heightMeters: 11,
+          visual: { style: "venue-civic" },
+        },
+      ],
     }),
   },
   {
@@ -243,6 +304,58 @@ export const industryTemplates: readonly IndustryTemplate[] = [
               { x: 20, y: 58 },
               { x: 88, y: 58 },
             ],
+          },
+        },
+      ],
+      // A concourse structure north of the bowl (bowl's own top edge is
+      // y=22, so this leaves an 8m gap), clear of south-gate and both
+      // exits. Kind "civic" fits a large public venue's calmer surroundings.
+      buildings: [
+        {
+          id: "concourse-pavilion",
+          name: "Concourse Pavilion",
+          kind: "civic",
+          footprint: {
+            type: "polygon",
+            points: [
+              { x: 44, y: 2 },
+              { x: 64, y: 2 },
+              { x: 64, y: 12 },
+              { x: 44, y: 12 },
+            ],
+          },
+          floors: 1,
+          heightMeters: 7,
+          visual: { style: "venue-civic" },
+        },
+      ],
+      shops: [
+        {
+          id: "concession-east",
+          name: "Concession Stand",
+          position: { x: 94, y: 44 },
+          entrancePosition: { x: 90, y: 44 },
+          size: { width: 8, height: 6 },
+          attraction: 1.0,
+          dwellMeanSeconds: 100,
+          brand: {
+            profileId: "concession-east",
+            category: "dining",
+            visibility: 0.6,
+          },
+        },
+        {
+          id: "team-store",
+          name: "Team Store",
+          position: { x: 94, y: 28 },
+          entrancePosition: { x: 90, y: 28 },
+          size: { width: 8, height: 8 },
+          attraction: 1.1,
+          dwellMeanSeconds: 150,
+          brand: {
+            profileId: "team-store",
+            category: "entertainment",
+            visibility: 0.65,
           },
         },
       ],

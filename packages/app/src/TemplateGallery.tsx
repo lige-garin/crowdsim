@@ -49,9 +49,20 @@ export function TemplateGallery({
               {thumbnail.walls.map((wall, index) => (
                 <line key={index} x1={wall.x1} y1={wall.y1} x2={wall.x2} y2={wall.y2} />
               ))}
+              {thumbnail.buildings.map((building, index) => (
+                <rect
+                  key={index}
+                  className="thumbnail-building"
+                  x={building.x}
+                  y={building.y}
+                  width={building.width}
+                  height={building.height}
+                />
+              ))}
               {thumbnail.shops.map((shop, index) => (
                 <rect
                   key={index}
+                  className="thumbnail-shop"
                   x={shop.x}
                   y={shop.y}
                   width={shop.width}

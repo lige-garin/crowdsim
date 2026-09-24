@@ -1,4 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { clamp } from "./numberUtils";
 import { mulberry32 } from "./simulationEngineRandom";
 
 /** Axis-aligned rectangle in scene coordinates (metres, y down). */
@@ -55,6 +56,7 @@ export type CityLayout = {
 export function createCityLayout(scene: CrowdSimScene) {
   const ring = 150;
   const rng = mulberry32((scene.seed ?? 1) * 2654435761);
+  const characterOffset = characterOffsetFor(scene);
   const district: Rect = {
     maxX: scene.world.width,
     maxY: scene.world.height,
@@ -136,7 +138,7 @@ export function createCityLayout(scene: CrowdSimScene) {
         scatterTrees(cell, 7, rng, trees);
         continue;
       }
-      fillBlock(cell, nearness, rng, buildings);
+      fillBlock(cell, nearness, characterOffset, rng, buildings);
       lineStreetTrees(cell, rng, trees);
     }
   }
@@ -279,9 +281,52 @@ function plazaTrees(
   }
 }
 
+/**
+ * How the scene's own declared buildings bias the *generated* ring city's
+ * style, so a metro hall's or an airport's surroundings do not read as the
+ * same downtown skyline as a mall's. Purely a nudge to `pickStyle`'s
+ * `nearness` roll -- it changes which style table a block draws from, not
+ * the block/lot layout itself.
+ *
+ * Only `scene.buildings` counts (the scene's own architecture, not the
+ * generated city's), and only the majority `kind` -- one kiosk-sized
+ * building should not tip a scene with a dozen mixed-use ones. No buildings,
+ * or a majority of "mixedUse"/"retail"/"office"/"residential"/"utility"/
+ * "shelter": zero offset, exactly this function's behaviour before this
+ * bias existed (`defaultDemoScene`'s retail+mixedUse buildings land here).
+ */
+export function characterOffsetFor(scene: CrowdSimScene): number {
+  if (scene.buildings.length === 0) return 0;
+  const counts = new Map<string, number>();
+  for (const building of scene.buildings) {
+    counts.set(building.kind, (counts.get(building.kind) ?? 0) + 1);
+  }
+  // A tie (e.g. one "civic" and one "transit" building) resolves to
+  // whichever kind appears first in `scene.buildings` -- `Map` iteration
+  // order is insertion order, and `>` (not `>=`) keeps the first kind seen
+  // once a tie is reached. Deterministic and tested (`cityLayout.test.ts`),
+  // but a scene author reordering otherwise-unrelated buildings can flip
+  // which bias wins on an exact tie.
+  let majorityKind = "";
+  let majorityCount = 0;
+  for (const [kind, count] of counts) {
+    if (count > majorityCount) {
+      majorityKind = kind;
+      majorityCount = count;
+    }
+  }
+  // Transit hubs sit in dense interchange districts; skew toward more
+  // office/tower rolls. Civic buildings (hospitals, venues, stadiums) tend
+  // toward calmer, lower surroundings; skew the other way.
+  if (majorityKind === "transit") return 0.15;
+  if (majorityKind === "civic") return -0.15;
+  return 0;
+}
+
 function fillBlock(
   cell: Rect,
   nearness: number,
+  characterOffset: number,
   rng: () => number,
   out: CityBuilding[],
 ) {
@@ -312,8 +357,9 @@ function fillBlock(
       };
       if (width(rect) < 6 || height(rect) < 6) continue;
 
-      const style = pickStyle(nearness, rng);
-      const floors = floorsFor(style, nearness, rng);
+      const biasedNearness = clamp(nearness + characterOffset, 0, 1);
+      const style = pickStyle(biasedNearness, rng);
+      const floors = floorsFor(style, biasedNearness, rng);
       const heightMeters =
         floors * (style === "tower" || style === "office" ? 3.6 : 3.1) + 1.2;
       out.push({
