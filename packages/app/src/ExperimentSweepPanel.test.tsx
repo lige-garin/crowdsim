@@ -107,6 +107,22 @@ describe("ExperimentSweepPanel", () => {
     expect(screen.getByTestId("sweep-result-narrow").textContent).not.toMatch(/95%/);
   });
 
+  it("draws an error-bar chart once the sweep completes", async () => {
+    const { reply, worker } = fakeWorker();
+    renderPanel(worker);
+    fireEvent.click(screen.getByTestId("sweep-run"));
+    reply({
+      results: [result("wide", 30), result("wide", 34), result("wide", 32)],
+      type: "complete",
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("img", { name: "均值与 95% 置信区间" }),
+      ).toBeInTheDocument(),
+    );
+  });
+
   it("says what went wrong instead of showing nothing", async () => {
     const { reply, worker } = fakeWorker();
     renderPanel(worker);

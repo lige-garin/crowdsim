@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { rimeaCoreScenarios } from "./benchmarkScenarios";
 import type { ExperimentQueueProgress } from "./experimentQueue";
 import type { ExperimentRunResult } from "./experimentRunner";
+import { ExperimentSweepErrorBarChart } from "./ExperimentSweepErrorBarChart";
 import {
   createExperimentFromSweep,
   summarizeMonteCarloDistribution,
@@ -120,14 +121,20 @@ export function ExperimentSweepPanel({
       {state.kind === "failed" ? (
         <code data-testid="sweep-error">{state.message}</code>
       ) : null}
-      {state.kind === "done"
-        ? Object.entries(state.distribution).map(([variantId, metric]) => (
+      {state.kind === "done" ? (
+        <>
+          <ExperimentSweepErrorBarChart
+            distribution={state.distribution}
+            language={zh ? "zh" : "en"}
+          />
+          {Object.entries(state.distribution).map(([variantId, metric]) => (
             <code key={variantId} data-testid={`sweep-result-${variantId}`}>
               {variantId} | {zh ? "均值" : "mean"} {metric.mean}{" "}
               {formatInterval(metric, zh)}
             </code>
-          ))
-        : null}
+          ))}
+        </>
+      ) : null}
     </section>
   );
 }
