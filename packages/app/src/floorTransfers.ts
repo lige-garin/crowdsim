@@ -149,6 +149,13 @@ export function planFloorLegs(
         shaftId: connector.shaftId,
         finalX: destination.x,
         finalY: destination.y,
+        // Reaching this branch required destination.floorId to differ from
+        // agent.floorId (line 112's early return above). destinationOf only
+        // ever produces a floorId that differs from agent.floorId when it
+        // comes from agent.transfer.floorId (a required string, never
+        // undefined) -- the other branch returns agent.floorId itself, which
+        // by definition can't differ from agent.floorId. So this is always a
+        // real floor id here, not the type system missing a case.
         floorId: destination.floorId!,
       },
       targetX: connector.fromPoint.x,

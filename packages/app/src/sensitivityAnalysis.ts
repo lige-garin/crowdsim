@@ -35,6 +35,20 @@ export type SensitivityParameter = {
 
 export type ParameterPoint = Readonly<Record<string, number>>;
 
+/**
+ * `ParameterPoint` is deliberately generic (`Record<string, number>`) so the
+ * Morris-screening machinery below stays domain-agnostic -- it never reads a
+ * parameter id, only passes them through. The two call sites that hand a
+ * point to the social-force model, though, know their ids are always drawn
+ * from `defaultSocialForceScreeningParameters`, i.e. always real
+ * `SocialForceParameters` keys. This narrows that specific, known-safe
+ * correspondence once, in one named place, instead of casting through
+ * `unknown` at each call site.
+ */
+function toSocialForceOverrides(point: ParameterPoint): Partial<SocialForceParameters> {
+  return point as Partial<Record<keyof SocialForceParameters, number>>;
+}
+
 export type MorrisTrajectory = {
   /** `parameters.length + 1` points; consecutive points differ in exactly
    * one parameter, by exactly one grid step. */
@@ -290,7 +304,7 @@ export function runSocialForceSensitivity(
       id: `${scenario.id}__morris-${evaluationCount}`,
       simulation: {
         ...scenario.simulation,
-        movementParameters: point as unknown as Partial<SocialForceParameters>,
+        movementParameters: toSocialForceOverrides(point),
       },
     };
     return metric(runBenchmarkScenario(variantScenario));
@@ -327,7 +341,7 @@ export function buildMorrisExperiment(
         id: morrisVariantId(trajectoryIndex, pointIndex),
         name: `trajectory ${trajectoryIndex}, point ${pointIndex}`,
         simulationOverrides: {
-          movementParameters: point as unknown as Partial<SocialForceParameters>,
+          movementParameters: toSocialForceOverrides(point),
         },
       })),
   );

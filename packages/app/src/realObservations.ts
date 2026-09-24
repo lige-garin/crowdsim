@@ -230,6 +230,10 @@ export function summarizeLineCountComparison(
   let totalSimulated = 0;
 
   for (const row of rows) {
+    // observedForward/observedBackward (and the simulated pair) are always
+    // written together, never independently null -- see compareLineCounts
+    // above, the only place a row is built. Checking only the *Forward half
+    // here is enough to guard both non-null assertions below.
     const hasObserved = row.observedForward !== null;
     const hasSimulated = row.simulatedForward !== null;
     if (hasObserved) totalObserved += row.observedForward! + row.observedBackward!;

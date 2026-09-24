@@ -183,6 +183,10 @@ export function createFigureGeometry(b: Build) {
       .translate(0, 0, b.hipHeight + b.torsoDepth * 0.1 - skirtLength / 2);
     bodyParts.push(painted(skirt, white));
   }
+  // `mergeGeometries` returns null only for an empty input or a set of
+  // geometries with mismatched attributes; every call in this file passes a
+  // fixed, non-empty, consistently-built array, so it's never null here or
+  // at this function's other four call sites below.
   const body = mergeGeometries(bodyParts)!;
 
   const shoulders = shoulderPoint(b);

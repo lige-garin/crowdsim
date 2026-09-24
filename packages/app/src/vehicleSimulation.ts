@@ -280,6 +280,14 @@ export function stepVehicles(input: VehicleStepInput): VehicleAgent[] {
       // would sit at the terminus forever, jamming everyone still queued
       // behind it. It was still a valid leader for whoever was behind it
       // during the tick that retired it (queue lookups above ran first).
+      //
+      // `roadsById.get(vehicle.roadId)` below is never undefined: `stepped`
+      // (built by iterating `roads` above) and `spawnVehicles` (same) both
+      // only ever produce vehicles whose `roadId` came from this tick's own
+      // `roads` array, never from `vehicles`' possibly-stale input list. A
+      // road deleted mid-simulation just stops appearing in `roads`, so its
+      // vehicles are silently dropped by the same iteration rather than
+      // reaching this lookup with a dangling id.
       .filter(
         (vehicle) =>
           vehicle.progressMeters < roadsById.get(vehicle.roadId)!.totalLengthMeters,

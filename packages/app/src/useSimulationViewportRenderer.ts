@@ -176,7 +176,10 @@ export function useSimulationViewportRenderer({
     // 3D draws people (heads, limbs, five builds); 2D keeps flat top-down dots.
     const figures =
       viewMode === "3d" ? createCrowdFigures(crowdBudget.maxAgents) : undefined;
-    // 2D draws each person as a flat square dot.
+    // 2D draws each person as a flat square dot. Mutually exclusive with
+    // `figures` by construction (exactly one of the two is ever defined for
+    // a given render) -- every `figures!`/`agents!` non-null assertion
+    // below this point relies on that.
     const agents = figures
       ? undefined
       : new InstancedMesh(
