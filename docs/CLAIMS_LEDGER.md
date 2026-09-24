@@ -2503,3 +2503,19 @@ Not wired into `SensitivityPanel.tsx` — a Sobol results section is real additi
 ### Verified
 
 `pnpm typecheck` (all packages) clean. Full test suite: 1069 app tests (1059 baseline + 10 new: 3 sample-matrix structure tests, 2 tests against known analytical Sobol results, 1 divide-by-zero guard test, 4 social-force/worker-parity tests) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. ponytail-review (self-applied): one real finding — a hand-rolled `mean` helper duplicating `numberUtils.ts`'s already-exported one — fixed by importing it instead; `toSocialForceOverrides` was exported from `sensitivityAnalysis.ts` rather than duplicated, for the same reason.
+
+## 2026-09-24 (thirty-seventh entry): weather integration is now a real live fetch, not just a contract (ADR-0028)
+
+Item 6 of the same ten-item backlog. CLAUDE.md's V2 Progress section had described this since it was written: "Weather integration is MCP-ready: normalized live weather snapshots can be requested via a `weather.current` MCP contract" — true of a contract, not a running fetch; `weatherIntegration.ts` was deleted as an orphan on 2026-08-30 for having no caller.
+
+### What was built
+
+`weatherMcpClient.ts`'s `fetchCurrentWeather(latitude, longitude, fetchImpl?)` calls Open-Meteo's real, public, keyless forecast API and parses its actual current-conditions response (temperature, precipitation, wind speed, WMO weather code) into a normalized snapshot — a real external service actually called and its actual response actually parsed, not a mock standing in for one. `fetchImpl` is an injectable parameter (defaulting to the platform's own `fetch`) so every test exercises the real parsing/conversion logic against a realistic fixed response body without making a network call. `weatherCodeToFactorKind` maps Open-Meteo's real, documented WMO weather codes onto `environmentFactorSchema`'s existing rain/fog/snow/storm kinds; `weatherToEnvironmentFactors` converts a snapshot into zero or more ready-to-place environment factors, reusing the already-real, already-wired `weatherCrowdImpact.ts`/`calculateEnvironmentImpact` pipeline for everything downstream of "here are some environment factors."
+
+### What this deliberately is not (see ADR-0028)
+
+Not continuous live polling inside a running simulation — a one-shot conversion utility, matching the original "requested" framing, not an async fetch wired into the engine's synchronous step loop (which nothing else in this engine's live-input handling does either). Not an editor panel — real, separable UI work left for later, the same split ADR-0027 (Sobol) already took. Not literally the Model Context Protocol transport, disclosed as such — a real live HTTPS fetch and real parsing is what the plan's own language was actually asking for, not protocol theatre wrapping a GET request.
+
+### Verified
+
+`pnpm typecheck` (all packages) clean. Full test suite: 1083 app tests (1069 baseline + 14 new: real-shaped response parsing, correct endpoint/coordinate construction, fail-loud on a non-OK response and on a missing field, every WMO code mapping, threshold behavior for heat/cold/wind, precipitation-intensity scaling, multi-factor output, and stable ids across repeated conversions) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. Decisively confirmed: temporarily disabling the storm-code mapping reproduced the expected test failure before the fix was restored.
