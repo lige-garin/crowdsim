@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
-import { bioCityDemoScene } from "./bioCityDemoScene";
-import { createBioCityRenderPlan } from "./bioCityRenderPlan";
+import { defaultDemoScene } from "./defaultDemoScene";
+import { createSceneRenderPlan } from "./sceneRenderPlan";
 
-describe("bioCityRenderPlan", () => {
-  it("creates 3D primitives for BioCity roads, buildings, stops, obstacles, and hazards", () => {
-    const plan = createBioCityRenderPlan(bioCityDemoScene, 1200);
+describe("sceneRenderPlan", () => {
+  it("creates 3D primitives for scene roads, buildings, stops, obstacles, and hazards", () => {
+    const plan = createSceneRenderPlan(defaultDemoScene, 1200);
 
     expect(plan.primitives.map((primitive) => primitive.kind)).toEqual(
       expect.arrayContaining(["road", "building", "transitStop", "obstacle", "hazard"]),
@@ -31,9 +31,9 @@ describe("bioCityRenderPlan", () => {
           kind: "gltf-scene",
           lod: "medium",
           lodSources: expect.objectContaining({
-            low: "/assets/biocity/rain-market-streetscape.low.glb",
+            low: "/assets/demo-scene/rain-market-streetscape.low.glb",
           }),
-          sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+          sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
         }),
         expect.objectContaining({
           id: "asset-bus-stop-shelter",
@@ -44,7 +44,7 @@ describe("bioCityRenderPlan", () => {
   });
 
   it("exposes weather visual state for rain, fog, and wind effects", () => {
-    const plan = createBioCityRenderPlan(bioCityDemoScene, 2100);
+    const plan = createSceneRenderPlan(defaultDemoScene, 2100);
 
     expect(plan.weather.condition).toBe("heavyRain");
     expect(plan.weather.fogOpacity).toBeGreaterThan(0);
@@ -58,18 +58,18 @@ describe("bioCityRenderPlan", () => {
 
   it("produces a crosswalk primitive from scene.crosswalks (ADR-0020, previously produced nothing at all)", () => {
     const scene = parseScene({
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       crosswalks: [
         {
           id: "crosswalk-test",
-          roadId: bioCityDemoScene.roads[0].id,
+          roadId: defaultDemoScene.roads[0].id,
           position: { x: 5, y: 5 },
           widthMeters: 4,
         },
       ],
     });
 
-    const plan = createBioCityRenderPlan(scene, 0);
+    const plan = createSceneRenderPlan(scene, 0);
 
     expect(plan.primitives).toContainEqual(
       expect.objectContaining({
@@ -82,10 +82,10 @@ describe("bioCityRenderPlan", () => {
   });
 
   it("marks active hazard visuals more strongly than inactive hazards", () => {
-    const inactive = createBioCityRenderPlan(bioCityDemoScene, 300).primitives.find(
+    const inactive = createSceneRenderPlan(defaultDemoScene, 300).primitives.find(
       (primitive) => primitive.id === "hazard-curbside-pooling",
     );
-    const active = createBioCityRenderPlan(bioCityDemoScene, 1200).primitives.find(
+    const active = createSceneRenderPlan(defaultDemoScene, 1200).primitives.find(
       (primitive) => primitive.id === "hazard-curbside-pooling",
     );
 

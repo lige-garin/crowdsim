@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import {
-  compileBioCityRouteGraph,
-  estimateBioCityRouteInfluence,
-  nearestBioCityRouteNode,
-} from "./bioCityRouteGraph";
+  compileSceneRouteGraph,
+  estimateSceneRouteInfluence,
+  nearestSceneRouteNode,
+} from "./sceneRouteGraph";
 
-describe("bioCityRouteGraph", () => {
+describe("sceneRouteGraph", () => {
   it("compiles roads, entrances, buildings, transit stops, and walkable spaces", () => {
-    const graph = compileBioCityRouteGraph(bioCityDemoScene, 0);
+    const graph = compileSceneRouteGraph(defaultDemoScene, 0);
 
     expect(graph.nodes.map((node) => node.kind)).toEqual(
       expect.arrayContaining([
@@ -25,14 +25,14 @@ describe("bioCityRouteGraph", () => {
     expect(
       graph.walkableSpaces.some((space) => space.sourceId === "downtown-walkable"),
     ).toBe(true);
-    expect(nearestBioCityRouteNode(graph, { x: 122, y: 72 })?.sourceId).toBe(
+    expect(nearestSceneRouteNode(graph, { x: 122, y: 72 })?.sourceId).toBe(
       "rain-market-bus-stop",
     );
   });
 
   it("adds active hazards and obstacles to blocked spaces", () => {
-    const clear = compileBioCityRouteGraph(bioCityDemoScene, 300);
-    const rainy = compileBioCityRouteGraph(bioCityDemoScene, 1200);
+    const clear = compileSceneRouteGraph(defaultDemoScene, 300);
+    const rainy = compileSceneRouteGraph(defaultDemoScene, 1200);
 
     expect(clear.activeHazardIds).toEqual([]);
     expect(rainy.activeHazardIds).toEqual(["curbside-pooling"]);
@@ -42,8 +42,8 @@ describe("bioCityRouteGraph", () => {
   });
 
   it("raises route edge cost when a road is affected by an active hazard", () => {
-    const clear = compileBioCityRouteGraph(bioCityDemoScene, 300);
-    const rainy = compileBioCityRouteGraph(bioCityDemoScene, 1200);
+    const clear = compileSceneRouteGraph(defaultDemoScene, 300);
+    const rainy = compileSceneRouteGraph(defaultDemoScene, 1200);
     const clearRoad = clear.edges.find(
       (edge) => edge.sourceId === "rain-market-avenue",
     )!;
@@ -56,8 +56,8 @@ describe("bioCityRouteGraph", () => {
   });
 
   it("estimates local hazard and obstacle influence at a point", () => {
-    const influence = estimateBioCityRouteInfluence(
-      bioCityDemoScene,
+    const influence = estimateSceneRouteInfluence(
+      defaultDemoScene,
       { x: 98, y: 58 },
       1200,
     );
@@ -69,7 +69,7 @@ describe("bioCityRouteGraph", () => {
 
   it("raises road edge cost while a road close event is active", () => {
     const scene = parseScene({
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       eventTimeline: {
         events: [
           {
@@ -82,8 +82,8 @@ describe("bioCityRouteGraph", () => {
         ],
       },
     });
-    const open = compileBioCityRouteGraph(scene, 30);
-    const closed = compileBioCityRouteGraph(scene, 120);
+    const open = compileSceneRouteGraph(scene, 30);
+    const closed = compileSceneRouteGraph(scene, 120);
     const openRoad = open.edges.find((edge) => edge.sourceId === "rain-market-avenue")!;
     const closedRoad = closed.edges.find(
       (edge) => edge.sourceId === "rain-market-avenue",

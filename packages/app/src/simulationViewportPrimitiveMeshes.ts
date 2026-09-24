@@ -13,14 +13,14 @@ import { facadeWindows } from "./buildingFacade";
 import { groundTextures, groundTileMeters, repeatFor } from "./groundTextures";
 import { streetDressingPlacements } from "./streetDressing";
 import type {
-  BioCityRenderAssetPlacement,
-  BioCityRenderPrimitive,
-} from "./bioCityRenderPlan";
+  SceneRenderAssetPlacement,
+  SceneRenderPrimitive,
+} from "./sceneRenderPlan";
 import type { ViewMode } from "./simulationViewportTypes";
 import { primitiveBounds, toRenderX, toRenderY } from "./simulationViewportGeometry";
 
-export function createBioCityPrimitiveMesh(
-  primitive: BioCityRenderPrimitive,
+export function createRenderPrimitiveMesh(
+  primitive: SceneRenderPrimitive,
   scene: CrowdSimScene,
   viewMode: ViewMode,
 ) {
@@ -296,10 +296,7 @@ function createWetRoadMesh(
   return mesh;
 }
 
-export function createBioCitySceneDressingObjects(
-  scene: CrowdSimScene,
-  viewMode: ViewMode,
-) {
+export function createSceneDressingObjects(scene: CrowdSimScene, viewMode: ViewMode) {
   if (viewMode !== "3d") {
     return [];
   }
@@ -382,8 +379,8 @@ function createStreetLight(x: number, y: number) {
 
   return group;
 }
-export function createBioCityAssetPlaceholder(
-  asset: BioCityRenderAssetPlacement,
+export function createSceneAssetPlaceholder(
+  asset: SceneRenderAssetPlacement,
   scene: CrowdSimScene,
   viewMode: ViewMode,
 ) {

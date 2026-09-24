@@ -1,7 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { I18nProvider } from "./i18n";
 import { templateScenes } from "./industryTemplates";
 import { SceneEditor } from "./SceneEditor";
@@ -45,36 +45,36 @@ const buildingCount = (container: HTMLElement) =>
 
 describe("SceneEditor stays in step with the live scene", () => {
   it("takes an outside change silently while it holds no edits", () => {
-    const { container, rerender } = renderEditor(bioCityDemoScene);
+    const { container, rerender } = renderEditor(defaultDemoScene);
     const before = buildingCount(container);
 
     // A building placed in the 3D world while the editor was open or hidden.
-    rerender(placeInScene(bioCityDemoScene, "building", { x: 40, y: 86 })!);
+    rerender(placeInScene(defaultDemoScene, "building", { x: 40, y: 86 })!);
 
     expect(buildingCount(container)).toBe(before + 1);
     expect(screen.queryByTestId("editor-stale-banner")).toBeNull();
   });
 
   it("keeps its own edits and warns when the live scene changes underneath", () => {
-    const { container, rerender } = renderEditor(bioCityDemoScene);
+    const { container, rerender } = renderEditor(defaultDemoScene);
     // An unapplied edit: swap the working copy to a template.
     fireEvent.change(screen.getByLabelText("示例场景"), {
       target: { value: templateScenes[1].id },
     });
     const editedBuildings = buildingCount(container);
 
-    rerender(placeInScene(bioCityDemoScene, "building", { x: 40, y: 86 })!);
+    rerender(placeInScene(defaultDemoScene, "building", { x: 40, y: 86 })!);
 
     expect(buildingCount(container)).toBe(editedBuildings);
     expect(screen.getByTestId("editor-stale-banner")).toBeInTheDocument();
   });
 
   it("reloads the live scene on request, dropping the stale edits", () => {
-    const { container, rerender } = renderEditor(bioCityDemoScene);
+    const { container, rerender } = renderEditor(defaultDemoScene);
     fireEvent.change(screen.getByLabelText("示例场景"), {
       target: { value: templateScenes[1].id },
     });
-    const live = placeInScene(bioCityDemoScene, "building", { x: 40, y: 86 })!;
+    const live = placeInScene(defaultDemoScene, "building", { x: 40, y: 86 })!;
     rerender(live);
 
     fireEvent.click(screen.getByTestId("editor-reload-live-scene"));
@@ -84,7 +84,7 @@ describe("SceneEditor stays in step with the live scene", () => {
   });
 
   it("does not warn about the scene it applied itself", () => {
-    const { onApplyScene, rerender } = renderEditor(bioCityDemoScene);
+    const { onApplyScene, rerender } = renderEditor(defaultDemoScene);
     fireEvent.change(screen.getByLabelText("示例场景"), {
       target: { value: templateScenes[1].id },
     });
@@ -100,7 +100,7 @@ describe("SceneEditor stays in step with the live scene", () => {
 
 describe("SceneEditor parameter edits", () => {
   it("are undoable, one step per entity however many keystrokes", () => {
-    const { container } = renderEditor(bioCityDemoScene);
+    const { container } = renderEditor(defaultDemoScene);
     const building = container.querySelector("g.editor-building")!;
     fireEvent.pointerDown(building);
     const floors = screen.getByLabelText("层数") as HTMLInputElement;

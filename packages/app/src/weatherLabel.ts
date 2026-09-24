@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { getActiveWeatherSample } from "./bioCityWeatherSystem";
+import { getActiveWeatherSample } from "./sceneRuntimeConditions";
 
 type WeatherCondition = CrowdSimScene["weatherProfile"]["samples"][number]["condition"];
 

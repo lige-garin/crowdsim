@@ -295,7 +295,7 @@
   color: #dcefff;
 }
 
-.biocity-inspector-compact {
+.inspector-compact {
   gap: 12px;
   padding: 14px 12px;
   height: calc(100dvh - 58px);
@@ -303,27 +303,27 @@
   overflow: hidden;
 }
 
-.biocity-analytics-compact .eyebrow {
+.analytics-compact .eyebrow {
   color: #8fb6d6;
   font-size: var(--fs-body);
   font-weight: 820;
 }
 
-.biocity-inspector-title strong {
+.inspector-compact-title strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.biocity-compact-panel header strong {
+.compact-panel header strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.biocity-analytics-compact {
+.analytics-compact {
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -334,16 +334,16 @@
     rgba(6, 17, 28, 0.82);
 }
 
-.biocity-analytics-compact h2 {
+.analytics-compact h2 {
   color: #f4f8ff;
   font-size: var(--fs-title);
 }
 
-.biocity-compact-list {
+.compact-list {
   display: grid;
 }
 
-.biocity-status-list div {
+.status-list div {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 8px;
@@ -354,8 +354,8 @@
   background: rgba(5, 15, 25, 0.58);
 }
 
-.biocity-compact-panel[aria-label="BioCity system status"]
-  .biocity-status-list
+.compact-panel:is([aria-label="Engineering signals"], [aria-label="工程状态"])
+  .status-list
   div:last-child {
   display: none;
 }
@@ -373,31 +373,31 @@
   grid-column: 1 / -1;
 }
 
-.biocity-compact-list span {
+.compact-list span {
   font-family: var(--lab-mono);
   font-weight: 820;
 }
 
-.biocity-status-list span {
+.status-list span {
   font-family: var(--lab-mono);
   font-weight: 820;
 }
 
-.biocity-compact-list strong {
+.compact-list strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.biocity-status-list strong {
+.status-list strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.biocity-compact-list em {
+.compact-list em {
   font-style: normal;
   font-weight: 760;
 }
@@ -448,7 +448,7 @@
   border-color: rgba(203, 219, 232, 0.96);
 }
 
-.inspector .biocity-compact-panel {
+.inspector .compact-panel {
   border-color: rgba(203, 219, 232, 0.96);
 }
 
@@ -494,42 +494,42 @@
   font-weight: 760;
 }
 
-.biocity-compact-list article {
+.compact-list article {
   grid-template-columns: 42px minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
   border-color: rgba(203, 219, 232, 0.96);
 }
 
-.biocity-object-grid article {
+.compact-object-grid article {
   border-color: rgba(203, 219, 232, 0.96);
 }
 
-.biocity-status-list > div {
+.status-list > div {
   border-color: rgba(203, 219, 232, 0.96);
 }
 
-.biocity-compact-list article span {
+.compact-list article span {
   color: var(--lab-muted);
 }
 
-.biocity-object-grid article span {
+.compact-object-grid article span {
   color: var(--lab-muted);
 }
 
-.biocity-status-list > div span {
+.status-list > div span {
   color: var(--lab-muted);
 }
 
-.biocity-compact-list article strong {
+.compact-list article strong {
   color: var(--lab-ink);
 }
 
-.biocity-object-grid article strong {
+.compact-object-grid article strong {
   color: var(--lab-ink);
 }
 
-.biocity-status-list > div strong {
+.status-list > div strong {
   color: var(--lab-ink);
 }
 
@@ -551,7 +551,7 @@
   border-left-color: rgba(205, 220, 232, 0.92);
 }
 
-.biocity-compact-panel {
+.compact-panel {
   display: grid;
   gap: 8px;
   padding: 10px;
@@ -583,7 +583,7 @@
   border-color: var(--lab-line);
 }
 
-.workspace .inspector.biocity-inspector-compact {
+.workspace .inspector.inspector-compact {
   grid-area: inspect;
   display: flex;
   gap: 16px;
@@ -600,13 +600,13 @@
   scrollbar-color: rgba(220, 193, 139, 0.2) transparent;
 }
 
-.workspace .biocity-inspector-title {
+.workspace .inspector-compact-title {
   display: grid;
   gap: 3px;
   padding: 0 2px;
 }
 
-.workspace .biocity-inspector-title span {
+.workspace .inspector-compact-title span {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
   font-weight: 640;
@@ -614,14 +614,14 @@
   text-transform: uppercase;
 }
 
-.workspace .biocity-inspector-title strong {
+.workspace .inspector-compact-title strong {
   color: var(--lab-ink);
   font-size: var(--fs-lede);
   font-weight: 600;
   letter-spacing: -0.015em;
 }
 
-.workspace .biocity-object-grid {
+.workspace .compact-object-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
@@ -629,7 +629,7 @@
   border-bottom: 1px solid var(--lab-line);
 }
 
-.workspace .biocity-analytics-compact .dashboard-metrics {
+.workspace .analytics-compact .dashboard-metrics {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
@@ -637,7 +637,7 @@
   border-bottom: 1px solid var(--lab-line);
 }
 
-.workspace .biocity-object-grid article {
+.workspace .compact-object-grid article {
   display: grid;
   min-width: 0;
   min-height: 54px;
@@ -652,7 +652,7 @@
   box-shadow: none;
 }
 
-.workspace .biocity-analytics-compact .dashboard-metric {
+.workspace .analytics-compact .dashboard-metric {
   display: grid;
   min-width: 0;
   min-height: 54px;
@@ -682,41 +682,41 @@
   box-shadow: none;
 }
 
-.workspace .biocity-object-grid article:nth-child(odd) {
+.workspace .compact-object-grid article:nth-child(odd) {
   border-left: 0;
 }
 
-.workspace .biocity-analytics-compact .dashboard-metric:nth-child(odd) {
+.workspace .analytics-compact .dashboard-metric:nth-child(odd) {
   border-left: 0;
 }
 
-.workspace .biocity-object-grid span {
+.workspace .compact-object-grid span {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
   font-weight: 620;
 }
 
-.workspace .biocity-analytics-compact .dashboard-metric span {
+.workspace .analytics-compact .dashboard-metric span {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
   font-weight: 620;
 }
 
-.workspace .biocity-object-grid strong {
+.workspace .compact-object-grid strong {
   color: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: var(--fs-lede);
   font-weight: 620;
 }
 
-.workspace .biocity-analytics-compact .dashboard-metric strong {
+.workspace .analytics-compact .dashboard-metric strong {
   color: var(--lab-ink);
   font-family: var(--lab-mono);
   font-size: var(--fs-lede);
   font-weight: 620;
 }
 
-.workspace .inspector .biocity-compact-panel {
+.workspace .inspector .compact-panel {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -727,7 +727,7 @@
   box-shadow: none;
 }
 
-.workspace .inspector .biocity-analytics-compact {
+.workspace .inspector .analytics-compact {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -749,12 +749,12 @@
   box-shadow: none;
 }
 
-.workspace .biocity-analytics-heading {
+.workspace .analytics-compact-heading {
   display: grid;
   gap: 3px;
 }
 
-.workspace .biocity-analytics-heading .eyebrow {
+.workspace .analytics-compact-heading .eyebrow {
   margin: 0;
   color: var(--lab-blue);
   font-size: var(--fs-micro);
@@ -763,13 +763,13 @@
   text-transform: uppercase;
 }
 
-.workspace .biocity-analytics-heading h2 {
+.workspace .analytics-compact-heading h2 {
   color: var(--lab-ink);
   font-size: var(--fs-lede);
   font-weight: 600;
 }
 
-.workspace .biocity-analytics-heading > p:last-child {
+.workspace .analytics-compact-heading > p:last-child {
   max-width: 34em;
   margin: 0;
   color: var(--lab-faint);
@@ -777,37 +777,37 @@
   line-height: 1.5;
 }
 
-.workspace .biocity-compact-panel header {
+.workspace .compact-panel header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
 }
 
-.workspace .biocity-compact-panel header span {
+.workspace .compact-panel header span {
   color: var(--lab-muted);
   font-size: var(--fs-micro);
   font-weight: 590;
 }
 
-.workspace .biocity-compact-panel header strong {
+.workspace .compact-panel header strong {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
   font-weight: 570;
 }
 
-.workspace .biocity-compact-list {
+.workspace .compact-list {
   gap: 4px;
 }
 
-.workspace .biocity-compact-list h3 {
+.workspace .compact-list h3 {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
   font-weight: 620;
   letter-spacing: 0.04em;
 }
 
-.workspace .biocity-compact-list article {
+.workspace .compact-list article {
   display: grid;
   min-height: 28px;
   padding: 5px 7px;
@@ -819,7 +819,7 @@
   box-shadow: none;
 }
 
-.workspace .biocity-status-list > div {
+.workspace .status-list > div {
   display: grid;
   min-height: 28px;
   padding: 5px 7px;
@@ -831,7 +831,7 @@
   box-shadow: none;
 }
 
-.workspace .inspector .biocity-status-list > div {
+.workspace .inspector .status-list > div {
   display: grid;
   min-height: 28px;
   padding: 5px 7px;
@@ -843,42 +843,42 @@
   box-shadow: none;
 }
 
-.workspace .biocity-compact-list article:last-child {
+.workspace .compact-list article:last-child {
   border-bottom: 0;
 }
 
-.workspace .biocity-status-list > div:last-child {
+.workspace .status-list > div:last-child {
   border-bottom: 0;
 }
 
-.workspace .biocity-compact-list span {
+.workspace .compact-list span {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
 }
 
-.workspace .biocity-status-list span {
+.workspace .status-list span {
   color: var(--lab-faint);
   font-size: var(--fs-micro);
 }
 
-.workspace .biocity-compact-list strong {
+.workspace .compact-list strong {
   color: var(--lab-ink);
   font-size: var(--fs-micro);
   font-weight: 560;
 }
 
-.workspace .biocity-status-list strong {
+.workspace .status-list strong {
   color: var(--lab-ink);
   font-size: var(--fs-micro);
   font-weight: 560;
 }
 
-.workspace .biocity-compact-list em {
+.workspace .compact-list em {
   color: var(--lab-muted);
   font-size: var(--fs-micro);
 }
 
-.workspace .biocity-signal-dock {
+.workspace .signal-dock {
   display: none;
 }
 
@@ -890,7 +890,7 @@
   }
 }
 @media (max-width: 980px) {
-  .workspace .inspector.biocity-inspector-compact {
+  .workspace .inspector.inspector-compact {
     height: auto;
     max-height: none;
     display: grid;
@@ -899,7 +899,7 @@
     border-left: 0;
   }
 
-  .workspace .biocity-inspector-title {
+  .workspace .inspector-compact-title {
     grid-column: 1 / -1;
   }
 }
@@ -911,13 +911,13 @@
   }
 }
 @media (max-width: 760px) {
-  .workspace .inspector.biocity-inspector-compact {
+  .workspace .inspector.inspector-compact {
     border: 0;
     border-top: 1px solid var(--lab-line);
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .workspace .biocity-inspector-title {
+  .workspace .inspector-compact-title {
     grid-column: auto;
   }
 }

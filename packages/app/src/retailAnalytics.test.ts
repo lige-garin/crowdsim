@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
-import { createBioCityAnalyticsSummary } from "./bioCityAnalytics";
+import { defaultDemoScene } from "./defaultDemoScene";
+import { createRetailAnalyticsSummary } from "./retailAnalytics";
 import type { HeatmapCell } from "./heatmap";
 
-describe("bioCityAnalytics", () => {
-  it("summarizes BioCity operating analytics from scene, weather, risks, and heatmap", () => {
+describe("retailAnalytics", () => {
+  it("summarizes retail operating analytics from scene, weather, risks, and heatmap", () => {
     const heatmapCells: HeatmapCell[] = [
       {
         count: 32,
@@ -30,10 +30,10 @@ describe("bioCityAnalytics", () => {
       },
     ];
 
-    const summary = createBioCityAnalyticsSummary({
+    const summary = createRetailAnalyticsSummary({
       elapsedSeconds: 1200,
       heatmapCells,
-      scene: bioCityDemoScene,
+      scene: defaultDemoScene,
     });
 
     expect(summary.heatmapPeak).toMatchObject({
@@ -81,11 +81,11 @@ describe("bioCityAnalytics", () => {
   });
 
   it("handles scenes without live heatmap or transit stops", () => {
-    const summary = createBioCityAnalyticsSummary({
+    const summary = createRetailAnalyticsSummary({
       elapsedSeconds: 0,
       heatmapCells: [],
       scene: {
-        ...bioCityDemoScene,
+        ...defaultDemoScene,
         hazards: [],
         transitStops: [],
       },

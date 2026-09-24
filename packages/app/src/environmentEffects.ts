@@ -1,5 +1,5 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { createBioCityWeatherRuntimeState } from "./bioCityWeatherSystem";
+import { createSceneRuntimeConditions } from "./sceneRuntimeConditions";
 import type { BenchmarkScenario } from "./benchmarkTypes";
 import type { ExperimentDefinition } from "./experimentRunner";
 
@@ -31,7 +31,7 @@ export function calculateEnvironmentImpact(
 ): EnvironmentImpact {
   return [
     ...scene.environmentFactors,
-    ...createBioCityWeatherRuntimeState(scene, elapsedSeconds).environmentFactors,
+    ...createSceneRuntimeConditions(scene, elapsedSeconds).environmentFactors,
   ]
     .filter((factor) => isFactorActive(factor, elapsedSeconds))
     .reduce(applyFactorImpact, clearEnvironmentImpact);

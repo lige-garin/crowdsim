@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { generateStoreLotsForZone } from "./storeLotGeneration";
 import { createRouteCostMap, estimatePointRouteCost } from "./routeCostMap";
 import { parseScene } from "@crowdsim/scene-schema";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 
 const baseScene = parseScene({
   schemaVersion: "1.0.0",
@@ -72,9 +72,9 @@ describe("route cost map", () => {
     expect(smoke.maxCost).toBeGreaterThan(clear.maxCost);
   });
 
-  it("includes BioCity road edges and active hazards in route costs", () => {
-    const clear = createRouteCostMap(bioCityDemoScene, 300);
-    const rainy = createRouteCostMap(bioCityDemoScene, 1200);
+  it("includes scene road edges and active hazards in route costs", () => {
+    const clear = createRouteCostMap(defaultDemoScene, 300);
+    const rainy = createRouteCostMap(defaultDemoScene, 1200);
     const clearRoad = clear.cells.find((cell) => cell.roadId === "rain-market-avenue")!;
     const rainyRoad = rainy.cells.find((cell) => cell.roadId === "rain-market-avenue")!;
 
@@ -82,7 +82,7 @@ describe("route cost map", () => {
     expect(rainy.environmentFactorIds).toContain("curbside-pooling");
     expect(rainyRoad.cost).toBeGreaterThan(clearRoad.cost);
     expect(
-      estimatePointRouteCost(bioCityDemoScene, { x: 98, y: 58 }, 1200),
-    ).toBeGreaterThan(estimatePointRouteCost(bioCityDemoScene, { x: 10, y: 10 }, 1200));
+      estimatePointRouteCost(defaultDemoScene, { x: 98, y: 58 }, 1200),
+    ).toBeGreaterThan(estimatePointRouteCost(defaultDemoScene, { x: 10, y: 10 }, 1200));
   });
 });

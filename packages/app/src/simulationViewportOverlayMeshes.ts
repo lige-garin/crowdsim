@@ -1,22 +1,22 @@
 ﻿import { CylinderGeometry, Mesh, MeshBasicMaterial, PlaneGeometry } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import type { BioCityRenderPlan, BioCityWeatherLine } from "./bioCityRenderPlan";
+import type { SceneRenderPlan, SceneWeatherLine } from "./sceneRenderPlan";
 import type {
-  BioCityViewportFlowOverlay,
-  BioCityViewportHeatmapOverlay,
-  BioCityViewportOverlayPlan,
-  BioCityViewportRiskOverlay,
-} from "./bioCityViewportOverlayPlan";
+  ViewportFlowOverlay,
+  ViewportHeatmapOverlay,
+  ViewportOverlayPlan,
+  ViewportRiskOverlay,
+} from "./viewportOverlayPlan";
 import { viewportLayerObjectPrefix } from "./viewportLayers";
 import type { ViewMode } from "./simulationViewportTypes";
 import { toRenderX, toRenderY } from "./simulationViewportGeometry";
 import { createLineLikeMesh } from "./simulationViewportPrimitiveMeshes";
 import { createRainField } from "./rainField";
 
-export function createBioCityOverlayObjects(
+export function createOverlayRenderObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
-  overlayPlan?: BioCityViewportOverlayPlan,
+  overlayPlan?: ViewportOverlayPlan,
 ) {
   if (!overlayPlan) {
     return [];
@@ -30,10 +30,10 @@ export function createBioCityOverlayObjects(
     ...overlayPlan.risks.map((risk) => createRiskOverlayMesh(risk, scene, viewMode)),
   ];
 }
-export function createBioCityWeatherObjects(
+export function createWeatherRenderObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
-  plan: BioCityRenderPlan,
+  plan: SceneRenderPlan,
 ) {
   if (viewMode === "3d") {
     const intensity = plan.weather.precipitationIntensity;
@@ -70,7 +70,7 @@ export function createBioCityWeatherObjects(
 }
 
 function createHeatmapOverlayMesh(
-  cell: BioCityViewportHeatmapOverlay,
+  cell: ViewportHeatmapOverlay,
   scene: CrowdSimScene,
   viewMode: ViewMode,
 ) {
@@ -93,7 +93,7 @@ function createHeatmapOverlayMesh(
 }
 
 function createFlowOverlayMesh(
-  flow: BioCityViewportFlowOverlay,
+  flow: ViewportFlowOverlay,
   scene: CrowdSimScene,
   viewMode: ViewMode,
 ) {
@@ -115,7 +115,7 @@ function createFlowOverlayMesh(
 }
 
 function createRiskOverlayMesh(
-  risk: BioCityViewportRiskOverlay,
+  risk: ViewportRiskOverlay,
   scene: CrowdSimScene,
   viewMode: ViewMode,
 ) {
@@ -140,7 +140,7 @@ function createRiskOverlayMesh(
 }
 
 function createWeatherLineMesh(
-  line: BioCityWeatherLine,
+  line: SceneWeatherLine,
   scene: CrowdSimScene,
   color: string,
   opacity: number,

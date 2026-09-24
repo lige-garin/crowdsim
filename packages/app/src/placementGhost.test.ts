@@ -1,6 +1,6 @@
 import { PerspectiveCamera, Scene } from "three";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { attachPlacementGhost } from "./placementGhost";
 import type { EditorTool } from "./sceneEditorState";
 
@@ -18,7 +18,7 @@ function setup() {
   const ghostApi = attachPlacementGhost({
     camera,
     canvas,
-    getScene: () => bioCityDemoScene,
+    getScene: () => defaultDemoScene,
     getTool: () => tool,
     onPlace: () => undefined,
     parent,

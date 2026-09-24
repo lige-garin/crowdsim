@@ -151,7 +151,7 @@ function renderWorkbench() {
 }
 
 describe("App", () => {
-  it("starts from home, enters the BioCity studio, and can return home", () => {
+  it("starts from home, enters the workbench, and can return home", () => {
     render(<App />);
 
     expect(
@@ -188,7 +188,7 @@ describe("App", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the compact BioCity studio shell", () => {
+  it("renders the compact workbench shell", () => {
     renderWorkbench();
 
     // The shell is a status bar and two icon rails over a full-bleed scene.

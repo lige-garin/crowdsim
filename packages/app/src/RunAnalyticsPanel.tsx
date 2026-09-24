@@ -133,7 +133,7 @@ export function RunAnalyticsPanel({
   }
 
   return (
-    <section className="biocity-compact-panel run-analytics" aria-label={text.region}>
+    <section className="compact-panel run-analytics" aria-label={text.region}>
       <header>
         <span>{text.title}</span>
         <strong>{seconds(summary.elapsedSeconds)}</strong>
@@ -167,7 +167,7 @@ export function RunAnalyticsPanel({
             )}
             {occupied === 0 ? <span className="los-bar-empty">–</span> : null}
           </div>
-          <div className="biocity-status-list">
+          <div className="status-list">
             <div>
               <span>{text.peak}</span>
               <strong>
@@ -184,7 +184,7 @@ export function RunAnalyticsPanel({
           {summary.flows.length === 0 ? (
             <p className="run-analytics-empty">{text.noLines}</p>
           ) : (
-            <div className="biocity-status-list run-analytics-lines">
+            <div className="status-list run-analytics-lines">
               {summary.flows.map((flow) => (
                 <div key={flow.id} data-testid={`count-line-${flow.id}`}>
                   <span>{flow.name}</span>
@@ -203,7 +203,7 @@ export function RunAnalyticsPanel({
           )}
 
           <h4>{text.journeys}</h4>
-          <div className="biocity-status-list">
+          <div className="status-list">
             <div>
               <span>n = {summary.journeys.count}</span>
               <strong>
@@ -231,7 +231,7 @@ export function RunAnalyticsPanel({
                   visits: place.visits,
                 }))}
               />
-              <div className="biocity-status-list">
+              <div className="status-list">
                 {places.map((place) => (
                   <div key={`${place.kind}:${place.placeId}`}>
                     <span>

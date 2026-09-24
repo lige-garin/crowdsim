@@ -1,20 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import {
-  createBioCityWeatherRuntimeState,
+  createSceneRuntimeConditions,
   getActiveCityEvents,
   getActiveWeatherSample,
-} from "./bioCityWeatherSystem";
+} from "./sceneRuntimeConditions";
 
-describe("bioCityWeatherSystem", () => {
+describe("sceneRuntimeConditions", () => {
   it("selects the active weather sample by simulation time", () => {
-    expect(getActiveWeatherSample(bioCityDemoScene, 300)?.condition).toBe("rain");
-    expect(getActiveWeatherSample(bioCityDemoScene, 2100)?.condition).toBe("heavyRain");
+    expect(getActiveWeatherSample(defaultDemoScene, 300)?.condition).toBe("rain");
+    expect(getActiveWeatherSample(defaultDemoScene, 2100)?.condition).toBe("heavyRain");
   });
 
   it("turns weather profile samples into environment factors", () => {
-    const state = createBioCityWeatherRuntimeState(bioCityDemoScene, 2100);
+    const state = createSceneRuntimeConditions(defaultDemoScene, 2100);
     const weather = state.environmentFactors.find((factor) =>
       factor.id.startsWith("weather-profile-heavyRain"),
     );
@@ -31,7 +31,7 @@ describe("bioCityWeatherSystem", () => {
   });
 
   it("activates event timeline effects and hazards by time", () => {
-    const state = createBioCityWeatherRuntimeState(bioCityDemoScene, 1200);
+    const state = createSceneRuntimeConditions(defaultDemoScene, 1200);
 
     expect(state.activeEventIds).toEqual(
       expect.arrayContaining(["bus-delay-start", "pooling-warning"]),
@@ -48,7 +48,7 @@ describe("bioCityWeatherSystem", () => {
 
   it("maps road close events into active city events", () => {
     const scene = parseScene({
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       eventTimeline: {
         events: [
           {
@@ -66,7 +66,7 @@ describe("bioCityWeatherSystem", () => {
       "close-avenue",
     ]);
     expect(
-      createBioCityWeatherRuntimeState(scene, 120).environmentFactors[1],
+      createSceneRuntimeConditions(scene, 120).environmentFactors[1],
     ).toMatchObject({
       id: "event-close-avenue",
       kind: "exitClosed",

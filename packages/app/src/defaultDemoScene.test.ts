@@ -1,10 +1,10 @@
 import { parseScene } from "@crowdsim/scene-schema";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 
-describe("bioCityDemoScene", () => {
-  it("round-trips through JSON and keeps BioCity collections", () => {
-    const roundTripped = parseScene(JSON.parse(JSON.stringify(bioCityDemoScene)));
+describe("defaultDemoScene", () => {
+  it("round-trips through JSON and keeps environment collections", () => {
+    const roundTripped = parseScene(JSON.parse(JSON.stringify(defaultDemoScene)));
 
     expect(roundTripped.roads.map((road) => road.id)).toEqual([
       "rain-market-avenue",
@@ -33,12 +33,12 @@ describe("bioCityDemoScene", () => {
       },
       collisionMode: "none",
       lodSources: {
-        high: "/assets/biocity/rain-market-streetscape.high.glb",
-        low: "/assets/biocity/rain-market-streetscape.low.glb",
-        medium: "/assets/biocity/rain-market-streetscape.glb",
+        high: "/assets/demo-scene/rain-market-streetscape.high.glb",
+        low: "/assets/demo-scene/rain-market-streetscape.low.glb",
+        medium: "/assets/demo-scene/rain-market-streetscape.glb",
       },
       originalSourceFormat: "sketchup",
-      sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
     });
     expect(roundTripped.transitStops[0]).toMatchObject({
       id: "rain-market-bus-stop",

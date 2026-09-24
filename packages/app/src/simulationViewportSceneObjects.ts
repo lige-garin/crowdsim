@@ -29,29 +29,29 @@ import {
   skyEnvironmentRotation,
 } from "./skyEnvironment";
 import { shadowCameraFrustum } from "./shadowConfig";
-import { partitionBioCityPrimitives } from "./bioCityRenderLayers";
-import type { BioCityRenderPlan } from "./bioCityRenderPlan";
-import type { BioCityViewportOverlayPlan } from "./bioCityViewportOverlayPlan";
+import { partitionRenderPrimitives } from "./renderLayerPartition";
+import type { SceneRenderPlan } from "./sceneRenderPlan";
+import type { ViewportOverlayPlan } from "./viewportOverlayPlan";
 import type { ViewMode } from "./simulationViewportTypes";
 import {
-  createBioCityAssetPlaceholder,
-  createBioCityPrimitiveMesh,
-  createBioCitySceneDressingObjects,
+  createSceneAssetPlaceholder,
+  createRenderPrimitiveMesh,
+  createSceneDressingObjects,
 } from "./simulationViewportPrimitiveMeshes";
 import {
-  createBioCityOverlayObjects,
-  createBioCityWeatherObjects,
+  createOverlayRenderObjects,
+  createWeatherRenderObjects,
 } from "./simulationViewportOverlayMeshes";
 
 // Start the city mid-morning rather than at midnight.
-const BIOCITY_LOCAL_DAY_OFFSET_SECONDS = CITY_DAY_LENGTH_SECONDS * 0.32;
+const LOCAL_DAY_OFFSET_SECONDS = CITY_DAY_LENGTH_SECONDS * 0.32;
 
 const cityLighting = (elapsedSeconds: number) =>
-  dayNightLighting(elapsedSeconds + BIOCITY_LOCAL_DAY_OFFSET_SECONDS);
+  dayNightLighting(elapsedSeconds + LOCAL_DAY_OFFSET_SECONDS);
 
 /** 0 in daylight, 1 at night — drives lit windows and street lamps. */
 export function cityNightLevel(elapsedSeconds: number) {
-  const sun = sunLevel(elapsedSeconds + BIOCITY_LOCAL_DAY_OFFSET_SECONDS);
+  const sun = sunLevel(elapsedSeconds + LOCAL_DAY_OFFSET_SECONDS);
   return MathUtils.clamp((0.45 - sun) / 0.35, 0, 1);
 }
 
@@ -95,13 +95,13 @@ export function createWall(
   return wall;
 }
 
-// Split of the former `createBioCityObjects`. Everything that does not read the
+// Split of a former, single `createSceneRenderObjects`. Everything that does not read the
 // simulation clock or the heatmap belongs to the structural layer and is built
 // once per scene; the rest is rebuilt every few simulated seconds.
-export function createBioCityStaticObjects(
+export function createStaticRenderObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
-  plan: BioCityRenderPlan,
+  plan: SceneRenderPlan,
 ) {
   // In 3D the generated city (cityMeshes) owns buildings, trees and lamps, and
   // the baked streetscape scene is superseded by it. Drawing the plan's
@@ -109,34 +109,34 @@ export function createBioCityStaticObjects(
   // over the glass pavilions and hide the crowd inside them.
   const is3d = viewMode === "3d";
   return [
-    ...partitionBioCityPrimitives(plan.primitives)
+    ...partitionRenderPrimitives(plan.primitives)
       .static.filter((primitive) => !is3d || primitive.kind !== "building")
-      .map((primitive) => createBioCityPrimitiveMesh(primitive, scene, viewMode)),
+      .map((primitive) => createRenderPrimitiveMesh(primitive, scene, viewMode)),
     ...plan.assets
       .filter((asset) => !is3d || asset.kind !== "gltf-scene")
-      .map((asset) => createBioCityAssetPlaceholder(asset, scene, viewMode)),
-    ...(is3d ? [] : createBioCitySceneDressingObjects(scene, viewMode)),
+      .map((asset) => createSceneAssetPlaceholder(asset, scene, viewMode)),
+    ...(is3d ? [] : createSceneDressingObjects(scene, viewMode)),
   ];
 }
 
-export function createBioCityDynamicObjects(
+export function createDynamicRenderObjects(
   scene: CrowdSimScene,
   viewMode: ViewMode,
-  plan: BioCityRenderPlan,
-  overlayPlan?: BioCityViewportOverlayPlan,
+  plan: SceneRenderPlan,
+  overlayPlan?: ViewportOverlayPlan,
 ): Object3D[] {
   return [
-    ...createBioCityOverlayObjects(scene, viewMode, overlayPlan),
+    ...createOverlayRenderObjects(scene, viewMode, overlayPlan),
     // Hazard tint/opacity follow the active-hazard schedule, so hazards are
     // time-varying even though the other primitives are not.
-    ...partitionBioCityPrimitives(plan.primitives).dynamic.map((primitive) =>
-      createBioCityPrimitiveMesh(primitive, scene, viewMode),
+    ...partitionRenderPrimitives(plan.primitives).dynamic.map((primitive) =>
+      createRenderPrimitiveMesh(primitive, scene, viewMode),
     ),
-    ...createBioCityWeatherObjects(scene, viewMode, plan),
+    ...createWeatherRenderObjects(scene, viewMode, plan),
   ];
 }
 
-export function bioCityAtmosphere(plan: BioCityRenderPlan, elapsedSeconds = 0) {
+export function sceneAtmosphere(plan: SceneRenderPlan, elapsedSeconds = 0) {
   const lighting = cityLighting(elapsedSeconds);
   const precipitation = MathUtils.clamp(plan.weather.precipitationIntensity, 0, 1);
   const fogOpacity = MathUtils.clamp(plan.weather.fogOpacity, 0, 1);
@@ -156,9 +156,9 @@ export function bioCityAtmosphere(plan: BioCityRenderPlan, elapsedSeconds = 0) {
   };
 }
 
-export function applyBioCityAtmosphere(
+export function applySceneAtmosphere(
   renderScene: Scene,
-  plan: BioCityRenderPlan,
+  plan: SceneRenderPlan,
   elapsedSeconds: number,
   viewMode: ViewMode,
 ) {
@@ -168,7 +168,7 @@ export function applyBioCityAtmosphere(
     return;
   }
 
-  const atmosphere = bioCityAtmosphere(plan, elapsedSeconds);
+  const atmosphere = sceneAtmosphere(plan, elapsedSeconds);
   renderScene.background = new Color(atmosphere.background);
   renderScene.fog =
     atmosphere.fogDensity > 0
@@ -209,7 +209,7 @@ export function createDayNightRig(world: { height: number; width: number }) {
    * @param overcast 0 clear .. 1 overcast (weather), greying the reflected sky.
    */
   function setTime(elapsedSeconds: number, overcast = 0) {
-    const clock = elapsedSeconds + BIOCITY_LOCAL_DAY_OFFSET_SECONDS;
+    const clock = elapsedSeconds + LOCAL_DAY_OFFSET_SECONDS;
     const lighting = cityLighting(elapsedSeconds);
     const sun = sunLevel(clock);
     // The reflected sky now lights every surface as well, so the flat fills

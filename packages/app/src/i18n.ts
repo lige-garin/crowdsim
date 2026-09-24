@@ -148,7 +148,7 @@ export function formatSceneName(
 
 const zhSceneNames: Record<string, string> = {
   "atrium-demo": "中庭示例",
-  "biocity-rainy-high-street": "雨天商业街",
+  "rainy-high-street": "雨天商业街",
   "mall-atrium": "商场中庭",
   "metro-station-hall": "地铁站厅",
   "performance-venue": "演出场馆疏散",

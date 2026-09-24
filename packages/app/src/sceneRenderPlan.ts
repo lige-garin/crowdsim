@@ -1,8 +1,8 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import { createBioCityWeatherRuntimeState } from "./bioCityWeatherSystem";
+import { createSceneRuntimeConditions } from "./sceneRuntimeConditions";
 import { streetscapeBlueprint } from "./streetscapeBlueprint";
 
-export type BioCityRenderPrimitive =
+export type SceneRenderPrimitive =
   | {
       color: string;
       end: ScenePoint;
@@ -41,24 +41,24 @@ export type BioCityRenderPrimitive =
       widthMeters: number;
     };
 
-export type BioCityWeatherVisualState = {
+export type SceneWeatherVisualState = {
   condition: string;
   fogDensity: number;
   fogOpacity: number;
   precipitationIntensity: number;
-  rainStreaks: BioCityWeatherLine[];
-  windIndicators: BioCityWeatherLine[];
+  rainStreaks: SceneWeatherLine[];
+  windIndicators: SceneWeatherLine[];
   windVector: ScenePoint;
 };
 
-export type BioCityWeatherLine = {
+export type SceneWeatherLine = {
   end: ScenePoint;
   id: string;
   intensity: number;
   start: ScenePoint;
 };
 
-export type BioCityRenderAssetPlacement = {
+export type SceneRenderAssetPlacement = {
   anchor: {
     x: number;
     y: number;
@@ -80,19 +80,19 @@ export type BioCityRenderAssetPlacement = {
   sourceUrl: string;
 };
 
-export type BioCityRenderPlan = {
-  assets: BioCityRenderAssetPlacement[];
-  primitives: BioCityRenderPrimitive[];
-  weather: BioCityWeatherVisualState;
+export type SceneRenderPlan = {
+  assets: SceneRenderAssetPlacement[];
+  primitives: SceneRenderPrimitive[];
+  weather: SceneWeatherVisualState;
 };
 
-export function createBioCityRenderPlan(
+export function createSceneRenderPlan(
   scene: CrowdSimScene,
   elapsedSeconds = 0,
-): BioCityRenderPlan {
-  const weather = createBioCityWeatherRuntimeState(scene, elapsedSeconds);
+): SceneRenderPlan {
+  const weather = createSceneRuntimeConditions(scene, elapsedSeconds);
   const activeHazardIds = new Set(weather.activeHazardIds);
-  const primitives: BioCityRenderPrimitive[] = [
+  const primitives: SceneRenderPrimitive[] = [
     ...scene.roads.flatMap((road) =>
       road.geometry.points.slice(1).map((point, index) => ({
         color: road.transitOnly ? "#38bdf8" : "#64748b",
@@ -257,7 +257,7 @@ function windVector(
 function rainStreaks(
   scene: CrowdSimScene,
   sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
-): BioCityWeatherLine[] {
+): SceneWeatherLine[] {
   const intensity = precipitationIntensity(sample);
 
   if (intensity <= 0) {
@@ -292,7 +292,7 @@ function rainStreaks(
 function windIndicators(
   scene: CrowdSimScene,
   sample: CrowdSimScene["weatherProfile"]["samples"][number] | undefined,
-): BioCityWeatherLine[] {
+): SceneWeatherLine[] {
   const wind = windVector(sample);
   const intensity = Math.hypot(wind.x, wind.y);
 

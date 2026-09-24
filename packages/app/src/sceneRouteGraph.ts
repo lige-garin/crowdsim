@@ -1,21 +1,21 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import { getActiveCityEvents } from "./bioCityWeatherSystem";
+import { getActiveCityEvents } from "./sceneRuntimeConditions";
 
-export type BioCityRouteNodeKind =
+export type SceneRouteNodeKind =
   | "buildingEntrance"
   | "entrance"
   | "roadEndpoint"
   | "target"
   | "transitStop";
 
-export type BioCityRouteNode = {
+export type SceneRouteNode = {
   id: string;
-  kind: BioCityRouteNodeKind;
+  kind: SceneRouteNodeKind;
   position: ScenePoint;
   sourceId: string;
 };
 
-export type BioCityRouteEdge = {
+export type SceneRouteEdge = {
   id: string;
   fromNodeId: string;
   toNodeId: string;
@@ -28,7 +28,7 @@ export type BioCityRouteEdge = {
   routeCostMultiplier: number;
 };
 
-export type BioCityWalkableSpace = {
+export type SceneWalkableSpace = {
   id: string;
   kind: "area" | "zone";
   sourceId: string;
@@ -36,7 +36,7 @@ export type BioCityWalkableSpace = {
   points: ScenePoint[];
 };
 
-export type BioCityBlockedSpace = {
+export type SceneBlockedSpace = {
   id: string;
   kind: "hazard" | "obstacle" | "zone";
   sourceId: string;
@@ -45,12 +45,12 @@ export type BioCityBlockedSpace = {
   riskScore: number;
 };
 
-export type BioCityRouteGraph = {
+export type SceneRouteGraph = {
   activeHazardIds: string[];
-  blockedSpaces: BioCityBlockedSpace[];
-  edges: BioCityRouteEdge[];
-  nodes: BioCityRouteNode[];
-  walkableSpaces: BioCityWalkableSpace[];
+  blockedSpaces: SceneBlockedSpace[];
+  edges: SceneRouteEdge[];
+  nodes: SceneRouteNode[];
+  walkableSpaces: SceneWalkableSpace[];
 };
 
 type RouteInfluence = {
@@ -59,15 +59,15 @@ type RouteInfluence = {
   speedMultiplier: number;
 };
 
-export function compileBioCityRouteGraph(
+export function compileSceneRouteGraph(
   scene: CrowdSimScene,
   elapsedSeconds = 0,
-): BioCityRouteGraph {
+): SceneRouteGraph {
   const activeHazards = scene.hazards.filter((hazard) =>
     isHazardActive(hazard, elapsedSeconds),
   );
   const activeEvents = getActiveCityEvents(scene, elapsedSeconds);
-  const nodes: BioCityRouteNode[] = [
+  const nodes: SceneRouteNode[] = [
     ...routeNodesFromRoads(scene),
     ...routeNodesFromEntrances(scene),
     ...routeNodesFromTargets(scene),
@@ -104,7 +104,7 @@ export function compileBioCityRouteGraph(
   };
 }
 
-export function estimateBioCityRouteInfluence(
+export function estimateSceneRouteInfluence(
   scene: CrowdSimScene,
   point: ScenePoint,
   elapsedSeconds = 0,
@@ -137,8 +137,8 @@ export function estimateBioCityRouteInfluence(
   };
 }
 
-export function nearestBioCityRouteNode(graph: BioCityRouteGraph, point: ScenePoint) {
-  return graph.nodes.reduce<BioCityRouteNode | undefined>((best, node) => {
+export function nearestSceneRouteNode(graph: SceneRouteGraph, point: ScenePoint) {
+  return graph.nodes.reduce<SceneRouteNode | undefined>((best, node) => {
     if (!best) {
       return node;
     }
@@ -149,7 +149,7 @@ export function nearestBioCityRouteNode(graph: BioCityRouteGraph, point: ScenePo
   }, undefined);
 }
 
-function routeNodesFromRoads(scene: CrowdSimScene): BioCityRouteNode[] {
+function routeNodesFromRoads(scene: CrowdSimScene): SceneRouteNode[] {
   return scene.roads.flatMap((road) =>
     road.geometry.points.map((point, index) => ({
       id: `node-${road.id}-${index}`,
@@ -160,7 +160,7 @@ function routeNodesFromRoads(scene: CrowdSimScene): BioCityRouteNode[] {
   );
 }
 
-function routeNodesFromEntrances(scene: CrowdSimScene): BioCityRouteNode[] {
+function routeNodesFromEntrances(scene: CrowdSimScene): SceneRouteNode[] {
   return scene.entrances.map((entrance) => ({
     id: `node-${entrance.id}`,
     kind: "entrance",
@@ -169,7 +169,7 @@ function routeNodesFromEntrances(scene: CrowdSimScene): BioCityRouteNode[] {
   }));
 }
 
-function routeNodesFromTargets(scene: CrowdSimScene): BioCityRouteNode[] {
+function routeNodesFromTargets(scene: CrowdSimScene): SceneRouteNode[] {
   return scene.targets.map((target) => ({
     id: `node-${target.id}`,
     kind: "target",
@@ -178,7 +178,7 @@ function routeNodesFromTargets(scene: CrowdSimScene): BioCityRouteNode[] {
   }));
 }
 
-function routeNodesFromBuildings(scene: CrowdSimScene): BioCityRouteNode[] {
+function routeNodesFromBuildings(scene: CrowdSimScene): SceneRouteNode[] {
   return scene.buildings.flatMap((building) =>
     building.entrancePosition
       ? [
@@ -193,7 +193,7 @@ function routeNodesFromBuildings(scene: CrowdSimScene): BioCityRouteNode[] {
   );
 }
 
-function routeNodesFromTransitStops(scene: CrowdSimScene): BioCityRouteNode[] {
+function routeNodesFromTransitStops(scene: CrowdSimScene): SceneRouteNode[] {
   return scene.transitStops.map((stop) => ({
     id: `node-${stop.id}`,
     kind: "transitStop",
@@ -206,7 +206,7 @@ function routeEdgesFromRoads(
   scene: CrowdSimScene,
   activeHazards: CrowdSimScene["hazards"],
   activeEvents: CrowdSimScene["eventTimeline"]["events"],
-): BioCityRouteEdge[] {
+): SceneRouteEdge[] {
   return scene.roads.flatMap((road) => {
     const roadClosed = activeEvents.some(
       (event) => event.kind === "roadClose" && event.targetId === road.id,
@@ -257,7 +257,7 @@ function routeEdgesFromRoads(
   });
 }
 
-function blockedSpacesFromZones(scene: CrowdSimScene): BioCityBlockedSpace[] {
+function blockedSpacesFromZones(scene: CrowdSimScene): SceneBlockedSpace[] {
   return scene.zones
     .filter((zone) => !zone.walkable)
     .map((zone) => ({
@@ -270,7 +270,7 @@ function blockedSpacesFromZones(scene: CrowdSimScene): BioCityBlockedSpace[] {
     }));
 }
 
-function blockedSpacesFromObstacles(scene: CrowdSimScene): BioCityBlockedSpace[] {
+function blockedSpacesFromObstacles(scene: CrowdSimScene): SceneBlockedSpace[] {
   return scene.obstacles
     .filter((obstacle) => obstacle.blocksMovement)
     .map((obstacle) => ({
@@ -285,7 +285,7 @@ function blockedSpacesFromObstacles(scene: CrowdSimScene): BioCityBlockedSpace[]
 
 function blockedSpacesFromHazards(
   hazards: CrowdSimScene["hazards"],
-): BioCityBlockedSpace[] {
+): SceneBlockedSpace[] {
   return hazards.map((hazard) => ({
     id: `blocked-${hazard.id}`,
     kind: "hazard",

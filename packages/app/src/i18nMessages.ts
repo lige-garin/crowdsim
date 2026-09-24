@@ -418,7 +418,7 @@ export const editorToolKeys: Record<string, TranslationKey> = {
 };
 export const sceneNames: Record<string, LocalizedText> = {
   "atrium-demo": { zh: "中庭示例", en: "Atrium Demo" },
-  "biocity-rainy-high-street": { zh: "雨天商业街", en: "BioCity Rainy High Street" },
+  "rainy-high-street": { zh: "雨天商业街", en: "Rainy Commercial Street" },
   "mall-atrium": { zh: "商场中庭", en: "Mall Atrium" },
   "metro-station-hall": { zh: "地铁站厅", en: "Metro Station Hall" },
   "performance-venue": { zh: "演出场馆疏散", en: "Performance Venue Evacuation" },

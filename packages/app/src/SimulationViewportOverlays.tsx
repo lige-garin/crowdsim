@@ -15,7 +15,7 @@ import { fruinColours, fruinDensityBreaks, fruinLevels } from "./fruinLevelOfSer
  * What the heatmap layer's colours mean. The layer itself was drawn from
  * launch with no key anywhere in the app -- a colour scale nobody could read.
  * The bands and colours here are read straight from `fruinLevelOfService.ts`,
- * the same module `bioCityViewportOverlayPlan.ts` uses to colour the cells,
+ * the same module `viewportOverlayPlan.ts` uses to colour the cells,
  * so the legend can never drift from what is actually painted.
  */
 export function HeatmapLegendOverlay({ language }: { language: "zh" | "en" }) {

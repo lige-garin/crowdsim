@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
-import { createBioCityViewportOverlayPlan } from "./bioCityViewportOverlayPlan";
+import { defaultDemoScene } from "./defaultDemoScene";
+import { createViewportOverlayPlan } from "./viewportOverlayPlan";
 import type { HeatmapCell } from "./heatmap";
 
-describe("bioCityViewportOverlayPlan", () => {
+describe("viewportOverlayPlan", () => {
   it("creates sorted heatmap overlays with stable opacity and colors", () => {
     const heatmapCells: HeatmapCell[] = [
       {
@@ -30,7 +30,7 @@ describe("bioCityViewportOverlayPlan", () => {
       },
     ];
 
-    const plan = createBioCityViewportOverlayPlan(bioCityDemoScene, {
+    const plan = createViewportOverlayPlan(defaultDemoScene, {
       heatmapCells,
       maxHeatmapCells: 1,
     });
@@ -49,7 +49,7 @@ describe("bioCityViewportOverlayPlan", () => {
   });
 
   it("marks active hazards as risk overlays and raises affected road flow risk", () => {
-    const plan = createBioCityViewportOverlayPlan(bioCityDemoScene, {
+    const plan = createViewportOverlayPlan(defaultDemoScene, {
       elapsedSeconds: 1200,
     });
 
@@ -73,7 +73,7 @@ describe("bioCityViewportOverlayPlan", () => {
   });
 
   it("keeps inactive hazards visible but less prominent and distinguishes transit flow", () => {
-    const plan = createBioCityViewportOverlayPlan(bioCityDemoScene, {
+    const plan = createViewportOverlayPlan(defaultDemoScene, {
       elapsedSeconds: 300,
     });
 

@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import { RetailAnalyticsPanel } from "./RetailAnalyticsPanel";
 import type { DashboardSample } from "./dashboardStats";
 import { RealObservationsPanel } from "./RealObservationsPanel";
 import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
@@ -47,11 +47,8 @@ export function AppInspector({
   const areaCount = scene.areas.length + scene.roads.length + scene.buildings.length;
 
   return (
-    <aside
-      className="inspector biocity-inspector-compact"
-      aria-label={t("systemSignals")}
-    >
-      <header className="biocity-inspector-title">
+    <aside className="inspector inspector-compact" aria-label={t("systemSignals")}>
+      <header className="inspector-compact-title">
         <span>{language === "zh" ? "实时分析" : "Live analytics"}</span>
         <strong>{formatSceneName(scene, language)}</strong>
       </header>
@@ -80,21 +77,21 @@ export function AppInspector({
         places={runSummary.places}
       />
 
-      <BioCityAnalyticsPanel
+      <RetailAnalyticsPanel
         elapsedSeconds={elapsedSeconds}
         heatmapCells={heatmapCells}
         scene={scene}
       />
 
       <section
-        className="biocity-compact-panel"
+        className="compact-panel"
         aria-label={language === "zh" ? "场景对象" : "Scene objects"}
       >
         <header>
           <span>{language === "zh" ? "场景对象" : "Scene objects"}</span>
           <strong>{areaCount}</strong>
         </header>
-        <div className="biocity-object-grid">
+        <div className="compact-object-grid">
           <Metric
             label={language === "zh" ? "道路" : "Roads"}
             value={String(scene.roads.length)}
@@ -115,14 +112,14 @@ export function AppInspector({
       </section>
 
       <section
-        className="biocity-compact-panel"
+        className="compact-panel"
         aria-label={language === "zh" ? "系统与记录" : "System & recording"}
       >
         <header>
           <span>{language === "zh" ? "系统与记录" : "System & recording"}</span>
           <strong>{formatStatus(simulationCredibility.status, language)}</strong>
         </header>
-        <div className="biocity-status-list">
+        <div className="status-list">
           <Row
             label={language === "zh" ? "内核" : "Kernel"}
             value={formatStatus(webGpuProbe.status, language)}
@@ -151,14 +148,14 @@ export function AppInspector({
       </section>
 
       <section
-        className="biocity-compact-panel biocity-signal-dock"
+        className="compact-panel signal-dock"
         aria-label={language === "zh" ? "工程状态" : "Engineering signals"}
       >
         <header>
           <span>{language === "zh" ? "工程状态" : "Engineering signals"}</span>
           <strong>{language === "zh" ? "已收起" : "Collapsed"}</strong>
         </header>
-        <div className="biocity-status-list">
+        <div className="status-list">
           {activeSignals.map((signal) => (
             <Row key={signal.label} label={signal.label} value={signal.value} />
           ))}

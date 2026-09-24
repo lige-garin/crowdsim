@@ -39,9 +39,9 @@ import { attachPlacementGhost } from "./placementGhost";
 import type { EditorTool } from "./sceneEditorState";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { ViewportAgentOverlayFrame } from "./simulationViewportOverlay";
-import { createBioCityRenderPlan } from "./bioCityRenderPlan";
-import { createBioCityViewportOverlayPlan } from "./bioCityViewportOverlayPlan";
-import { loadBioCityVisualAssetObject } from "./bioCityModelAssets";
+import { createSceneRenderPlan } from "./sceneRenderPlan";
+import { createViewportOverlayPlan } from "./viewportOverlayPlan";
+import { loadSceneVisualAssetObject } from "./sceneModelAssets";
 import type { ViewportLayers } from "./viewportLayers";
 import type { HeatmapCell } from "./heatmap";
 import type { RenderStatus, ViewMode } from "./simulationViewportTypes";
@@ -49,11 +49,11 @@ import type { ViewportRenderMode } from "./viewportRenderMode";
 import { localizedStatus, rawStatus } from "./simulationViewportStatus";
 import { applyViewportLayers } from "./simulationViewportLayerVisibility";
 import {
-  applyBioCityAtmosphere,
-  bioCityAtmosphere,
+  applySceneAtmosphere,
+  sceneAtmosphere,
   cityNightLevel,
-  createBioCityDynamicObjects,
-  createBioCityStaticObjects,
+  createDynamicRenderObjects,
+  createStaticRenderObjects,
   createDayNightRig,
   createFloor,
   createWall,
@@ -136,7 +136,7 @@ export function useSimulationViewportRenderer({
   const [renderMode, setRenderMode] = useState<ViewportRenderMode>("detecting");
   const [fps, setFps] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
-  const bioCityVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
+  const sceneVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
   const hasScene = crowdScene !== undefined;
   const worldWidth = crowdScene?.world.width ?? 80;
   const worldHeight = crowdScene?.world.height ?? 48;
@@ -200,7 +200,7 @@ export function useSimulationViewportRenderer({
     );
     vehicles.frustumCulled = false;
     const dynamicGroup = new Group();
-    dynamicGroup.name = "biocity-dynamic";
+    dynamicGroup.name = "scene-dynamic";
     const lightRig =
       viewMode === "3d" && hasScene
         ? createDayNightRig({ height: worldHeight, width: worldWidth })
@@ -553,7 +553,7 @@ export function useSimulationViewportRenderer({
       return;
     }
     let disposed = false;
-    let loadedBioCityAssets: Object3D[] = [];
+    let loadedSceneAssets: Object3D[] = [];
     // The generated city brings its own ground in 3D.
     const floor = viewMode === "3d" ? undefined : createFloor(crowdScene);
     // The scene's walls. This used to be two hard-coded walls at fixed
@@ -574,8 +574,8 @@ export function useSimulationViewportRenderer({
         );
     });
     const city = viewMode === "3d" ? createCityObjects(crowdScene) : undefined;
-    const staticPlan = createBioCityRenderPlan(crowdScene, 0);
-    const staticCityObjects = createBioCityStaticObjects(
+    const staticPlan = createSceneRenderPlan(crowdScene, 0);
+    const staticCityObjects = createStaticRenderObjects(
       crowdScene,
       viewMode,
       staticPlan,
@@ -596,14 +596,14 @@ export function useSimulationViewportRenderer({
           .filter((asset) => asset.kind !== "gltf-scene")
           .map(async (asset) => ({
             asset,
-            object: await loadBioCityVisualAssetObject(asset, crowdScene),
+            object: await loadSceneVisualAssetObject(asset, crowdScene),
           })),
       ).then((loadedAssets) => {
         if (disposed) {
           loadedAssets.forEach(({ object }) => object && disposeRenderObject(object));
           return;
         }
-        loadedBioCityAssets = loadedAssets.flatMap(({ asset, object }) => {
+        loadedSceneAssets = loadedAssets.flatMap(({ asset, object }) => {
           if (!object) {
             return [];
           }
@@ -620,7 +620,7 @@ export function useSimulationViewportRenderer({
     return () => {
       disposed = true;
       if (cityRef.current === city) cityRef.current = null;
-      [...owned, ...loadedBioCityAssets].forEach((object) => {
+      [...owned, ...loadedSceneAssets].forEach((object) => {
         object.removeFromParent();
         disposeRenderObject(object);
       });
@@ -636,33 +636,28 @@ export function useSimulationViewportRenderer({
     if (!scene || !dynamicGroup || !crowdScene) {
       return;
     }
-    const plan = createBioCityRenderPlan(crowdScene, bioCityVisualSecond);
-    const overlayPlan = createBioCityViewportOverlayPlan(crowdScene, {
-      elapsedSeconds: bioCityVisualSecond,
+    const plan = createSceneRenderPlan(crowdScene, sceneVisualSecond);
+    const overlayPlan = createViewportOverlayPlan(crowdScene, {
+      elapsedSeconds: sceneVisualSecond,
       heatmapCells,
     });
-    const objects = createBioCityDynamicObjects(
-      crowdScene,
-      viewMode,
-      plan,
-      overlayPlan,
-    );
+    const objects = createDynamicRenderObjects(crowdScene, viewMode, plan, overlayPlan);
     if (viewMode === "3d") {
       lightRigRef.current?.setTime(
-        bioCityVisualSecond,
-        bioCityAtmosphere(plan, bioCityVisualSecond).overcast,
+        sceneVisualSecond,
+        sceneAtmosphere(plan, sceneVisualSecond).overcast,
       );
-      cityRef.current?.setNightLevel(cityNightLevel(bioCityVisualSecond));
+      cityRef.current?.setNightLevel(cityNightLevel(sceneVisualSecond));
     }
     objects.forEach((object) => dynamicGroup.add(object));
     applyViewportLayers(dynamicGroup, crowdMeshRef.current, layersRef.current);
-    applyBioCityAtmosphere(scene, plan, bioCityVisualSecond, viewMode);
+    applySceneAtmosphere(scene, plan, sceneVisualSecond, viewMode);
     return () => {
       objects.forEach((object) => {
         object.removeFromParent();
         disposeRenderObject(object);
       });
     };
-  }, [bioCityVisualSecond, crowdScene, heatmapCells, viewMode]);
+  }, [sceneVisualSecond, crowdScene, heatmapCells, viewMode]);
   return { canvasRef, fps, renderMode, selectedAgentId, status };
 }

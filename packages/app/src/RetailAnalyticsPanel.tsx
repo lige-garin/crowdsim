@@ -1,6 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useMemo } from "react";
-import { createBioCityAnalyticsSummary } from "./bioCityAnalytics";
+import { createRetailAnalyticsSummary } from "./retailAnalytics";
 import type { HeatmapCell } from "./heatmap";
 import { useI18n, type Language } from "./i18n";
 
@@ -39,7 +39,7 @@ const copy: Record<Language, Record<string, string>> = {
   },
 };
 
-export function BioCityAnalyticsPanel({
+export function RetailAnalyticsPanel({
   elapsedSeconds,
   heatmapCells,
   scene,
@@ -52,7 +52,7 @@ export function BioCityAnalyticsPanel({
   const text = copy[language];
   const summary = useMemo(
     () =>
-      createBioCityAnalyticsSummary({
+      createRetailAnalyticsSummary({
         elapsedSeconds,
         heatmapCells,
         scene,
@@ -61,11 +61,8 @@ export function BioCityAnalyticsPanel({
   );
 
   return (
-    <section
-      className="dashboard-v2-panel biocity-analytics-compact"
-      aria-label={text.region}
-    >
-      <div className="biocity-analytics-heading">
+    <section className="dashboard-v2-panel analytics-compact" aria-label={text.region}>
+      <div className="analytics-compact-heading">
         <p className="eyebrow">{text.eyebrow}</p>
         <h2>{text.title}</h2>
         <p>{text.lede}</p>
@@ -79,7 +76,7 @@ export function BioCityAnalyticsPanel({
           value={`${summary.commercialConversionForecastPercent}%`}
         />
       </div>
-      <section className="biocity-compact-list" aria-label={text.corridors}>
+      <section className="compact-list" aria-label={text.corridors}>
         <h3>{text.corridors}</h3>
         {(summary.topCorridors.length > 0 ? summary.topCorridors.slice(0, 3) : []).map(
           (corridor, index) => (
@@ -92,7 +89,7 @@ export function BioCityAnalyticsPanel({
         )}
         {summary.topCorridors.length === 0 ? <code>{text.noTrails}</code> : null}
       </section>
-      <section className="biocity-compact-list" aria-label={text.sales}>
+      <section className="compact-list" aria-label={text.sales}>
         <h3>{text.sales}</h3>
         {summary.salesForecastCards.slice(0, 2).map((shop) => (
           <article key={shop.id}>
@@ -106,7 +103,7 @@ export function BioCityAnalyticsPanel({
           </article>
         ))}
       </section>
-      <section className="biocity-compact-list" aria-label={text.buildings}>
+      <section className="compact-list" aria-label={text.buildings}>
         <h3>{text.buildings}</h3>
         {summary.buildingPropertyCards.slice(0, 1).map((building) => (
           <article key={building.id}>

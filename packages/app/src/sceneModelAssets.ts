@@ -1,20 +1,20 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { Mesh, type Object3D } from "three";
-import type { BioCityRenderAssetPlacement } from "./bioCityRenderPlan";
+import type { SceneRenderAssetPlacement } from "./sceneRenderPlan";
 
-export type BioCityAssetLod = "high" | "low" | "medium";
+export type SceneAssetLod = "high" | "low" | "medium";
 
-export type BioCityAssetLoadPlan = {
+export type SceneAssetLoadPlan = {
   estimatedTriangles: number;
   fallback: "placeholder";
   id: string;
   loader: "gltf-loader" | "tileset-renderer";
-  requestedLod: BioCityAssetLod;
-  selectedLod: BioCityAssetLod;
+  requestedLod: SceneAssetLod;
+  selectedLod: SceneAssetLod;
   sourceUrl: string;
 };
 
-export type BioCityAssetLoadingReport = {
+export type SceneAssetLoadingReport = {
   assetCount: number;
   deferredCount: number;
   estimatedTriangles: number;
@@ -27,7 +27,7 @@ export type BioCityAssetLoadingReport = {
   uniqueSourceCount: number;
 };
 
-export type BioCityAssetWorldTransform = {
+export type SceneAssetWorldTransform = {
   position: {
     x: number;
     y: number;
@@ -43,15 +43,15 @@ export type BioCityAssetWorldTransform = {
 
 const gltfSceneCache = new Map<string, Promise<Object3D | undefined>>();
 
-export type BioCityAssetLoadOptions = {
+export type SceneAssetLoadOptions = {
   maxUniqueSources?: number;
-  quality?: BioCityAssetLod;
+  quality?: SceneAssetLod;
 };
 
-export function createBioCityAssetLoadPlan(
-  asset: BioCityRenderAssetPlacement,
-  options: BioCityAssetLoadOptions = {},
-): BioCityAssetLoadPlan {
+export function createSceneAssetLoadPlan(
+  asset: SceneRenderAssetPlacement,
+  options: SceneAssetLoadOptions = {},
+): SceneAssetLoadPlan {
   const requestedLod = options.quality ?? "medium";
   const selectedLod = selectAssetLod(asset.lod, requestedLod);
 
@@ -66,14 +66,14 @@ export function createBioCityAssetLoadPlan(
   };
 }
 
-export function createBioCityAssetLoadPlans(
-  assets: readonly BioCityRenderAssetPlacement[],
-  options: BioCityAssetLoadOptions = {},
+export function createSceneAssetLoadPlans(
+  assets: readonly SceneRenderAssetPlacement[],
+  options: SceneAssetLoadOptions = {},
 ) {
   const seenSources = new Set<string>();
 
   return assets.map((asset) => {
-    const plan = createBioCityAssetLoadPlan(asset, options);
+    const plan = createSceneAssetLoadPlan(asset, options);
 
     if (
       options.maxUniqueSources !== undefined &&
@@ -96,9 +96,9 @@ export function createBioCityAssetLoadPlans(
   });
 }
 
-export function summarizeBioCityAssetLoading(
-  plans: readonly BioCityAssetLoadPlan[],
-): BioCityAssetLoadingReport {
+export function summarizeSceneAssetLoading(
+  plans: readonly SceneAssetLoadPlan[],
+): SceneAssetLoadingReport {
   return {
     assetCount: plans.length,
     deferredCount: plans.filter((plan) => plan.sourceUrl === "").length,
@@ -117,10 +117,10 @@ export function summarizeBioCityAssetLoading(
   };
 }
 
-export function createBioCityAssetWorldTransform(
-  asset: BioCityRenderAssetPlacement,
+export function createSceneAssetWorldTransform(
+  asset: SceneRenderAssetPlacement,
   scene: CrowdSimScene,
-): BioCityAssetWorldTransform {
+): SceneAssetWorldTransform {
   return {
     position: {
       x: asset.anchor.x - scene.world.width / 2,
@@ -136,11 +136,11 @@ export function createBioCityAssetWorldTransform(
   };
 }
 
-export async function loadBioCityVisualAssetObject(
-  asset: BioCityRenderAssetPlacement,
+export async function loadSceneVisualAssetObject(
+  asset: SceneRenderAssetPlacement,
   scene: CrowdSimScene,
 ): Promise<Object3D | undefined> {
-  const plan = createBioCityAssetLoadPlan(asset);
+  const plan = createSceneAssetLoadPlan(asset);
 
   if (plan.loader !== "gltf-loader" || plan.sourceUrl === "") {
     return undefined;
@@ -152,8 +152,8 @@ export async function loadBioCityVisualAssetObject(
     return undefined;
   }
 
-  const object = prepareBioCityVisualAssetObject(cachedScene.clone(true));
-  const transform = createBioCityAssetWorldTransform(asset, scene);
+  const object = prepareSceneVisualAssetObject(cachedScene.clone(true));
+  const transform = createSceneAssetWorldTransform(asset, scene);
 
   object.name = `${asset.id}-model`;
   object.position.set(transform.position.x, transform.position.y, transform.position.z);
@@ -167,7 +167,7 @@ export async function loadBioCityVisualAssetObject(
  * A placed copy that owns its geometry and materials, so disposing it never
  * frees resources shared with the loader cache.
  */
-export function prepareBioCityVisualAssetObject(object: Object3D) {
+export function prepareSceneVisualAssetObject(object: Object3D) {
   object.traverse((child) => {
     if (!(child instanceof Mesh)) return;
 
@@ -181,10 +181,10 @@ export function prepareBioCityVisualAssetObject(object: Object3D) {
 }
 
 function selectAssetLod(
-  assetLod: BioCityAssetLod,
-  requestedLod: BioCityAssetLod,
-): BioCityAssetLod {
-  const rank: Record<BioCityAssetLod, number> = {
+  assetLod: SceneAssetLod,
+  requestedLod: SceneAssetLod,
+): SceneAssetLod {
+  const rank: Record<SceneAssetLod, number> = {
     high: 3,
     low: 1,
     medium: 2,
@@ -194,8 +194,8 @@ function selectAssetLod(
 }
 
 function estimateAssetTriangles(
-  kind: BioCityRenderAssetPlacement["kind"],
-  lod: BioCityAssetLod,
+  kind: SceneRenderAssetPlacement["kind"],
+  lod: SceneAssetLod,
 ) {
   if (kind === "tileset") return 0;
   if (kind === "gltf-prop") {

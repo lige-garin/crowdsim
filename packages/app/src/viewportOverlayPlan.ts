@@ -1,9 +1,9 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import type { HeatmapCell } from "./heatmap";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
-import { createBioCityWeatherRuntimeState } from "./bioCityWeatherSystem";
+import { createSceneRuntimeConditions } from "./sceneRuntimeConditions";
 
-export type BioCityViewportHeatmapOverlay = {
+export type ViewportHeatmapOverlay = {
   color: string;
   height: number;
   id: string;
@@ -14,7 +14,7 @@ export type BioCityViewportHeatmapOverlay = {
   y: number;
 };
 
-export type BioCityViewportFlowOverlay = {
+export type ViewportFlowOverlay = {
   color: string;
   end: ScenePoint;
   id: string;
@@ -25,7 +25,7 @@ export type BioCityViewportFlowOverlay = {
   widthMeters: number;
 };
 
-export type BioCityViewportRiskOverlay = {
+export type ViewportRiskOverlay = {
   active: boolean;
   color: string;
   id: string;
@@ -36,10 +36,10 @@ export type BioCityViewportRiskOverlay = {
   severity: number;
 };
 
-export type BioCityViewportOverlayPlan = {
-  flows: BioCityViewportFlowOverlay[];
-  heatmap: BioCityViewportHeatmapOverlay[];
-  risks: BioCityViewportRiskOverlay[];
+export type ViewportOverlayPlan = {
+  flows: ViewportFlowOverlay[];
+  heatmap: ViewportHeatmapOverlay[];
+  risks: ViewportRiskOverlay[];
   summary: {
     activeRiskCount: number;
     flowCount: number;
@@ -48,17 +48,17 @@ export type BioCityViewportOverlayPlan = {
   };
 };
 
-export function createBioCityViewportOverlayPlan(
+export function createViewportOverlayPlan(
   scene: CrowdSimScene,
   options: {
     elapsedSeconds?: number;
     heatmapCells?: readonly HeatmapCell[];
     maxHeatmapCells?: number;
   } = {},
-): BioCityViewportOverlayPlan {
+): ViewportOverlayPlan {
   const elapsedSeconds = options.elapsedSeconds ?? 0;
   const maxHeatmapCells = options.maxHeatmapCells ?? 120;
-  const weatherState = createBioCityWeatherRuntimeState(scene, elapsedSeconds);
+  const weatherState = createSceneRuntimeConditions(scene, elapsedSeconds);
   const activeHazardIds = new Set(weatherState.activeHazardIds);
   const heatmap = createHeatmapOverlay(options.heatmapCells ?? [], maxHeatmapCells);
   const flows = createFlowOverlay(scene, activeHazardIds);
@@ -83,7 +83,7 @@ export function createBioCityViewportOverlayPlan(
 function createHeatmapOverlay(
   heatmapCells: readonly HeatmapCell[],
   maxHeatmapCells: number,
-): BioCityViewportHeatmapOverlay[] {
+): ViewportHeatmapOverlay[] {
   // Coloured by Fruin level of service on its absolute density, not scaled to
   // the busiest cell: a quiet plaza stays green however empty the rest is.
   return [...heatmapCells]
@@ -104,7 +104,7 @@ function createHeatmapOverlay(
 function createFlowOverlay(
   scene: CrowdSimScene,
   activeHazardIds: ReadonlySet<string>,
-): BioCityViewportFlowOverlay[] {
+): ViewportFlowOverlay[] {
   return scene.roads.flatMap((road) => {
     const roadRisk = scene.hazards
       .filter(
@@ -131,7 +131,7 @@ function createFlowOverlay(
 function createRiskOverlay(
   scene: CrowdSimScene,
   activeHazardIds: ReadonlySet<string>,
-): BioCityViewportRiskOverlay[] {
+): ViewportRiskOverlay[] {
   return scene.hazards.map((hazard) => {
     const active = activeHazardIds.has(hazard.id);
     const riskScore = round(hazard.riskScore);

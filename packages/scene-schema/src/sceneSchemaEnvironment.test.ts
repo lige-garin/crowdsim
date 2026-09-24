@@ -2,19 +2,19 @@
 import { parseScene, safeParseScene } from "./index";
 import { validScene } from "./sceneTestFixtures";
 
-describe("sceneSchema BioCity extensions", () => {
-  it("parses visual-only 3D model assets for BioCity rendering", () => {
+describe("sceneSchema environment extensions", () => {
+  it("parses visual-only 3D model assets for environment-layer rendering", () => {
     const scene = parseScene({
       ...validScene,
       visualAssets: [
         {
           id: "sketchup-street-canyon",
           kind: "gltf-scene",
-          sourceUrl: "/assets/biocity/street-canyon.glb",
+          sourceUrl: "/assets/sample/street-canyon.glb",
           lodSources: {
-            high: "/assets/biocity/street-canyon.high.glb",
-            low: "/assets/biocity/street-canyon.low.glb",
-            medium: "/assets/biocity/street-canyon.medium.glb",
+            high: "/assets/sample/street-canyon.high.glb",
+            low: "/assets/sample/street-canyon.low.glb",
+            medium: "/assets/sample/street-canyon.medium.glb",
           },
           originalSourceFormat: "sketchup",
           anchor: { x: 40, y: 24 },
@@ -35,7 +35,7 @@ describe("sceneSchema BioCity extensions", () => {
         {
           id: "bus-shelter-prop",
           kind: "gltf-prop",
-          sourceUrl: "/assets/biocity/bus-shelter.glb",
+          sourceUrl: "/assets/sample/bus-shelter.glb",
           anchor: { x: 58, y: 34, z: 0.1 },
         },
       ],
@@ -58,9 +58,9 @@ describe("sceneSchema BioCity extensions", () => {
       },
       lod: "medium",
       lodSources: {
-        high: "/assets/biocity/street-canyon.high.glb",
-        low: "/assets/biocity/street-canyon.low.glb",
-        medium: "/assets/biocity/street-canyon.medium.glb",
+        high: "/assets/sample/street-canyon.high.glb",
+        low: "/assets/sample/street-canyon.low.glb",
+        medium: "/assets/sample/street-canyon.medium.glb",
       },
       originalSourceFormat: "sketchup",
       visible: true,
@@ -76,7 +76,7 @@ describe("sceneSchema BioCity extensions", () => {
     expect(scene.visualAssets[1].scale).toBe(1);
   });
 
-  it("parses BioCity objects and applies defaults", () => {
+  it("parses environment objects and applies defaults", () => {
     const scene = parseScene({
       ...validScene,
       roads: [
@@ -277,12 +277,12 @@ describe("sceneSchema BioCity extensions", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects duplicate entity ids across BioCity collections", () => {
+  it("rejects duplicate entity ids across environment collections", () => {
     const result = safeParseScene({
       ...validScene,
       roads: [
         {
-          id: "shared-biocity-id",
+          id: "shared-sample-id",
           geometry: {
             type: "polyline",
             points: [
@@ -294,7 +294,7 @@ describe("sceneSchema BioCity extensions", () => {
       ],
       hazards: [
         {
-          id: "shared-biocity-id",
+          id: "shared-sample-id",
           kind: "roadClosure",
           position: { x: 20, y: 8 },
         },
@@ -341,7 +341,7 @@ describe("sceneSchema BioCity extensions", () => {
         {
           id: "bad-lod-model",
           kind: "gltf-prop",
-          sourceUrl: "/assets/biocity/model.glb",
+          sourceUrl: "/assets/sample/model.glb",
           lodSources: {
             low: "https://example.com/model.low.glb",
           },

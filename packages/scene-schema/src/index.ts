@@ -31,7 +31,7 @@ import {
   sceneVisualSchema,
   transitStopSchema,
   weatherProfileSchema,
-} from "./sceneSchemaBioCity";
+} from "./sceneSchemaEnvironment";
 
 export const sceneSchema = z
   .object({

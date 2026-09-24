@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { render } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { fruinLevels } from "./fruinLevelOfService";
 import {
   HeatmapLegendOverlay,
@@ -12,7 +12,7 @@ describe("ViewportCityLabelOverlay", () => {
   it("keeps the full annotation set in the analytical 2D view", () => {
     const { container } = render(
       createElement(ViewportCityLabelOverlay, {
-        scene: bioCityDemoScene,
+        scene: defaultDemoScene,
         viewMode: "2d",
       }),
     );

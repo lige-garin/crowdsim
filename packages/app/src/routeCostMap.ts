@@ -1,8 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import {
-  compileBioCityRouteGraph,
-  estimateBioCityRouteInfluence,
-} from "./bioCityRouteGraph";
+import { compileSceneRouteGraph, estimateSceneRouteInfluence } from "./sceneRouteGraph";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 
 export type RouteCostCell = {
@@ -26,15 +23,11 @@ export function createRouteCostMap(
   elapsedSeconds = 0,
 ): RouteCostMap {
   const environment = calculateEnvironmentImpact(scene, elapsedSeconds);
-  const graph = compileBioCityRouteGraph(scene, elapsedSeconds);
+  const graph = compileSceneRouteGraph(scene, elapsedSeconds);
   const zoneCells = scene.zones.map((zone) => {
     const attractionScore = attractionForZone(scene, zone.id);
     const centroid = polygonCentroid(zone.geometry.points);
-    const localInfluence = estimateBioCityRouteInfluence(
-      scene,
-      centroid,
-      elapsedSeconds,
-    );
+    const localInfluence = estimateSceneRouteInfluence(scene, centroid, elapsedSeconds);
     const riskScore =
       environment.riskScore + localInfluence.riskScore + (zone.walkable ? 0 : 1);
     const cost =
@@ -84,7 +77,7 @@ export function estimatePointRouteCost(
   return (
     (map.cells.find((cell) => cell.zoneId === containingZone?.id)?.cost ??
       calculateEnvironmentImpact(scene, elapsedSeconds).routeCostMultiplier) *
-    estimateBioCityRouteInfluence(scene, point, elapsedSeconds).routeCostMultiplier
+    estimateSceneRouteInfluence(scene, point, elapsedSeconds).routeCostMultiplier
   );
 }
 

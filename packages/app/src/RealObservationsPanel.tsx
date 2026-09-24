@@ -116,10 +116,7 @@ export function RealObservationsPanel({
     : null;
 
   return (
-    <section
-      className="biocity-compact-panel real-observations"
-      aria-label={text.title}
-    >
+    <section className="compact-panel real-observations" aria-label={text.title}>
       <header>
         <span>{text.title}</span>
       </header>
@@ -157,7 +154,7 @@ export function RealObservationsPanel({
       ) : null}
 
       {lineSummary ? (
-        <div className="biocity-status-list" data-testid="line-count-summary">
+        <div className="status-list" data-testid="line-count-summary">
           <div>
             <span>{text.matched}</span>
             <strong>{lineSummary.matchedMinutes}</strong>
@@ -187,7 +184,7 @@ export function RealObservationsPanel({
       )}
 
       {receiptComparison ? (
-        <div className="biocity-status-list" data-testid="receipt-comparison">
+        <div className="status-list" data-testid="receipt-comparison">
           {receiptComparison.map((row) => (
             <div key={row.placeId}>
               <span>{row.placeId}</span>

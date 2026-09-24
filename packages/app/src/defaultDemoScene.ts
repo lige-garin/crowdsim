@@ -1,9 +1,9 @@
 import { parseScene } from "@crowdsim/scene-schema";
 
-export const bioCityDemoScene = parseScene({
+export const defaultDemoScene = parseScene({
   schemaVersion: "1.0.0",
-  id: "biocity-rainy-high-street",
-  name: "BioCity Rainy High Street",
+  id: "rainy-high-street",
+  name: "Rainy Commercial Street",
   seed: 31,
   world: {
     width: 160,
@@ -22,11 +22,11 @@ export const bioCityDemoScene = parseScene({
       id: "rain-market-streetscape",
       name: "Rain Market Streetscape",
       kind: "gltf-scene",
-      sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
       lodSources: {
-        high: "/assets/biocity/rain-market-streetscape.high.glb",
-        low: "/assets/biocity/rain-market-streetscape.low.glb",
-        medium: "/assets/biocity/rain-market-streetscape.glb",
+        high: "/assets/demo-scene/rain-market-streetscape.high.glb",
+        low: "/assets/demo-scene/rain-market-streetscape.low.glb",
+        medium: "/assets/demo-scene/rain-market-streetscape.glb",
       },
       originalSourceFormat: "sketchup",
       anchor: { x: 80, y: 48, z: 0 },
@@ -48,9 +48,9 @@ export const bioCityDemoScene = parseScene({
       id: "bus-stop-shelter",
       name: "Bus Stop Shelter",
       kind: "gltf-prop",
-      sourceUrl: "/assets/biocity/bus-stop-shelter.glb",
+      sourceUrl: "/assets/demo-scene/bus-stop-shelter.glb",
       lodSources: {
-        low: "/assets/biocity/bus-stop-shelter.low.glb",
+        low: "/assets/demo-scene/bus-stop-shelter.low.glb",
       },
       originalSourceFormat: "glb",
       anchor: { x: 122, y: 72, z: 0 },
@@ -229,7 +229,7 @@ export const bioCityDemoScene = parseScene({
     name: "Rainy Commute Profile",
     source: "manual",
     location: {
-      name: "BioCity Downtown",
+      name: "Commercial District",
       latitude: 31.2304,
       longitude: 121.4737,
       timezone: "Asia/Shanghai",

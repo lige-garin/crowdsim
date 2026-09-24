@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { SceneEditorParamPanel } from "./SceneEditorParamPanel";
 import { updateDocumentEntranceProfile } from "./sceneEditorMutations";
 import { createEditorDocumentFromScene } from "./sceneEditorState";
@@ -17,7 +17,7 @@ describe("SceneEditorParamPanel", () => {
    * JSON by hand.
    */
   it("edits the arrival rate and kind of a selected entrance", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const source = document.entrances.find((entrance) => entrance.kind === "source");
     const onEntranceNumberChange = vi.fn();
     const onEntranceKindChange = vi.fn();
@@ -61,7 +61,7 @@ describe("SceneEditorParamPanel", () => {
    * to change it once a profile existed.
    */
   it("shows the slot length once a profile has been entered, and commits changes to it", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const source = document.entrances.find((entrance) => entrance.kind === "source");
     expect(source, "demo scene must have a source entrance").toBeDefined();
     const withProfile = updateDocumentEntranceProfile(document, source!.id, "60, 120");
@@ -85,7 +85,7 @@ describe("SceneEditorParamPanel", () => {
   });
 
   it("does not offer a slot length before any profile has been entered", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const source = document.entrances.find((entrance) => entrance.kind === "source");
 
     render(<SceneEditorParamPanel {...baseProps()} selectedEntrance={source} />);
@@ -94,7 +94,7 @@ describe("SceneEditorParamPanel", () => {
   });
 
   it("shows the population's composition once a named population is picked, and hides it for the default", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const source = document.entrances.find((entrance) => entrance.kind === "source");
     expect(source, "demo scene must have a source entrance").toBeDefined();
 
@@ -115,7 +115,7 @@ describe("SceneEditorParamPanel", () => {
   });
 
   it("does not offer an arrival rate on an exit, which cannot spawn anyone", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const sink = document.entrances.find((entrance) => entrance.kind === "sink");
     expect(sink, "demo scene must have an exit").toBeDefined();
 
@@ -125,8 +125,8 @@ describe("SceneEditorParamPanel", () => {
     expect(screen.getByLabelText("width")).toBeInTheDocument();
   });
 
-  it("renders and wires road BioCity controls", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+  it("renders and wires road environment controls", () => {
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const onRoadDirectionChange = vi.fn();
     const onRoadNumberChange = vi.fn();
     const onToggleRoadTransitOnly = vi.fn();
@@ -165,7 +165,7 @@ describe("SceneEditorParamPanel", () => {
   });
 
   it("edits a vehicle-accessible road's traffic fields (ADR-0016/0020)", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const onRoadNumberChange = vi.fn();
     const vehicleRoad = {
       ...document.roads[0],
@@ -198,7 +198,7 @@ describe("SceneEditorParamPanel", () => {
   });
 
   it("renders and wires a crosswalk's road dropdown and width (ADR-0020)", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const onCrosswalkNumberChange = vi.fn();
     const onCrosswalkRoadIdChange = vi.fn();
     const otherRoadId = "road-elsewhere";
@@ -295,8 +295,8 @@ describe("SceneEditorParamPanel", () => {
     expect(onServiceOutageWindowsChange).toHaveBeenCalledWith("630-900");
   });
 
-  it("renders and wires hazard BioCity controls", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+  it("renders and wires hazard environment controls", () => {
+    const document = createEditorDocumentFromScene(defaultDemoScene);
     const onHazardKindChange = vi.fn();
     const onHazardNumberChange = vi.fn();
 

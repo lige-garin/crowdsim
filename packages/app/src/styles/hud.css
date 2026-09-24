@@ -98,7 +98,7 @@
  * HUD rule and paints every coloured tile the same grey. */
 
 /* The elapsed-time strip is permanent text along the bottom edge. */
-.game-shell .biocity-timeline {
+.game-shell .timeline {
   display: none;
 }
 

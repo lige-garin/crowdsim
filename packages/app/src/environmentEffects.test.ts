@@ -6,7 +6,7 @@ import {
   createEnvironmentComparisonExperiment,
   environmentScenarioPresets,
 } from "./environmentEffects";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 
 const scene = parseScene({
   schemaVersion: "1.0.0",
@@ -68,8 +68,8 @@ describe("environment effects", () => {
     expect(experiment.replications).toBe(2);
   });
 
-  it("includes BioCity weather profile, events, and hazards in environment impact", () => {
-    const impact = calculateEnvironmentImpact(bioCityDemoScene, 1200);
+  it("includes scene weather profile, events, and hazards in environment impact", () => {
+    const impact = calculateEnvironmentImpact(defaultDemoScene, 1200);
 
     expect(impact.activeFactorIds).toEqual(
       expect.arrayContaining([

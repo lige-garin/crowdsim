@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { contains, createCityLayout, districtKeepOut, overlaps } from "./cityLayout";
 import { placeInScene } from "./worldPlacement";
 
 describe("city layout", () => {
-  const layout = createCityLayout(bioCityDemoScene);
+  const layout = createCityLayout(defaultDemoScene);
 
   it("never builds inside the simulated district", () => {
     // The old filler shared the ground the crowd walks on. Nothing generated
@@ -18,7 +18,7 @@ describe("city layout", () => {
   });
 
   it("keeps plaza trees off everything people walk to", () => {
-    const keepOut = districtKeepOut(bioCityDemoScene);
+    const keepOut = districtKeepOut(defaultDemoScene);
     const insideTrees = layout.trees.filter((tree) =>
       contains(layout.district, tree.x, tree.y),
     );
@@ -52,8 +52,8 @@ describe("city layout", () => {
 
   it("puts the tall buildings downtown, next to the district", () => {
     const centre = {
-      x: bioCityDemoScene.world.width / 2,
-      y: bioCityDemoScene.world.height / 2,
+      x: defaultDemoScene.world.width / 2,
+      y: defaultDemoScene.world.height / 2,
     };
     const distance = (building: (typeof layout.buildings)[number]) =>
       Math.hypot(
@@ -69,7 +69,7 @@ describe("city layout", () => {
   });
 
   it("is deterministic for a scene", () => {
-    expect(createCityLayout(bioCityDemoScene)).toEqual(layout);
+    expect(createCityLayout(defaultDemoScene)).toEqual(layout);
   });
 
   it("gives every building a positive footprint", () => {
@@ -83,8 +83,8 @@ describe("city layout", () => {
 
 describe("city layout stability under edits", () => {
   it("only removes plaza trees where something is built, never moves the rest", () => {
-    const before = createCityLayout(bioCityDemoScene).trees;
-    const edited = placeInScene(bioCityDemoScene, "building", { x: 40, y: 86 })!;
+    const before = createCityLayout(defaultDemoScene).trees;
+    const edited = placeInScene(defaultDemoScene, "building", { x: 40, y: 86 })!;
     const after = createCityLayout(edited).trees;
 
     const key = (tree: { rotation: number; scale: number; x: number; y: number }) =>

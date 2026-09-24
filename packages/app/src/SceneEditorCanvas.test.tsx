@@ -3,7 +3,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
 import { demoScene } from "./demoScene";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
 import { createLiveCrowd } from "./liveCrowd";
 import { createEditorDocumentFromScene } from "./sceneEditorState";
@@ -54,13 +54,13 @@ describe("SceneEditorCanvas", () => {
     expect(container.querySelector(".editor-live-agent-heading")).toBeInTheDocument();
   });
 
-  it("renders BioCity roads, buildings, stops, obstacles, and hazards", () => {
+  it("renders scene roads, buildings, stops, obstacles, and hazards", () => {
     const { container } = render(
       <SceneEditorCanvas
         aiImageOverlay={null}
-        baseScene={bioCityDemoScene}
+        baseScene={defaultDemoScene}
         basemap={null}
-        document={createEditorDocumentFromScene(bioCityDemoScene)}
+        document={createEditorDocumentFromScene(defaultDemoScene)}
         draftWallPoints={[]}
         draftCountLine={null}
         onCountLineEndpointPointerDown={vi.fn()}
@@ -86,11 +86,11 @@ describe("SceneEditorCanvas", () => {
 
   it("renders a crosswalk, selected when it is the selected entity (ADR-0020, previously not rendered at all)", () => {
     const scene = parseScene({
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       crosswalks: [
         {
           id: "crosswalk-test",
-          roadId: bioCityDemoScene.roads[0].id,
+          roadId: defaultDemoScene.roads[0].id,
           position: { x: 5, y: 5 },
           widthMeters: 4,
         },

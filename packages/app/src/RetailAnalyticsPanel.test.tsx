@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
-import { BioCityAnalyticsPanel } from "./BioCityAnalyticsPanel";
+import { defaultDemoScene } from "./defaultDemoScene";
+import { RetailAnalyticsPanel } from "./RetailAnalyticsPanel";
 import { I18nProvider } from "./i18n";
 
 afterEach(() => {
@@ -13,16 +13,16 @@ function renderIn(language: "en" | "zh") {
   localStorage.setItem("crowdsim.language", language);
   return render(
     <I18nProvider>
-      <BioCityAnalyticsPanel
+      <RetailAnalyticsPanel
         elapsedSeconds={120}
         heatmapCells={[]}
-        scene={bioCityDemoScene}
+        scene={defaultDemoScene}
       />
     </I18nProvider>,
   );
 }
 
-describe("BioCityAnalyticsPanel", () => {
+describe("RetailAnalyticsPanel", () => {
   it("speaks English in English mode", () => {
     const { container } = renderIn("en");
     expect(screen.getByRole("heading", { name: "Operations" })).toBeInTheDocument();

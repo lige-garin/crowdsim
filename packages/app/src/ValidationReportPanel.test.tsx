@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { I18nProvider } from "./i18n";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { createValidationReport, renderValidationReportHtml } from "./validationReport";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 
@@ -24,7 +24,7 @@ describe("ValidationReportPanel", () => {
   it("shows a running state before the benchmark suite finishes, then the real report", async () => {
     render(
       <I18nProvider>
-        <ValidationReportPanel scene={bioCityDemoScene} />
+        <ValidationReportPanel scene={defaultDemoScene} />
       </I18nProvider>,
     );
 
@@ -49,7 +49,7 @@ describe("ValidationReportPanel", () => {
 
     render(
       <I18nProvider>
-        <ValidationReportPanel scene={bioCityDemoScene} />
+        <ValidationReportPanel scene={defaultDemoScene} />
       </I18nProvider>,
     );
 
@@ -70,20 +70,20 @@ describe("validation report for the open scene", () => {
   it("names the user's scene and carries its commercial section", async () => {
     render(
       <I18nProvider>
-        <ValidationReportPanel scene={bioCityDemoScene} />
+        <ValidationReportPanel scene={defaultDemoScene} />
       </I18nProvider>,
     );
     expect(
-      await screen.findByText(/BioCity Rainy High Street/, {}, { timeout: 30_000 }),
+      await screen.findByText(/Rainy Commercial Street/, {}, { timeout: 30_000 }),
     ).toBeInTheDocument();
 
     const report = createValidationReport({
-      commercialScene: bioCityDemoScene,
+      commercialScene: defaultDemoScene,
       generatedAtIso: "2026-09-14T00:00:00.000Z",
     });
     const html = renderValidationReportHtml(report, "en");
 
-    expect(html).toContain("Scene: BioCity Rainy High Street");
+    expect(html).toContain("Scene: Rainy Commercial Street");
     expect(html).toContain("Commercial behavior validation");
     expect(html).toContain("do not describe this scene");
   }, 30_000);

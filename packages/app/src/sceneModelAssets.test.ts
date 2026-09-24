@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import {
-  createBioCityAssetLoadPlans,
-  createBioCityAssetWorldTransform,
-  prepareBioCityVisualAssetObject,
-  summarizeBioCityAssetLoading,
-} from "./bioCityModelAssets";
-import { createBioCityRenderPlan } from "./bioCityRenderPlan";
+  createSceneAssetLoadPlans,
+  createSceneAssetWorldTransform,
+  prepareSceneVisualAssetObject,
+  summarizeSceneAssetLoading,
+} from "./sceneModelAssets";
+import { createSceneRenderPlan } from "./sceneRenderPlan";
 
-describe("bioCityModelAssets", () => {
+describe("sceneModelAssets", () => {
   it("plans GLB and GLTF assets for GLTFLoader with placeholder fallback", () => {
-    const renderPlan = createBioCityRenderPlan(bioCityDemoScene, 0);
-    const loadPlans = createBioCityAssetLoadPlans(renderPlan.assets);
+    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const loadPlans = createSceneAssetLoadPlans(renderPlan.assets);
 
     expect(loadPlans).toEqual([
       {
@@ -22,7 +22,7 @@ describe("bioCityModelAssets", () => {
         loader: "gltf-loader",
         requestedLod: "medium",
         selectedLod: "medium",
-        sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+        sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
       },
       {
         estimatedTriangles: 7500,
@@ -31,39 +31,39 @@ describe("bioCityModelAssets", () => {
         loader: "gltf-loader",
         requestedLod: "medium",
         selectedLod: "medium",
-        sourceUrl: "/assets/biocity/bus-stop-shelter.glb",
+        sourceUrl: "/assets/demo-scene/bus-stop-shelter.glb",
       },
     ]);
   });
 
   it("selects quality-specific LOD sources without exceeding asset LOD", () => {
-    const renderPlan = createBioCityRenderPlan(bioCityDemoScene, 0);
-    const lowPlans = createBioCityAssetLoadPlans(renderPlan.assets, {
+    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const lowPlans = createSceneAssetLoadPlans(renderPlan.assets, {
       quality: "low",
     });
-    const highPlans = createBioCityAssetLoadPlans(renderPlan.assets, {
+    const highPlans = createSceneAssetLoadPlans(renderPlan.assets, {
       quality: "high",
     });
 
     expect(lowPlans[0]).toMatchObject({
       selectedLod: "low",
-      sourceUrl: "/assets/biocity/rain-market-streetscape.low.glb",
+      sourceUrl: "/assets/demo-scene/rain-market-streetscape.low.glb",
     });
     expect(lowPlans[1]).toMatchObject({
       selectedLod: "low",
-      sourceUrl: "/assets/biocity/bus-stop-shelter.low.glb",
+      sourceUrl: "/assets/demo-scene/bus-stop-shelter.low.glb",
     });
     expect(highPlans[0]).toMatchObject({
       requestedLod: "high",
       selectedLod: "medium",
-      sourceUrl: "/assets/biocity/rain-market-streetscape.glb",
+      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
     });
   });
 
   it("keeps 3D tiles on the tileset renderer path", () => {
-    const renderPlan = createBioCityRenderPlan(
+    const renderPlan = createSceneRenderPlan(
       {
-        ...bioCityDemoScene,
+        ...defaultDemoScene,
         visualAssets: [
           {
             anchor: { x: 80, y: 48, z: 0 },
@@ -80,7 +80,7 @@ describe("bioCityModelAssets", () => {
             lodSources: {},
             rotationDegrees: 0,
             scale: 1,
-            sourceUrl: "/assets/biocity/tileset.json",
+            sourceUrl: "/assets/demo-scene/tileset.json",
             visible: true,
             customParameters: {},
           },
@@ -89,7 +89,7 @@ describe("bioCityModelAssets", () => {
       0,
     );
 
-    expect(createBioCityAssetLoadPlans(renderPlan.assets)[0]).toMatchObject({
+    expect(createSceneAssetLoadPlans(renderPlan.assets)[0]).toMatchObject({
       fallback: "placeholder",
       id: "asset-city-tiles",
       loader: "tileset-renderer",
@@ -97,13 +97,13 @@ describe("bioCityModelAssets", () => {
   });
 
   it("summarizes loader readiness and source URL de-duplication", () => {
-    const renderPlan = createBioCityRenderPlan(
+    const renderPlan = createSceneRenderPlan(
       {
-        ...bioCityDemoScene,
+        ...defaultDemoScene,
         visualAssets: [
-          ...bioCityDemoScene.visualAssets,
+          ...defaultDemoScene.visualAssets,
           {
-            ...bioCityDemoScene.visualAssets[1],
+            ...defaultDemoScene.visualAssets[1],
             id: "bus-stop-shelter-copy",
           },
         ],
@@ -112,7 +112,7 @@ describe("bioCityModelAssets", () => {
     );
 
     expect(
-      summarizeBioCityAssetLoading(createBioCityAssetLoadPlans(renderPlan.assets)),
+      summarizeSceneAssetLoading(createSceneAssetLoadPlans(renderPlan.assets)),
     ).toEqual({
       assetCount: 3,
       deferredCount: 0,
@@ -128,12 +128,12 @@ describe("bioCityModelAssets", () => {
   });
 
   it("reports deferred assets when the unique source budget is exceeded", () => {
-    const renderPlan = createBioCityRenderPlan(bioCityDemoScene, 0);
-    const plans = createBioCityAssetLoadPlans(renderPlan.assets, {
+    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const plans = createSceneAssetLoadPlans(renderPlan.assets, {
       maxUniqueSources: 1,
     });
 
-    expect(summarizeBioCityAssetLoading(plans)).toMatchObject({
+    expect(summarizeSceneAssetLoading(plans)).toMatchObject({
       deferredCount: 1,
       uniqueSourceCount: 1,
     });
@@ -144,14 +144,14 @@ describe("bioCityModelAssets", () => {
   });
 
   it("applies visual asset calibration to world transforms", () => {
-    const renderPlan = createBioCityRenderPlan(
+    const renderPlan = createSceneRenderPlan(
       {
-        ...bioCityDemoScene,
+        ...defaultDemoScene,
         visualAssets: [
           {
-            ...bioCityDemoScene.visualAssets[0],
+            ...defaultDemoScene.visualAssets[0],
             calibration: {
-              ...bioCityDemoScene.visualAssets[0].calibration,
+              ...defaultDemoScene.visualAssets[0].calibration,
               unitScaleMeters: 0.5,
               upAxis: "z-up",
             },
@@ -163,7 +163,7 @@ describe("bioCityModelAssets", () => {
     );
 
     expect(
-      createBioCityAssetWorldTransform(renderPlan.assets[0], bioCityDemoScene),
+      createSceneAssetWorldTransform(renderPlan.assets[0], defaultDemoScene),
     ).toEqual({
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },
@@ -191,7 +191,7 @@ describe("bioCityModelAssets", () => {
     building.position.set(4, 5, 6);
     cached.add(building);
 
-    const prepared = prepareBioCityVisualAssetObject(cached.clone(true));
+    const prepared = prepareSceneVisualAssetObject(cached.clone(true));
     const meshes: Mesh[] = [];
     prepared.traverse((child) => child instanceof Mesh && meshes.push(child));
     const materials = meshes.map((mesh) => mesh.material as MeshStandardMaterial);

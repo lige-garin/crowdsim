@@ -48,7 +48,7 @@ import {
   updateDocumentZoneCategory,
   updateDocumentZoneNumber,
 } from "./sceneEditorMutations";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { demoScene } from "./demoScene";
 import { exampleScenes } from "./exampleScenes";
 
@@ -104,8 +104,8 @@ describe("scene editor state", () => {
     ]);
   });
 
-  it("loads BioCity editor objects from schema scenes", () => {
-    const document = createEditorDocumentFromScene(bioCityDemoScene);
+  it("loads environment editor objects from schema scenes", () => {
+    const document = createEditorDocumentFromScene(defaultDemoScene);
 
     expect(document.roads.map((road) => road.id)).toContain("rain-market-avenue");
     expect(document.buildings.map((building) => building.id)).toContain("glass-arcade");
@@ -124,7 +124,7 @@ describe("scene editor state", () => {
     });
   });
 
-  it("adds BioCity editor objects with stable defaults", () => {
+  it("adds environment editor objects with stable defaults", () => {
     let document = createEditorDocumentFromScene(demoScene);
 
     document = addRoad(document, { x: 20, y: 20 });
@@ -252,7 +252,7 @@ describe("scene editor state", () => {
     ]);
   });
 
-  it("moves and removes BioCity entities", () => {
+  it("moves and removes environment entities", () => {
     let document = addRoad(createEditorDocumentFromScene(demoScene), {
       x: 20,
       y: 20,
@@ -343,7 +343,7 @@ describe("scene editor state", () => {
     expect(scene.countLines[0].geometry.points).toHaveLength(2);
   });
 
-  it("exports BioCity editor objects back to valid scene json", () => {
+  it("exports environment editor objects back to valid scene json", () => {
     let document = createEditorDocumentFromScene(demoScene);
 
     document = addRoad(document, { x: 20, y: 20 });
@@ -375,7 +375,7 @@ describe("scene editor state", () => {
     });
   });
 
-  it("updates BioCity object properties and exports them", () => {
+  it("updates environment object properties and exports them", () => {
     let document = createEditorDocumentFromScene(demoScene);
 
     document = addRoad(document, { x: 20, y: 20 });

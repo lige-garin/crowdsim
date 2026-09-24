@@ -1,7 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { useWorldBuilding } from "./useWorldBuilding";
 
 function setup() {
@@ -18,7 +18,7 @@ function setup() {
         onCancelTool,
         scene,
       }),
-    { initialProps: { scene: bioCityDemoScene } },
+    { initialProps: { scene: defaultDemoScene } },
   );
   return { applied, hook, onCancelTool };
 }
@@ -30,13 +30,13 @@ describe("useWorldBuilding", () => {
 
     act(() => hook.result.current.place("shop", { x: 40, y: 86 }));
     act(() => hook.result.current.place("shop", { x: 60, y: 86 }));
-    expect(applied.at(-1)!.shops).toHaveLength(bioCityDemoScene.shops.length + 2);
+    expect(applied.at(-1)!.shops).toHaveLength(defaultDemoScene.shops.length + 2);
     expect(hook.result.current.canUndo).toBe(true);
 
     act(() => hook.result.current.undo());
-    expect(applied.at(-1)!.shops).toHaveLength(bioCityDemoScene.shops.length + 1);
+    expect(applied.at(-1)!.shops).toHaveLength(defaultDemoScene.shops.length + 1);
     act(() => hook.result.current.undo());
-    expect(applied.at(-1)).toBe(bioCityDemoScene);
+    expect(applied.at(-1)).toBe(defaultDemoScene);
     expect(hook.result.current.canUndo).toBe(false);
   });
 
@@ -46,7 +46,7 @@ describe("useWorldBuilding", () => {
     expect(hook.result.current.canUndo).toBe(true);
 
     // e.g. "apply" from the 2D editor.
-    act(() => hook.rerender({ scene: { ...bioCityDemoScene, name: "edited" } }));
+    act(() => hook.rerender({ scene: { ...defaultDemoScene, name: "edited" } }));
     expect(hook.result.current.canUndo).toBe(false);
   });
 
@@ -72,13 +72,13 @@ describe("useWorldBuilding", () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { ctrlKey: true, key: "z" }));
     });
     expect(onCancelTool).toHaveBeenCalled();
-    expect(applied.at(-1)).toBe(bioCityDemoScene);
+    expect(applied.at(-1)).toBe(defaultDemoScene);
   });
 });
 
 describe("useWorldBuilding outside the 3D run view", () => {
   it("offers no undo, and keeps the history for when the user comes back", () => {
-    let current: CrowdSimScene = bioCityDemoScene;
+    let current: CrowdSimScene = defaultDemoScene;
     const hook = renderHook(
       ({ enabled, scene }: { enabled: boolean; scene: CrowdSimScene }) =>
         useWorldBuilding({
@@ -89,7 +89,7 @@ describe("useWorldBuilding outside the 3D run view", () => {
           onCancelTool: () => undefined,
           scene,
         }),
-      { initialProps: { enabled: true, scene: bioCityDemoScene } },
+      { initialProps: { enabled: true, scene: defaultDemoScene } },
     );
     act(() => hook.result.current.place("shop", { x: 40, y: 86 }));
     hook.rerender({ enabled: true, scene: current });
@@ -100,7 +100,7 @@ describe("useWorldBuilding outside the 3D run view", () => {
     hook.rerender({ enabled: false, scene: current });
     expect(hook.result.current.canUndo).toBe(false);
     act(() => hook.result.current.undo());
-    expect(current).not.toBe(bioCityDemoScene);
+    expect(current).not.toBe(defaultDemoScene);
 
     hook.rerender({ enabled: true, scene: current });
     expect(hook.result.current.canUndo).toBe(true);

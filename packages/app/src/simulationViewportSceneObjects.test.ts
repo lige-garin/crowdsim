@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
-import { createBioCityRenderPlan } from "./bioCityRenderPlan";
-import { bioCityAtmosphere } from "./simulationViewportSceneObjects";
+import { defaultDemoScene } from "./defaultDemoScene";
+import { createSceneRenderPlan } from "./sceneRenderPlan";
+import { sceneAtmosphere } from "./simulationViewportSceneObjects";
 
-describe("bioCityAtmosphere", () => {
+describe("sceneAtmosphere", () => {
   it("turns the rainy scene into a wet, fogged environment", () => {
-    const atmosphere = bioCityAtmosphere(
-      createBioCityRenderPlan(bioCityDemoScene, 2_100),
+    const atmosphere = sceneAtmosphere(
+      createSceneRenderPlan(defaultDemoScene, 2_100),
       0,
     );
 
@@ -16,10 +16,10 @@ describe("bioCityAtmosphere", () => {
   });
 
   it("keeps the sky tied to the local day and night cycle", () => {
-    const plan = createBioCityRenderPlan(bioCityDemoScene, 2_100);
+    const plan = createSceneRenderPlan(defaultDemoScene, 2_100);
 
-    expect(bioCityAtmosphere(plan, 0).background).not.toBe(
-      bioCityAtmosphere(plan, 60).background,
+    expect(sceneAtmosphere(plan, 0).background).not.toBe(
+      sceneAtmosphere(plan, 60).background,
     );
   });
 });

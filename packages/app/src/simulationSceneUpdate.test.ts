@@ -1,11 +1,11 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { createSimulationEngineFromScene, hotUpdateBlocker } from "./simulationEngine";
 import { reconcileAgentsWithScene } from "./simulationSceneReconcile";
 import { placeInScene } from "./worldPlacement";
 
-const scene = bioCityDemoScene;
+const scene = defaultDemoScene;
 
 function runningEngine(steps: number, base: CrowdSimScene = scene) {
   const engine = createSimulationEngineFromScene(base);

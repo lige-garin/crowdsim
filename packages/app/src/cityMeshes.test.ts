@@ -1,6 +1,6 @@
 import { Color, InstancedMesh, Mesh, MeshStandardMaterial, type Object3D } from "three";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { BoxBatch } from "./boxBatch";
 import { createCityLayout } from "./cityLayout";
 import { createCityObjects } from "./cityMeshes";
@@ -17,7 +17,7 @@ const drawables = (objects: Object3D[]) => {
 };
 
 describe("3d city meshes", () => {
-  const city = createCityObjects(bioCityDemoScene);
+  const city = createCityObjects(defaultDemoScene);
   const meshes = drawables(city.objects);
 
   it("draws a whole city in a small number of draw calls", () => {
@@ -29,7 +29,7 @@ describe("3d city meshes", () => {
       .filter((mesh) => mesh.name.startsWith("city-facades-"))
       .reduce((sum, mesh) => sum + mesh.geometry.getAttribute("position").count, 0);
     // Four walls of six vertices for every generated building, in two meshes.
-    const buildings = createCityLayout(bioCityDemoScene).buildings.length;
+    const buildings = createCityLayout(defaultDemoScene).buildings.length;
     expect(facadeVertices).toBeGreaterThanOrEqual(buildings * 24);
   });
 
@@ -52,7 +52,7 @@ describe("3d city meshes", () => {
 });
 
 describe("district meshes", () => {
-  const meshes = drawables(createDistrictObjects(bioCityDemoScene));
+  const meshes = drawables(createDistrictObjects(defaultDemoScene));
 
   it("draws the district's buildings as see-through pavilions", () => {
     // Opaque boxes here hid the shoppers the app exists to show.
@@ -67,7 +67,7 @@ describe("district meshes", () => {
     const floors = meshes.find((mesh) => mesh.name === "district-shop-floors")!;
     // Two triangles per shop floor.
     expect(floors.geometry.getAttribute("position").count).toBe(
-      bioCityDemoScene.shops.length * 6,
+      defaultDemoScene.shops.length * 6,
     );
   });
 });

@@ -6,7 +6,7 @@ import type { EvacuationState, StageTab, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
 import { createHudReadouts } from "./appTopbarMetrics";
 import { createDashboardStats } from "./dashboardStats";
-import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
+import { defaultDemoScene as initialScene } from "./defaultDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, heatmapSamplesOnFloor } from "./heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";

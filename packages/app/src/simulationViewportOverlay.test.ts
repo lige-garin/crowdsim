@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import {
   selectAgentIntentOverlay,
   selectViewportAgentAnnotations,
@@ -28,7 +28,7 @@ describe("simulationViewportOverlay", () => {
 
   it("projects agent annotations into the 3D viewport and caps marker count", () => {
     const annotations = selectViewportAgentAnnotations({
-      scene: bioCityDemoScene,
+      scene: defaultDemoScene,
       snapshot: {
         agentCount: 180,
         agents: Array.from({ length: 180 }, (_, index) => ({
@@ -65,7 +65,7 @@ describe("simulationViewportOverlay", () => {
 
   it("keeps top-down annotations aligned to scene coordinates", () => {
     const annotations = selectViewportAgentAnnotations({
-      scene: bioCityDemoScene,
+      scene: defaultDemoScene,
       snapshot: {
         agentCount: 1,
         agents: [

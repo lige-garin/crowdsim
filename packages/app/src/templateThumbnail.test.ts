@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { buildSceneThumbnail } from "./templateThumbnail";
 
 describe("buildSceneThumbnail", () => {
   it("scales walls, entrances, and shops into the fixed viewBox", () => {
-    const thumbnail = buildSceneThumbnail(bioCityDemoScene);
+    const thumbnail = buildSceneThumbnail(defaultDemoScene);
 
-    expect(thumbnail.entrances.length).toBe(bioCityDemoScene.entrances.length);
-    expect(thumbnail.shops.length).toBe(bioCityDemoScene.shops.length);
+    expect(thumbnail.entrances.length).toBe(defaultDemoScene.entrances.length);
+    expect(thumbnail.shops.length).toBe(defaultDemoScene.shops.length);
 
     for (const point of [...thumbnail.entrances, ...thumbnail.shops]) {
       expect(point.x).toBeGreaterThanOrEqual(0);
@@ -26,7 +26,7 @@ describe("buildSceneThumbnail", () => {
 
   it("closes a wall drawn as a polygon but leaves an open polyline open", () => {
     const scene = {
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       entrances: [],
       shops: [],
       walls: [
@@ -68,10 +68,10 @@ describe("buildSceneThumbnail", () => {
 
   it("only draws entities on the scene's first floor", () => {
     const scene = {
-      ...bioCityDemoScene,
+      ...defaultDemoScene,
       entrances: [
-        { ...bioCityDemoScene.entrances[0], floorId: "floor-0" },
-        { ...bioCityDemoScene.entrances[0], floorId: "floor-1" },
+        { ...defaultDemoScene.entrances[0], floorId: "floor-0" },
+        { ...defaultDemoScene.entrances[0], floorId: "floor-1" },
       ],
       floors: [
         { basemapIds: [], elevationMeters: 0, id: "floor-0", level: 0, visible: true },

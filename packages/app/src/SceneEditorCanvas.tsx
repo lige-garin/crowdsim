@@ -84,7 +84,7 @@ export function SceneEditorCanvas({
         {aiImageOverlay ? (
           <EditorImageGeometryLayer overlay={aiImageOverlay} t={t} />
         ) : null}
-        <EditorBioCityObjects
+        <EditorEnvironmentObjects
           document={document}
           onEntityPointerDown={onEntityPointerDown}
           selectedId={selectedId}
@@ -137,7 +137,7 @@ function EditorImageGeometryLayer({
   );
 }
 
-function EditorBioCityObjects({
+function EditorEnvironmentObjects({
   document,
   onEntityPointerDown,
   selectedId,
@@ -149,7 +149,7 @@ function EditorBioCityObjects({
   t: (key: TranslationKey) => string;
 }) {
   return (
-    <g className="editor-biocity-objects">
+    <g className="editor-environment-objects">
       {document.roads.map((road) => (
         <g key={road.id} onPointerDown={(event) => onEntityPointerDown(event, road.id)}>
           <polyline

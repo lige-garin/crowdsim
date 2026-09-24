@@ -1,9 +1,9 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { calculateEnvironmentImpact } from "./environmentEffects";
 import type { HeatmapCell } from "./heatmap";
-import { createBioCityViewportOverlayPlan } from "./bioCityViewportOverlayPlan";
+import { createViewportOverlayPlan } from "./viewportOverlayPlan";
 
-export type BioCityAnalyticsSummary = {
+export type RetailAnalyticsSummary = {
   activeRiskCount: number;
   buildingPropertyCards: Array<{
     capacity: number;
@@ -54,16 +54,16 @@ export type BioCityAnalyticsSummary = {
   };
 };
 
-export function createBioCityAnalyticsSummary(options: {
+export function createRetailAnalyticsSummary(options: {
   elapsedSeconds: number;
   heatmapCells: readonly HeatmapCell[];
   scene: CrowdSimScene;
-}): BioCityAnalyticsSummary {
+}): RetailAnalyticsSummary {
   const environmentImpact = calculateEnvironmentImpact(
     options.scene,
     options.elapsedSeconds,
   );
-  const overlayPlan = createBioCityViewportOverlayPlan(options.scene, {
+  const overlayPlan = createViewportOverlayPlan(options.scene, {
     elapsedSeconds: options.elapsedSeconds,
     heatmapCells: options.heatmapCells,
   });

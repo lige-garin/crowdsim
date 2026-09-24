@@ -4,7 +4,7 @@ import { PanelDock } from "./PanelDock";
 import { I18nProvider } from "./i18n";
 import { panelRegistry } from "./panelRegistry";
 import { createTrajectoryRecording } from "./trajectoryRecording";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 
 afterEach(cleanup);
@@ -15,7 +15,7 @@ function renderDock() {
       <PanelDock
         language="zh"
         context={{
-          scene: bioCityDemoScene,
+          scene: defaultDemoScene,
           trajectoryRecording: createTrajectoryRecording({
             id: "test",
             runtime: createLiveSimulationRuntimeArtifact({
@@ -23,8 +23,8 @@ function renderDock() {
               sharedMemory: "fallback",
               thread: "main",
             }),
-            sceneId: bioCityDemoScene.id,
-            seed: bioCityDemoScene.seed,
+            sceneId: defaultDemoScene.id,
+            seed: defaultDemoScene.seed,
           }),
         }}
       />

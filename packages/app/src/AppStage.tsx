@@ -155,13 +155,13 @@ export function AppStage({
               trajectory replay, which the live loop does not have yet.
             */}
             <div
-              className="biocity-timeline"
+              className="timeline"
               aria-label={language === "zh" ? "仿真时钟" : "Simulation clock"}
             >
-              <div className="biocity-time-rail">
+              <div className="time-rail">
                 <span>{language === "zh" ? "已运行" : "Elapsed"}</span>
                 <div
-                  className="biocity-time-progress"
+                  className="time-progress"
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={elapsedWindowSeconds}

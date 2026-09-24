@@ -1,6 +1,6 @@
 import { PerspectiveCamera } from "three";
 import { describe, expect, it } from "vitest";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { placeEditorTool, createEditorDocumentFromScene } from "./sceneEditorState";
 import {
   placeInScene,
@@ -22,7 +22,7 @@ function topDownCamera(renderX: number, renderY: number) {
 }
 
 describe("scenePointAtScreen", () => {
-  const world = bioCityDemoScene.world;
+  const world = defaultDemoScene.world;
 
   it("maps the screen centre to the ground point under the camera, in scene metres", () => {
     // Render (0,0) is the world centre; render +y is scene −y.
@@ -56,10 +56,10 @@ describe("placeInScene", () => {
   const at = { x: 40, y: 86 };
 
   it("adds what the 2D editor would add for the same click", () => {
-    const next = placeInScene(bioCityDemoScene, "building", at)!;
-    expect(next.buildings).toHaveLength(bioCityDemoScene.buildings.length + 1);
+    const next = placeInScene(defaultDemoScene, "building", at)!;
+    expect(next.buildings).toHaveLength(defaultDemoScene.buildings.length + 1);
     const expected = placeEditorTool(
-      createEditorDocumentFromScene(bioCityDemoScene),
+      createEditorDocumentFromScene(defaultDemoScene),
       "building",
       at,
     )!;
@@ -67,7 +67,7 @@ describe("placeInScene", () => {
   });
 
   it("never reuses an existing id", () => {
-    const next = placeInScene(bioCityDemoScene, "shop", at)!;
+    const next = placeInScene(defaultDemoScene, "shop", at)!;
     const ids = next.shops.map((shop) => shop.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -75,28 +75,28 @@ describe("placeInScene", () => {
   it("can place again on a scene it already placed into", () => {
     // Regression: the lifted document restarted ids at 1, so the second shop
     // was a duplicate `shop-1` and the schema threw.
-    const once = placeInScene(bioCityDemoScene, "shop", at)!;
+    const once = placeInScene(defaultDemoScene, "shop", at)!;
     const twice = placeInScene(once, "shop", { x: 60, y: 86 })!;
     const ids = twice.shops.map((shop) => shop.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(twice.shops).toHaveLength(bioCityDemoScene.shops.length + 2);
+    expect(twice.shops).toHaveLength(defaultDemoScene.shops.length + 2);
   });
 
   it("keeps the rest of the scene intact", () => {
-    const next = placeInScene(bioCityDemoScene, "road", at)!;
-    expect(next.roads).toHaveLength(bioCityDemoScene.roads.length + 1);
-    expect(next.shops).toHaveLength(bioCityDemoScene.shops.length);
-    expect(next.world).toEqual(bioCityDemoScene.world);
+    const next = placeInScene(defaultDemoScene, "road", at)!;
+    expect(next.roads).toHaveLength(defaultDemoScene.roads.length + 1);
+    expect(next.shops).toHaveLength(defaultDemoScene.shops.length);
+    expect(next.world).toEqual(defaultDemoScene.world);
   });
 
   it("refuses to place onto something solid", () => {
-    expect(placeInScene(bioCityDemoScene, "building", { x: 80, y: 54 })).toBeNull();
+    expect(placeInScene(defaultDemoScene, "building", { x: 80, y: 54 })).toBeNull();
   });
 
   it("does nothing for tools that are not one click", () => {
     expect(placesInWorld("select")).toBe(false);
     expect(placesInWorld("wall")).toBe(false);
-    expect(placeInScene(bioCityDemoScene, "wall", at)).toBeNull();
+    expect(placeInScene(defaultDemoScene, "wall", at)).toBeNull();
     expect(placesInWorld("road")).toBe(true);
   });
 });
@@ -104,7 +104,7 @@ describe("placeInScene", () => {
 describe("placementConflict", () => {
   // Demo geometry: Rain Market Avenue runs y=54, x 8→152, 10 m wide.
   // Glass Arcade spans x 22–64, y 16–40 and holds shops at (36,34) and (50,30).
-  const scene = bioCityDemoScene;
+  const scene = defaultDemoScene;
 
   it("keeps a building off a road", () => {
     expect(placementConflict(scene, "building", { x: 80, y: 54 })).toBe(
@@ -201,14 +201,14 @@ describe("placementConflict", () => {
 describe("placementConflict symmetry", () => {
   it("keeps a barrier out of a building, as a building is kept off a barrier", () => {
     // Glass Arcade spans x 22–64, y 16–40.
-    expect(placementConflict(bioCityDemoScene, "obstacle", { x: 40, y: 28 })).toBe(
+    expect(placementConflict(defaultDemoScene, "obstacle", { x: 40, y: 28 })).toBe(
       "glass-arcade",
     );
   });
 
   it("still lets a barrier close a road", () => {
     expect(
-      placementConflict(bioCityDemoScene, "obstacle", { x: 80, y: 54 }),
+      placementConflict(defaultDemoScene, "obstacle", { x: 80, y: 54 }),
     ).toBeNull();
   });
 });

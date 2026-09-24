@@ -1,12 +1,12 @@
 import { render } from "@testing-library/react";
-import { bioCityDemoScene } from "./bioCityDemoScene";
+import { defaultDemoScene } from "./defaultDemoScene";
 import { describe, expect, it } from "vitest";
 import { I18nProvider } from "./i18n";
 import { panelRegistry } from "./panelRegistry";
 import type { PanelDockContext } from "./panelRegistry";
 
 const ctx = {
-  scene: bioCityDemoScene,
+  scene: defaultDemoScene,
   trajectoryRecording: {
     id: "t",
     runtime: {} as never,

@@ -5,17 +5,17 @@ type EnvironmentFactor = CrowdSimScene["environmentFactors"][number];
 type CityEvent = CrowdSimScene["eventTimeline"]["events"][number];
 type Hazard = CrowdSimScene["hazards"][number];
 
-export type BioCityWeatherRuntimeState = {
+export type SceneRuntimeConditions = {
   activeEventIds: string[];
   activeHazardIds: string[];
   currentWeatherSample?: WeatherSample;
   environmentFactors: EnvironmentFactor[];
 };
 
-export function createBioCityWeatherRuntimeState(
+export function createSceneRuntimeConditions(
   scene: CrowdSimScene,
   elapsedSeconds = 0,
-): BioCityWeatherRuntimeState {
+): SceneRuntimeConditions {
   const activeEvents = getActiveCityEvents(scene, elapsedSeconds);
   const activeHazards = getActiveHazards(scene, elapsedSeconds);
   const currentWeatherSample = getActiveWeatherSample(scene, elapsedSeconds);
