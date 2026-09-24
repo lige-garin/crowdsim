@@ -32,6 +32,8 @@ const params: GpuSimCoreSocialForceParams = {
   anticipationHorizonSeconds: 3,
   anticipationRangeMeters: 3,
   anticipationMaxAcceleration: 5,
+  holdEaseMeters: 1,
+  maxSpeedRatio: 1.3,
 };
 const spawns: AgentSpawn[] = Array.from({ length: N }, (_, i) => ({
   index: i,
@@ -64,7 +66,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("step() performs no buffer mapping; only readAggregates maps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
     });
     expect(device).toBeDefined();
 
@@ -99,7 +101,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("identical cores produce identical results after 40 steps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
     });
     expect(device).toBeDefined();
 

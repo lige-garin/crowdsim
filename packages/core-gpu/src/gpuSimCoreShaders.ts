@@ -131,6 +131,17 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // simulationEngine.ts's hazardAvoidancePush and passed in exactly like
 // formationSlots already is — a higher-level system's per-agent output, so
 // there is no loop for it here, just a direct add.
+//
+// Stage 6: crowdMovement.ts's own two-part integration
+// (gpuSimCoreSocialForce.ts's integrateWithRelaxation() doc comment has the
+// full rationale) — desiredSpeed eases with distance to target (a real
+// discrepancy from stages 1-5's flat freeSpeed target, present since stage
+// 1 and not specific to holding), holding agents ease over holdEaseMeters
+// instead, and the final clamp is freeSpeed * maxSpeedRatio (a per-agent
+// cap), not the flat params.maxSpeed stages 1-5 used. Pushes are Euler-
+// integrated into velocity first; relaxation toward the desired heading is
+// then solved exactly as a linear ODE over dt, not approximated by folding
+// it into the same Euler step as the pushes.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -157,6 +168,8 @@ struct MoveParams {
   anticipationHorizonSeconds: f32,
   anticipationRangeMeters: f32,
   anticipationMaxAcceleration: f32,
+  holdEaseMeters: f32,
+  maxSpeedRatio: f32,
 };
 @group(0) @binding(0) var<storage, read> params: MoveParams;
 @group(0) @binding(1) var<storage, read> positionsIn: array<vec2<f32>>;
@@ -172,6 +185,7 @@ struct MoveParams {
 @group(0) @binding(11) var<storage, read> groupIds: array<i32>;
 @group(0) @binding(12) var<storage, read> formationSlots: array<vec2<f32>>;
 @group(0) @binding(13) var<storage, read> hazardAvoidance: array<vec2<f32>>;
+@group(0) @binding(14) var<storage, read> holding: array<u32>;
 
 const formationGain: f32 = 1.0;
 const formationRoomMeters: f32 = 1.0;
@@ -196,13 +210,26 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
 
   let p = positionsIn[i];
   let v = velocitiesIn[i];
-  let ds = select(params.desiredSpeed, speed[i], speed[i] > 0.0);
+  let freeSpeed = select(params.desiredSpeed, speed[i], speed[i] > 0.0);
 
   let toTarget = targets[i] - p;
-  let tlen = length(toTarget);
+  let distance = length(toTarget);
   var desired = vec2<f32>(0.0, 0.0);
-  if (tlen > 0.0001) { desired = toTarget / tlen; }
-  var force = (desired * ds - v) / params.relaxationTime;
+  if (distance > 0.0001) { desired = toTarget / distance; }
+  // Stage 6: crowdMovement.ts's own two-part integration (this file's own
+  // doc comment below the kernel string has the full citation) — desired
+  // speed eases with distance to target (even for non-holding agents, a
+  // real discrepancy from stages 1-5's flat freeSpeed target discovered
+  // while scoping this stage), holding agents ease over holdEaseMeters
+  // instead. force here accumulates PUSHES ONLY (everything except
+  // relaxation) — relaxation is applied as an exact closed-form decay at
+  // the very end, not folded into this sum.
+  let isHolding = holding[i] != 0u;
+  var desiredSpeed = min(freeSpeed, distance / params.relaxationTime);
+  if (isHolding) {
+    desiredSpeed = min(freeSpeed, (freeSpeed * distance) / params.holdEaseMeters);
+  }
+  var force = vec2<f32>(0.0, 0.0);
 
   // agent repulsion over the sorted 3x3 neighborhood — exponential falloff,
   // anisotropic (weighted less from behind), plus a contact term once bodies
@@ -333,11 +360,19 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
 
   force = force + hazardAvoidance[i];
 
-  // integrate + clamp to maxSpeed
-  let uv = v + force * params.dt;
-  let len = length(uv);
-  var cv = uv;
-  if (len > params.maxSpeed && len > 0.0001) { cv = (uv / len) * params.maxSpeed; }
+  // Stage 6: pushes Euler-integrated into velocity first, then relaxation
+  // toward (desired * desiredSpeed) solved exactly as a linear ODE over dt
+  // — the closed-form v(dt) = target + (v0 - target) * e^(-dt/tau), which
+  // cannot overshoot the target velocity at any step length. Ports
+  // gpuSimCoreSocialForce.ts's integrateWithRelaxation() exactly.
+  let relax = exp(-params.dt / params.relaxationTime);
+  let targetV = desired * desiredSpeed;
+  var cv = targetV + (v + force * params.dt - targetV) * relax;
+  // freeSpeed * maxSpeedRatio is the real, per-agent clamp — NOT
+  // params.maxSpeed (stages 1-5's flat clamp, unused by this integration).
+  let len = length(cv);
+  let maxSpeed = freeSpeed * params.maxSpeedRatio;
+  if (len > maxSpeed && len > 0.0001) { cv = (cv / len) * maxSpeed; }
   velocitiesOut[i] = cv;
   positionsOut[i] = p + cv * params.dt;
 }`;

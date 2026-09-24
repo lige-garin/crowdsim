@@ -37,6 +37,8 @@ const params: GpuSimCoreSocialForceParams = {
   // with a bigger cellSize where the wider range actually matters.
   anticipationRangeMeters: 2,
   anticipationMaxAcceleration: 5,
+  holdEaseMeters: 1,
+  maxSpeedRatio: 1.3,
 };
 const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
 
@@ -619,14 +621,19 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
       ...params,
       anticipationRangeMeters: 5,
-      relaxationTime: 1e9, // makes relaxation's own contribution negligible
-      maxSpeed: 1000, // keeps integrate()'s own clamp from masking this one
+      relaxationTime: 1e9, // makes relaxation's own contribution (both the
+      // exponential decay factor and desiredSpeed's distance/relaxationTime
+      // term) negligible
+      maxSpeedRatio: 1000, // stage 6's real clamp is freeSpeed * maxSpeedRatio,
+      // not the (now-unused-by-this-integration) inherited `maxSpeed` field
+      // — this keeps that clamp from masking the one under test here.
     });
 
-    // result.velocities = initial velocity + force * dt (clampMagnitude is a
-    // no-op at maxSpeed: 1000), so subtracting initial velocity and dividing
-    // by dt recovers the force itself — dominated by anticipation, since
-    // repulsion is zero at this range and relaxation is negligible.
+    // result.velocities ≈ initial velocity + force * dt (relax ≈ 1 with
+    // relaxationTime this large, and the maxSpeedRatio clamp is a no-op),
+    // so subtracting initial velocity and dividing by dt recovers the force
+    // itself — dominated by anticipation, since repulsion is zero at this
+    // range and relaxation is negligible.
     const forceX = (result.velocities[0] - v0x) / params.dt;
     const forceY = (result.velocities[1] - v0y) / params.dt;
     const magnitude = Math.hypot(forceX, forceY);
@@ -722,10 +729,16 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
     );
     const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
 
-    // Alone, no walls, zero relaxation pull: the only force at all with
-    // hazard avoidance supplied is the hazard vector itself.
+    // Alone, no walls, target = own position (desiredSpeed and the target
+    // velocity both zero): the push is Euler-added to velocity, then stage
+    // 6's exact exponential relaxation decays that toward the (zero) target
+    // velocity within the same step — not the old naive `3 * dt`, since
+    // relaxation now applies to everything, not just the "desired heading"
+    // term.
+    const relax = Math.exp(-params.dt / params.relaxationTime);
+    const expectedVx = 3 * params.dt * relax;
     expect(withHazard.velocities[0]).toBeGreaterThan(0);
-    expect(withHazard.velocities[0]).toBeCloseTo(3 * params.dt, 5);
+    expect(withHazard.velocities[0]).toBeCloseTo(expectedVx, 5);
     expect(without.velocities[0]).toBeCloseTo(0, 9);
   });
 
@@ -784,6 +797,167 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
       undefined,
       undefined,
       hazardAvoidance,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+});
+
+describe("stage 6: distance-based desired-speed easing, holding, and the exact exponential relaxation (crowdMovement.ts's two-part integrate)", () => {
+  it("eases desired speed down as a non-holding agent nears its target, not just a flat free speed", () => {
+    const far = createAgentSoA(1);
+    setAgentPosition(far, 0, 0, 0);
+    setAgentSpeed(far, 0, 1.34);
+    setAgentRadius(far, 0, 0.22);
+    const farTargets = new Float32Array([50, 0]); // far: desiredSpeed pinned at freeSpeed
+
+    const near = createAgentSoA(1);
+    setAgentPosition(near, 0, 0, 0);
+    setAgentSpeed(near, 0, 1.34);
+    setAgentRadius(near, 0, 0.22);
+    const nearTargets = new Float32Array([0.05, 0]); // near: distance/relaxationTime << freeSpeed
+
+    const farResult = stepGpuSimCoreSocialForceCpu(far, farTargets, [], params);
+    const nearResult = stepGpuSimCoreSocialForceCpu(near, nearTargets, [], params);
+
+    // Both start at rest with nothing pushing them but relaxation toward
+    // their own target — the near agent's desiredSpeed is capped by
+    // distance / relaxationTime (0.05 / 0.644 ≈ 0.078 m/s), the far one's
+    // isn't (50 / 0.644 far exceeds freeSpeed, so min() picks freeSpeed).
+    expect(nearResult.velocities[0]).toBeGreaterThan(0);
+    expect(nearResult.velocities[0]).toBeLessThan(farResult.velocities[0]);
+  });
+
+  it("holding agents ease toward their spot over holdEaseMeters, not the relaxationTime-based formula non-holding agents use", () => {
+    const N = 1;
+    const holdingFlags = new Uint32Array([1]);
+    const notHoldingFlags = new Uint32Array([0]);
+    const distance = 0.05;
+
+    const makeScene = () => {
+      const agents = createAgentSoA(N);
+      setAgentPosition(agents, 0, 0, 0);
+      setAgentSpeed(agents, 0, 1.34);
+      setAgentRadius(agents, 0, 0.22);
+      return agents;
+    };
+    const targets = new Float32Array([distance, 0]);
+
+    // holdEaseMeters (1) and relaxationTime (0.644) are different numbers,
+    // so the same distance produces a different desiredSpeed cap under the
+    // two formulas: freeSpeed * distance / holdEaseMeters vs.
+    // distance / relaxationTime.
+    const holdingResult = stepGpuSimCoreSocialForceCpu(
+      makeScene(),
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holdingFlags,
+    );
+    const notHoldingResult = stepGpuSimCoreSocialForceCpu(
+      makeScene(),
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      notHoldingFlags,
+    );
+
+    expect(holdingResult.velocities[0]).toBeGreaterThan(0);
+    expect(notHoldingResult.velocities[0]).toBeGreaterThan(0);
+    expect(holdingResult.velocities[0]).not.toBeCloseTo(
+      notHoldingResult.velocities[0],
+      6,
+    );
+  });
+
+  it("clamps the final velocity to freeSpeed * maxSpeedRatio — a PER-AGENT cap, not the inherited flat maxSpeed field", () => {
+    const slow = createAgentSoA(1);
+    setAgentPosition(slow, 0, 0, 0);
+    setAgentSpeed(slow, 0, 0.5); // this agent's own freeSpeed is well under params.maxSpeed
+    setAgentRadius(slow, 0, 0.22);
+    const targets = new Float32Array([500, 0]); // far away: desiredSpeed pinned at freeSpeed
+    setAgentVelocity(slow, 0, 10, 0); // start already moving far faster than any real cap
+
+    const result = stepGpuSimCoreSocialForceCpu(slow, targets, [], params);
+
+    // freeSpeed * maxSpeedRatio = 0.5 * 1.3 = 0.65 — much smaller than the
+    // inherited (and, since stage 6, unused-by-this-integration) flat
+    // params.maxSpeed of 1.7 that an old-style clamp would have allowed.
+    const speed = Math.hypot(result.velocities[0], result.velocities[1]);
+    expect(speed).toBeLessThanOrEqual(0.5 * params.maxSpeedRatio + 1e-6);
+  });
+
+  it("matches the closed-form exponential relaxation exactly for an isolated agent, not a first-order Euler approximation", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentSpeed(agents, 0, 1.34);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentVelocity(agents, 0, 0.2, 0);
+    const targets = new Float32Array([50, 0]); // far: desiredSpeed = freeSpeed exactly
+
+    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    // No pushes at all here (alone, no walls) — pure relaxation from v=0.2
+    // toward freeSpeed=1.34, over one step. The exact solution:
+    // v(dt) = target + (v0 - target) * e^(-dt/tau).
+    const relax = Math.exp(-params.dt / params.relaxationTime);
+    const expectedVx = 1.34 + (0.2 - 1.34) * relax;
+    // A naive Euler step (v0 + (target - v0)/tau * dt) would give a
+    // measurably different number at this dt/tau ratio — this assertion is
+    // only meaningful because the two formulas actually disagree here.
+    const eulerVx = 0.2 + ((1.34 - 0.2) / params.relaxationTime) * params.dt;
+    expect(Math.abs(expectedVx - eulerVx)).toBeGreaterThan(1e-4);
+    expect(result.velocities[0]).toBeCloseTo(expectedVx, 5);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with holding flags active", () => {
+    const N = 20;
+    const agents = createAgentSoA(N);
+    const targets = new Float32Array(N * 2);
+    const holding = new Uint32Array(N);
+    for (let i = 0; i < N; i++) {
+      setAgentPosition(agents, i, 5 + (i % 5) * 1.2, 5 + Math.floor(i / 5) * 1.2);
+      setAgentSpeed(agents, i, 1.34);
+      setAgentRadius(agents, i, 0.22);
+      targets[i * 2] = 5 + (i % 5) * 1.2 + 0.3; // close targets: easing actually matters
+      targets[i * 2 + 1] = 5 + Math.floor(i / 5) * 1.2;
+      holding[i] = i % 3 === 0 ? 1 : 0; // a mix, not all-or-nothing
+    }
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+      undefined,
+      undefined,
+      undefined,
+      holding,
     );
 
     for (let i = 0; i < N * 2; i++) {

@@ -193,6 +193,7 @@ export async function stepForParity(
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
+  holding?: Uint32Array,
 ): Promise<StepParityReadback> {
   const count = agents.count;
   if (count === 0) {
@@ -268,6 +269,14 @@ export async function stepForParity(
     count * 2 * F32,
     GPUBufferUsage.COPY_DST,
   );
+  // ADR-0015 stage 6: always bound (same reasoning as the buffers above),
+  // harmless as all-zero (not holding) when nobody supplies a real one.
+  const holdingBuffer = createStorageBuffer(
+    device,
+    "step-holding",
+    count * U32,
+    GPUBufferUsage.COPY_DST,
+  );
   const wallsBuffer = createStorageBuffer(
     device,
     "step-walls",
@@ -281,7 +290,7 @@ export async function stepForParity(
   });
   const moveParamsBuffer = device.createBuffer({
     label: "step-move-params",
-    size: 92,
+    size: 100,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const cellCountsBuffer = createStorageBuffer(
@@ -339,6 +348,11 @@ export async function stepForParity(
     hazardAvoidanceBuffer,
     0,
     hazardAvoidance ? hazardAvoidance.slice(0, count * 2) : new Float32Array(count * 2),
+  );
+  device.queue.writeBuffer(
+    holdingBuffer,
+    0,
+    holding ? holding.slice(0, count) : new Uint32Array(count),
   );
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
@@ -406,6 +420,7 @@ export async function stepForParity(
         { binding: 11, resource: { buffer: groupIdsBuffer } },
         { binding: 12, resource: { buffer: formationSlotsBuffer } },
         { binding: 13, resource: { buffer: hazardAvoidanceBuffer } },
+        { binding: 14, resource: { buffer: holdingBuffer } },
       ],
     });
   });
@@ -474,6 +489,7 @@ export async function stepForParity(
     groupIdsBuffer,
     formationSlotsBuffer,
     hazardAvoidanceBuffer,
+    holdingBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,

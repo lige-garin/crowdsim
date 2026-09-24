@@ -22,7 +22,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
       });
       expect(device).toBeDefined();
 
@@ -60,6 +60,8 @@ describe("fused move parity (real WebGPU)", () => {
         anticipationHorizonSeconds: 3,
         anticipationRangeMeters: 2,
         anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
       };
       // cellSize >= interactionRangeMeters so the GPU 3x3 neighborhood is exact.
       const layout = createSpatialHashGridLayout({
@@ -102,7 +104,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
       });
       expect(device).toBeDefined();
 
@@ -142,6 +144,8 @@ describe("fused move parity (real WebGPU)", () => {
         anticipationHorizonSeconds: 3,
         anticipationRangeMeters: 2,
         anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -191,7 +195,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
       });
       expect(device).toBeDefined();
 
@@ -242,6 +246,8 @@ describe("fused move parity (real WebGPU)", () => {
         anticipationHorizonSeconds: 3,
         anticipationRangeMeters: 2,
         anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -291,7 +297,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
       });
       expect(device).toBeDefined();
 
@@ -331,6 +337,8 @@ describe("fused move parity (real WebGPU)", () => {
         anticipationHorizonSeconds: 3,
         anticipationRangeMeters: 3,
         anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -371,7 +379,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
       });
       expect(device).toBeDefined();
 
@@ -413,6 +421,8 @@ describe("fused move parity (real WebGPU)", () => {
         anticipationHorizonSeconds: 3,
         anticipationRangeMeters: 2,
         anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -449,6 +459,100 @@ describe("fused move parity (real WebGPU)", () => {
         undefined,
         undefined,
         hazardAvoidance,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 6: distance-based speed easing, holding, exact exponential relaxation) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+      });
+      expect(device).toBeDefined();
+
+      // Targets close enough that desiredSpeed's distance easing actually
+      // binds (not just "far away, always at freeSpeed") — the whole point
+      // of this stage. Every third agent holds (uses holdEaseMeters instead
+      // of relaxationTime for that easing), a mix like stage 3's grouping.
+      const N = 20;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      const holding = new Uint32Array(N);
+      for (let i = 0; i < N; i++) {
+        setAgentPosition(agents, i, 5 + (i % 5) * 1.2, 5 + Math.floor(i / 5) * 1.2);
+        setAgentSpeed(agents, i, 1.34);
+        setAgentRadius(agents, i, 0.22);
+        targets[i * 2] = 5 + (i % 5) * 1.2 + 0.3;
+        targets[i * 2 + 1] = 5 + Math.floor(i / 5) * 1.2;
+        holding[i] = i % 3 === 0 ? 1 : 0;
+      }
+      const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 64,
+        height: 64,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          undefined,
+          undefined,
+          undefined,
+          holding,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        holding,
       );
 
       for (let i = 0; i < N * 2; i++) {

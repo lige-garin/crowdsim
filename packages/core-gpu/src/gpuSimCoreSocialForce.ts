@@ -43,10 +43,10 @@ import type {
  * implementation (WGSL and TypeScript cannot share a function body).
  *
  * Deliberately NOT ported here, left for a later stage per ADR-0015's own
- * order (base force first, since everything else assumes it's right):
- * holding-state speed easing, the no-walking-backward clamp, and the
- * no-overshoot-past-target clamp. Leader-following is a decision-layer
- * target rewrite, not a 60Hz force — nothing to port.
+ * order (base force first, since everything else assumes it's right): the
+ * no-walking-backward clamp and the no-overshoot-past-target clamp.
+ * Leader-following is a decision-layer target rewrite, not a 60Hz force —
+ * nothing to port.
  *
  * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
  * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
@@ -103,6 +103,17 @@ export type GpuSimCoreSocialForceParams = SocialForceParams & {
    * `anticipationMaxAcceleration`, applied to the summed anticipation force
    * only (not the combined total), exactly like the CPU original. */
   anticipationMaxAcceleration: number;
+  /** How far out (m) a holding agent eases toward its own spot —
+   * crowdMovement's `holdEaseMeters`, another real calibrated field. Stage 6
+   * uses this for the desired-speed formula's holding branch. */
+  holdEaseMeters: number;
+  /** Per-agent speed cap as a multiple of that agent's own free speed —
+   * crowdMovement's `maxSpeedRatio`. Stage 6 uses `freeSpeed * maxSpeedRatio`
+   * as the real clamp, NOT the inherited `maxSpeed` field (kept only
+   * because `SocialForceParams` is shared with the frozen linear-model
+   * probe — `socialForceCpu.ts`/`motionGpu.ts` — that still uses it as a
+   * flat clamp; this file's own stage-6 integration ignores it). */
+  maxSpeedRatio: number;
 };
 
 /**
@@ -319,19 +330,49 @@ function clampAnticipation(
   return { x: fx, y: fy };
 }
 
-function integrate(
+/**
+ * Stage 6: `crowdMovement.ts`'s own two-part integration, ported exactly —
+ * NOT the naive `v += force * dt` stages 1-5 used for the relaxation term
+ * (a real, deeper discrepancy discovered while scoping this stage, present
+ * since stage 1 and not specific to holding at all: `desiredSpeed` itself
+ * eases with distance-to-target — `min(freeSpeed, distance / relaxationTime)`
+ * even for non-holding agents — a distance-based deceleration stages 1-5's
+ * flat `desiredSpeed = freeSpeed` never had). Pushes (`ax`/`ay` — repulsion,
+ * wall, sidestep, anticipation, formation, hazard avoidance; everything
+ * EXCEPT relaxation toward the desired heading) are Euler-integrated into
+ * velocity first, then relaxation is solved EXACTLY as a linear ODE from
+ * that intermediate velocity — the closed-form `v(dt) = v_target + (v0 −
+ * v_target) · e^(−dt/τ)`, which cannot overshoot the target velocity at any
+ * step length, unlike an explicit `(v_target − v)/τ` force step would.
+ *
+ * `desiredSpeed`'s two branches (`holding ? ... : ...`) and the
+ * `freeSpeed * maxSpeedRatio` clamp (replacing stages 1-5's flat
+ * `params.maxSpeed`) are both computed by the caller and passed in here,
+ * since both need `distance`/`freeSpeed`, already computed there for the
+ * neighbour loop's own desired-direction/facing math.
+ */
+function integrateWithRelaxation(
   vx: number,
   vy: number,
-  forceX: number,
-  forceY: number,
+  ax: number,
+  ay: number,
+  desired: { x: number; y: number },
+  desiredSpeed: number,
+  freeSpeed: number,
   params: GpuSimCoreSocialForceParams,
 ): { position: { x: number; y: number }; velocity: { x: number; y: number } } {
-  const unclampedVx = vx + forceX * params.dt;
-  const unclampedVy = vy + forceY * params.dt;
-  const clamped = clampMagnitude(unclampedVx, unclampedVy, params.maxSpeed);
+  const dt = params.dt;
+  const relax = Math.exp(-dt / params.relaxationTime);
+  const targetVx = desired.x * desiredSpeed;
+  const targetVy = desired.y * desiredSpeed;
+  let vxNew = targetVx + (vx + ax * dt - targetVx) * relax;
+  let vyNew = targetVy + (vy + ay * dt - targetVy) * relax;
+  const clamped = clampMagnitude(vxNew, vyNew, freeSpeed * params.maxSpeedRatio);
+  vxNew = clamped.x;
+  vyNew = clamped.y;
   return {
-    position: { x: clamped.x * params.dt, y: clamped.y * params.dt },
-    velocity: clamped,
+    position: { x: vxNew * dt, y: vyNew * dt },
+    velocity: { x: vxNew, y: vyNew },
   };
 }
 
@@ -351,6 +392,7 @@ export function stepGpuSimCoreSocialForceCpu(
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
+  holding?: Uint32Array,
 ): SocialForceStepResult {
   const nextPositions = agents.positions.slice(0, agents.count * 2);
   const nextVelocities = agents.velocities.slice(0, agents.count * 2);
@@ -362,11 +404,18 @@ export function stepGpuSimCoreSocialForceCpu(
     const vy = agents.velocities[index * 2 + 1];
     const targetX = targetPositions[index * 2];
     const targetY = targetPositions[index * 2 + 1];
-    const desiredSpeed =
+    const freeSpeed =
       agents.speed[index] > 0 ? agents.speed[index] : params.desiredSpeed;
-    const desired = normalize2(targetX - px, targetY - py);
-    let forceX = (desired.x * desiredSpeed - vx) / params.relaxationTime;
-    let forceY = (desired.y * desiredSpeed - vy) / params.relaxationTime;
+    const dxTarget = targetX - px;
+    const dyTarget = targetY - py;
+    const distance = Math.hypot(dxTarget, dyTarget);
+    const desired = normalize2(dxTarget, dyTarget);
+    const isHolding = holding !== undefined && holding[index] !== 0;
+    const desiredSpeed = isHolding
+      ? Math.min(freeSpeed, (freeSpeed * distance) / params.holdEaseMeters)
+      : Math.min(freeSpeed, distance / params.relaxationTime);
+    let ax = 0;
+    let ay = 0;
 
     let strangersClose = 0;
     let anticipationX = 0;
@@ -390,8 +439,8 @@ export function stepGpuSimCoreSocialForceCpu(
         groupIds[index] >= 0 &&
         groupIds[index] === groupIds[other];
       const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
-      forceX += push.x;
-      forceY += push.y;
+      ax += push.x;
+      ay += push.y;
       const anticipate = anticipationPairForce(
         px,
         py,
@@ -408,12 +457,12 @@ export function stepGpuSimCoreSocialForceCpu(
       anticipationY += anticipate.y;
     }
     const anticipation = clampAnticipation(anticipationX, anticipationY, params);
-    forceX += anticipation.x;
-    forceY += anticipation.y;
+    ax += anticipation.x;
+    ay += anticipation.y;
 
     const wall = wallForce(px, py, walls, params);
-    forceX += wall.x;
-    forceY += wall.y;
+    ax += wall.x;
+    ay += wall.y;
 
     const formation = formationForce(
       index,
@@ -424,8 +473,8 @@ export function stepGpuSimCoreSocialForceCpu(
       groupIds,
       formationSlots,
     );
-    forceX += formation.x;
-    forceY += formation.y;
+    ax += formation.x;
+    ay += formation.y;
 
     // Hazard avoidance (ADR-0012): steer away from the worst fire/smoke
     // source exposing this agent. Precomputed once per DECISION tick by
@@ -436,11 +485,20 @@ export function stepGpuSimCoreSocialForceCpu(
     // output, not a neighbour-summed force, so there is no loop here at
     // all, just an add.
     if (hazardAvoidance) {
-      forceX += hazardAvoidance[index * 2];
-      forceY += hazardAvoidance[index * 2 + 1];
+      ax += hazardAvoidance[index * 2];
+      ay += hazardAvoidance[index * 2 + 1];
     }
 
-    const result = integrate(vx, vy, forceX, forceY, params);
+    const result = integrateWithRelaxation(
+      vx,
+      vy,
+      ax,
+      ay,
+      desired,
+      desiredSpeed,
+      freeSpeed,
+      params,
+    );
     nextVelocities[index * 2] = result.velocity.x;
     nextVelocities[index * 2 + 1] = result.velocity.y;
     nextPositions[index * 2] = px + result.position.x;
@@ -471,6 +529,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
+  holding?: Uint32Array,
 ): SocialForceStepResult {
   if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
@@ -512,11 +571,18 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     const vy = agents.velocities[index * 2 + 1];
     const targetX = targetPositions[index * 2];
     const targetY = targetPositions[index * 2 + 1];
-    const desiredSpeed =
+    const freeSpeed =
       agents.speed[index] > 0 ? agents.speed[index] : params.desiredSpeed;
-    const desired = normalize2(targetX - px, targetY - py);
-    let forceX = (desired.x * desiredSpeed - vx) / params.relaxationTime;
-    let forceY = (desired.y * desiredSpeed - vy) / params.relaxationTime;
+    const dxTarget = targetX - px;
+    const dyTarget = targetY - py;
+    const distance = Math.hypot(dxTarget, dyTarget);
+    const desired = normalize2(dxTarget, dyTarget);
+    const isHolding = holding !== undefined && holding[index] !== 0;
+    const desiredSpeed = isHolding
+      ? Math.min(freeSpeed, (freeSpeed * distance) / params.holdEaseMeters)
+      : Math.min(freeSpeed, distance / params.relaxationTime);
+    let ax = 0;
+    let ay = 0;
 
     const cell = computeCellId(px, py, layout);
     const column = cell % layout.columns;
@@ -560,8 +626,8 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
             groupIds[index] >= 0 &&
             groupIds[index] === groupIds[other];
           const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
-          forceX += push.x;
-          forceY += push.y;
+          ax += push.x;
+          ay += push.y;
           const anticipate = anticipationPairForce(
             px,
             py,
@@ -580,12 +646,12 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       }
     }
     const anticipation = clampAnticipation(anticipationX, anticipationY, params);
-    forceX += anticipation.x;
-    forceY += anticipation.y;
+    ax += anticipation.x;
+    ay += anticipation.y;
 
     const wall = wallForce(px, py, walls, params);
-    forceX += wall.x;
-    forceY += wall.y;
+    ax += wall.x;
+    ay += wall.y;
 
     const formation = formationForce(
       index,
@@ -596,15 +662,24 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       groupIds,
       formationSlots,
     );
-    forceX += formation.x;
-    forceY += formation.y;
+    ax += formation.x;
+    ay += formation.y;
 
     if (hazardAvoidance) {
-      forceX += hazardAvoidance[index * 2];
-      forceY += hazardAvoidance[index * 2 + 1];
+      ax += hazardAvoidance[index * 2];
+      ay += hazardAvoidance[index * 2 + 1];
     }
 
-    const result = integrate(vx, vy, forceX, forceY, params);
+    const result = integrateWithRelaxation(
+      vx,
+      vy,
+      ax,
+      ay,
+      desired,
+      desiredSpeed,
+      freeSpeed,
+      params,
+    );
     nextVelocities[index * 2] = result.velocity.x;
     nextVelocities[index * 2 + 1] = result.velocity.y;
     nextPositions[index * 2] = px + result.position.x;

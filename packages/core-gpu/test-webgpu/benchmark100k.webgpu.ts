@@ -15,7 +15,7 @@ describe("100k step-time benchmark (real WebGPU)", () => {
   gpuTest("100k agents step-time", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
     });
     expect(device).toBeDefined();
 
@@ -44,6 +44,8 @@ describe("100k step-time benchmark (real WebGPU)", () => {
       anticipationHorizonSeconds: 3,
       anticipationRangeMeters: 3,
       anticipationMaxAcceleration: 5,
+      holdEaseMeters: 1,
+      maxSpeedRatio: 1.3,
     };
     const core = createGpuSimCore(device!, {
       capacity: N,

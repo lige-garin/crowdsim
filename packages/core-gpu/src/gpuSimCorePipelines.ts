@@ -92,13 +92,13 @@ export function createMovePipeline(device: GPUDevice): {
   layout: GPUBindGroupLayout;
   pipeline: GPUComputePipeline;
 } {
-  // The fused move binds 14 storage buffers (11 + ADR-0015 stage 2's
-  // groupIds/formationSlots + stage 5's hazardAvoidance) — above the
-  // WebGPU default of 8. Without this check the pipeline fails validation
-  // *silently* (async device error) and every step() becomes a no-op that
-  // still costs submission time, which is exactly how a benchmark measures
-  // a dead pipeline.
-  const needed = 14;
+  // The fused move binds 15 storage buffers (11 + ADR-0015 stage 2's
+  // groupIds/formationSlots + stage 5's hazardAvoidance + stage 6's
+  // holding) — above the WebGPU default of 8. Without this check the
+  // pipeline fails validation *silently* (async device error) and every
+  // step() becomes a no-op that still costs submission time, which is
+  // exactly how a benchmark measures a dead pipeline.
+  const needed = 15;
 
   if (device.limits.maxStorageBuffersPerShaderStage < needed) {
     throw new Error(
@@ -130,6 +130,7 @@ export function createMovePipeline(device: GPUDevice): {
       readOnlyStorageBinding(11), // groupIds
       readOnlyStorageBinding(12), // formationSlots
       readOnlyStorageBinding(13), // hazardAvoidance
+      readOnlyStorageBinding(14), // holding
     ],
   });
   return {
@@ -147,7 +148,7 @@ export function buildMoveParamsData(
   params: GpuSimCoreSocialForceParams,
   wallCount: number,
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(92);
+  const buffer = new ArrayBuffer(100);
   const view = new DataView(buffer);
   view.setUint32(0, count, true);
   view.setUint32(4, layout.columns, true);
@@ -172,6 +173,8 @@ export function buildMoveParamsData(
   view.setFloat32(80, params.anticipationHorizonSeconds, true);
   view.setFloat32(84, params.anticipationRangeMeters, true);
   view.setFloat32(88, params.anticipationMaxAcceleration, true);
+  view.setFloat32(92, params.holdEaseMeters, true);
+  view.setFloat32(96, params.maxSpeedRatio, true);
   return buffer;
 }
 export function buildGridParamsData(
