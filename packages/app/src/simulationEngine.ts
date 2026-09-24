@@ -781,6 +781,7 @@ export function createSimulationEngine(
       stepped.push(
         ...stepVehicles({
           dtSeconds: fixedDtSeconds,
+          elapsedSeconds,
           pedestrians: agents.filter(
             (agent) => (agent.floorId ?? baseFloor()) === floor.id,
           ),

@@ -57,6 +57,28 @@ export const crosswalkSchema = z.object({
   visual: visual2d5Schema,
 });
 
+/**
+ * A traffic signal governing one road (ADR-0023, SP-3 stage 2) — not an
+ * intersection entity: an intersection is inferred purely from road
+ * endpoints meeting in space, and a signal is just a stop line one road's
+ * own traffic checks, the same relationship a crosswalk already has to its
+ * `roadId`. Phase is a pure function of the simulation clock (two-phase:
+ * green then red, no amber warning phase), so two signals can be staggered
+ * via `offsetSeconds` but are otherwise independent of each other and of
+ * any other road meeting at the same inferred junction.
+ */
+export const trafficSignalSchema = z.object({
+  id: idSchema,
+  name: z.string().min(1).optional(),
+  floorId: floorIdSchema,
+  roadId: idSchema,
+  position: pointSchema,
+  greenSeconds: z.number().positive().default(20),
+  redSeconds: z.number().positive().default(20),
+  offsetSeconds: z.number().nonnegative().default(0),
+  visual: visual2d5Schema,
+});
+
 export const buildingKindSchema = z.enum([
   "civic",
   "mixedUse",

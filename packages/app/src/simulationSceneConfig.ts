@@ -211,10 +211,13 @@ export function deriveSceneGeometry(
 
 /**
  * A scene's `vehicleAccessible` roads, ready to drive (ADR-0016 stage 1,
- * wired in by ADR-0020). Every other road — the overwhelming majority, since
- * `vehicleAccessible` defaults false — is left out here exactly as
- * `sceneHazardRuntimes` leaves out hazard kinds this project has not modelled:
- * still a shape on the map, never a simulated one.
+ * ADR-0023 stage 2, wired in by ADR-0020). Every other road — the
+ * overwhelming majority, since `vehicleAccessible` defaults false — is left
+ * out here exactly as `sceneHazardRuntimes` leaves out hazard kinds this
+ * project has not modelled: still a shape on the map, never a simulated
+ * one. `stepVehicles` infers the road *network* (which roads connect at a
+ * junction) from these `RoadRuntime`s' own endpoints every tick — nothing
+ * about connectivity is precomputed or stored here.
  */
 export function sceneRoadRuntimes(scene: CrowdSimScene): RoadRuntime[] {
   return scene.roads
@@ -225,6 +228,7 @@ export function sceneRoadRuntimes(scene: CrowdSimScene): RoadRuntime[] {
         scene.crosswalks,
         scene.transitStops,
         resolveFloorId(scene, road),
+        scene.trafficSignals,
       ),
     );
 }

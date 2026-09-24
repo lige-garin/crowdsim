@@ -2,6 +2,8 @@ import { parseScene } from "@crowdsim/scene-schema";
 import { describe, expect, it } from "vitest";
 import {
   buildRoadRuntime,
+  buildRoadTurnOptions,
+  signalIsRed,
   stepVehicles,
   worldPositionAtProgress,
   type VehicleAgent,
@@ -236,6 +238,7 @@ describe("stepVehicles: free-flow car-following", () => {
     for (let i = 0; i < 600; i++) {
       vehicles = stepVehicles({
         dtSeconds: 1 / 10,
+        elapsedSeconds: 0,
         pedestrians: [],
         random: alwaysOne,
         roads: [runtime],
@@ -258,6 +261,7 @@ describe("stepVehicles: free-flow car-following", () => {
     for (let i = 0; i < 2000; i++) {
       vehicles = stepVehicles({
         dtSeconds: 1 / 20,
+        elapsedSeconds: 0,
         pedestrians: [],
         random: alwaysOne,
         roads: [runtime],
@@ -294,6 +298,7 @@ describe("stepVehicles: crosswalk yielding", () => {
     for (let i = 0; i < 400; i++) {
       vehicles = stepVehicles({
         dtSeconds: 1 / 20,
+        elapsedSeconds: 0,
         pedestrians: occupiedCrosswalk,
         random: alwaysOne,
         roads: [runtime],
@@ -308,6 +313,7 @@ describe("stepVehicles: crosswalk yielding", () => {
     for (let i = 0; i < 400; i++) {
       vehicles = stepVehicles({
         dtSeconds: 1 / 20,
+        elapsedSeconds: 0,
         pedestrians: [], // pedestrian has crossed
         random: alwaysOne,
         roads: [runtime],
@@ -349,6 +355,7 @@ describe("stepVehicles: bus dwell", () => {
     for (let i = 0; i < 4000 && arrivedAtProgress === undefined; i++) {
       vehicles = stepVehicles({
         dtSeconds,
+        elapsedSeconds: 0,
         pedestrians: [],
         random: alwaysOne,
         roads: [runtime],
@@ -373,6 +380,7 @@ describe("stepVehicles: bus dwell", () => {
     while (stillDwelling && steps < 4000) {
       vehicles = stepVehicles({
         dtSeconds,
+        elapsedSeconds: 0,
         pedestrians: [],
         random: alwaysOne,
         roads: [runtime],
@@ -390,6 +398,7 @@ describe("stepVehicles: bus dwell", () => {
     for (let i = 0; i < 200; i++) {
       vehicles = stepVehicles({
         dtSeconds,
+        elapsedSeconds: 0,
         pedestrians: [],
         random: alwaysOne,
         roads: [runtime],
@@ -418,6 +427,7 @@ describe("stepVehicles: bus dwell", () => {
 
     vehicles = stepVehicles({
       dtSeconds: 1,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysOne,
       roads: [runtime],
@@ -438,6 +448,7 @@ describe("stepVehicles: despawn", () => {
 
     vehicles = stepVehicles({
       dtSeconds: 1,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysOne,
       roads: [runtime],
@@ -463,6 +474,7 @@ describe("stepVehicles: despawn", () => {
 
     const afterTick1 = stepVehicles({
       dtSeconds: 1 / 10,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysOne,
       roads: [runtime],
@@ -482,6 +494,7 @@ describe("stepVehicles: despawn", () => {
     // decelerating toward where "ahead" used to be.
     const afterTick2 = stepVehicles({
       dtSeconds: 1 / 10,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysOne,
       roads: [runtime],
@@ -503,6 +516,7 @@ describe("stepVehicles: spawning", () => {
     );
     const spawned = stepVehicles({
       dtSeconds: 1,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysZero, // 0 < probability always spawns
       roads: [runtime],
@@ -517,6 +531,7 @@ describe("stepVehicles: spawning", () => {
     const runtime = buildRoadRuntime(road({ vehicleArrivalRatePerMinute: 0 }), [], []);
     const spawned = stepVehicles({
       dtSeconds: 1,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysZero,
       roads: [runtime],
@@ -533,11 +548,333 @@ describe("stepVehicles: spawning", () => {
     );
     const result = stepVehicles({
       dtSeconds: 1,
+      elapsedSeconds: 0,
       pedestrians: [],
       random: alwaysZero,
       roads: [runtime],
       vehicles: [car({ progressMeters: 1 })],
     });
     expect(result).toHaveLength(1); // only the pre-existing vehicle, stepped
+  });
+});
+
+describe("buildRoadTurnOptions (ADR-0023)", () => {
+  it("connects two roads whose endpoints meet within the snap tolerance", () => {
+    const built = scene({
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+        },
+        {
+          id: "cross-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 100, y: 0 },
+              { x: 100, y: 100 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+        },
+      ],
+    });
+    const runtimes = built.roads.map((r) => buildRoadRuntime(r, [], []));
+    const options = buildRoadTurnOptions(runtimes);
+    expect(options.get("main-street:end")).toEqual([
+      { end: "start", roadId: "cross-street" },
+    ]);
+    expect(options.get("cross-street:start")).toEqual([
+      { end: "end", roadId: "main-street" },
+    ]);
+  });
+
+  it("does not connect roads whose endpoints are far apart", () => {
+    const built = scene({
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+        },
+        {
+          id: "far-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 500, y: 500 },
+              { x: 600, y: 500 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+        },
+      ],
+    });
+    const runtimes = built.roads.map((r) => buildRoadRuntime(r, [], []));
+    const options = buildRoadTurnOptions(runtimes);
+    expect(options.get("main-street:end")).toEqual([]);
+  });
+});
+
+describe("stepVehicles: turning at a junction (ADR-0023)", () => {
+  function junctionRoads(
+    crossDirection: "oneWayForward" | "oneWayBackward" | "twoWay",
+  ) {
+    const built = scene({
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          direction: "oneWayForward",
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+        {
+          id: "cross-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 100, y: 0 },
+              { x: 100, y: 100 },
+            ],
+          },
+          direction: crossDirection,
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+      ],
+    });
+    return built.roads.map((r) => buildRoadRuntime(r, [], []));
+  }
+
+  it("turns a vehicle onto a connected road instead of despawning it", () => {
+    const roads = junctionRoads("twoWay");
+    // One step from the far end: covers the remaining distance and arrives
+    // exactly at the junction this same tick.
+    let vehicles: VehicleAgent[] = [
+      car({ progressMeters: 99, speedMetersPerSecond: 10 }),
+    ];
+    vehicles = stepVehicles({
+      dtSeconds: 1,
+      elapsedSeconds: 0,
+      pedestrians: [],
+      random: alwaysZero,
+      roads,
+      vehicles,
+    });
+    expect(vehicles).toHaveLength(1); // did not despawn
+    expect(vehicles[0].roadId).toBe("cross-street");
+    expect(vehicles[0].laneDirection).toBe("forward");
+    expect(vehicles[0].progressMeters).toBe(0);
+    expect(vehicles[0].x).toBeCloseTo(100);
+    expect(vehicles[0].y).toBeCloseTo(0);
+  });
+
+  it("despawns at a dead end when no connected road permits entry (one-way against it)", () => {
+    // cross-street is oneWayBackward: entering it from its own start
+    // ("forward") is not a direction it permits, so main-street's traffic
+    // has nowhere to turn even though the roads geometrically meet.
+    const roads = junctionRoads("oneWayBackward");
+    let vehicles: VehicleAgent[] = [
+      car({ progressMeters: 99, speedMetersPerSecond: 10 }),
+    ];
+    vehicles = stepVehicles({
+      dtSeconds: 1,
+      elapsedSeconds: 0,
+      pedestrians: [],
+      random: alwaysZero,
+      roads,
+      vehicles,
+    });
+    expect(vehicles).toHaveLength(0);
+  });
+
+  it("picks among multiple connected roads using the deterministic random draw, not always the first", () => {
+    const built = scene({
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          direction: "oneWayForward",
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+        {
+          id: "branch-a",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 100, y: 0 },
+              { x: 100, y: 100 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+        {
+          id: "branch-b",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 100, y: 0 },
+              { x: 100, y: -100 },
+            ],
+          },
+          direction: "twoWay",
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+      ],
+    });
+    const roads = built.roads.map((r) => buildRoadRuntime(r, [], []));
+    const withDraw = (draw: number) =>
+      stepVehicles({
+        dtSeconds: 1,
+        elapsedSeconds: 0,
+        pedestrians: [],
+        random: () => draw,
+        roads,
+        vehicles: [car({ progressMeters: 99, speedMetersPerSecond: 10 })],
+      })[0].roadId;
+    // Two candidates (branch-a, branch-b) in the order buildRoadTurnOptions
+    // enumerates roads: a low draw picks the first, a draw just under 1
+    // picks the last — proving the choice is real, not hardcoded to always
+    // the same branch.
+    expect(withDraw(0)).toBe("branch-a");
+    expect(withDraw(0.99)).toBe("branch-b");
+  });
+});
+
+describe("signalIsRed (ADR-0023)", () => {
+  const signal = {
+    forwardArclengthMeters: 0,
+    greenSeconds: 20,
+    id: "signal-1",
+    offsetSeconds: 0,
+    redSeconds: 10,
+  };
+
+  it("is green for the first greenSeconds of each cycle and red after", () => {
+    expect(signalIsRed(signal, 0)).toBe(false);
+    expect(signalIsRed(signal, 19.9)).toBe(false);
+    expect(signalIsRed(signal, 20)).toBe(true);
+    expect(signalIsRed(signal, 29.9)).toBe(true);
+  });
+
+  it("wraps to green again at the start of the next cycle", () => {
+    expect(signalIsRed(signal, 30)).toBe(false); // cycle length 30
+    expect(signalIsRed(signal, 50)).toBe(true);
+  });
+
+  it("staggers via offsetSeconds", () => {
+    const offsetSignal = { ...signal, offsetSeconds: 20 };
+    // Same instant a same-timed, unoffset signal is green, this one is red.
+    expect(signalIsRed(signal, 0)).toBe(false);
+    expect(signalIsRed(offsetSignal, 0)).toBe(true);
+  });
+});
+
+describe("stepVehicles: traffic signals (ADR-0023)", () => {
+  function signalledRoad() {
+    const built = scene({
+      roads: [
+        {
+          id: "main-street",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 0, y: 0 },
+              { x: 100, y: 0 },
+            ],
+          },
+          direction: "oneWayForward",
+          vehicleAccessible: true,
+          vehicleSpeedLimitMetersPerSecond: 10,
+        },
+      ],
+      trafficSignals: [
+        {
+          id: "signal-1",
+          roadId: "main-street",
+          position: { x: 80, y: 0 },
+          greenSeconds: 20,
+          redSeconds: 20,
+          offsetSeconds: 0,
+        },
+      ],
+    });
+    return buildRoadRuntime(built.roads[0], [], [], undefined, built.trafficSignals);
+  }
+
+  it("holds a vehicle before a red signal instead of driving through it", () => {
+    const runtime = signalledRoad();
+    let vehicles: VehicleAgent[] = [
+      car({ progressMeters: 60, speedMetersPerSecond: 10 }),
+    ];
+    // elapsedSeconds=25 -> past greenSeconds=20 -> red.
+    for (let i = 0; i < 300; i++) {
+      vehicles = stepVehicles({
+        dtSeconds: 1 / 10,
+        elapsedSeconds: 25,
+        pedestrians: [],
+        random: alwaysOne,
+        roads: [runtime],
+        vehicles,
+      });
+    }
+    expect(vehicles[0].progressMeters).toBeLessThan(80);
+    expect(vehicles[0].progressMeters).toBeGreaterThan(70); // actually approached the line
+  });
+
+  it("lets a vehicle proceed through a green signal", () => {
+    const runtime = signalledRoad();
+    let vehicles: VehicleAgent[] = [
+      car({ progressMeters: 60, speedMetersPerSecond: 10 }),
+    ];
+    // elapsedSeconds=5 -> within greenSeconds=20 -> green throughout.
+    for (let i = 0; i < 100; i++) {
+      vehicles = stepVehicles({
+        dtSeconds: 1 / 10,
+        elapsedSeconds: 5,
+        pedestrians: [],
+        random: alwaysOne,
+        roads: [runtime],
+        vehicles,
+      });
+      if (vehicles.length === 0) break; // despawned past the road's own end
+    }
+    // Despawned (drove all the way to the road's 100 m end) rather than
+    // stuck sitting at the signal's 80 m stop line.
+    expect(vehicles).toHaveLength(0);
   });
 });

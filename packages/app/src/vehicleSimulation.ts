@@ -16,13 +16,23 @@ import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
  * pedestrian lifecycle of its own; the engine calls `stepVehicles` once per
  * floor, the same way it steps a pedestrian crowd once per plane.
  *
- * Deliberately out of scope for stage 1, and not attempted here: a road
- * network (a vehicle only ever traverses the one road segment it spawned
- * on, start to end — no turns, no routing), intersections and signals,
- * congestion that propagates between roads, and any live pedestrian
- * ridership feeding a transit stop's boarding count (no code anywhere in
- * this project currently generates pedestrians who walk to and wait at a
- * transit stop — the closest thing, `bioAgentBehavior.ts`'s
+ * SP-3 stage 2 (ADR-0023, 2026-09-24): a road **network**. Roads whose
+ * endpoints meet within a snap tolerance are inferred as connected at a
+ * junction (no authored intersection entity — see the ADR for why), and a
+ * vehicle reaching the end of its road turns onto a real, randomly-chosen
+ * connected road (respecting one-way direction) instead of despawning. A
+ * `trafficSignalSchema` road can hold traffic at a red light, modelled as
+ * the same stationary-obstacle IDM constraint a crosswalk already is.
+ * **Not route planning** — a vehicle has no destination and turns at random,
+ * the same way it never had a reason for being on its road in stage 1.
+ *
+ * Deliberately out of scope, and not attempted here: routing a vehicle
+ * toward a real destination, protected turn phases or coordination between
+ * two signals at the same junction, congestion modelling beyond what a
+ * queue backing up through IDM car-following already produces, and any live
+ * pedestrian ridership feeding a transit stop's boarding count (no code
+ * anywhere in this project currently generates pedestrians who walk to and
+ * wait at a transit stop — the closest thing, `bioAgentBehavior.ts`'s
  * `chooseTransitStop` scoring heuristic, was deleted as an orphan; see
  * CLAUDE.md's 孤儿模块 section). A bus's dwell therefore only ever accounts
  * for `alightingPerArrival` — its scripted per-arrival alighting count —
@@ -74,6 +84,16 @@ export type RoadRuntimeStop = {
   alightingPerArrival: number;
 };
 
+/** A traffic signal's timing (ADR-0023). Phase is a pure function of the
+ * simulation clock — see `signalIsRed`. */
+export type RoadRuntimeSignal = {
+  id: string;
+  forwardArclengthMeters: number;
+  greenSeconds: number;
+  redSeconds: number;
+  offsetSeconds: number;
+};
+
 export type RoadRuntime = {
   id: string;
   /** Copied onto every vehicle spawned on this road; see `VehicleAgent.floorId`. */
@@ -88,6 +108,7 @@ export type RoadRuntime = {
   arrivalRatePerMinutePerDirection: number;
   crosswalks: readonly RoadRuntimeCrosswalk[];
   stops: readonly RoadRuntimeStop[];
+  signals: readonly RoadRuntimeSignal[];
 };
 
 const idmParameters = {
@@ -128,6 +149,7 @@ export function buildRoadRuntime(
    * a road with no `floorId` of its own still belongs to a scene's base
    * floor once that scene declares floors at all. */
   floorId?: string,
+  signals: readonly CrowdSimScene["trafficSignals"][number][] = [],
 ): RoadRuntime {
   const points = road.geometry.points;
   const cumulative: number[] = [0];
@@ -161,6 +183,15 @@ export function buildRoadRuntime(
     floorId,
     id: road.id,
     points,
+    signals: signals
+      .filter((signal) => signal.roadId === road.id)
+      .map((signal) => ({
+        forwardArclengthMeters: projectToArclength(points, cumulative, signal.position),
+        greenSeconds: signal.greenSeconds,
+        id: signal.id,
+        offsetSeconds: signal.offsetSeconds,
+        redSeconds: signal.redSeconds,
+      })),
     speedLimitMetersPerSecond: road.vehicleSpeedLimitMetersPerSecond,
     stops: stops
       .filter((stop) => stop.roadId === road.id)
@@ -171,6 +202,22 @@ export function buildRoadRuntime(
       })),
     totalLengthMeters,
   };
+}
+
+/** True while a signal is in its red phase, at `elapsedSeconds` on the
+ * simulation clock. A pure function of time (like `dayNightCycle.ts`'s own
+ * `sunLevel`), not a state machine: two signals with different
+ * `offsetSeconds` are simply evaluated at different points on their own
+ * cycle, with no separate bookkeeping. */
+export function signalIsRed(
+  signal: RoadRuntimeSignal,
+  elapsedSeconds: number,
+): boolean {
+  const cycleSeconds = signal.greenSeconds + signal.redSeconds;
+  const phase =
+    (((elapsedSeconds + signal.offsetSeconds) % cycleSeconds) + cycleSeconds) %
+    cycleSeconds;
+  return phase >= signal.greenSeconds;
 }
 
 /** A vehicle's world position always advances `progressMeters` from 0 to
@@ -205,6 +252,57 @@ export function worldPositionAtProgress(
     headingRadians:
       laneDirection === "forward" ? headingRadians : headingRadians + Math.PI,
   };
+}
+
+/** Which end of a road's own polyline a vehicle arrives at, or departs
+ * from, depending on its direction of travel. */
+export type RoadEnd = "start" | "end";
+
+/** How close two road endpoints must be to be inferred as the same
+ * junction (ADR-0023) — a "drawn to touch" tolerance, not measured. */
+export const intersectionSnapMeters = 0.75;
+
+function roadEndPoint(road: RoadRuntime, end: RoadEnd): ScenePoint {
+  return end === "start" ? road.points[0] : road.points[road.points.length - 1];
+}
+
+/** The direction of travel required to enter a road at `end` and continue
+ * along it: arriving at its own start means heading toward its own end
+ * (`forward`), and vice versa. */
+function laneDirectionEnteringAt(end: RoadEnd): LaneDirection {
+  return end === "start" ? "forward" : "backward";
+}
+
+/**
+ * Every road-end paired with the other road-ends within `intersectionSnapMeters`
+ * of it — an inferred junction, not an authored one (ADR-0023). Keyed by
+ * `${roadId}:${end}` rather than by a synthetic node id: nothing downstream
+ * ever needs a junction's own identity, only "what can I turn onto from
+ * here," so there is no node object to give one to.
+ */
+export function buildRoadTurnOptions(
+  roads: readonly RoadRuntime[],
+): Map<string, { roadId: string; end: RoadEnd }[]> {
+  const ends = roads.flatMap((road) =>
+    (["start", "end"] as const).map((end) => ({
+      end,
+      point: roadEndPoint(road, end),
+      roadId: road.id,
+    })),
+  );
+  const options = new Map<string, { roadId: string; end: RoadEnd }[]>();
+  for (const a of ends) {
+    const key = `${a.roadId}:${a.end}`;
+    const matches: { roadId: string; end: RoadEnd }[] = [];
+    for (const b of ends) {
+      if (a.roadId === b.roadId && a.end === b.end) continue;
+      if (distance(a.point, b.point) <= intersectionSnapMeters) {
+        matches.push({ end: b.end, roadId: b.roadId });
+      }
+    }
+    options.set(key, matches);
+  }
+  return options;
 }
 
 /** How far ahead of a vehicle at `progressMeters` a road feature (given by
@@ -264,11 +362,18 @@ export type VehicleStepInput = {
   /** Deterministic spawn draws, the same role `seed`/`rand` play throughout
    * this project's engine (`simulationEngine.ts`'s own `spawnArrivals`). */
   random: () => number;
+  /** The simulation clock, for evaluating traffic-signal phase
+   * (`signalIsRed`) — the same clock `dayNightCycle.ts` is driven from. */
+  elapsedSeconds: number;
 };
 
 export function stepVehicles(input: VehicleStepInput): VehicleAgent[] {
-  const { dtSeconds, pedestrians, random, roads, vehicles } = input;
+  const { dtSeconds, elapsedSeconds, pedestrians, random, roads, vehicles } = input;
   const roadsById = new Map(roads.map((road) => [road.id, road]));
+  // Rebuilt fresh from this tick's own `roads` every call — see ADR-0023's
+  // "Consequences" for why that is not a measured performance concern at
+  // this project's road counts.
+  const turnOptions = buildRoadTurnOptions(roads);
 
   const stepped: VehicleAgent[] = [];
   for (const road of roads) {
@@ -289,40 +394,70 @@ export function stepVehicles(input: VehicleStepInput): VehicleAgent[] {
             queue[index + 1],
             pedestrians,
             dtSeconds,
+            elapsedSeconds,
           ),
         );
       }
     }
   }
 
-  return (
-    [...stepped, ...spawnVehicles(roads, vehicles, random, dtSeconds)]
-      // Despawn: a vehicle that reached its road's far end this tick is
-      // dropped here, not kept clamped at `totalLengthMeters` — otherwise it
-      // would sit at the terminus forever, jamming everyone still queued
-      // behind it. It was still a valid leader for whoever was behind it
-      // during the tick that retired it (queue lookups above ran first).
-      //
-      // `roadsById.get(vehicle.roadId)` below is never undefined: `stepped`
-      // (built by iterating `roads` above) and `spawnVehicles` (same) both
-      // only ever produce vehicles whose `roadId` came from this tick's own
-      // `roads` array, never from `vehicles`' possibly-stale input list. A
-      // road deleted mid-simulation just stops appearing in `roads`, so its
-      // vehicles are silently dropped by the same iteration rather than
-      // reaching this lookup with a dangling id.
-      .filter(
-        (vehicle) =>
-          vehicle.progressMeters < roadsById.get(vehicle.roadId)!.totalLengthMeters,
-      )
-      .map((vehicle) => {
-        const road = roadsById.get(vehicle.roadId)!;
+  // `roadsById.get(vehicle.roadId)` below is never undefined: `stepped`
+  // (built by iterating `roads` above) and `spawnVehicles` (same) both only
+  // ever produce vehicles whose `roadId` came from this tick's own `roads`
+  // array, never from `vehicles`' possibly-stale input list. A road deleted
+  // mid-simulation just stops appearing in `roads`, so its vehicles are
+  // silently dropped by the same iteration rather than reaching this lookup
+  // with a dangling id.
+  return [...stepped, ...spawnVehicles(roads, vehicles, random, dtSeconds)].flatMap(
+    (vehicle) => {
+      const road = roadsById.get(vehicle.roadId)!;
+      if (vehicle.progressMeters < road.totalLengthMeters) {
         const { x, y, headingRadians } = worldPositionAtProgress(
           road,
           vehicle.laneDirection,
           vehicle.progressMeters,
         );
-        return { ...vehicle, x, y, headingRadians };
-      })
+        return [{ ...vehicle, headingRadians, x, y }];
+      }
+
+      // Reached the far end this tick (ADR-0023): look for a road to turn
+      // onto at the junction inferred there, rather than despawning
+      // outright — it was still a valid leader for whoever was behind it
+      // during the tick that retired it (queue lookups above ran first).
+      const arrivalEnd: RoadEnd = vehicle.laneDirection === "forward" ? "end" : "start";
+      const candidates = (turnOptions.get(`${road.id}:${arrivalEnd}`) ?? []).filter(
+        (candidate) => {
+          const candidateRoad = roadsById.get(candidate.roadId);
+          return (
+            candidateRoad !== undefined &&
+            candidateRoad.directions.includes(laneDirectionEnteringAt(candidate.end))
+          );
+        },
+      );
+      // Dead end, or every road there is one-way against this vehicle:
+      // despawn, exactly as stage 1 already did unconditionally.
+      if (candidates.length === 0) return [];
+
+      const chosen = candidates[Math.floor(random() * candidates.length)];
+      const nextRoad = roadsById.get(chosen.roadId)!;
+      const nextLaneDirection = laneDirectionEnteringAt(chosen.end);
+      const { x, y, headingRadians } = worldPositionAtProgress(
+        nextRoad,
+        nextLaneDirection,
+        0,
+      );
+      return [
+        {
+          ...vehicle,
+          headingRadians,
+          laneDirection: nextLaneDirection,
+          progressMeters: 0,
+          roadId: chosen.roadId,
+          x,
+          y,
+        },
+      ];
+    },
   );
 }
 
@@ -333,6 +468,7 @@ function stepOneVehicle(
   leader: VehicleAgent | undefined,
   pedestrians: readonly PedestrianLike[],
   dtSeconds: number,
+  elapsedSeconds: number,
 ): VehicleAgent {
   if (vehicle.dwellRemainingSeconds > 0) {
     const remaining = vehicle.dwellRemainingSeconds - dtSeconds;
@@ -409,6 +545,22 @@ function stepOneVehicle(
       (pedestrian) => distance(pedestrian, crosswalkPoint) <= crosswalk.widthMeters / 2,
     );
     if (occupied) {
+      constraints.push({ gapMeters: gap, leadSpeedMetersPerSecond: 0 });
+    }
+  }
+
+  for (const signal of road.signals) {
+    const gap = progressToFeature(
+      road,
+      laneDirection,
+      vehicle.progressMeters,
+      signal.forwardArclengthMeters,
+    );
+    // Already past the stop line: a red phase that started after the
+    // vehicle crossed it does not reach back and hold it in the
+    // intersection — the same "gap <= 0 skip" rule a crosswalk already uses.
+    if (gap <= 0) continue;
+    if (signalIsRed(signal, elapsedSeconds)) {
       constraints.push({ gapMeters: gap, leadSpeedMetersPerSecond: 0 });
     }
   }

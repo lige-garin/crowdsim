@@ -29,6 +29,7 @@ import {
   obstacleSchema,
   roadSchema,
   sceneVisualSchema,
+  trafficSignalSchema,
   transitStopSchema,
   weatherProfileSchema,
 } from "./sceneSchemaEnvironment";
@@ -70,6 +71,7 @@ export const sceneSchema = z
     environmentFactors: z.array(environmentFactorSchema).default([]),
     roads: z.array(roadSchema).default([]),
     crosswalks: z.array(crosswalkSchema).default([]),
+    trafficSignals: z.array(trafficSignalSchema).default([]),
     buildings: z.array(buildingSchema).default([]),
     transitStops: z.array(transitStopSchema).default([]),
     obstacles: z.array(obstacleSchema).default([]),
