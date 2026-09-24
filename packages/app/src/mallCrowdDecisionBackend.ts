@@ -219,9 +219,15 @@ export function createMallCrowdDecisionBackend(options: {
       servicePoints,
       evacuationActive,
       evacuationStartedSeconds,
+      evacuatingFloorIds,
       routeDistance,
     }) {
       const activeShops = shops ?? options.shops;
+      // ADR-0025: undefined means every floor, unchanged from before phased
+      // evacuation existed. An agent on a floor not in this set is not
+      // evacuating at all, whatever `evacuationActive` says.
+      const isEvacuatingFloor = (agent: SimulationAgent) =>
+        evacuatingFloorIds === undefined || evacuatingFloorIds.has(agent.floorId);
       const activeServicePoints = servicePoints ?? [];
       const decisions: SimulationAgentDecision[] = [];
       const shopById = new Map(activeShops.map((shop) => [shop.id, shop]));
@@ -483,8 +489,11 @@ export function createMallCrowdDecisionBackend(options: {
 
         const state = agent.lifecycleState;
 
-        // Evacuation overrides shopping: abandon the shop, head for an exit.
-        if (evacuationActive) {
+        // Evacuation overrides shopping: abandon the shop, head for an exit
+        // — but only on a floor that is actually evacuating (ADR-0025). An
+        // agent elsewhere falls straight through to its ordinary decision
+        // logic below, unaware an alarm exists anywhere in the building.
+        if (evacuationActive && isEvacuatingFloor(agent)) {
           // Not everyone on the same tick. Each person has a pre-movement time
           // (right-skewed, behaviorDistributions); until theirs has passed they
           // carry on with what they were doing, which is what the notice-and-

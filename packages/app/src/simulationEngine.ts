@@ -24,6 +24,7 @@ import {
   fedIncapacitationDose,
   hazardAvoidancePush,
   mostExposingHazard,
+  smokeRadiusAt,
   type SimulationHazard,
 } from "./smokeHazards";
 import { weidmannMaxSpecificFlow } from "./pedestrianFundamentalDiagram";
@@ -691,6 +692,7 @@ export function createSimulationEngine(
         servicePoints: withTransitBoardingServicePoints(),
         evacuationActive,
         evacuationStartedSeconds,
+        evacuatingFloorIds: currentEvacuatingFloorIds(),
         routeDistance: floorGraph.distance,
       }),
       decisionTick,
@@ -731,6 +733,28 @@ export function createSimulationEngine(
       servers: doorOpenStopIds.has(stop.id) ? transitBoardingDoors : 0,
     }));
     return [...servicePoints, ...boardingPoints];
+  }
+  /**
+   * Which floors are actually evacuating right now (ADR-0025): the floors
+   * carrying at least one currently-active fire/smoke hazard
+   * (`smokeRadiusAt` > 0 — the same liveness check `applyHazardExposure`
+   * already uses to slow and expose agents, so the two readings of "active"
+   * never disagree). `undefined` means every floor: a scene with no hazards
+   * declared has no floor to phase around, so `evacuationActive` alone still
+   * evacuates the whole building, unchanged from before this field existed.
+   * Also `undefined` when a scene has hazards declared but none is
+   * currently active (not yet started, or already burned out) — with no
+   * live fire to phase around, evacuating everyone stays the safe default
+   * rather than evacuating nobody.
+   */
+  function currentEvacuatingFloorIds(): Set<string | undefined> | undefined {
+    const floorIds = new Set<string | undefined>();
+    for (const hazard of hazards) {
+      if (smokeRadiusAt(hazard, elapsedSeconds) > 0) {
+        floorIds.add(hazard.floorId);
+      }
+    }
+    return floorIds.size > 0 ? floorIds : undefined;
   }
   /**
    * Arrivals enter through their entrance no faster than it can pass people:

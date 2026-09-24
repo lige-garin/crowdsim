@@ -2455,3 +2455,19 @@ Both confirmed decisive: each fix independently reverted, the integration test r
 ### Verified
 
 `pnpm typecheck` (all packages) clean. Full test suite: 1043 app tests (1034 baseline + 9 new: 6 decision-backend unit tests including two decisive revert-verify cycles, plus 3 engine-level `createSimulationEngineFromScene` integration tests covering the full walk→queue→board→vanish pipeline and two regressions — no bus present, no stop declared) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. ponytail-review (self-applied, matching the skill's rules): one real finding — `chooseTransitStop`'s hand-rolled nearest-search loop duplicated `simulationDecisionBackend.ts`'s existing exported `nearest()` helper — fixed by reusing it; no other findings.
+
+## 2026-09-24 (thirty-fourth entry): phased evacuation — only the floor a real fire is on evacuates (ADR-0025)
+
+Item 3 of the same ten-item backlog. CLAUDE.md had recorded this exact gap since the multi-floor work landed: raising the alarm always sent every agent on every floor to the nearest exit at once, with no distinction between a floor with a fire on it and a floor with nothing wrong.
+
+### What was built
+
+`smokeHazards.ts` already had everything phased evacuation needed: a hazard carries its own `floorId`, and `smokeRadiusAt(hazard, elapsedSeconds)` — the same liveness check `applyHazardExposure` already uses every tick to slow and expose agents — tells whether it is currently affecting anything at all. `simulationEngine.ts` computes, once per decision tick, the set of floor ids carrying at least one currently-active fire/smoke hazard; `mallCrowdDecisionBackend.ts`'s evacuation branch now also checks whether an agent's floor is in that set before treating it as evacuating, falling through to ordinary shopping/browsing/checkout logic otherwise. `undefined` (rather than an empty set) means "every floor" in two cases — a scene with no hazards declared at all, and a scene with hazards declared but none currently active (not yet started, or already burned out) — both fall back to the pre-existing, building-wide evacuation behaviour rather than evacuating nobody, keeping every hazard-less evacuation test in this project a decisive regression check.
+
+### What this deliberately is not (see ADR-0025)
+
+Not floor-above/floor-below buffering — real phased-evacuation codes commonly also move the floor immediately above a fire (stack effect), but this project has no smoke-through-connector model to justify picking a buffer floor from; evacuating only the hazard's own floor is the claim the data actually supports. Not dynamic in the direction of un-evacuating someone already moving if a hazard's `endsAtSeconds` passes. Not a new alarm-raising path — `setEvacuation(true)` is unchanged, only which agents it actually moves is now hazard-aware.
+
+### Verified
+
+`pnpm typecheck` (all packages) clean. Full test suite: 1048 app tests (1043 baseline + 5 new: 3 decision-backend unit tests with a decisive revert-verify cycle, plus 2 `createSimulationEngineFromScene`-level integration tests — a two-floor scene with a fire on one floor confirming only that floor evacuates while the other keeps shopping, and a no-hazard regression confirming both floors still evacuate — also independently confirmed decisive) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. ponytail-review (self-applied): no findings — the diff reuses `smokeRadiusAt` rather than inventing a second hazard-liveness check, and adds no unused flexibility.

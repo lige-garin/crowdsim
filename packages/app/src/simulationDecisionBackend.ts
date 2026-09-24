@@ -121,6 +121,15 @@ export type SimulationDecisionTickInput = {
    */
   evacuationStartedSeconds?: number;
   /**
+   * Which floors are actually evacuating right now (ADR-0025) — the floors
+   * carrying at least one currently-active fire/smoke hazard. `undefined`
+   * means every floor (a hazard-less scene has no floor to phase around, so
+   * `evacuationActive` alone still evacuates the whole building, unchanged
+   * from before this field existed). An agent on a floor not in this set
+   * falls through to its ordinary, non-evacuation decision logic.
+   */
+  evacuatingFloorIds?: ReadonlySet<string | undefined>;
+  /**
    * Walking distance around walls. Progress toward a target is measured with
    * it, so a shopper detouring round a building is not mistaken for one stuck
    * against a wall. Straight-line distance when absent.

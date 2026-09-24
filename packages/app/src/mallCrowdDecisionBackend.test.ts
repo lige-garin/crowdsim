@@ -976,3 +976,80 @@ describe("transit ridership (ADR-0024)", () => {
     expect(d[0].targetSinkId).toBe("exit");
   });
 });
+
+describe("phased evacuation (ADR-0025)", () => {
+  it("evacuates everyone when evacuatingFloorIds is absent (regression: unchanged from before phasing existed)", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const groundAgent = agent({ id: 1, floorId: "ground", x: 10, y: 10 });
+    const upperAgent = agent({ id: 2, floorId: "upper", x: 10, y: 10 });
+    const decisions = backend.decideAgents({
+      agents: [groundAgent, upperAgent],
+      decisionTick: 0,
+      elapsedSeconds: 60,
+      evacuationStartedSeconds: 0,
+      sinks,
+      shops,
+      evacuationActive: true,
+    });
+    expect(decisions.every((d) => d.nextState === "evacuate")).toBe(true);
+  });
+
+  it("evacuates only the floor named in evacuatingFloorIds, leaving another floor shopping undisturbed", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const onFireFloor = agent({
+      id: 1,
+      floorId: "fire-floor",
+      lifecycleState: "browse",
+      selectedStoreId: "a",
+      browseUntilSeconds: 5,
+      x: 10,
+      y: 10,
+    });
+    const elsewhere = agent({
+      id: 2,
+      floorId: "safe-floor",
+      lifecycleState: "browse",
+      selectedStoreId: "a",
+      browseUntilSeconds: 5,
+      x: 10,
+      y: 10,
+    });
+    const decisions = backend.decideAgents({
+      agents: [onFireFloor, elsewhere],
+      decisionTick: 0,
+      elapsedSeconds: 60,
+      evacuationStartedSeconds: 0,
+      sinks,
+      shops,
+      evacuationActive: true,
+      evacuatingFloorIds: new Set(["fire-floor"]),
+    });
+    const byId = new Map(decisions.map((d) => [d.agentId, d]));
+    expect(byId.get(1)?.nextState).toBe("evacuate");
+    // Still shopping: the dwell already ran out (elapsedSeconds 60 >=
+    // browseUntilSeconds 5) so a non-evacuating browser proceeds straight
+    // to its own ordinary post-browse decision, unaware of the alarm.
+    expect(byId.get(2)?.nextState).not.toBe("evacuate");
+  });
+
+  it("does not even pin a fresh, undecided agent on a non-evacuating floor", () => {
+    const backend = createMallCrowdDecisionBackend({ shops, seed: 1 });
+    const fresh = agent({ id: 3, floorId: "safe-floor" });
+    const decisions = backend.decideAgents({
+      agents: [fresh],
+      decisionTick: 0,
+      elapsedSeconds: 0,
+      evacuationStartedSeconds: 0,
+      sinks,
+      shops,
+      evacuationActive: true,
+      evacuatingFloorIds: new Set(["fire-floor"]),
+    });
+    // A fresh agent on the evacuating floor would be pinned in place
+    // (nextState: "walk", target unchanged) rather than sent shopping — a
+    // non-evacuating floor's fresh agent instead gets the ordinary "pick a
+    // shop" decision.
+    expect(decisions[0].nextState).toBe("walk");
+    expect(decisions[0].selectedStoreId).toBeDefined();
+  });
+});
