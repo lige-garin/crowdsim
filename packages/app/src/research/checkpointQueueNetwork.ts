@@ -1,5 +1,5 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { sampleServiceSeconds } from "../behaviorDistributions";
+import { hashUnit, sampleServiceSeconds } from "../behaviorDistributions";
 
 /**
  * SP-3-adjacent stage 1 for gap-closure plan batch 5.2 ("多级排队网络" —
@@ -26,24 +26,43 @@ import { sampleServiceSeconds } from "../behaviorDistributions";
  * real, tested model, NOT wired into `simulationEngine.ts`, the live decision
  * backend, the worker, the viewport, or the editor.
  *
- * Deliberately out of scope for stage 1, and not attempted here: priority
- * lanes (the plan's own "优先通道") — every stage here is one FIFO line, no
- * eligibility or fast-track concept; branching networks (a stage's `next` is
- * a single id, not a choice of several — a linear chain, not a general
- * graph); and any live fault model — an outage is a scripted time window
- * (`servicePointSchema.outageWindows`), not something that can be triggered
- * by, say, a hazard or a random failure process.
+ * Priority lanes and weighted branching added in ADR-0030 (gap-closure plan
+ * batch 5.2's remaining "优先通道"/branching items): `priorityServers`
+ * reserves some of a stage's own servers as a genuine dedicated fast lane
+ * (not queue-jumping within one shared pool — see the ADR for why), and
+ * `branches` lets a served party's next stage be a deterministic weighted
+ * draw among several, rather than always the one fixed `nextStageId`.
+ *
+ * Deliberately still out of scope: any live fault model — an outage is a
+ * scripted time window (`servicePointSchema.outageWindows`), not something
+ * that can be triggered by, say, a hazard or a random failure process; and
+ * load-aware branching — a branch's weight is fixed at authoring time, not
+ * adjusted by which downstream stage is currently shorter.
  */
 
 export type CheckpointOutageWindow = { startsAtSeconds: number; endsAtSeconds: number };
 
+/** One weighted candidate in a stage's `branches` (ADR-0030). */
+export type CheckpointBranch = { stageId: string; weight: number };
+
 export type CheckpointStage = {
   id: string;
   servers: number;
+  /** Of `servers`, how many are reserved exclusively for
+   * `priorityEligible` parties (ADR-0030) — a dedicated fast lane, not
+   * queue-jumping within a shared pool; see the ADR for why. 0 (the
+   * default every existing stage reads as) means no priority lane. Must be
+   * <= `servers`. */
+  priorityServers?: number;
   serviceMeanSeconds: number;
   /** The next stage a party moves to once served here, if any. Absent: this
-   * stage is a network exit. */
+   * stage is a network exit. Ignored when `branches` is present. */
   nextStageId?: string;
+  /** Several weighted next-stage candidates (ADR-0030); when present, a
+   * served party's own next stage is drawn from these instead of the fixed
+   * `nextStageId`, deterministically per party. Absent (the default every
+   * existing stage reads as) keeps the single-choice `nextStageId` chain. */
+  branches?: readonly CheckpointBranch[];
   outageWindows: readonly CheckpointOutageWindow[];
 };
 
@@ -55,6 +74,9 @@ export type CheckpointParty = {
   status: CheckpointPartyStatus;
   queueJoinedSeconds: number;
   serviceEndsAtSeconds: number | null;
+  /** Eligible for a stage's priority lane, if it has one (ADR-0030).
+   * Absent is the same as false — every existing party reads this way. */
+  priorityEligible?: boolean;
 };
 
 /** Builds a stage from a scene's own service point, the same conversion
@@ -83,14 +105,43 @@ export function spawnParty(
   id: number,
   stageId: string,
   elapsedSeconds: number,
+  priorityEligible = false,
 ): CheckpointParty {
   return {
     id,
+    priorityEligible,
     queueJoinedSeconds: elapsedSeconds,
     serviceEndsAtSeconds: null,
     stageId,
     status: "queued",
   };
+}
+
+/** A served party's own next stage (ADR-0030): `branches`, drawn
+ * deterministically by weight, when the stage declares any; otherwise the
+ * existing single `nextStageId`. `undefined` means the network exit either
+ * way. */
+function nextStageIdFor(
+  stage: CheckpointStage,
+  party: CheckpointParty,
+  seed: number,
+): string | undefined {
+  if (!stage.branches || stage.branches.length === 0) {
+    return stage.nextStageId;
+  }
+  const totalWeight = stage.branches.reduce((sum, branch) => sum + branch.weight, 0);
+  if (totalWeight <= 0) {
+    return undefined;
+  }
+  const draw = hashUnit(seed, party.id, stage.id, "branch") * totalWeight;
+  let cumulative = 0;
+  for (const branch of stage.branches) {
+    cumulative += branch.weight;
+    if (draw < cumulative) {
+      return branch.stageId;
+    }
+  }
+  return stage.branches[stage.branches.length - 1].stageId;
 }
 
 function isDown(stage: CheckpointStage, elapsedSeconds: number): boolean {
@@ -155,6 +206,13 @@ export function stepCheckpointNetwork(
         `Stage '${stage.id}' chains to '${stage.nextStageId}', which is not in the stages passed to this step`,
       );
     }
+    for (const branch of stage.branches ?? []) {
+      if (!stagesById.has(branch.stageId)) {
+        throw new Error(
+          `Stage '${stage.id}' branches to '${branch.stageId}', which is not in the stages passed to this step`,
+        );
+      }
+    }
   }
 
   const advanced: CheckpointParty[] = parties.map((party) => {
@@ -165,10 +223,11 @@ export function stepCheckpointNetwork(
       return party;
     }
     const stage = stagesById.get(party.stageId)!;
-    const { nextStageId } = stage;
+    const nextStageId = nextStageIdFor(stage, party, seed);
     return nextStageId
       ? {
           id: party.id,
+          priorityEligible: party.priorityEligible,
           queueJoinedSeconds: elapsedSeconds,
           serviceEndsAtSeconds: null,
           stageId: nextStageId,
@@ -188,16 +247,33 @@ export function stepCheckpointNetwork(
   const result: CheckpointParty[] = [];
   for (const stage of stages) {
     const here = (byStage.get(stage.id) ?? []).slice();
-    const inServiceCount = here.filter((party) => party.status === "inService").length;
-    const queue = here.filter((party) => party.status === "queued").sort(byQueueOrder);
+    // A party only counts as using the priority lane when the stage
+    // actually has one (ADR-0030) — with priorityServers 0 (the default),
+    // every party falls into the single "regular" pool with the stage's
+    // full server count, reproducing the original single-queue behaviour
+    // exactly regardless of any party's own priorityEligible flag.
+    const priorityServers = Math.min(
+      stage.servers,
+      Math.max(0, stage.priorityServers ?? 0),
+    );
+    const usesPriorityLane = (party: CheckpointParty) =>
+      priorityServers > 0 && party.priorityEligible === true;
 
-    let admitted = inServiceCount;
     const admittedIds = new Set<number>();
     if (!isDown(stage, elapsedSeconds)) {
-      for (const party of queue) {
-        if (admitted >= stage.servers) break;
-        admittedIds.add(party.id);
-        admitted++;
+      for (const [servers, pool] of [
+        [priorityServers, here.filter(usesPriorityLane)],
+        [stage.servers - priorityServers, here.filter((p) => !usesPriorityLane(p))],
+      ] as const) {
+        let admitted = pool.filter((party) => party.status === "inService").length;
+        const queue = pool
+          .filter((party) => party.status === "queued")
+          .sort(byQueueOrder);
+        for (const party of queue) {
+          if (admitted >= servers) break;
+          admittedIds.add(party.id);
+          admitted++;
+        }
       }
     }
 

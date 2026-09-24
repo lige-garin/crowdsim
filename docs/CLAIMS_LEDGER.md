@@ -2535,3 +2535,15 @@ Restructuring the dispatch passes made the `claimedFloors` bookkeeping set write
 ### Verified
 
 `pnpm typecheck` (all packages) clean. Full test suite: 1087 app tests (1083 baseline + 4 new, 2 of which were independently confirmed decisive by reverting each fix and rerunning — a door-window boarding test with an explicit bounded-window regression alongside it, and two load-balancing tests covering both the same-floor-overflow and dispatch-from-the-other-floor cases) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. All pre-existing elevator tests (single-car, single-caller scenarios) pass unchanged, confirming the two fixes only add behavior in the overflow/continuous-arrival cases they target.
+
+## 2026-09-24 (thirty-ninth entry): priority lanes and weighted branching for the checkpoint queue network (ADR-0030)
+
+Item 8 of the same ten-item backlog. `checkpointQueueNetwork.ts`'s own module doc had said since it was written: "Deliberately out of scope for stage 1, and not attempted here: priority lanes... branching networks."
+
+### What was built
+
+`CheckpointStage.priorityServers` reserves some of a stage's own servers exclusively for `priorityEligible` parties — a genuine dedicated fast lane, not queue-jumping within one shared pool: those seats never serve a regular party even when the priority lane is empty and the regular line is long, the same real-world trade an actual dedicated lane carries. Queue-jumping (a priority party bumping an already-admitted regular one, or refusing an available regular server while a priority party is still walking over) was considered and rejected as a real behavioral claim this project has no basis to make; dedicated capacity needs no such claim. `CheckpointStage.branches` (a list of `{stageId, weight}`) lets a served party's next stage be a deterministic weighted draw — `hashUnit(seed, party.id, stage.id, "branch")` against cumulative weights, the same per-party hashing this project's shop/counter choice logic already uses — rather than always the single fixed `nextStageId`, which is unchanged and still works exactly as before for any stage that declares no branches.
+
+### Verified
+
+`pnpm typecheck` (all packages) clean. Full test suite: 1095 app tests (1087 baseline + 8 new, 2 of which were independently confirmed decisive by reverting each mechanism and rerunning — priority-lane exclusivity/idle-lane behavior, and weighted-branch splitting/determinism/missing-branch validation) + 36 core-gpu + 35 scene-schema + 11 Rust tests, all passing. `pnpm lint` and `npx prettier . --check` clean. A pre-existing exact-equality test on `spawnParty`'s return shape needed a one-line update once the new `priorityEligible: false` default field was added — a legitimate, disclosed shape change, not a behavior regression.

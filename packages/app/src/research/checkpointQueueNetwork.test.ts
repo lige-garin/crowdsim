@@ -73,14 +73,19 @@ describe("buildCheckpointStage", () => {
 });
 
 describe("spawnParty", () => {
-  it("creates a party queued at the given stage from the given moment", () => {
+  it("creates a party queued at the given stage from the given moment, not priority-eligible by default", () => {
     expect(spawnParty(7, "stage-a", 42)).toEqual({
       id: 7,
+      priorityEligible: false,
       queueJoinedSeconds: 42,
       serviceEndsAtSeconds: null,
       stageId: "stage-a",
       status: "queued",
     });
+  });
+
+  it("marks a party priority-eligible when asked", () => {
+    expect(spawnParty(7, "stage-a", 42, true).priorityEligible).toBe(true);
   });
 });
 
@@ -301,5 +306,169 @@ describe("stepCheckpointNetwork: determinism", () => {
     const a = stepCheckpointNetwork({ elapsedSeconds: 0, parties, seed: 42, stages });
     const b = stepCheckpointNetwork({ elapsedSeconds: 0, parties, seed: 42, stages });
     expect(a).toEqual(b);
+  });
+});
+
+describe("stepCheckpointNetwork: priority lanes (ADR-0030)", () => {
+  it("with priorityServers 0 (the default), a priority-eligible party competes in the same single queue as everyone else (regression)", () => {
+    const stages = [stage({ servers: 1, serviceMeanSeconds: 10 })];
+    // Regular party joined first; priority party joined second — with no
+    // dedicated lane, FIFO order alone decides, whatever priorityEligible says.
+    const parties = [spawnParty(1, "stage-a", 0), spawnParty(2, "stage-a", 1, true)];
+    const stepped = stepCheckpointNetwork({
+      elapsedSeconds: 5,
+      parties,
+      seed: 1,
+      stages,
+    });
+    const byId = new Map(stepped.map((p) => [p.id, p]));
+    expect(byId.get(1)!.status).toBe("inService"); // first-come, still served first
+    expect(byId.get(2)!.status).toBe("queued");
+  });
+
+  it("reserves priorityServers exclusively for priority-eligible parties, never a regular one", () => {
+    const stages = [stage({ servers: 2, priorityServers: 1, serviceMeanSeconds: 10 })];
+    const parties = [
+      spawnParty(1, "stage-a", 0), // regular, joined first
+      spawnParty(2, "stage-a", 0), // regular, joined second
+      spawnParty(3, "stage-a", 0, true), // priority
+    ];
+    const stepped = stepCheckpointNetwork({
+      elapsedSeconds: 5,
+      parties,
+      seed: 1,
+      stages,
+    });
+    const byId = new Map(stepped.map((p) => [p.id, p]));
+    // 1 regular server admits party 1 (earliest regular arrival) only;
+    // party 2 still queues even though a second server physically exists,
+    // because that seat is reserved for the priority lane.
+    expect(byId.get(1)!.status).toBe("inService");
+    expect(byId.get(2)!.status).toBe("queued");
+    // The priority lane's own dedicated server admits party 3 immediately,
+    // not behind the regular queue.
+    expect(byId.get(3)!.status).toBe("inService");
+  });
+
+  it("leaves a priority lane idle rather than lending its seat to the regular queue, even when the priority lane is empty", () => {
+    const stages = [stage({ servers: 2, priorityServers: 1, serviceMeanSeconds: 10 })];
+    const parties = [
+      spawnParty(1, "stage-a", 0),
+      spawnParty(2, "stage-a", 0),
+      spawnParty(3, "stage-a", 0),
+    ];
+    const stepped = stepCheckpointNetwork({
+      elapsedSeconds: 5,
+      parties,
+      seed: 1,
+      stages,
+    });
+    const inService = stepped.filter((p) => p.status === "inService");
+    // Only the one regular server is ever used by regular parties — the
+    // dedicated seat sits unused rather than absorbing overflow, the same
+    // real-world trade a dedicated fast lane actually carries.
+    expect(inService).toHaveLength(1);
+  });
+});
+
+describe("stepCheckpointNetwork: weighted branching (ADR-0030)", () => {
+  it("keeps the existing single-choice nextStageId chain when a stage declares no branches (regression)", () => {
+    const stages = [
+      stage({ id: "security", nextStageId: "gate", serviceMeanSeconds: 1 }),
+      stage({ id: "gate", serviceMeanSeconds: 1 }),
+    ];
+    const parties: CheckpointParty[] = [
+      {
+        ...spawnParty(1, "security", -1),
+        serviceEndsAtSeconds: 0,
+        status: "inService",
+      },
+    ];
+    const stepped = stepCheckpointNetwork({
+      elapsedSeconds: 0,
+      parties,
+      seed: 1,
+      stages,
+    });
+    expect(stepped[0].stageId).toBe("gate");
+  });
+
+  it("splits parties across weighted branches roughly in proportion to their weight", () => {
+    const stages = [
+      stage({
+        id: "security",
+        branches: [
+          { stageId: "gate-a", weight: 1 },
+          { stageId: "gate-b", weight: 3 },
+        ],
+        serviceMeanSeconds: 1,
+      }),
+      stage({ id: "gate-a", serviceMeanSeconds: 1 }),
+      stage({ id: "gate-b", serviceMeanSeconds: 1 }),
+    ];
+    const parties: CheckpointParty[] = Array.from({ length: 200 }, (_, i) => ({
+      ...spawnParty(i, "security", -1),
+      serviceEndsAtSeconds: 0,
+      status: "inService" as const,
+    }));
+    const stepped = stepCheckpointNetwork({
+      elapsedSeconds: 0,
+      parties,
+      seed: 7,
+      stages,
+    });
+    const toA = stepped.filter((p) => p.stageId === "gate-a").length;
+    const toB = stepped.filter((p) => p.stageId === "gate-b").length;
+    expect(toA + toB).toBe(200);
+    // Weight 1 vs 3: gate-b should get roughly 3x gate-a's share, not an
+    // even 50/50 split and not always the same single branch for everyone.
+    expect(toA).toBeGreaterThan(20);
+    expect(toA).toBeLessThan(80);
+    expect(toB).toBeGreaterThan(toA * 2);
+  });
+
+  it("is deterministic: the same seed sends the same party down the same branch every time", () => {
+    const stages = [
+      stage({
+        id: "security",
+        branches: [
+          { stageId: "gate-a", weight: 1 },
+          { stageId: "gate-b", weight: 1 },
+        ],
+        serviceMeanSeconds: 1,
+      }),
+      stage({ id: "gate-a", serviceMeanSeconds: 1 }),
+      stage({ id: "gate-b", serviceMeanSeconds: 1 }),
+    ];
+    const parties: CheckpointParty[] = [
+      {
+        ...spawnParty(5, "security", -1),
+        serviceEndsAtSeconds: 0,
+        status: "inService",
+      },
+    ];
+    const a = stepCheckpointNetwork({ elapsedSeconds: 0, parties, seed: 3, stages });
+    const b = stepCheckpointNetwork({ elapsedSeconds: 0, parties, seed: 3, stages });
+    expect(a[0].stageId).toBe(b[0].stageId);
+  });
+
+  it("throws rather than silently dropping a party when a branch points at a stage that does not exist", () => {
+    const stages = [
+      stage({
+        id: "security",
+        branches: [{ stageId: "no-such-gate", weight: 1 }],
+        serviceMeanSeconds: 1,
+      }),
+    ];
+    const parties: CheckpointParty[] = [
+      {
+        ...spawnParty(1, "security", -1),
+        serviceEndsAtSeconds: 0,
+        status: "inService",
+      },
+    ];
+    expect(() =>
+      stepCheckpointNetwork({ elapsedSeconds: 0, parties, seed: 1, stages }),
+    ).toThrow(/no-such-gate/);
   });
 });
