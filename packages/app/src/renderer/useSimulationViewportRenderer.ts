@@ -125,8 +125,16 @@ export function useSimulationViewportRenderer({
   useEffect(() => {
     crowdSceneRef.current = crowdScene;
   }, [crowdScene]);
-  // Camera rig outlives renderer rebuilds, so a scene edit keeps your view.
-  const rigRef = useRef<CityCameraRig>(initialCityCameraRig());
+  const hasScene = crowdScene !== undefined;
+  const worldWidth = crowdScene?.world.width ?? 80;
+  const worldHeight = crowdScene?.world.height ?? 48;
+  // Camera rig outlives renderer rebuilds, so a scene edit keeps your view --
+  // the initial value is sized to the FIRST scene this hook mounts with,
+  // since a template pick from the homepage remounts this hook fresh
+  // (App.tsx unmounts AppWorkbench while home is showing).
+  const rigRef = useRef<CityCameraRig>(
+    initialCityCameraRig({ height: worldHeight, width: worldWidth }),
+  );
   const cityRef = useRef<CityObjects | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const dynamicGroupRef = useRef<Group | null>(null);
@@ -138,9 +146,6 @@ export function useSimulationViewportRenderer({
   const [fps, setFps] = useState(0);
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const sceneVisualSecond = Math.floor((snapshot?.elapsedSeconds ?? 0) / 5) * 5;
-  const hasScene = crowdScene !== undefined;
-  const worldWidth = crowdScene?.world.width ?? 80;
-  const worldHeight = crowdScene?.world.height ?? 48;
   /*
    * Renderer layer: GPU device, renderer, camera, crowd instances, controls,
    * lights and the render loop. Keyed on the view mode and the world's size.

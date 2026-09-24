@@ -1,10 +1,13 @@
 import type { PerspectiveCamera } from "three";
 import { isClick } from "../agentPicking";
+import { clamp } from "../numberUtils";
 import {
   orbitByDrag,
   orbitToPosition,
   panByDrag,
   panByKeys,
+  RADIUS_MAX,
+  RADIUS_MIN,
   zoomByWheel,
   type GroundPoint,
   type OrbitState,
@@ -185,14 +188,43 @@ export function attachCityCameraControls(options: {
   };
 }
 
-/** Where a fresh city camera starts: a three-quarter view over the district. */
-export function initialCityCameraRig(): CityCameraRig {
+/**
+ * Where a fresh city camera starts: a three-quarter view over the district.
+ *
+ * `radius` used to be a flat 210 m regardless of the scene. The district
+ * (the scene's own content -- every industry template is 82-121 m across
+ * on its diagonal, see `exampleScenes.ts`/`industryTemplates.ts`) sits
+ * inside a 150 m generated ring of filler downtown that looks the same for
+ * every template (`cityLayout.ts`'s `ring`); at a fixed 210 m that ring
+ * dominated the frame and the district itself read as a small, similar-
+ * looking patch in the middle -- different templates looked near-identical
+ * on first load, confirmed directly in the browser pane (every template's
+ * opening framing was the same wide shot of generic downtown). Scaling
+ * `radius` off the district's own diagonal instead keeps the district the
+ * dominant thing on screen regardless of which template it is, verified by
+ * eye against the real renderer for several templates rather than derived
+ * from the FOV maths alone (the camera's tilt makes the maths a rough guide,
+ * not an exact answer).
+ *
+ * Clamped to `RADIUS_MIN`/`RADIUS_MAX` -- the same bounds `zoomByWheel`
+ * already enforces on every interactive zoom. `world` has no upper size
+ * limit in the schema, and an imported building (`ifcImport.ts`/
+ * `dxfImport.ts`, ADR-0018) can easily be large enough that an unclamped
+ * `diagonal * 0.75` starts outside that range: the first scroll would then
+ * snap the camera to the bound instead of zooming smoothly from it, and
+ * `panByKeys`'s speed (which scales off `radius`) would be off by the same
+ * factor until that snap happened.
+ */
+export function initialCityCameraRig(world: {
+  height: number;
+  width: number;
+}): CityCameraRig {
+  const diagonal = Math.hypot(world.width, world.height);
   return {
-    // High enough (~150m) to look over an 80m downtown at the district.
     orbit: {
       azimuth: (-120 * Math.PI) / 180,
       polar: (44 * Math.PI) / 180,
-      radius: 210,
+      radius: clamp(diagonal * 0.75, RADIUS_MIN, RADIUS_MAX),
     },
     target: { x: 0, y: 0 },
   };
