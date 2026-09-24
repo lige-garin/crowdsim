@@ -1,15 +1,24 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { Language } from "./i18n";
+import { TemplateGallery } from "./TemplateGallery";
+import type { UiMode } from "./uiMode";
 
 type AppHomeProps = {
   language: Language;
   onEnterLab: () => void;
   onOpenNetwork: () => void;
+  onSelectTemplate: (scene: CrowdSimScene) => void;
   onSetLanguage: (language: Language) => void;
+  onToggleUiMode: () => void;
   runState: string;
+  uiMode: UiMode;
   webGpuStatus: string;
 };
 
 type HomeCopy = {
+  basicModeAction: string;
+  basicSubtitle: string;
+  expertModeAction: string;
   graphLabel: string;
   kicker: string;
   lab: string;
@@ -18,12 +27,16 @@ type HomeCopy = {
   pageLabel: string;
   primaryAction: string;
   statusLabel: string;
+  stepOneLabel: string;
   subtitle: string;
   title: string;
 };
 
 const homeCopy: Record<Language, HomeCopy> = {
   zh: {
+    basicModeAction: "切到普通模式",
+    basicSubtitle: "四步做完一次仿真:选模板 → 跑起来 → 看驾驶舱 → 出报告。",
+    expertModeAction: "切到专家模式",
     graphLabel: "商业客流网络预览",
     kicker: "商业客流运营套件",
     lab: "商业客流操作系统",
@@ -32,10 +45,15 @@ const homeCopy: Record<Language, HomeCopy> = {
     pageLabel: "CrowdSim 首页",
     primaryAction: "进入运营台",
     statusLabel: "运行摘要",
+    stepOneLabel: "第 1 步 · 选模板",
     subtitle: "把客流仿真、品牌吸引、接触网络和验证报告放进一个可交付的商业运营台。",
     title: "CrowdSim Operations",
   },
   en: {
+    basicModeAction: "Switch to basic mode",
+    basicSubtitle:
+      "Four steps to a finished run: pick a template → run it → watch the dashboard → export a report.",
+    expertModeAction: "Switch to expert mode",
     graphLabel: "Commercial flow network preview",
     kicker: "Commercial operations suite",
     lab: "Commercial crowd operating system",
@@ -44,6 +62,7 @@ const homeCopy: Record<Language, HomeCopy> = {
     pageLabel: "CrowdSim home",
     primaryAction: "Open console",
     statusLabel: "Run summary",
+    stepOneLabel: "Step 1 · Pick a template",
     subtitle:
       "Simulation, brand pull, contact networks, and validation reports in one client-ready operating console.",
     title: "CrowdSim Operations",
@@ -86,11 +105,15 @@ export function AppHome({
   language,
   onEnterLab,
   onOpenNetwork,
+  onSelectTemplate,
   onSetLanguage,
+  onToggleUiMode,
   runState,
+  uiMode,
   webGpuStatus,
 }: AppHomeProps) {
   const copy = homeCopy[language];
+  const basic = uiMode === "basic";
   const pulses = [
     { label: "SIM", value: runState },
     { label: "GPU", value: webGpuStatus },
@@ -131,100 +154,122 @@ export function AppHome({
             EN
           </button>
         </div>
+        <button
+          type="button"
+          className="home-mode-toggle"
+          aria-pressed={!basic}
+          onClick={onToggleUiMode}
+        >
+          {basic ? copy.expertModeAction : copy.basicModeAction}
+        </button>
       </header>
 
-      <section className="home-hero">
-        <div className="home-copy">
-          <p className="home-kicker">{copy.kicker}</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.subtitle}</p>
-          <div className="home-actions">
-            <button type="button" className="home-primary" onClick={onEnterLab}>
-              {copy.primaryAction}
-            </button>
-            <button type="button" className="home-secondary" onClick={onOpenNetwork}>
-              {copy.networkAction}
-            </button>
+      {basic ? (
+        <section className="home-hero home-hero-basic">
+          <div className="home-copy">
+            <p className="home-kicker">{copy.kicker}</p>
+            <h1>{copy.title}</h1>
+            <p>{copy.basicSubtitle}</p>
           </div>
-        </div>
-
-        <div className="home-visual-panel">
-          <div className="home-visual-top">
-            <span>OPERATIONS NETWORK</span>
-            <span>LIVE CAPACITY MODEL</span>
+          <div className="home-template-step">
+            <p className="home-step-label">{copy.stepOneLabel}</p>
+            <TemplateGallery language={language} onSelect={onSelectTemplate} />
           </div>
-          <svg
-            className="home-network"
-            viewBox="0 0 640 460"
-            role="img"
-            aria-label={copy.graphLabel}
-          >
-            <defs>
-              <linearGradient id="homeEdgeGradient" x1="0%" x2="100%" y1="0%" y2="0%">
-                <stop offset="0%" stopColor="#005bff" />
-                <stop offset="52%" stopColor="#00b7ff" />
-                <stop offset="100%" stopColor="#c8ff2d" />
-              </linearGradient>
-            </defs>
-            <g className="home-grid-lines">
-              {Array.from({ length: 6 }, (_, index) => (
-                <line
-                  key={`h-${index}`}
-                  x1="52"
-                  x2="588"
-                  y1={72 + index * 62}
-                  y2={72 + index * 62}
-                />
-              ))}
-              {Array.from({ length: 7 }, (_, index) => (
-                <line
-                  key={`v-${index}`}
-                  x1={68 + index * 82}
-                  x2={68 + index * 82}
-                  y1="54"
-                  y2="414"
-                />
-              ))}
-            </g>
-            <g className="home-links">
-              {links.map(([sourceId, targetId, tone]) => {
-                const source = findNode(sourceId);
-                const target = findNode(targetId);
+        </section>
+      ) : (
+        <section className="home-hero">
+          <div className="home-copy">
+            <p className="home-kicker">{copy.kicker}</p>
+            <h1>{copy.title}</h1>
+            <p>{copy.subtitle}</p>
+            <div className="home-actions">
+              <button type="button" className="home-primary" onClick={onEnterLab}>
+                {copy.primaryAction}
+              </button>
+              <button type="button" className="home-secondary" onClick={onOpenNetwork}>
+                {copy.networkAction}
+              </button>
+            </div>
+          </div>
 
-                return (
+          <div className="home-visual-panel">
+            <div className="home-visual-top">
+              <span>OPERATIONS NETWORK</span>
+              <span>LIVE CAPACITY MODEL</span>
+            </div>
+            <svg
+              className="home-network"
+              viewBox="0 0 640 460"
+              role="img"
+              aria-label={copy.graphLabel}
+            >
+              <defs>
+                <linearGradient id="homeEdgeGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+                  <stop offset="0%" stopColor="#005bff" />
+                  <stop offset="52%" stopColor="#00b7ff" />
+                  <stop offset="100%" stopColor="#c8ff2d" />
+                </linearGradient>
+              </defs>
+              <g className="home-grid-lines">
+                {Array.from({ length: 6 }, (_, index) => (
                   <line
-                    key={`${sourceId}-${targetId}`}
-                    className={`home-link home-link-${tone}`}
-                    x1={source.x}
-                    x2={target.x}
-                    y1={source.y}
-                    y2={target.y}
+                    key={`h-${index}`}
+                    x1="52"
+                    x2="588"
+                    y1={72 + index * 62}
+                    y2={72 + index * 62}
                   />
-                );
-              })}
-            </g>
-            <g className="home-nodes">
-              {nodes.map((node) => (
-                <g key={node.id} className={`home-node home-node-${node.tone}`}>
-                  <circle cx={node.x} cy={node.y} r={node.size + 8} />
-                  <circle cx={node.x} cy={node.y} r={node.size} />
-                  <text x={node.x} y={node.y + node.size + 23}>
-                    {node.id}
-                  </text>
-                </g>
+                ))}
+                {Array.from({ length: 7 }, (_, index) => (
+                  <line
+                    key={`v-${index}`}
+                    x1={68 + index * 82}
+                    x2={68 + index * 82}
+                    y1="54"
+                    y2="414"
+                  />
+                ))}
+              </g>
+              <g className="home-links">
+                {links.map(([sourceId, targetId, tone]) => {
+                  const source = findNode(sourceId);
+                  const target = findNode(targetId);
+
+                  return (
+                    <line
+                      key={`${sourceId}-${targetId}`}
+                      className={`home-link home-link-${tone}`}
+                      x1={source.x}
+                      x2={target.x}
+                      y1={source.y}
+                      y2={target.y}
+                    />
+                  );
+                })}
+              </g>
+              <g className="home-nodes">
+                {nodes.map((node) => (
+                  <g key={node.id} className={`home-node home-node-${node.tone}`}>
+                    <circle cx={node.x} cy={node.y} r={node.size + 8} />
+                    <circle cx={node.x} cy={node.y} r={node.size} />
+                    <text x={node.x} y={node.y + node.size + 23}>
+                      {node.id}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            </svg>
+            <div className="home-rail" aria-label={copy.statusLabel}>
+              {pulses.map((pulse) => (
+                <article key={pulse.label}>
+                  <span>{pulse.label}</span>
+                  <strong>{pulse.value}</strong>
+                </article>
               ))}
-            </g>
-          </svg>
-          <div className="home-rail" aria-label={copy.statusLabel}>
-            {pulses.map((pulse) => (
-              <article key={pulse.label}>
-                <span>{pulse.label}</span>
-                <strong>{pulse.value}</strong>
-              </article>
-            ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </main>
   );
 }

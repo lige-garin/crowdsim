@@ -98,8 +98,20 @@ async function canvasHasContent(page: Page) {
  * suite failed the moment the landing page shipped. The journey now includes
  * this click; the primary button is matched by its stable class because its
  * label is localized (进入运营台 / Open console).
+ *
+ * Basic mode (`uiMode.ts`) is now the default landing state and has no
+ * `.home-primary` button at all -- home is the template gallery instead. The
+ * tests below exercise the classic expert-mode workbench (build tools, the
+ * full HUD), so this switches to expert mode first via the mode toggle
+ * (`.home-mode-toggle`). Basic mode's own path has its own e2e coverage,
+ * "basic mode: template pick runs a simulation with the dashboard already
+ * open," below.
  */
 async function enterWorkbench(page: Page) {
+  const modeToggle = page.locator("button.home-mode-toggle");
+  await expect(modeToggle).toBeVisible();
+  await modeToggle.click();
+
   const enter = page.locator("button.home-primary");
   await expect(enter).toBeVisible();
   await enter.click();
@@ -688,6 +700,52 @@ test("live analytics draws real charts for the running crowd, not just numbers",
   await page.getByTestId("info-window-tools").click();
   await page.getByTestId("panel-chip-validation-report").click();
   await expect(page.getByTestId("panel-dock-body")).toBeVisible();
+
+  expect(errors.messages).toEqual([]);
+});
+
+/**
+ * Basic mode (`uiMode.ts`) is the app's new default landing state: the
+ * four-step path this plan named ("select a template, run, watch the
+ * cockpit, get a report") as its own literal UI, not merely reachable
+ * through the classic expert-mode workbench once you know where to click.
+ * Every other test in this file switches to expert mode first
+ * (`enterWorkbench`'s mode-toggle click) specifically to keep testing that
+ * classic path; this is the only one that walks basic mode itself, in a
+ * real browser, end to end.
+ */
+test("basic mode: picking a template runs a simulation with the dashboard already open", async ({
+  page,
+}) => {
+  const errors = captureRuntimeErrors(page);
+
+  await page.goto("/");
+
+  // Home is the template gallery by default -- no console/network buttons,
+  // no mode toggle click needed to reach it.
+  const firstCard = page.locator("button.template-card").first();
+  await expect(firstCard).toBeVisible();
+  await firstCard.click();
+
+  // Step two (run) and step three (dashboard) happen without further
+  // clicks: picking a template both loads the scene and opens the
+  // dashboard, which a first-time user has no way to discover otherwise.
+  await expect(page.getByTestId("sim-toggle")).toHaveAttribute(
+    "aria-label",
+    /Pause|暂停/,
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("hud-window-analytics")).toBeVisible();
+
+  // The build toolbar and info rail are expert-mode surfaces; neither
+  // should exist in basic mode at all.
+  await expect(page.getByLabel(/Build tools|建造工具/)).toHaveCount(0);
+  await expect(page.getByLabel(/Info views|信息视图/)).toHaveCount(0);
+
+  // Step four: one button opens the real report for the scene that is
+  // actually running, not a trip through the tools window and panel dock.
+  await page.getByTestId("hud-report-trigger").click();
+  await expect(page.getByTestId("hud-window-report")).toBeVisible();
 
   expect(errors.messages).toEqual([]);
 });

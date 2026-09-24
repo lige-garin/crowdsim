@@ -10,6 +10,7 @@ import { bioCityDemoScene as initialScene } from "./bioCityDemoScene";
 import { createEvacuationFlowPlan } from "./evacuationPlan";
 import { createHeatmapCellsFromSamples, heatmapSamplesOnFloor } from "./heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";
+import { UiModeProvider, useUiMode } from "./uiMode";
 import { createSimulationCredibilityReport } from "./simulationCredibility";
 import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import { useAppProbes } from "./useAppProbes";
@@ -34,12 +35,15 @@ import {
 export function App() {
   return (
     <I18nProvider>
-      <AppContent />
+      <UiModeProvider>
+        <AppContent />
+      </UiModeProvider>
     </I18nProvider>
   );
 }
 function AppContent() {
   const { language, setLanguage, t } = useI18n();
+  const { uiMode, toggleUiMode } = useUiMode();
   // The live scene is shell state, not a module constant. The editor hands its
   // working copy back through `applyScene`, and swapping this value is what
   // puts the new geometry into both simulation paths (hot when the world and
@@ -418,8 +422,14 @@ function AppContent() {
           language={language}
           onEnterLab={() => enterLab()}
           onOpenNetwork={() => enterLab("network")}
+          onSelectTemplate={(templateScene) => {
+            applyScene(templateScene);
+            enterLab();
+          }}
           onSetLanguage={setLanguage}
+          onToggleUiMode={toggleUiMode}
           runState={runState}
+          uiMode={uiMode}
           webGpuStatus={probes.webGpuProbe.status}
         />
       </>
@@ -534,6 +544,7 @@ function AppContent() {
                 }
               : undefined
           }
+          uiMode={uiMode}
           viewMode={viewMode}
         />
       </div>

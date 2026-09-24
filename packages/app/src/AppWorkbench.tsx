@@ -7,6 +7,7 @@ import { AppInspector } from "./AppInspector";
 import { AppStage } from "./AppStage";
 import { PanelDock } from "./PanelDock";
 import { TrajectoryReplayBar } from "./TrajectoryReplayBar";
+import { ValidationReportPanel } from "./ValidationReportPanel";
 import { infoWindows, type InfoWindowId } from "./hudCatalog";
 import type { Language, TranslationKey } from "./i18n";
 import type { StageTab, StageViewMode } from "./AppTypes";
@@ -14,6 +15,7 @@ import type { SimulationStatus } from "./simulationEngine";
 import { heatmapWindows } from "./appUi";
 import type { ViewportLayerId, ViewportLayers } from "./viewportLayers";
 import type { EditorTool } from "./sceneEditorState";
+import type { UiMode } from "./uiMode";
 
 import type { HudReadout } from "./appTopbarMetrics";
 
@@ -58,6 +60,7 @@ type AppWorkbenchProps = {
   readouts: { clock: HudReadout; weather: HudReadout };
   /** Present while the recorded run is being replayed. */
   replay?: ComponentProps<typeof TrajectoryReplayBar>;
+  uiMode: UiMode;
   viewMode: StageViewMode;
 };
 
@@ -84,12 +87,25 @@ export function AppWorkbench({
   t,
   readouts,
   replay,
+  uiMode,
   viewMode,
 }: AppWorkbenchProps) {
-  const [openWindows, setOpenWindows] = useState<InfoWindowId[]>([]);
+  const basic = uiMode === "basic";
+  // Basic mode's third step, "watch the dashboard," has to already be open
+  // when the run view mounts -- a user who does not yet know this app has no
+  // reason to discover the info rail's analytics icon.
+  const [openWindows, setOpenWindows] = useState<InfoWindowId[]>(() =>
+    basic ? ["analytics"] : [],
+  );
+  const [reportOpen, setReportOpen] = useState(false);
 
   // The window last touched draws on top; a newly opened window is touched.
-  const [focusedWindow, setFocusedWindow] = useState<InfoWindowId | null>(null);
+  // "report" is basic mode's own floating window, outside the expert-mode
+  // `InfoWindowId` catalog (`hudCatalog.ts`), since only two windows can ever
+  // compete for focus there -- analytics (auto-opened) and this one.
+  const [focusedWindow, setFocusedWindow] = useState<InfoWindowId | "report" | null>(
+    null,
+  );
 
   function toggleWindow(id: InfoWindowId) {
     const opening = !openWindows.includes(id);
@@ -121,21 +137,44 @@ export function AppWorkbench({
 
       {replay ? <TrajectoryReplayBar {...replay} /> : null}
 
-      <AppBuildRail
-        canUndo={controls.canUndoBuild}
-        editorTool={controls.editorTool}
-        language={language}
-        onEditorToolChange={controls.onEditorToolChange}
-        onUndo={controls.onUndoBuild}
-      />
+      {/*
+        Basic mode's whole interface is the four-step path (template → run →
+        dashboard → report) -- the build toolbar and the info rail's layer
+        toggles/tools window are expert-mode surfaces, so neither renders
+        here. The dashboard is opened automatically above; this button is
+        basic mode's one way to reach step four.
+      */}
+      {basic ? (
+        <button
+          type="button"
+          className="hud-report-trigger"
+          data-testid="hud-report-trigger"
+          onClick={() => {
+            setReportOpen(true);
+            setFocusedWindow("report");
+          }}
+        >
+          {t("exportReport")}
+        </button>
+      ) : (
+        <>
+          <AppBuildRail
+            canUndo={controls.canUndoBuild}
+            editorTool={controls.editorTool}
+            language={language}
+            onEditorToolChange={controls.onEditorToolChange}
+            onUndo={controls.onUndoBuild}
+          />
 
-      <AppInfoRail
-        language={language}
-        layers={controls.layers}
-        onToggleLayer={controls.onToggleLayer}
-        onToggleWindow={toggleWindow}
-        openWindows={openWindows}
-      />
+          <AppInfoRail
+            language={language}
+            layers={controls.layers}
+            onToggleLayer={controls.onToggleLayer}
+            onToggleWindow={toggleWindow}
+            openWindows={openWindows}
+          />
+        </>
+      )}
 
       {/*
         The heatmap window length only means anything while the heatmap is being
@@ -181,7 +220,7 @@ export function AppWorkbench({
         </AppFloatingWindow>
       ) : null}
 
-      {openWindows.includes("tools") ? (
+      {!basic && openWindows.includes("tools") ? (
         <AppFloatingWindow
           focused={focusedWindow === "tools"}
           initialX={24}
@@ -193,6 +232,21 @@ export function AppWorkbench({
           width={720}
         >
           <PanelDock {...panelDockProps} />
+        </AppFloatingWindow>
+      ) : null}
+
+      {basic && reportOpen ? (
+        <AppFloatingWindow
+          focused={focusedWindow === "report"}
+          initialX={24}
+          initialY={92}
+          onFocus={() => setFocusedWindow("report")}
+          onClose={() => setReportOpen(false)}
+          testId="hud-window-report"
+          title={t("exportReport")}
+          width={420}
+        >
+          <ValidationReportPanel scene={panelDockProps.context.scene} />
         </AppFloatingWindow>
       ) : null}
     </main>

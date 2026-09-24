@@ -4,14 +4,20 @@ import { AppHome } from "./AppHome";
 
 afterEach(cleanup);
 
+// These tests check the status pulses (SIM/GPU/TRACE/DATA), which only
+// render in expert mode's hero -- basic mode replaces that panel with the
+// template gallery (see AppHome.uiMode.test.tsx).
 function renderHome() {
   return render(
     <AppHome
       language="en"
       onEnterLab={vi.fn()}
       onOpenNetwork={vi.fn()}
+      onSelectTemplate={vi.fn()}
       onSetLanguage={vi.fn()}
+      onToggleUiMode={vi.fn()}
       runState="running"
+      uiMode="expert"
       webGpuStatus="ready"
     />,
   );

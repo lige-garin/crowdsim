@@ -141,6 +141,12 @@ afterEach(() => {
 
 function renderWorkbench() {
   render(<App />);
+  // Basic mode (template gallery) is the new default (uiMode.ts); these
+  // tests exercise the classic expert-mode workbench, which basic mode's
+  // home screen no longer shows a "进入运营台" button for directly -- switch
+  // to expert mode first. Basic mode's own path has its own coverage in
+  // AppHome.uiMode.test.tsx.
+  fireEvent.click(screen.getByRole("button", { name: "切到专家模式" }));
   fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 }
 
@@ -152,6 +158,9 @@ describe("App", () => {
       screen.getByRole("heading", { name: "CrowdSim Operations" }),
     ).toBeInTheDocument();
 
+    // Basic mode is the default; this test exercises the expert-mode
+    // workbench path.
+    fireEvent.click(screen.getByRole("button", { name: "切到专家模式" }));
     fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 
     expect(screen.getByLabelText("状态栏")).toBeInTheDocument();
@@ -292,5 +301,51 @@ describe("App", () => {
 
     expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "true");
     expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  describe("basic mode (uiMode.ts default)", () => {
+    it("picking a template enters a stripped-down run view with the dashboard already open", () => {
+      render(<App />);
+
+      // Basic mode's home screen is the template gallery, not the classic
+      // hero buttons -- picking any card is step one of the four-step path.
+      const firstCard = screen.getAllByRole("button", {
+        name: /地铁站厅|商场中庭/,
+      })[0];
+      fireEvent.click(firstCard);
+
+      // Step three, "watch the dashboard," is already open -- a basic-mode
+      // user has no reason to know an info-rail icon exists to open it.
+      expect(screen.getByTestId("hud-window-analytics")).toBeInTheDocument();
+
+      // The build toolbar and info rail are expert-mode surfaces.
+      expect(screen.queryByLabelText("建造工具")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("信息视图")).not.toBeInTheDocument();
+
+      // Step four is one button, not a trip through the tools window.
+      expect(screen.getByTestId("hud-report-trigger")).toBeInTheDocument();
+    });
+
+    it("the report button opens the real scene's validation report panel", () => {
+      render(<App />);
+      fireEvent.click(
+        screen.getAllByRole("button", {
+          name: /地铁站厅|商场中庭/,
+        })[0],
+      );
+
+      fireEvent.click(screen.getByTestId("hud-report-trigger"));
+
+      expect(screen.getByTestId("hud-window-report")).toBeInTheDocument();
+    });
+
+    it("expert mode shows none of the basic-mode-only chrome", () => {
+      renderWorkbench();
+
+      expect(screen.queryByTestId("hud-report-trigger")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Rail station concourse/ }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

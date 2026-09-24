@@ -140,6 +140,7 @@ export const messages = {
   exited: { zh: "已离开", en: "Exited" },
   export: { zh: "导出", en: "Export" },
   exportedScene: { zh: "Exported .csim.json", en: "Exported .csim.json" },
+  exportReport: { zh: "第 4 步 · 出报告", en: "Step 4 · Export report" },
   finishWall: { zh: "完成墙体", en: "Finish wall" },
   floors: { zh: "楼层", en: "Floors" },
   storeys: { zh: "层数", en: "Storeys" },

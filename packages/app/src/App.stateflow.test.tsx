@@ -31,6 +31,9 @@ afterEach(() => {
 
 function renderWorkbench() {
   render(<App />);
+  // Basic mode (template gallery) is the new default (uiMode.ts); this
+  // helper exercises the classic expert-mode workbench.
+  fireEvent.click(screen.getByRole("button", { name: "切到专家模式" }));
   fireEvent.click(screen.getByRole("button", { name: "进入运营台" }));
 }
 

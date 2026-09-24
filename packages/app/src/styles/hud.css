@@ -523,6 +523,26 @@
   right: 14px;
 }
 
+/* Basic mode's step-four action: the info rail (and its "tools" window,
+   where an expert would reach the report) is hidden in basic mode, so this
+   sits where the info rail otherwise would. */
+.game-shell .hud-report-trigger {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  z-index: 25;
+  transform: translateY(-50%);
+  padding: 10px 16px;
+  border: 1px solid var(--hud-edge);
+  border-radius: 16px;
+  background: var(--hud-panel);
+  box-shadow: var(--hud-lift);
+  color: #f2a93b;
+  font-family: var(--lab-mono);
+  font-weight: 780;
+  white-space: nowrap;
+}
+
 .game-shell .hud-rail-buttons {
   display: grid;
   gap: 6px;
