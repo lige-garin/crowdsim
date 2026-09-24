@@ -145,7 +145,7 @@ export function buildMoveParamsData(
   params: GpuSimCoreSocialForceParams,
   wallCount: number,
 ): ArrayBuffer {
-  const buffer = new ArrayBuffer(76);
+  const buffer = new ArrayBuffer(92);
   const view = new DataView(buffer);
   view.setUint32(0, count, true);
   view.setUint32(4, layout.columns, true);
@@ -166,6 +166,10 @@ export function buildMoveParamsData(
   view.setFloat32(64, params.interactionRangeMeters, true);
   view.setFloat32(68, params.sidestep, true);
   view.setFloat32(72, params.sidestepCone, true);
+  view.setFloat32(76, params.anticipationStrength, true);
+  view.setFloat32(80, params.anticipationHorizonSeconds, true);
+  view.setFloat32(84, params.anticipationRangeMeters, true);
+  view.setFloat32(88, params.anticipationMaxAcceleration, true);
   return buffer;
 }
 export function buildGridParamsData(

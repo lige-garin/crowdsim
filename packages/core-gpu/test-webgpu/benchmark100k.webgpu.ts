@@ -40,6 +40,10 @@ describe("100k step-time benchmark (real WebGPU)", () => {
       interactionRangeMeters: 2,
       sidestep: 0.6,
       sidestepCone: 0.7,
+      anticipationStrength: 1.5,
+      anticipationHorizonSeconds: 3,
+      anticipationRangeMeters: 3,
+      anticipationMaxAcceleration: 5,
     };
     const core = createGpuSimCore(device!, {
       capacity: N,

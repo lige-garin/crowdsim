@@ -5,6 +5,7 @@ import {
   setAgentPosition,
   setAgentRadius,
   setAgentSpeed,
+  setAgentVelocity,
   type WallSegment,
 } from "./index";
 import {
@@ -27,6 +28,15 @@ const params: GpuSimCoreSocialForceParams = {
   interactionRangeMeters: 2,
   sidestep: 0.6,
   sidestepCone: 0.7,
+  anticipationStrength: 1.5,
+  anticipationHorizonSeconds: 3,
+  // crowdMovement.ts's own default is 3m, but every existing fixture in
+  // this file uses cellSize: 2 — matching that here (rather than bumping
+  // every fixture's cellSize) keeps the pre-anticipation tests as decisive
+  // regressions; dedicated anticipation tests below use their own layout
+  // with a bigger cellSize where the wider range actually matters.
+  anticipationRangeMeters: 2,
+  anticipationMaxAcceleration: 5,
 };
 const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
 
@@ -535,5 +545,160 @@ describe("stage 3: the together fix and the sidestep nudge (crowdMovement.ts's p
         Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
       ).toBeLessThan(1e-9);
     }
+  });
+});
+
+describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collision push)", () => {
+  it("pushes an agent away from someone on a head-on collision course", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentVelocity(agents, 0, 1.34, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // Within params' own anticipationRangeMeters (2m) — 2.5m would sit
+    // outside it and anticipation would correctly contribute nothing at
+    // all, making this comparison a no-op regardless of anticipationStrength.
+    setAgentPosition(agents, 1, 1.5, 0);
+    setAgentVelocity(agents, 1, -1.34, 0);
+    setAgentRadius(agents, 1, 0.22);
+    // Targets match current heading so relaxation doesn't fight anticipation.
+    const targets = new Float32Array([10, 0, -10, 0]);
+
+    const withAnticipation = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
+      ...params,
+      anticipationStrength: 0,
+    });
+
+    // The push resists closing speed: agent 0's x-velocity should end up
+    // lower with anticipation active than without it (braking/diverting
+    // ahead of the projected collision), not just numerically different.
+    expect(withAnticipation.velocities[0]).toBeLessThan(without.velocities[0]);
+  });
+
+  it("does nothing between two agents moving apart (not on a collision course)", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentVelocity(agents, 0, -1.34, 0);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 1, 0);
+    setAgentVelocity(agents, 1, 1.34, 0);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([-10, 0, 10, 0]);
+
+    const withAnticipation = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
+      ...params,
+      anticipationStrength: 0,
+    });
+
+    // b = w·(v_self - v_other) <= 0 here (moving apart), so anticipation's
+    // own early-return should leave the two runs identical.
+    expect(withAnticipation.velocities[0]).toBeCloseTo(without.velocities[0], 9);
+    expect(withAnticipation.velocities[1]).toBeCloseTo(without.velocities[1], 9);
+  });
+
+  it("clamps the summed anticipatory push to anticipationMaxAcceleration", () => {
+    // A near-miss (small lateral offset, high closing speed) drives tau
+    // toward zero, and the push's raw magnitude toward infinity — exactly
+    // the case the cap exists for. 3m apart is beyond interactionRangeMeters
+    // (2, params' default) so agent repulsion contributes nothing here —
+    // this isolates the anticipation force specifically, not "every force
+    // combined stays under maxSpeed" (a much weaker, already-existing
+    // guarantee from integrate()'s own clamp).
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    const v0x = 3;
+    const v0y = 0.01;
+    setAgentVelocity(agents, 0, v0x, v0y);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 3, 0);
+    setAgentVelocity(agents, 1, -3, -0.01);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([0, 0, 3, 0]); // target = own position: zero desired-velocity pull
+
+    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
+      ...params,
+      anticipationRangeMeters: 5,
+      relaxationTime: 1e9, // makes relaxation's own contribution negligible
+      maxSpeed: 1000, // keeps integrate()'s own clamp from masking this one
+    });
+
+    // result.velocities = initial velocity + force * dt (clampMagnitude is a
+    // no-op at maxSpeed: 1000), so subtracting initial velocity and dividing
+    // by dt recovers the force itself — dominated by anticipation, since
+    // repulsion is zero at this range and relaxation is negligible.
+    const forceX = (result.velocities[0] - v0x) / params.dt;
+    const forceY = (result.velocities[1] - v0y) / params.dt;
+    const magnitude = Math.hypot(forceX, forceY);
+    // Positions/velocities round-trip through a Float32Array (single
+    // precision), so a value around 5 carries ~1e-6 relative rounding
+    // noise even with exact math — a tighter epsilon would be testing
+    // float32 precision, not the clamp.
+    expect(magnitude).toBeLessThanOrEqual(params.anticipationMaxAcceleration * 1.001);
+    // Not vacuous: the cap must actually be doing something, i.e. the raw
+    // (unclamped) push at this near-miss really would exceed it.
+    expect(magnitude).toBeGreaterThan(params.anticipationMaxAcceleration * 0.9);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with anticipation's own (wider) range", () => {
+    const N = 30;
+    const agents = createAgentSoA(N);
+    const targets = new Float32Array(N * 2);
+    for (let i = 0; i < N; i++) {
+      setAgentPosition(agents, i, 5 + (i % 6) * 1.5, 5 + Math.floor(i / 6) * 1.5);
+      // Alternate facing directions so plenty of pairs are actually closing.
+      setAgentVelocity(agents, i, i % 2 === 0 ? 1.2 : -1.2, 0);
+      setAgentRadius(agents, i, 0.22);
+      targets[i * 2] = i % 2 === 0 ? 60 : -60;
+      targets[i * 2 + 1] = 5 + Math.floor(i / 6) * 1.5;
+    }
+    const wideParams: GpuSimCoreSocialForceParams = {
+      ...params,
+      anticipationRangeMeters: 3,
+    };
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 3 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(agents, targets, walls, wideParams);
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      wideParams,
+      layout,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+
+  it("throws when anticipationRangeMeters exceeds cellSize", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]);
+    const tooCoarse = createSpatialHashGridLayout({
+      width: 64,
+      height: 64,
+      cellSize: 1.5,
+    });
+
+    expect(() =>
+      stepGpuSimCoreSocialForceNeighborhoodCpu(
+        agents,
+        targets,
+        [],
+        // interactionRangeMeters also has to stay <= cellSize here, or that
+        // earlier (and unrelated) check would throw first and this
+        // assertion wouldn't actually be testing the anticipation check.
+        { ...params, interactionRangeMeters: 1, anticipationRangeMeters: 2 },
+        tooCoarse,
+      ),
+    ).toThrow(/anticipationRangeMeters/);
   });
 });

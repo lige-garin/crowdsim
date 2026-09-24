@@ -271,7 +271,7 @@ export async function stepForParity(
   });
   const moveParamsBuffer = device.createBuffer({
     label: "step-move-params",
-    size: 76,
+    size: 92,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const cellCountsBuffer = createStorageBuffer(

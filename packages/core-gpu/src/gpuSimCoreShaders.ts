@@ -112,6 +112,17 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // roughly ahead and not in the same group, reusing the same push magnitude
 // — `sidestep`/`sidestepCone` ARE calibrated `socialForceParameters` fields
 // (unlike formation's constants), so they're MoveParams fields.
+//
+// Stage 4: the Karamouzas/Skinner/Guy time-to-collision anticipation push
+// (gpuSimCoreSocialForce.ts's own doc comment has the full citation and
+// formula). A SEPARATE pass over the same 3x3 neighbourhood, not fused into
+// the repulsion loop above — it uses its own range
+// (anticipationRangeMeters, independent of interactionRangeMeters) and its
+// own geometric test (closing speed + discriminant, not distance alone),
+// exactly like crowdMovement.ts itself calls anticipation() as a separate
+// function after its own repulsion loop. The summed push is clamped to
+// anticipationMaxAcceleration once, after every neighbour's contribution is
+// added — not per-neighbour.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -134,6 +145,10 @@ struct MoveParams {
   interactionRangeMeters: f32,
   sidestep: f32,
   sidestepCone: f32,
+  anticipationStrength: f32,
+  anticipationHorizonSeconds: f32,
+  anticipationRangeMeters: f32,
+  anticipationMaxAcceleration: f32,
 };
 @group(0) @binding(0) var<storage, read> params: MoveParams;
 @group(0) @binding(1) var<storage, read> positionsIn: array<vec2<f32>>;
@@ -233,6 +248,55 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
       }
     }
   }
+
+  // anticipation (Karamouzas/Skinner/Guy time-to-collision push) — a
+  // SEPARATE pass over the same 3x3 neighbourhood, its own range
+  // (anticipationRangeMeters) and its own geometric test, exactly like the
+  // CPU original calls anticipation() as its own function.
+  var antX = 0.0;
+  var antY = 0.0;
+  for (var dr2 = -1; dr2 <= 1; dr2 = dr2 + 1) {
+    let nr2 = ru + dr2;
+    if (nr2 < 0 || nr2 >= i32(params.rows)) { continue; }
+    for (var dc2 = -1; dc2 <= 1; dc2 = dc2 + 1) {
+      let nc2 = cu + dc2;
+      if (nc2 < 0 || nc2 >= i32(params.columns)) { continue; }
+      let ncell2 = u32(nr2) * params.columns + u32(nc2);
+      let start2 = cellOffsets[ncell2];
+      let end2 = cellOffsets[ncell2 + 1u];
+      for (var slot2 = start2; slot2 < end2; slot2 = slot2 + 1u) {
+        let other2 = sortedAgentIds[slot2];
+        if (other2 == i) { continue; }
+        let w2 = positionsIn[other2] - p;
+        let distSq2 = dot(w2, w2);
+        if (distSq2 > params.anticipationRangeMeters * params.anticipationRangeMeters) { continue; }
+        let rv = v - velocitiesIn[other2];
+        let b2 = dot(w2, rv);
+        if (b2 <= 0.0) { continue; }
+        let bodies2 = radii[i] + radii[other2];
+        let c2 = distSq2 - bodies2 * bodies2;
+        if (c2 <= 0.0) { continue; }
+        let a2 = dot(rv, rv);
+        let disc = b2 * b2 - a2 * c2;
+        if (a2 < 0.000001 || disc <= 0.0) { continue; }
+        let root2 = sqrt(disc);
+        let tau = (b2 - root2) / a2;
+        if (tau <= 0.0) { continue; }
+        let scale2 = (-params.anticipationStrength * exp(-tau / params.anticipationHorizonSeconds) *
+          (2.0 / tau + 1.0 / params.anticipationHorizonSeconds)) / (a2 * tau * tau);
+        antX = antX + scale2 * (rv.x - (b2 * rv.x - a2 * w2.x) / root2);
+        antY = antY + scale2 * (rv.y - (b2 * rv.y - a2 * w2.y) / root2);
+      }
+    }
+  }
+  let antLen = length(vec2<f32>(antX, antY));
+  if (antLen > params.anticipationMaxAcceleration && antLen > 0.0001) {
+    let antScale = params.anticipationMaxAcceleration / antLen;
+    antX = antX * antScale;
+    antY = antY * antScale;
+  }
+  force.x = force.x + antX;
+  force.y = force.y + antY;
 
   // wall repulsion, and wallClose (formation force's other gate: the crowd
   // falls into single file near a wall instead of holding a side-by-side

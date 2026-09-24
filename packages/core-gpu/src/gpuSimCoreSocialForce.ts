@@ -44,10 +44,9 @@ import type {
  *
  * Deliberately NOT ported here, left for a later stage per ADR-0015's own
  * order (base force first, since everything else assumes it's right):
- * sidestep, anticipation (Karamouzas time-to-collision), leader-following
- * (a decision-layer target rewrite, not a 60Hz force — nothing to port),
  * hazard avoidance, holding-state speed easing, the no-walking-backward
- * clamp, and the no-overshoot-past-target clamp.
+ * clamp, and the no-overshoot-past-target clamp. Leader-following is a
+ * decision-layer target rewrite, not a 60Hz force — nothing to port.
  *
  * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
  * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
@@ -86,6 +85,24 @@ export type GpuSimCoreSocialForceParams = SocialForceParams & {
   /** Cosine-of-facing-angle threshold above which sidestep triggers, ≈45°
    * (crowdMovement's `sidestepCone`) — same reasoning as `sidestep`. */
   sidestepCone: number;
+  /** Anticipation strength k in Karamouzas, Skinner & Guy (2014)'s
+   * k·τ⁻²·e^(−τ/τ₀) interaction energy — crowdMovement's `anticipationStrength`,
+   * another real calibrated field (0 turns anticipation off there; here it is
+   * ported unconditionally, since a per-agent on/off switch belongs to
+   * scene/behaviour configuration this module has never carried). */
+  anticipationStrength: number;
+  /** τ₀ in the same formula, s — crowdMovement's `anticipationHorizonSeconds`. */
+  anticipationHorizonSeconds: number;
+  /** Neighbour search radius for anticipation, m — crowdMovement's
+   * `anticipationRangeMeters`. Independent of `interactionRangeMeters` (the
+   * paper's own default, 3m, is LARGER than this module's own
+   * `interactionRangeMeters` default of 2m), so it gets its own
+   * `<= cellSize` invariant below rather than reusing the existing one. */
+  anticipationRangeMeters: number;
+  /** Cap on the anticipatory push's magnitude, m/s² — crowdMovement's
+   * `anticipationMaxAcceleration`, applied to the summed anticipation force
+   * only (not the combined total), exactly like the CPU original. */
+  anticipationMaxAcceleration: number;
 };
 
 /**
@@ -223,6 +240,85 @@ function formationForce(
   };
 }
 
+/**
+ * One neighbour's contribution to the anticipation (time-to-collision) push
+ * — `crowdMovement.ts`'s own `anticipation()`, ported per-pair rather than
+ * per-agent since this module already structures every other force as a
+ * per-neighbour contribution summed by the caller. τ is when the two
+ * bodies' current-velocity paths would first touch; the push is (minus) the
+ * velocity-gradient of k·τ⁻²·e^(−τ/τ₀), the paper's own interaction energy.
+ * Not a subset of `agentInteractionForce`'s neighbour loop — it uses a
+ * different range (`anticipationRangeMeters`, independent of
+ * `interactionRangeMeters`) and a different geometric test (closing speed
+ * and discriminant, not distance alone), so it is its own separate pass
+ * over the same neighbourhood, exactly like `crowdMovement.ts` itself calls
+ * `anticipation()` as a separate function after its own repulsion loop, not
+ * fused into it.
+ */
+function anticipationPairForce(
+  px: number,
+  py: number,
+  vx: number,
+  vy: number,
+  bodies: number,
+  ox: number,
+  oy: number,
+  ovx: number,
+  ovy: number,
+  params: GpuSimCoreSocialForceParams,
+): { x: number; y: number } {
+  const wx = ox - px;
+  const wy = oy - py;
+  const distanceSq = wx * wx + wy * wy;
+  if (distanceSq > params.anticipationRangeMeters ** 2) {
+    return { x: 0, y: 0 };
+  }
+  const rvx = vx - ovx;
+  const rvy = vy - ovy;
+  // Not closing in: no collision ahead.
+  const b = wx * rvx + wy * rvy;
+  if (b <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const c = distanceSq - bodies * bodies;
+  if (c <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const a = rvx * rvx + rvy * rvy;
+  const discriminant = b * b - a * c;
+  if (a < 1e-6 || discriminant <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const root = Math.sqrt(discriminant);
+  const tau = (b - root) / a;
+  if (tau <= 0) {
+    return { x: 0, y: 0 };
+  }
+  const k = params.anticipationStrength;
+  const t0 = params.anticipationHorizonSeconds;
+  const scale = (-k * Math.exp(-tau / t0) * (2 / tau + 1 / t0)) / (a * tau * tau);
+  return {
+    x: scale * (rvx - (b * rvx - a * wx) / root),
+    y: scale * (rvy - (b * rvy - a * wy) / root),
+  };
+}
+
+/** Clamps the summed anticipation push to `anticipationMaxAcceleration` —
+ * `crowdMovement.ts`'s own magnitude cap on the SUM, applied once after
+ * every neighbour's contribution is added up, not per-neighbour. */
+function clampAnticipation(
+  fx: number,
+  fy: number,
+  params: GpuSimCoreSocialForceParams,
+): { x: number; y: number } {
+  const magnitude = Math.hypot(fx, fy);
+  if (magnitude > params.anticipationMaxAcceleration) {
+    const scale = params.anticipationMaxAcceleration / magnitude;
+    return { x: fx * scale, y: fy * scale };
+  }
+  return { x: fx, y: fy };
+}
+
 function integrate(
   vx: number,
   vy: number,
@@ -272,6 +368,8 @@ export function stepGpuSimCoreSocialForceCpu(
     let forceY = (desired.y * desiredSpeed - vy) / params.relaxationTime;
 
     let strangersClose = 0;
+    let anticipationX = 0;
+    let anticipationY = 0;
     for (let other = 0; other < agents.count; other++) {
       if (other === index) {
         continue;
@@ -293,7 +391,24 @@ export function stepGpuSimCoreSocialForceCpu(
       const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
       forceX += push.x;
       forceY += push.y;
+      const anticipate = anticipationPairForce(
+        px,
+        py,
+        vx,
+        vy,
+        bodies,
+        agents.positions[other * 2],
+        agents.positions[other * 2 + 1],
+        agents.velocities[other * 2],
+        agents.velocities[other * 2 + 1],
+        params,
+      );
+      anticipationX += anticipate.x;
+      anticipationY += anticipate.y;
     }
+    const anticipation = clampAnticipation(anticipationX, anticipationY, params);
+    forceX += anticipation.x;
+    forceY += anticipation.y;
 
     const wall = wallForce(px, py, walls, params);
     forceX += wall.x;
@@ -359,6 +474,17 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       "formationRoomMeters must be <= cellSize for the 3x3 neighborhood to be lossless",
     );
   }
+  // Anticipation searches the SAME 3x3 neighbourhood, restricted to its own
+  // anticipationRangeMeters — independent of interactionRangeMeters (the
+  // paper's own default, 3m, is larger than this module's interaction
+  // default of 2m), so it needs its own invariant, not a reuse of the check
+  // above. Always enforced (unlike the group-only formation check): every
+  // caller pays the anticipation force, there is no "off" switch here.
+  if (params.anticipationRangeMeters > layout.cellSize) {
+    throw new Error(
+      "anticipationRangeMeters must be <= cellSize for the 3x3 neighborhood to be lossless",
+    );
+  }
 
   const grid = buildSpatialHashGridCpu(agents, layout);
   const nextPositions = agents.positions.slice(0, agents.count * 2);
@@ -382,6 +508,8 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     const row = Math.floor(cell / layout.columns);
 
     let strangersClose = 0;
+    let anticipationX = 0;
+    let anticipationY = 0;
     for (let dr = -1; dr <= 1; dr++) {
       const nr = row + dr;
       if (nr < 0 || nr >= layout.rows) {
@@ -419,9 +547,26 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
           const push = agentInteractionForce(desired, bodies, dx, dy, together, params);
           forceX += push.x;
           forceY += push.y;
+          const anticipate = anticipationPairForce(
+            px,
+            py,
+            vx,
+            vy,
+            bodies,
+            agents.positions[other * 2],
+            agents.positions[other * 2 + 1],
+            agents.velocities[other * 2],
+            agents.velocities[other * 2 + 1],
+            params,
+          );
+          anticipationX += anticipate.x;
+          anticipationY += anticipate.y;
         }
       }
     }
+    const anticipation = clampAnticipation(anticipationX, anticipationY, params);
+    forceX += anticipation.x;
+    forceY += anticipation.y;
 
     const wall = wallForce(px, py, walls, params);
     forceX += wall.x;

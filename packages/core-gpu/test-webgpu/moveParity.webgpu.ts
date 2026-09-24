@@ -5,6 +5,7 @@ import {
   setAgentPosition,
   setAgentRadius,
   setAgentSpeed,
+  setAgentVelocity,
   stepGpuSimCoreSocialForceCpu,
   type GpuSimCoreSocialForceParams,
   type WallSegment,
@@ -55,6 +56,10 @@ describe("fused move parity (real WebGPU)", () => {
         interactionRangeMeters: 2,
         sidestep: 0.6,
         sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
       };
       // cellSize >= interactionRangeMeters so the GPU 3x3 neighborhood is exact.
       const layout = createSpatialHashGridLayout({
@@ -133,6 +138,10 @@ describe("fused move parity (real WebGPU)", () => {
         interactionRangeMeters: 2,
         sidestep: 0.6,
         sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -229,6 +238,10 @@ describe("fused move parity (real WebGPU)", () => {
         interactionRangeMeters: 2,
         sidestep: 0.6,
         sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
       };
       const layout = createSpatialHashGridLayout({
         width: 64,
@@ -263,6 +276,86 @@ describe("fused move parity (real WebGPU)", () => {
         20,
         groupIds,
         formationSlots,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 4: anticipation) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      });
+      expect(device).toBeDefined();
+
+      // crowdMovement.ts's own default anticipationRangeMeters (3m) needs a
+      // cellSize that covers it, unlike the earlier fixtures in this file
+      // (which deliberately matched anticipation's range down to their own
+      // 2m cellSize) — this fixture exists specifically to exercise the
+      // wider range for real.
+      const N = 30;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      for (let i = 0; i < N; i++) {
+        setAgentPosition(agents, i, 5 + (i % 6) * 1.5, 5 + Math.floor(i / 6) * 1.5);
+        // Alternate facing directions head-on so plenty of pairs are
+        // actually on a collision course, not just closely spaced.
+        setAgentVelocity(agents, i, i % 2 === 0 ? 1.2 : -1.2, 0);
+        setAgentRadius(agents, i, 0.22);
+        targets[i * 2] = i % 2 === 0 ? 60 : -60;
+        targets[i * 2 + 1] = 5 + Math.floor(i / 6) * 1.5;
+      }
+      const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 3,
+        anticipationMaxAcceleration: 5,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 64,
+        height: 64,
+        cellSize: 3,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(cpuAgents, targets, walls, params);
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
       );
 
       for (let i = 0; i < N * 2; i++) {
