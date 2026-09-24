@@ -1,3 +1,4 @@
+import { ArrivalProfileChart } from "./ArrivalProfileChart";
 import type { TranslationKey } from "./i18n";
 import type { EditorDocument, EditorZoneCategory } from "./sceneEditorState";
 import { walkingGroupParameters } from "./walkingGroups";
@@ -642,13 +643,21 @@ export function EntranceParamGrid({
           />
           {/* Only means something once there are slots for it to size. */}
           {selectedEntrance.arrivalProfile ? (
-            <NumberInput
-              label={t("arrivalProfileIntervalMinutes")}
-              min={1}
-              step={1}
-              value={selectedEntrance.arrivalProfile.intervalMinutes}
-              onChange={onProfileIntervalChange}
-            />
+            <>
+              <ArrivalProfileChart
+                intervalMinutes={selectedEntrance.arrivalProfile.intervalMinutes}
+                rates={selectedEntrance.arrivalProfile.ratesPerMinute}
+                t={t}
+                onChange={(rates) => onProfileChange(rates.join(", "))}
+              />
+              <NumberInput
+                label={t("arrivalProfileIntervalMinutes")}
+                min={1}
+                step={1}
+                value={selectedEntrance.arrivalProfile.intervalMinutes}
+                onChange={onProfileIntervalChange}
+              />
+            </>
           ) : null}
           <NumberInput
             label={t("groupShare")}

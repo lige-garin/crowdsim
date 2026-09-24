@@ -22,6 +22,12 @@ export const messages = {
     zh: "每段时长 (分钟)",
     en: "Slot length (minutes)",
   },
+  arrivalProfileChartLabel: {
+    zh: "分时段到达速率（可拖动调整）",
+    en: "Arrival rate by time slot (drag to adjust)",
+  },
+  arrivalProfileSlotLabel: { zh: "分段", en: "Slot" },
+  arrivalProfileFromMinute: { zh: "起于第", en: "from minute" },
   groupShare: { zh: "结伴比例 (0–1)", en: "Share in groups (0–1)" },
   entranceKind: { zh: "出入口类型", en: "Entrance type" },
   attraction: { zh: "吸引力", en: "Attraction" },

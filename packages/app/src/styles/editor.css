@@ -657,6 +657,33 @@
   line-height: 1.4;
 }
 
+.arrival-profile-chart {
+  grid-column: 1 / -1;
+}
+
+.arrival-profile-chart svg {
+  width: 100%;
+  height: 90px;
+  touch-action: none;
+}
+
+.arrival-profile-bar {
+  fill: #2fd0ff;
+  cursor: ns-resize;
+}
+
+.arrival-profile-bar:focus-visible {
+  outline: 2px solid var(--lab-blue);
+  outline-offset: 1px;
+}
+
+.arrival-profile-chart text {
+  fill: var(--lab-faint);
+  font-family: var(--lab-mono);
+  font-size: 8px;
+  text-anchor: middle;
+}
+
 .editor-param-grid label {
   display: grid;
   gap: 4px;
