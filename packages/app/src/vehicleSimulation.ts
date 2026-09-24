@@ -56,6 +56,9 @@ export type VehicleAgent = {
   dwelledStopIds: readonly string[];
   x: number;
   y: number;
+  /** Which way it's facing, scene-coordinate radians — `worldPositionAtProgress`'s
+   * own heading, kept alongside x/y the same way it's computed alongside them. */
+  headingRadians: number;
 };
 
 export type RoadRuntimeCrosswalk = {
@@ -173,16 +176,35 @@ export function buildRoadRuntime(
 /** A vehicle's world position always advances `progressMeters` from 0 to
  * `totalLengthMeters` regardless of direction; only the arclength (and so
  * the point on the road) it corresponds to differs. */
+export type VehiclePose = ScenePoint & {
+  /** Which way the vehicle is facing, scene-coordinate radians (`atan2` of
+   * the road segment it's on, 0 = +x) — a renderer maps this to its own
+   * rotation convention, the same as it already does for position. */
+  headingRadians: number;
+};
+
 export function worldPositionAtProgress(
   road: RoadRuntime,
   laneDirection: LaneDirection,
   progressMeters: number,
-): ScenePoint {
+): VehiclePose {
   const arclength =
     laneDirection === "forward"
       ? progressMeters
       : road.totalLengthMeters - progressMeters;
-  return pointAtArclength(road.points, road.cumulative, arclength);
+  const { point, headingRadians } = poseAtArclength(
+    road.points,
+    road.cumulative,
+    arclength,
+  );
+  // Travelling "backward" walks the same polyline tail-to-head, so its
+  // facing is the forward segment's heading turned around, not the forward
+  // heading itself.
+  return {
+    ...point,
+    headingRadians:
+      laneDirection === "forward" ? headingRadians : headingRadians + Math.PI,
+  };
 }
 
 /** How far ahead of a vehicle at `progressMeters` a road feature (given by
@@ -294,12 +316,12 @@ export function stepVehicles(input: VehicleStepInput): VehicleAgent[] {
       )
       .map((vehicle) => {
         const road = roadsById.get(vehicle.roadId)!;
-        const { x, y } = worldPositionAtProgress(
+        const { x, y, headingRadians } = worldPositionAtProgress(
           road,
           vehicle.laneDirection,
           vehicle.progressMeters,
         );
-        return { ...vehicle, x, y };
+        return { ...vehicle, x, y, headingRadians };
       })
   );
 }
@@ -378,11 +400,11 @@ function stepOneVehicle(
     // absolute (measured from points[0]), independent of the vehicle's
     // direction of travel, so this reads off the polyline directly rather
     // than going through the direction-relative progress transform above.
-    const crosswalkPoint = pointAtArclength(
+    const crosswalkPoint = poseAtArclength(
       road.points,
       road.cumulative,
       crosswalk.forwardArclengthMeters,
-    );
+    ).point;
     const occupied = pedestrians.some(
       (pedestrian) => distance(pedestrian, crosswalkPoint) <= crosswalk.widthMeters / 2,
     );
@@ -439,11 +461,12 @@ function spawnVehicles(
       );
       if (nearEntry) continue;
 
-      const { x, y } = worldPositionAtProgress(road, laneDirection, 0);
+      const { x, y, headingRadians } = worldPositionAtProgress(road, laneDirection, 0);
       spawned.push({
         dwellRemainingSeconds: 0,
         dwelledStopIds: [],
         floorId: road.floorId,
+        headingRadians,
         id: `${road.id}-${laneDirection}-${Math.floor(random() * 1e9)}`,
         kind: "car",
         laneDirection,
@@ -458,11 +481,15 @@ function spawnVehicles(
   return spawned;
 }
 
-function pointAtArclength(
+/** A point on the polyline plus the heading (`atan2`, scene radians) of
+ * whichever segment it falls on — the one place both position and facing
+ * come from the same segment lookup, instead of a caller that wants both
+ * searching the polyline twice. */
+function poseAtArclength(
   points: readonly ScenePoint[],
   cumulative: readonly number[],
   arclength: number,
-): ScenePoint {
+): { point: ScenePoint; headingRadians: number } {
   const clamped = Math.max(
     0,
     Math.min(cumulative[cumulative.length - 1] ?? 0, arclength),
@@ -471,13 +498,23 @@ function pointAtArclength(
     if (clamped <= cumulative[i]) {
       const segmentLength = cumulative[i] - cumulative[i - 1];
       const t = segmentLength > 0 ? (clamped - cumulative[i - 1]) / segmentLength : 0;
+      const dx = points[i].x - points[i - 1].x;
+      const dy = points[i].y - points[i - 1].y;
       return {
-        x: points[i - 1].x + (points[i].x - points[i - 1].x) * t,
-        y: points[i - 1].y + (points[i].y - points[i - 1].y) * t,
+        point: {
+          x: points[i - 1].x + dx * t,
+          y: points[i - 1].y + dy * t,
+        },
+        headingRadians: Math.atan2(dy, dx),
       };
     }
   }
-  return points[points.length - 1];
+  const last = points[points.length - 1];
+  const previous = points[points.length - 2] ?? last;
+  return {
+    point: last,
+    headingRadians: Math.atan2(last.y - previous.y, last.x - previous.x),
+  };
 }
 
 /** Nearest point on the polyline to `target`, returned as forward arclength.

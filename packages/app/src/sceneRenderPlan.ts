@@ -1,4 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { nearestSegmentHeadingRadians } from "./sceneEditorGeometry";
 import { createSceneRuntimeConditions } from "./sceneRuntimeConditions";
 import { streetscapeBlueprint } from "./streetscapeBlueprint";
 
@@ -39,6 +40,19 @@ export type SceneRenderPrimitive =
       kind: "crosswalk";
       position: ScenePoint;
       widthMeters: number;
+      /** Which way its own road runs at `position` (`atan2`, scene
+       * radians) — the stripe's short side (`widthMeters`) runs along
+       * this, its long side across `roadWidthMeters`. */
+      headingRadians: number;
+      /** How far it spans across the road — the road's own `widthMeters`,
+       * not the crosswalk's (a crosswalk's `widthMeters` is the stripe's
+       * own depth along the road, not how far it reaches across one). Falls
+       * back to the crosswalk's own `widthMeters` (a square, the same shape
+       * this primitive always drew) for a `roadId` that no longer resolves
+       * to a real road, so an edit that orphans one still draws something
+       * instead of a zero-size mesh.
+       */
+      roadWidthMeters: number;
     };
 
 export type SceneWeatherVisualState = {
@@ -131,16 +145,21 @@ export function createSceneRenderPlan(
       position: copyPoint(stop.position),
       radiusMeters: Math.max(1.6, Math.min(3.2, stop.capacity / 42)),
     })),
-    // Un-oriented (ADR-0020, the same disclosed simplification the vehicle
-    // boxes themselves carry): a marker at the crossing's own point, not a
-    // stripe aligned across its road's actual direction of travel.
-    ...scene.crosswalks.map((crosswalk) => ({
-      color: "#f8fafc",
-      id: `crosswalk-${crosswalk.id}`,
-      kind: "crosswalk" as const,
-      position: copyPoint(crosswalk.position),
-      widthMeters: crosswalk.widthMeters,
-    })),
+    ...scene.crosswalks.map((crosswalk) => {
+      const road = scene.roads.find((candidate) => candidate.id === crosswalk.roadId);
+      return {
+        color: "#f8fafc",
+        id: `crosswalk-${crosswalk.id}`,
+        kind: "crosswalk" as const,
+        position: copyPoint(crosswalk.position),
+        widthMeters: crosswalk.widthMeters,
+        headingRadians:
+          road === undefined
+            ? 0
+            : nearestSegmentHeadingRadians(crosswalk.position, road.geometry.points),
+        roadWidthMeters: road?.widthMeters ?? crosswalk.widthMeters,
+      };
+    }),
     ...scene.obstacles.flatMap((obstacle) =>
       obstacle.geometry.points.slice(1).map((point, index) => ({
         color: obstacle.blocksMovement ? "#475569" : "#94a3b8",

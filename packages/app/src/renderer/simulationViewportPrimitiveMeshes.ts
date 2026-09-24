@@ -18,6 +18,7 @@ import type {
 } from "../sceneRenderPlan";
 import type { ViewMode } from "../simulationViewportTypes";
 import { primitiveBounds, toRenderX, toRenderY } from "../simulationViewportGeometry";
+import { sceneHeadingToRenderRotationZ } from "./sceneHeading";
 
 export function createRenderPrimitiveMesh(
   primitive: SceneRenderPrimitive,
@@ -141,10 +142,14 @@ export function createRenderPrimitiveMesh(
   }
 
   if (primitive.kind === "crosswalk") {
-    // Un-oriented flat patch (ADR-0020) — see the render-plan's own comment
-    // on why this does not align across its road's direction of travel.
+    // The stripe's short side (widthMeters, its own depth along the road)
+    // sits on x at zero rotation; its long side (roadWidthMeters, how far
+    // it spans across the road) on y. Rotated below to the road's own
+    // heading via `sceneHeadingToRenderRotationZ`, the same scene-to-render
+    // heading transform the vehicle boxes use
+    // (`useSimulationViewportRenderer.updateVehicleInstances`).
     const mesh = new Mesh(
-      new BoxGeometry(primitive.widthMeters, primitive.widthMeters, 0.04),
+      new BoxGeometry(primitive.widthMeters, primitive.roadWidthMeters, 0.04),
       new MeshBasicMaterial({ color: primitive.color }),
     );
 
@@ -153,6 +158,7 @@ export function createRenderPrimitiveMesh(
       toRenderY(primitive.position.y, scene),
       0.03,
     );
+    mesh.rotation.z = sceneHeadingToRenderRotationZ(primitive.headingRadians);
 
     return mesh;
   }

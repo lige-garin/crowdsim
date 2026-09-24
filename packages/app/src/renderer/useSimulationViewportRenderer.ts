@@ -27,6 +27,7 @@ import {
 import { crowdBudget } from "../crowdBudget";
 import { createCrowdFigures, type CrowdFigureAgent } from "./crowdFigures";
 import { screenToNdc } from "../agentPicking";
+import { sceneHeadingToRenderRotationZ } from "./sceneHeading";
 import {
   attachCityCameraControls,
   initialCityCameraRig,
@@ -189,10 +190,9 @@ export function useSimulationViewportRenderer({
         );
     if (agents) agents.frustumCulled = false;
     // A road-going vehicle is not a pedestrian: its own small InstancedMesh,
-    // not folded into `figures`/`agents` above. Un-oriented — it does not turn
-    // to face its direction of travel — the same disclosed simplification as
-    // the 2D pedestrian dot, kept for the same reason: this is a position
-    // update, not a vehicle model (ADR-0020).
+    // not folded into `figures`/`agents` above. Faces its direction of
+    // travel (`updateVehicleInstances`, `vehicleSimulation.headingRadians`)
+    // — this is still a box, not a vehicle model (ADR-0020).
     const vehicles = new InstancedMesh(
       new BoxGeometry(4, 1.8, 1.5),
       new MeshBasicMaterial({ color: "#3b4a5a" }),
@@ -343,6 +343,11 @@ export function useSimulationViewportRenderer({
           viewMode,
         );
         dummy.position.set(world.x, world.y, world.z);
+        // `dummy` is shared with `updateVehicleInstances` below, which does
+        // set a rotation — reset it here rather than assume it's still the
+        // zero identity, or a pedestrian drawn after a vehicle would inherit
+        // that vehicle's own facing.
+        dummy.rotation.set(0, 0, 0);
         dummy.scale.setScalar(1);
         dummy.updateMatrix();
         agents.setMatrixAt(index, dummy.matrix);
@@ -367,6 +372,15 @@ export function useSimulationViewportRenderer({
           viewMode,
         );
         dummy.position.set(world.x, world.y, viewMode === "3d" ? 0.75 : 0);
+        // The box mesh's own long side points along +x at zero rotation
+        // (`BoxGeometry(4, 1.8, 1.5)` below) — `sceneHeadingToRenderRotationZ`
+        // is the scene-to-render heading transform this shares with the
+        // crosswalk mesh (`simulationViewportPrimitiveMeshes.ts`).
+        dummy.rotation.set(
+          0,
+          0,
+          sceneHeadingToRenderRotationZ(live[index].headingRadians),
+        );
         dummy.scale.setScalar(1);
         dummy.updateMatrix();
         vehicles.setMatrixAt(index, dummy.matrix);

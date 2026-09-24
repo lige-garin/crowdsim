@@ -75,6 +75,7 @@ function car(overrides: Partial<VehicleAgent> = {}): VehicleAgent {
   return {
     dwellRemainingSeconds: 0,
     dwelledStopIds: [],
+    headingRadians: 0,
     id: "v1",
     kind: "car",
     laneDirection: "forward",
@@ -170,16 +171,57 @@ describe("buildRoadRuntime", () => {
 });
 
 describe("worldPositionAtProgress", () => {
-  it("moves forward vehicles from the road's start toward its end", () => {
+  it("moves forward vehicles from the road's start toward its end, facing along it", () => {
     const runtime = buildRoadRuntime(road(), [], []);
-    expect(worldPositionAtProgress(runtime, "forward", 0)).toEqual({ x: 0, y: 0 });
-    expect(worldPositionAtProgress(runtime, "forward", 100)).toEqual({ x: 100, y: 0 });
+    expect(worldPositionAtProgress(runtime, "forward", 0)).toEqual({
+      x: 0,
+      y: 0,
+      headingRadians: 0,
+    });
+    expect(worldPositionAtProgress(runtime, "forward", 100)).toEqual({
+      x: 100,
+      y: 0,
+      headingRadians: 0,
+    });
   });
 
-  it("moves backward vehicles from the road's end toward its start", () => {
+  it("moves backward vehicles from the road's end toward its start, facing the other way", () => {
     const runtime = buildRoadRuntime(road(), [], []);
-    expect(worldPositionAtProgress(runtime, "backward", 0)).toEqual({ x: 100, y: 0 });
-    expect(worldPositionAtProgress(runtime, "backward", 100)).toEqual({ x: 0, y: 0 });
+    expect(worldPositionAtProgress(runtime, "backward", 0)).toEqual({
+      x: 100,
+      y: 0,
+      headingRadians: Math.PI,
+    });
+    expect(worldPositionAtProgress(runtime, "backward", 100)).toEqual({
+      x: 0,
+      y: 0,
+      headingRadians: Math.PI,
+    });
+  });
+
+  it("faces the segment's own direction on a bent road, not the road's overall start-to-end line", () => {
+    const bent = buildRoadRuntime(
+      road({
+        geometry: {
+          type: "polyline",
+          points: [
+            { x: 0, y: 0 },
+            { x: 50, y: 0 },
+            { x: 50, y: 50 },
+          ],
+        },
+      }),
+      [],
+      [],
+    );
+
+    // Still on the first leg, along +x.
+    expect(worldPositionAtProgress(bent, "forward", 25).headingRadians).toBeCloseTo(0);
+    // Past the corner, on the second leg, along +y — atan2(dy, dx) for
+    // (0, 50), a quarter turn from the first leg's heading.
+    expect(worldPositionAtProgress(bent, "forward", 75).headingRadians).toBeCloseTo(
+      Math.PI / 2,
+    );
   });
 });
 

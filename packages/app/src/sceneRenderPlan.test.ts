@@ -71,14 +71,80 @@ describe("sceneRenderPlan", () => {
 
     const plan = createSceneRenderPlan(scene, 0);
 
+    // `rain-market-avenue` (roads[0]) is a straight east-west line, so this
+    // is heading 0 regardless of how far `position` sits from it — see the
+    // dedicated heading/road-width tests below for the parts this one
+    // doesn't exercise.
     expect(plan.primitives).toContainEqual(
       expect.objectContaining({
+        headingRadians: 0,
         id: "crosswalk-crosswalk-test",
         kind: "crosswalk",
         position: { x: 5, y: 5 },
+        roadWidthMeters: defaultDemoScene.roads[0].widthMeters,
         widthMeters: 4,
       }),
     );
+  });
+
+  it("orients a crosswalk to its own road's heading at that point, not a fixed direction", () => {
+    const scene = parseScene({
+      ...defaultDemoScene,
+      roads: [
+        ...defaultDemoScene.roads,
+        {
+          id: "north-south-road",
+          geometry: {
+            type: "polyline",
+            points: [
+              { x: 40, y: 0 },
+              { x: 40, y: 40 },
+            ],
+          },
+          widthMeters: 8,
+        },
+      ],
+      crosswalks: [
+        {
+          id: "crosswalk-ns",
+          roadId: "north-south-road",
+          position: { x: 40, y: 20 },
+          widthMeters: 3,
+        },
+      ],
+    });
+
+    const plan = createSceneRenderPlan(scene, 0);
+    const crosswalk = plan.primitives.find((p) => p.id === "crosswalk-crosswalk-ns");
+
+    expect(crosswalk).toMatchObject({
+      headingRadians: Math.PI / 2,
+      roadWidthMeters: 8,
+    });
+  });
+
+  it("falls back to a square (heading 0, its own widthMeters) when roadId no longer resolves to a real road", () => {
+    const scene = parseScene({
+      ...defaultDemoScene,
+      crosswalks: [
+        {
+          id: "crosswalk-orphan",
+          roadId: "a-road-that-was-deleted",
+          position: { x: 5, y: 5 },
+          widthMeters: 5,
+        },
+      ],
+    });
+
+    const plan = createSceneRenderPlan(scene, 0);
+    const crosswalk = plan.primitives.find(
+      (p) => p.id === "crosswalk-crosswalk-orphan",
+    );
+
+    expect(crosswalk).toMatchObject({
+      headingRadians: 0,
+      roadWidthMeters: 5,
+    });
   });
 
   it("marks active hazard visuals more strongly than inactive hazards", () => {

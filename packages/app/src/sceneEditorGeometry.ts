@@ -54,6 +54,27 @@ export function distanceToPolyline(
   return best;
 }
 
+/** The heading (`atan2`, scene radians) of whichever segment of the polyline
+ * `points` lies closest to `point` — the same nearest-segment search
+ * `distanceToPolyline` does, for a caller that needs which way the polyline
+ * runs at some point on it (e.g. a crosswalk's own road) rather than how far
+ * off it something is. 0 for a polyline with fewer than two points. */
+export function nearestSegmentHeadingRadians(
+  point: ScenePoint,
+  points: readonly ScenePoint[],
+): number {
+  let best = { distance: Infinity, headingRadians: 0 };
+  for (let index = 1; index < points.length; index++) {
+    const a = points[index - 1];
+    const b = points[index];
+    const distance = distanceToSegment(point, a, b);
+    if (distance < best.distance) {
+      best = { distance, headingRadians: Math.atan2(b.y - a.y, b.x - a.x) };
+    }
+  }
+  return best.headingRadians;
+}
+
 export function rectangleAround(
   center: ScenePoint,
   width: number,
