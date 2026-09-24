@@ -22,7 +22,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
       });
       expect(device).toBeDefined();
 
@@ -102,7 +102,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
       });
       expect(device).toBeDefined();
 
@@ -191,7 +191,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
       });
       expect(device).toBeDefined();
 
@@ -291,7 +291,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
       });
       expect(device).toBeDefined();
 
@@ -356,6 +356,99 @@ describe("fused move parity (real WebGPU)", () => {
         params,
         layout,
         20,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0015 stage 5: hazard avoidance) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
+      });
+      expect(device).toBeDefined();
+
+      // hazardAvoidance is not neighbour-dependent, so a small, ordinary
+      // scene suffices — the thing worth exercising is that a distinct
+      // per-agent vector actually reaches the shader, not crowd density.
+      const N = 20;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      const hazardAvoidance = new Float32Array(N * 2);
+      for (let i = 0; i < N; i++) {
+        setAgentPosition(agents, i, 5 + (i % 5) * 2, 5 + Math.floor(i / 5) * 2);
+        setAgentSpeed(agents, i, 1.34);
+        setAgentRadius(agents, i, 0.22);
+        targets[i * 2] = 60;
+        targets[i * 2 + 1] = 60;
+        // A distinct push per agent (not a uniform vector), so a shader bug
+        // that broadcasts one agent's value to everyone would show up as a
+        // parity failure rather than being masked by uniformity.
+        hazardAvoidance[i * 2] = (i % 4) - 1.5;
+        hazardAvoidance[i * 2 + 1] = ((i * 2) % 4) - 1.5;
+      }
+      const walls: WallSegment[] = [{ x1: 0, y1: 0, x2: 64, y2: 0 }];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 64,
+        height: 64,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          undefined,
+          undefined,
+          hazardAvoidance,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        undefined,
+        undefined,
+        hazardAvoidance,
       );
 
       for (let i = 0; i < N * 2; i++) {

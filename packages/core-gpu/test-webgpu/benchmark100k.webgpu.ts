@@ -15,7 +15,7 @@ describe("100k step-time benchmark (real WebGPU)", () => {
   gpuTest("100k agents step-time", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
     });
     expect(device).toBeDefined();
 

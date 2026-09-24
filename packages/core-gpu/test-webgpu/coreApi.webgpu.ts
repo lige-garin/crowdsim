@@ -37,7 +37,7 @@ describe("createGpuSimCore (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
       });
       expect(device).toBeDefined();
 

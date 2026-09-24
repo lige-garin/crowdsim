@@ -123,6 +123,14 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // function after its own repulsion loop. The summed push is clamped to
 // anticipationMaxAcceleration once, after every neighbour's contribution is
 // added — not per-neighbour.
+//
+// Stage 5: hazard avoidance (ADR-0012) — steering away from the worst
+// fire/smoke source exposing an agent. Not a neighbour force at all: a
+// function of one agent's own position, one hazard's position, and that
+// agent's exposure, computed once per DECISION tick by
+// simulationEngine.ts's hazardAvoidancePush and passed in exactly like
+// formationSlots already is — a higher-level system's per-agent output, so
+// there is no loop for it here, just a direct add.
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -163,6 +171,7 @@ struct MoveParams {
 @group(0) @binding(10) var<storage, read_write> velocitiesOut: array<vec2<f32>>;
 @group(0) @binding(11) var<storage, read> groupIds: array<i32>;
 @group(0) @binding(12) var<storage, read> formationSlots: array<vec2<f32>>;
+@group(0) @binding(13) var<storage, read> hazardAvoidance: array<vec2<f32>>;
 
 const formationGain: f32 = 1.0;
 const formationRoomMeters: f32 = 1.0;
@@ -321,6 +330,8 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
   if (myGroup >= 0 && !wallClose && strangersClose < 2u) {
     force = force + formationGain * (formationSlots[i] - p);
   }
+
+  force = force + hazardAvoidance[i];
 
   // integrate + clamp to maxSpeed
   let uv = v + force * params.dt;

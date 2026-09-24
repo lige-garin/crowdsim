@@ -702,3 +702,97 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     ).toThrow(/anticipationRangeMeters/);
   });
 });
+
+describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, added directly — no neighbour loop)", () => {
+  it("adds the supplied hazard avoidance vector directly to the resulting force", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([0, 0]); // target = own position: zero relaxation pull
+    const hazardAvoidance = new Float32Array([3, 0]);
+
+    const withHazard = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      hazardAvoidance,
+    );
+    const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    // Alone, no walls, zero relaxation pull: the only force at all with
+    // hazard avoidance supplied is the hazard vector itself.
+    expect(withHazard.velocities[0]).toBeGreaterThan(0);
+    expect(withHazard.velocities[0]).toBeCloseTo(3 * params.dt, 5);
+    expect(without.velocities[0]).toBeCloseTo(0, 9);
+  });
+
+  it("leaves the result unchanged when hazard avoidance is not supplied at all (backward compatible)", () => {
+    const agents = createAgentSoA(3);
+    for (let i = 0; i < 3; i++) {
+      setAgentPosition(agents, i, i * 0.6, 0);
+      setAgentRadius(agents, i, 0.22);
+    }
+    const targets = new Float32Array([10, 0, 10, 0, 10, 0]);
+
+    const undeclaredResult = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    const explicitZeroResult = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      new Float32Array(6), // all zeros: adding it should be a true no-op
+    );
+
+    for (let i = 0; i < 6; i++) {
+      expect(undeclaredResult.velocities[i]).toBeCloseTo(
+        explicitZeroResult.velocities[i],
+        9,
+      );
+    }
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with hazard avoidance active", () => {
+    const { agents, targets, layout, N } = makeScene();
+    const hazardAvoidance = new Float32Array(N * 2);
+    for (let i = 0; i < N; i++) {
+      // A different push per agent, not a uniform one, so a bug that
+      // broadcasts index 0's value to everyone would be caught.
+      hazardAvoidance[i * 2] = (i % 5) - 2;
+      hazardAvoidance[i * 2 + 1] = ((i * 3) % 5) - 2;
+    }
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      undefined,
+      undefined,
+      hazardAvoidance,
+    );
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+      undefined,
+      undefined,
+      hazardAvoidance,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+});

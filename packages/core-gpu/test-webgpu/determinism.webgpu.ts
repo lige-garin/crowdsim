@@ -64,7 +64,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("step() performs no buffer mapping; only readAggregates maps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
     });
     expect(device).toBeDefined();
 
@@ -99,7 +99,7 @@ describe("GPU core determinism + zero-readback (real WebGPU)", () => {
   gpuTest("identical cores produce identical results after 40 steps", async () => {
     const adapter = await maybeNavigator?.gpu?.requestAdapter();
     const device = await adapter?.requestDevice({
-      requiredLimits: { maxStorageBuffersPerShaderStage: 13 },
+      requiredLimits: { maxStorageBuffersPerShaderStage: 14 },
     });
     expect(device).toBeDefined();
 

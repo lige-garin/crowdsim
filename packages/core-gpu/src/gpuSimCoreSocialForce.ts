@@ -44,9 +44,9 @@ import type {
  *
  * Deliberately NOT ported here, left for a later stage per ADR-0015's own
  * order (base force first, since everything else assumes it's right):
- * hazard avoidance, holding-state speed easing, the no-walking-backward
- * clamp, and the no-overshoot-past-target clamp. Leader-following is a
- * decision-layer target rewrite, not a 60Hz force — nothing to port.
+ * holding-state speed easing, the no-walking-backward clamp, and the
+ * no-overshoot-past-target clamp. Leader-following is a decision-layer
+ * target rewrite, not a 60Hz force — nothing to port.
  *
  * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
  * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
@@ -350,6 +350,7 @@ export function stepGpuSimCoreSocialForceCpu(
   params: GpuSimCoreSocialForceParams,
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
+  hazardAvoidance?: Float32Array,
 ): SocialForceStepResult {
   const nextPositions = agents.positions.slice(0, agents.count * 2);
   const nextVelocities = agents.velocities.slice(0, agents.count * 2);
@@ -426,6 +427,19 @@ export function stepGpuSimCoreSocialForceCpu(
     forceX += formation.x;
     forceY += formation.y;
 
+    // Hazard avoidance (ADR-0012): steer away from the worst fire/smoke
+    // source exposing this agent. Precomputed once per DECISION tick by
+    // `simulationEngine.ts`'s `hazardAvoidancePush` — a function of the
+    // agent's own position, one hazard's position, and that agent's
+    // exposure, with no other agent involved — and passed in exactly like
+    // `formationSlots` already is: a higher-level system's per-agent
+    // output, not a neighbour-summed force, so there is no loop here at
+    // all, just an add.
+    if (hazardAvoidance) {
+      forceX += hazardAvoidance[index * 2];
+      forceY += hazardAvoidance[index * 2 + 1];
+    }
+
     const result = integrate(vx, vy, forceX, forceY, params);
     nextVelocities[index * 2] = result.velocity.x;
     nextVelocities[index * 2 + 1] = result.velocity.y;
@@ -456,6 +470,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
   layout: SpatialHashGridLayout,
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
+  hazardAvoidance?: Float32Array,
 ): SocialForceStepResult {
   if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
@@ -583,6 +598,11 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     );
     forceX += formation.x;
     forceY += formation.y;
+
+    if (hazardAvoidance) {
+      forceX += hazardAvoidance[index * 2];
+      forceY += hazardAvoidance[index * 2 + 1];
+    }
 
     const result = integrate(vx, vy, forceX, forceY, params);
     nextVelocities[index * 2] = result.velocity.x;

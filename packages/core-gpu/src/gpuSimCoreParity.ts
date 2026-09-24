@@ -192,6 +192,7 @@ export async function stepForParity(
   steps: number,
   groupIds?: Int32Array,
   formationSlots?: Float32Array,
+  hazardAvoidance?: Float32Array,
 ): Promise<StepParityReadback> {
   const count = agents.count;
   if (count === 0) {
@@ -255,6 +256,15 @@ export async function stepForParity(
   const formationSlotsBuffer = createStorageBuffer(
     device,
     "step-formation-slots",
+    count * 2 * F32,
+    GPUBufferUsage.COPY_DST,
+  );
+  // ADR-0015 stage 5: always bound (same reasoning as groupIds/
+  // formationSlots above), harmless as an all-zero vector when nobody
+  // supplies a real one — adding a zero vector to force is a no-op.
+  const hazardAvoidanceBuffer = createStorageBuffer(
+    device,
+    "step-hazard-avoidance",
     count * 2 * F32,
     GPUBufferUsage.COPY_DST,
   );
@@ -325,6 +335,11 @@ export async function stepForParity(
     0,
     formationSlots ? formationSlots.slice(0, count * 2) : new Float32Array(count * 2),
   );
+  device.queue.writeBuffer(
+    hazardAvoidanceBuffer,
+    0,
+    hazardAvoidance ? hazardAvoidance.slice(0, count * 2) : new Float32Array(count * 2),
+  );
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
   }
@@ -390,6 +405,7 @@ export async function stepForParity(
         { binding: 10, resource: { buffer: velBuffers[other] } },
         { binding: 11, resource: { buffer: groupIdsBuffer } },
         { binding: 12, resource: { buffer: formationSlotsBuffer } },
+        { binding: 13, resource: { buffer: hazardAvoidanceBuffer } },
       ],
     });
   });
@@ -457,6 +473,7 @@ export async function stepForParity(
     targetsBuffer,
     groupIdsBuffer,
     formationSlotsBuffer,
+    hazardAvoidanceBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,
