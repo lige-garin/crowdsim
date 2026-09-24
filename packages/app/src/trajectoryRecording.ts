@@ -1,4 +1,5 @@
 import { agentStateCode, agentStateKey } from "./agentStateColors";
+import { lerp } from "./numberUtils";
 import type { SimulationAgent, SimulationSnapshot } from "./simulationEngine";
 import {
   createSimulationRuntimeArtifact,
@@ -245,8 +246,4 @@ function firstFrameAtOrAfter(frames: readonly TrajectoryFrame[], time: number) {
     else high = middle;
   }
   return low;
-}
-
-function lerp(start: number, end: number, alpha: number) {
-  return start + (end - start) * alpha;
 }

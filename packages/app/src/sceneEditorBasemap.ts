@@ -1,4 +1,5 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
+import { clamp } from "./numberUtils";
 
 export type EditorBasemap = CrowdSimScene["basemaps"][number];
 
@@ -159,8 +160,4 @@ function distanceBetweenCalibrationPoints(basemap: EditorBasemap) {
 
 function defaultImageDistance(basemap: EditorBasemap) {
   return Math.max(1, basemap.widthMeters ?? 1);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }

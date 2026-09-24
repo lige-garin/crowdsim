@@ -2,6 +2,8 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { createAgentCohort } from "./agentPersona";
 import { createBrandStoresFromScene, rankBrandStores } from "./brandAttraction";
 import { calculateEnvironmentImpact } from "./environmentEffects";
+import { escapeHtml } from "./htmlEscape";
+import { mean } from "./numberUtils";
 import { createRouteCostMap } from "./routeCostMap";
 
 export type CommercialValidationBundle = {
@@ -91,21 +93,6 @@ function createCommercialNotes(
   return notes;
 }
 
-function mean(values: readonly number[]) {
-  return values.length > 0
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : 0;
-}
-
 function round(value: number) {
   return Number(value.toFixed(4));
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }

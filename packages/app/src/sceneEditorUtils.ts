@@ -1,11 +1,9 @@
 import type { ScenePoint } from "@crowdsim/scene-schema";
 
+export { clamp } from "./numberUtils";
+
 export function pointsToSvg(points: ScenePoint[]) {
   return points.map((point) => `${point.x},${point.y}`).join(" ");
-}
-
-export function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {

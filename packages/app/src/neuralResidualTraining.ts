@@ -14,6 +14,7 @@ import {
   type NeuralCorrectionModel,
 } from "./neuralCorrection";
 import type { BenchmarkRunResult } from "./benchmarkTypes";
+import { clamp } from "./numberUtils";
 
 export type ResidualProjectionSample = {
   features: NeuralCorrectionFeatures;
@@ -190,10 +191,6 @@ function targetResidual(value: number) {
 
 function clamp01(value: number) {
   return clamp(value, 0, 1);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function round(value: number) {

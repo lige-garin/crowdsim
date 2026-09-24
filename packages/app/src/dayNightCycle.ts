@@ -1,4 +1,5 @@
 import { MathUtils } from "three";
+import { lerp } from "./numberUtils";
 
 /**
  * The city view's day. At 120 simulated seconds per day the whole viewport went
@@ -29,10 +30,6 @@ export type DayNightLighting = {
 };
 
 type Rgb = [number, number, number];
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
 
 function lerpColor(night: Rgb, day: Rgb, t: number): string {
   const channel = (i: number) => {

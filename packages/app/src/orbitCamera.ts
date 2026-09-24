@@ -1,3 +1,5 @@
+import { clamp } from "./numberUtils";
+
 export type OrbitState = {
   /** Horizontal angle around the up(z) axis, radians. */
   azimuth: number;
@@ -22,10 +24,6 @@ export const RADIUS_MAX = 460;
 
 const ORBIT_SPEED = 0.005; // radians per dragged pixel
 const ZOOM_SPEED = 0.0015; // per wheel delta unit
-
-function clamp(value: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, value));
-}
 
 /** Pointer drag delta (pixels) -> new orbit. Dragging right spins the city left. */
 export function orbitByDrag(

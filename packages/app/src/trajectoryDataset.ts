@@ -1,4 +1,5 @@
 import { parseCsv, parseFiniteNumber, resolveColumnIndexes } from "./csvParsing";
+import { mean } from "./numberUtils";
 
 export type TrajectoryDatasetMetadata = {
   id: string;
@@ -157,12 +158,6 @@ function calculateBounds(samples: readonly TrajectorySample[]) {
     height: Math.max(...ys) - Math.min(...ys),
     width: Math.max(...xs) - Math.min(...xs),
   };
-}
-
-function mean(values: readonly number[]) {
-  return values.length > 0
-    ? values.reduce((sum, value) => sum + value, 0) / values.length
-    : 0;
 }
 
 function round(value: number) {

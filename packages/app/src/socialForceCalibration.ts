@@ -1,4 +1,5 @@
 import type { BenchmarkRunResult } from "./benchmarkTypes";
+import { clamp } from "./numberUtils";
 import {
   createDefaultNeuralCorrectionModel,
   createNeuralCorrectionRecommendation,
@@ -181,10 +182,6 @@ function relativeError(target: number, actual: number) {
   }
 
   return Math.abs(target - actual) / target;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function round(value: number) {

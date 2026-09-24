@@ -15,6 +15,7 @@ export {
   rasterizeWallsToBlockedCells,
 } from "./cpuGrid";
 export { stepSocialForceCpu } from "./socialForceCpu";
+export { clamp } from "./mathUtils";
 export { accumulateDensityGpu, buildSpatialHashGridGpu } from "./spatialGpu";
 export {
   createFlowFieldAtlasCpu,

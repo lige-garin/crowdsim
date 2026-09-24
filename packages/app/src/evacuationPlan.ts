@@ -6,6 +6,7 @@ import {
   type SpatialHashGridLayout,
 } from "@crowdsim/core-gpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { clamp } from "./numberUtils";
 import type { LocalizedText } from "./i18n";
 import type { SimulationAgent } from "./simulationEngine";
 import { wallSegmentsFromScene } from "./sceneGeometry";
@@ -114,8 +115,4 @@ function countReachable(flowField: FlowField) {
 
 function countNonZero(values: Uint8Array) {
   return values.reduce((count, value) => count + (value > 0 ? 1 : 0), 0);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }

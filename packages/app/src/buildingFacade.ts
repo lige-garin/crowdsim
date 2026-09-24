@@ -1,3 +1,5 @@
+import { clamp } from "./numberUtils";
+
 export type FacadeWindow = {
   /** Horizontal centre offset from the facade midline, world units. */
   offset: number;
@@ -6,10 +8,6 @@ export type FacadeWindow = {
   width: number;
   height: number;
 };
-
-function clamp(value: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, value));
-}
 
 /**
  * Lays out a grid of windows over one building facade so the 3d city reads as

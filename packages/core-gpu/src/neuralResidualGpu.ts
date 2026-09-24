@@ -5,6 +5,7 @@ import {
   readOnlyStorageBinding,
   storageBinding,
 } from "./gpuUtils";
+import { clamp } from "./mathUtils";
 import { neuralResidualShader } from "./shaders";
 
 export type NeuralResidualGpuFeature = {
@@ -284,8 +285,4 @@ function writeVec4(data: Float32Array, row: number, values: readonly number[]) {
 
 function dot(left: readonly number[], right: readonly number[]) {
   return left.reduce((sum, value, index) => sum + value * (right[index] ?? 0), 0);
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }

@@ -1,5 +1,6 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
+import { clamp } from "./numberUtils";
 
 export type SceneWorldBounds = {
   height: number;
@@ -252,8 +253,4 @@ function slideAlongWall(
 
 function cross(ax: number, ay: number, bx: number, by: number) {
   return ax * by - ay * bx;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
