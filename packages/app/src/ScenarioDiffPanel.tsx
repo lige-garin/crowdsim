@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { ScenarioDiffMetricChart } from "./ScenarioDiffMetricChart";
 import { useI18n } from "./i18n";
 import {
   buildScenarioDiffReport,
@@ -141,6 +142,16 @@ export function ScenarioDiffPanel({
             {state.report.metrics.length} {zh ? "项指标" : "metrics"} |{" "}
             {state.report.flows.length} {zh ? "条计数线" : "flow lines"}
           </code>
+          <div className="scenario-diff-metrics">
+            {state.report.metrics.map((metric) => (
+              <ScenarioDiffMetricChart
+                key={metric.key}
+                metric={metric}
+                scenarioAName={state.report.scenarioA.name}
+                scenarioBName={state.report.scenarioB.name}
+              />
+            ))}
+          </div>
           <button
             type="button"
             data-testid="scenario-diff-open-report"

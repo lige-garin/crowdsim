@@ -329,3 +329,38 @@
     max-height: none;
   }
 }
+
+/* Scenario diff report: one paired bar per metric, with the ▲▼ delta the
+   printable report itself uses. */
+.scenario-diff-metrics {
+  display: grid;
+  gap: 6px;
+}
+
+.scenario-diff-metric {
+  padding: 6px 0;
+  border-top: 1px solid var(--lab-line);
+}
+
+.scenario-diff-metric-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--lab-mono);
+  font-size: var(--fs-micro);
+  margin-bottom: 4px;
+}
+
+.scenario-diff-delta {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.scenario-diff-better {
+  color: #2e8b57;
+}
+
+.scenario-diff-worse {
+  color: #c2382f;
+}

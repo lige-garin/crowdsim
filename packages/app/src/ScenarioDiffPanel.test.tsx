@@ -8,6 +8,7 @@ import type {
   ScenarioDiffWorkerRequest,
   ScenarioDiffWorkerResponse,
 } from "./scenarioDiffWorkerClient";
+import { buildScenarioDiffReport } from "./scenarioDiffReport";
 import type { ScenarioRunSnapshot } from "./scenarioDiffReport";
 
 afterEach(cleanup);
@@ -93,6 +94,28 @@ describe("ScenarioDiffPanel", () => {
       "Scenario Beta",
     );
     expect(screen.getByTestId("scenario-diff-open-report")).toBeTruthy();
+  });
+
+  it("draws a paired-bar chart per metric once the comparison completes", async () => {
+    const { reply, worker } = fakeWorker();
+    renderPanel(worker);
+    const snapshotA = fakeSnapshot("a-id", "Scenario Alpha");
+    const snapshotB = fakeSnapshot("b-id", "Scenario Beta");
+    // The number of metric charts must track buildScenarioDiffReport's own
+    // output, not a count copied in by hand that goes stale the next time a
+    // metric is added or removed there.
+    const expectedMetricCount = buildScenarioDiffReport(snapshotA, snapshotB).metrics
+      .length;
+
+    fireEvent.click(screen.getByTestId("scenario-diff-run"));
+    reply({ scenarioA: snapshotA, scenarioB: snapshotB, type: "complete" });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("scenario-diff-metric-peakDensity")).toBeTruthy(),
+    );
+    expect(
+      document.querySelectorAll('[data-testid^="scenario-diff-metric-"]'),
+    ).toHaveLength(expectedMetricCount);
   });
 
   it("shows a worker error as an error, not a silent no-op", async () => {
