@@ -70,6 +70,10 @@ describe("panel dock data-source labelling", () => {
       "trajectory-replay",
       // Reports on the open scene since the report panel was given it.
       "validation-report",
+      // Reads the open scene's weatherProfile.location as a starting point
+      // and, when wired to onApplyScene, writes real fetched weather back
+      // into it.
+      "weather",
     ]);
   });
 });

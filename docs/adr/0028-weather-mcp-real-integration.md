@@ -78,10 +78,11 @@ zero-severity entry nothing downstream needs.
   async-state-injection design this engine does not have anywhere else
   (every other live input — hazards, transit stops, traffic signals — is
   synchronous scene data, not an awaited network call mid-tick).
-- **Not an editor panel.** A UI control that calls this and drops the
-  result into the scene under edit is real, separable work, left for later
-  — the same "primitive first, UI wiring later" split this backlog's other
-  items (Sobol, ADR-0027) already took.
+- ~~Not an editor panel.~~ **Done 2026-09-25**: `WeatherPanel.tsx` fetches
+  and applies real weather to the open scene, replacing its own previous
+  fetch's factors rather than accumulating them — the same "primitive
+  first, UI wiring later" split this backlog's other items (Sobol,
+  ADR-0027) already took. See `docs/CLAIMS_LEDGER.md`'s forty-third entry.
 - **Not a fitted precipitation-to-severity model.** The linear scaling
   from mm/hour to `severity`/`speedMultiplier` is this project's own
   choice, disclosed as such, not a citation.

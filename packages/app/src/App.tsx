@@ -502,6 +502,7 @@ function AppContent() {
                 probes.shopDecisionProbe.status === "ready"
                   ? probes.shopDecisionProbe.brandInsight
                   : undefined,
+              onApplyScene: applyScene,
               scene,
               trajectoryRecording,
             },

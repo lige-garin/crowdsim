@@ -11,12 +11,16 @@ import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
+import { WeatherPanel } from "./WeatherPanel";
 
 export type PanelDockContext = {
   /** The scene the app is running, for panels that report on the user's own project. */
   scene: CrowdSimScene;
   trajectoryRecording: TrajectoryRecording;
   brandInsight?: BrandDecisionInsight;
+  /** Only present for panels that actually mutate the open scene (currently
+   * just WeatherPanel) — every other panel here is read-only by design. */
+  onApplyScene?: (scene: CrowdSimScene) => void;
 };
 
 /**
@@ -106,5 +110,12 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "轨迹回放",
     labelEn: "Trajectory replay",
     render: (ctx) => <TrajectoryReplayPanel recording={ctx.trajectoryRecording} />,
+  },
+  {
+    dataSource: "live",
+    id: "weather",
+    labelZh: "实时天气",
+    labelEn: "Live weather",
+    render: (ctx) => <WeatherPanel scene={ctx.scene} onApplyScene={ctx.onApplyScene} />,
   },
 ];
