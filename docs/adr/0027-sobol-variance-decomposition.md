@@ -72,12 +72,13 @@ evaluation is a real benchmark run, so this runs in the background worker
 
 ### What this is still not
 
-- **Not wired into a UI panel.** `SensitivityPanel.tsx` shows Morris
-  results; adding a Sobol section is real, additional UI work (a table or
-  bar chart of `S_i`/`S_Ti` per parameter) deliberately left for a later
-  pass rather than folded into this one, the same "math and worker wiring
+- ~~Not wired into a UI panel.~~ **Done 2026-09-25**: `SensitivityPanel.tsx`
+  gained an independent Sobol section (its own run/stop buttons, its own
+  worker call, a tornado bar chart of `S_i` and a `S_i`-vs-`S_Ti` scatter)
+  below the existing Morris section — the same "math and worker wiring
   first, a panel is a separable next step" split ADR-0016 (vehicles) and
-  ADR-0020 (their UI wiring) already took two stages to do.
+  ADR-0020 (their UI wiring) already took two stages to do. See
+  `docs/CLAIMS_LEDGER.md`'s forty-second entry.
 - **Not a replacement for Morris.** The two answer different questions
   at very different cost; `sensitivityAnalysis.ts`'s Morris screening is
   unchanged and still the cheap first pass a caller should run before
