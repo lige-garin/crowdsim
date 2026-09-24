@@ -2,8 +2,11 @@
  * Who a person in the crowd looks like.
  *
  * HONESTY NOTE: this is appearance only. The simulation has no age or sex —
- * every agent walks with the same Weidmann free-flow speed — and the mix below
- * is self-authored for a shopping street, not calibrated against any count.
+ * every agent's speed is drawn from the same distribution regardless of
+ * demographic archetype (`behaviorDistributions.sampleSpeedFactor`, a
+ * Weidmann-shaped spread around the free-flow mean, not one fixed speed for
+ * everyone) — and the mix below is self-authored for a shopping street, not
+ * calibrated against any count.
  * (The sourced IMO population in `pedestrianPresets` describes ship passengers:
  * 40% mobility-impaired and no children, so it is the wrong crowd to borrow.)
  * Letting these groups change walking speed is a model change, not a visual one.
