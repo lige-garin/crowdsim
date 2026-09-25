@@ -2,6 +2,7 @@
   createStorageBuffer,
   createWallsBufferData,
   enqueueCopyToReadbackBuffer,
+  readFloat32Array,
   readUint32Array,
 } from "./gpuUtils";
 import {
@@ -40,10 +41,37 @@ export type GpuSimCoreOptions = {
 };
 export type GpuSimCore = {
   uploadSpawns(spawns: AgentSpawn[]): void;
+  /**
+   * ADR-0015 stage 2's group-formation input — one i32 per agent, index 0
+   * to count-1 written from offset 0 each call (not run-coalesced like
+   * `uploadSpawns`: unlike spawning, holding/hazard/group state changes for
+   * most live agents most ticks, so a full rewrite is both simpler and no
+   * more expensive than diffing). -1 means "not in a group", which gates
+   * the formation force off before `formationSlots` is ever read.
+   */
+  uploadGroupIds(groupIds: Int32Array): void;
+  /** ADR-0015 stage 2's per-agent formation-slot target, (x, y) per agent. */
+  uploadFormationSlots(formationSlots: Float32Array): void;
+  /** ADR-0015 stage 5's precomputed per-agent avoidance push, (x, y) per agent. */
+  uploadHazardAvoidance(hazardAvoidance: Float32Array): void;
+  /** ADR-0015 stage 6's holding-state flag — 0 or 1 per agent. */
+  uploadHolding(holding: Uint32Array): void;
   setCount(count: number): void;
   step(dt: number): void;
   positionsBuffer(): GPUBuffer;
   readAggregates(): Promise<{ cellCounts: Uint32Array; maxCount: number }>;
+  /**
+   * Persistent-buffer positions+velocities readback for the current agent
+   * count, built once at construction and reused every call — unlike
+   * `gpuSimCoreParity.ts`'s `stepForParity` (which allocates, copies, maps,
+   * and destroys fresh readback buffers per one-shot benchmark run), a
+   * resident engine backend calls this every tick (ADR-0033: floor
+   * transfers, vehicle stepping, exit tallying, and analytics all need a
+   * real CPU-side agent array regardless of which backend computed the
+   * movement, so "no readback" was never preservable once this became a
+   * real engine citizen, only in the standalone step-kernel benchmark).
+   */
+  readback(): Promise<{ positions: Float32Array; velocities: Float32Array }>;
   destroy(): void;
 };
 export function createGpuSimCore(
@@ -72,7 +100,12 @@ export function createGpuSimCore(
       device,
       `core-velocities-${i}`,
       capacity * 2 * F32,
-      GPUBufferUsage.COPY_DST,
+      // COPY_SRC is required by readback()'s copyBufferToBuffer below —
+      // without it that copy is an invalid GPU command that fails via an
+      // uncaptured error event, not a thrown JS exception, so the caller
+      // gets back stale (zero-initialized) data with no visible signal
+      // unless something pushes an error scope around it (readback() does).
+      GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
     ),
   );
   const speedBuffer = createStorageBuffer(
@@ -93,6 +126,35 @@ export function createGpuSimCore(
     capacity * 2 * F32,
     GPUBufferUsage.COPY_DST,
   );
+  // ADR-0015 stages 2/5/6: always bound (the shader has no way to omit a
+  // binding), harmless by default (group id -1 = ungrouped gates the
+  // formation force off before formationSlots is read; an all-zero hazard
+  // vector is a no-op add; holding 0 = not holding) — same reasoning as
+  // `gpuSimCoreParity.ts`'s `stepForParity`.
+  const groupIdsBuffer = createStorageBuffer(
+    device,
+    "core-group-ids",
+    capacity * 4,
+    GPUBufferUsage.COPY_DST,
+  );
+  const formationSlotsBuffer = createStorageBuffer(
+    device,
+    "core-formation-slots",
+    capacity * 2 * F32,
+    GPUBufferUsage.COPY_DST,
+  );
+  const hazardAvoidanceBuffer = createStorageBuffer(
+    device,
+    "core-hazard-avoidance",
+    capacity * 2 * F32,
+    GPUBufferUsage.COPY_DST,
+  );
+  const holdingBuffer = createStorageBuffer(
+    device,
+    "core-holding",
+    capacity * U32,
+    GPUBufferUsage.COPY_DST,
+  );
   const wallsBuffer = createStorageBuffer(
     device,
     "core-walls",
@@ -106,7 +168,7 @@ export function createGpuSimCore(
   });
   const moveParamsBuffer = device.createBuffer({
     label: "core-move-params",
-    size: 68,
+    size: 100,
     usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
   const cellCountsBuffer = createStorageBuffer(
@@ -145,6 +207,20 @@ export function createGpuSimCore(
     capacity * U32,
     GPUBufferUsage.STORAGE,
   );
+  // Persistent readback destinations for `readback()` — created once and
+  // reused every call, unlike `stepForParity`'s allocate-per-benchmark-run
+  // pattern. MAP_READ can't be OR'd with STORAGE (`createStorageBuffer`
+  // always adds STORAGE), so these are plain buffers.
+  const positionsReadbackBuffer = device.createBuffer({
+    label: "core-positions-readback",
+    size: capacity * 2 * F32,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+  const velocitiesReadbackBuffer = device.createBuffer({
+    label: "core-velocities-readback",
+    size: capacity * 2 * F32,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
   let count = 0;
   let cur = 0;
   let dt = params.dt;
@@ -155,6 +231,11 @@ export function createGpuSimCore(
     buildMoveParamsData(count, layout, params, wallCount),
   );
   device.queue.writeBuffer(metaBuffer, 0, new Uint32Array([cellCount]));
+  // GPU buffers are zero-initialized by spec, which is already the correct
+  // default for formationSlots/hazardAvoidance/holding — only groupIds
+  // needs an explicit fill, since 0 would mean "in group 0", not
+  // "ungrouped" (that's -1).
+  device.queue.writeBuffer(groupIdsBuffer, 0, new Int32Array(capacity).fill(-1));
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
   }
@@ -207,6 +288,10 @@ export function createGpuSimCore(
         { binding: 8, resource: { buffer: wallsBuffer } },
         { binding: 9, resource: { buffer: posBuffers[other] } },
         { binding: 10, resource: { buffer: velBuffers[other] } },
+        { binding: 11, resource: { buffer: groupIdsBuffer } },
+        { binding: 12, resource: { buffer: formationSlotsBuffer } },
+        { binding: 13, resource: { buffer: hazardAvoidanceBuffer } },
+        { binding: 14, resource: { buffer: holdingBuffer } },
       ],
     });
   });
@@ -224,6 +309,10 @@ export function createGpuSimCore(
     speedBuffer,
     radiiBuffer,
     targetsBuffer,
+    groupIdsBuffer,
+    formationSlotsBuffer,
+    hazardAvoidanceBuffer,
+    holdingBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,
@@ -233,6 +322,8 @@ export function createGpuSimCore(
     metaBuffer,
     cellCursorBuffer,
     sortedAgentIdsBuffer,
+    positionsReadbackBuffer,
+    velocitiesReadbackBuffer,
   ];
   return {
     setCount(next: number) {
@@ -276,6 +367,18 @@ export function createGpuSimCore(
         device.queue.writeBuffer(targetsBuffer, startIndex * 2 * F32, tgt);
         runStart = runEnd + 1;
       }
+    },
+    uploadGroupIds(groupIds: Int32Array) {
+      device.queue.writeBuffer(groupIdsBuffer, 0, groupIds);
+    },
+    uploadFormationSlots(formationSlots: Float32Array) {
+      device.queue.writeBuffer(formationSlotsBuffer, 0, formationSlots);
+    },
+    uploadHazardAvoidance(hazardAvoidance: Float32Array) {
+      device.queue.writeBuffer(hazardAvoidanceBuffer, 0, hazardAvoidance);
+    },
+    uploadHolding(holding: Uint32Array) {
+      device.queue.writeBuffer(holdingBuffer, 0, holding);
     },
     step(nextDt: number) {
       if (count === 0) {
@@ -327,6 +430,35 @@ export function createGpuSimCore(
       const cellCounts = await readUint32Array(readback, cellCount);
       readback.destroy();
       return { cellCounts, maxCount: maxUint32(cellCounts) };
+    },
+    async readback() {
+      if (count === 0) {
+        return { positions: new Float32Array(), velocities: new Float32Array() };
+      }
+      const bytes = count * 2 * F32;
+      device.pushErrorScope("validation");
+      device.pushErrorScope("internal");
+      const encoder = device.createCommandEncoder({ label: "core-readback" });
+      encoder.copyBufferToBuffer(posBuffers[cur], 0, positionsReadbackBuffer, 0, bytes);
+      encoder.copyBufferToBuffer(
+        velBuffers[cur],
+        0,
+        velocitiesReadbackBuffer,
+        0,
+        bytes,
+      );
+      device.queue.submit([encoder.finish()]);
+      await device.queue.onSubmittedWorkDone();
+      const internalError = await device.popErrorScope();
+      const validationError = await device.popErrorScope();
+      if (internalError || validationError) {
+        throw new Error(
+          internalError?.message ?? validationError?.message ?? "GPU readback failed",
+        );
+      }
+      const positions = await readFloat32Array(positionsReadbackBuffer, count * 2);
+      const velocities = await readFloat32Array(velocitiesReadbackBuffer, count * 2);
+      return { positions, velocities };
     },
     destroy() {
       for (const buffer of allBuffers) {
