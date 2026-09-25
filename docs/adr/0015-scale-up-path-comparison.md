@@ -1,6 +1,6 @@
 # ADR 0015: Scale-up path — GPU reconnection vs. multi-scale (comparison only)
 
-- Status: **GPU reconnection path started, seven stages in** — this ADR
+- Status: **GPU reconnection path complete, all eight stages ported** — this ADR
   originally recommended path (a) without starting it (see the Decision
   section below for why, as written at the time: no WebGPU adapter in that
   session's sandbox). That blocker lifted in a later session with real
@@ -24,12 +24,19 @@
   (2026-09-25): the no-walking-backward clamp — zeroing only the
   along-heading component of velocity when it points backward, applied
   right after relaxation and before the `maxSpeedRatio` clamp, skipped for
-  holding agents, exactly `crowdMovement.ts`'s own gate and order. Still not
-  wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"`
-  selection — this ADR authorizes behaviour-by-behaviour porting with
-  per-stage parity proof, not a claim of full parity yet. Remaining stages,
-  in this ADR's own order: the no-overshoot-past-target clamp — the last
-  one.
+  holding agents, exactly `crowdMovement.ts`'s own gate and order. **Stage 8**
+  (2026-09-25, the last stage in this ADR's own order): the
+  no-overshoot-past-target clamp — scales velocity down (using the
+  already-clamped speed from the `maxSpeedRatio` step, so it can only
+  shrink a step) so a non-holding agent never steps past its target within
+  one physics step; skipped for holding agents. Every stage in the order
+  this ADR laid out is now ported and verified on real hardware, stage by
+  stage, against the CPU oracle. Still not wired into
+  `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection — this
+  ADR authorized behaviour-by-behaviour porting with per-stage parity
+  proof, not a claim that the kernel is in production. Wiring it in (and
+  the full-pipeline fps measurement that would require) is separate,
+  unstarted follow-on work.
 - Touches: `packages/core-gpu/src/gpuSimCoreSocialForce.ts`,
   `gpuSimCoreShaders.ts`, `gpuSimCoreParity.ts`, `gpuSimCorePipelines.ts`
 - Related: ADR-0002 (100k GPU rewrite), ADR-0006 (WebGPU compute / WebGL

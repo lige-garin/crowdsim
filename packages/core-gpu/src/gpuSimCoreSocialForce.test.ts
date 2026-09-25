@@ -206,13 +206,19 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
     // Alone except for its own group's slot far to the side — no walls, no
     // strangers, so the only force at all (relaxation is zero: desired speed
     // matches current velocity of zero and target equals position) is the
-    // formation spring itself.
+    // formation spring itself. Held: at distance 0 the stage 8 overshoot
+    // clamp would otherwise zero out any push-only velocity for a
+    // non-holding agent (it really is "already at the target, don't move
+    // past it") — holding exempts this isolation fixture from both the
+    // stage 7 and stage 8 clamps, exactly like it did implicitly before
+    // either clamp existed.
     const agents = createAgentSoA(1);
     setAgentPosition(agents, 0, 0, 0);
     setAgentRadius(agents, 0, 0.22);
     const targets = new Float32Array([0, 0]);
     const groupIds = new Int32Array([1]);
     const formationSlots = new Float32Array([2, 0]);
+    const holding = new Uint32Array([1]);
 
     const result = stepGpuSimCoreSocialForceCpu(
       agents,
@@ -221,6 +227,8 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
       params,
       groupIds,
       formationSlots,
+      undefined,
+      holding,
     );
 
     expect(result.velocities[0]).toBeGreaterThan(0);
@@ -303,6 +311,12 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
     const groupIdsOne = new Int32Array([1, -1]);
     const groupIdsTwo = new Int32Array([1, -1, -1]);
     const formationSlots = new Float32Array([0, 5]);
+    // Agent 0's target equals its own position (distance 0), isolating the
+    // relaxation contribution to zero for the comparison below — holding
+    // exempts it from the stage 7/8 clamps that would otherwise zero out
+    // its push-only velocity entirely at that distance.
+    const holdingOne = new Uint32Array([1, 0]);
+    const holdingTwo = new Uint32Array([1, 0, 0]);
 
     const resultOne = stepGpuSimCoreSocialForceCpu(
       oneStranger,
@@ -311,6 +325,8 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
       params,
       groupIdsOne,
       formationSlots,
+      undefined,
+      holdingOne,
     );
     const resultTwo = stepGpuSimCoreSocialForceCpu(
       twoStrangers,
@@ -319,6 +335,8 @@ describe("stage 2: the in-formation spring force (crowdMovement.ts's formationGa
       params,
       groupIdsTwo,
       formationSlots,
+      undefined,
+      holdingTwo,
     );
 
     // One stranger: the pull toward (0, 5) is present, giving a clearly
@@ -486,6 +504,10 @@ describe("stage 3: the together fix and the sidestep nudge (crowdMovement.ts's p
     setAgentRadius(overlapping, 1, 0.22);
     const targets = new Float32Array([0, 0, 0, 0]);
     const sameGroup = new Int32Array([1, 1]);
+    // Targets equal own positions (distance 0) to isolate the contact push
+    // from relaxation — holding exempts both agents from the stage 7/8
+    // clamps that would otherwise zero this out at zero distance.
+    const holding = new Uint32Array([1, 1]);
 
     const together = stepGpuSimCoreSocialForceCpu(
       overlapping,
@@ -494,6 +516,8 @@ describe("stage 3: the together fix and the sidestep nudge (crowdMovement.ts's p
       params,
       sameGroup,
       new Float32Array(4),
+      undefined,
+      holding,
     );
 
     // Agent 0 is still pushed away (negative x-velocity) from the
@@ -617,17 +641,31 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     setAgentVelocity(agents, 1, -3, -0.01);
     setAgentRadius(agents, 1, 0.22);
     const targets = new Float32Array([0, 0, 3, 0]); // target = own position: zero desired-velocity pull
+    // Both agents start at real speed with target = own position (distance
+    // 0) — holding exempts them from the stage 7/8 clamps, which would
+    // otherwise zero this out entirely at zero distance (speed * dt always
+    // exceeds a distance of 0).
+    const holding = new Uint32Array([1, 1]);
 
-    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
-      ...params,
-      anticipationRangeMeters: 5,
-      relaxationTime: 1e9, // makes relaxation's own contribution (both the
-      // exponential decay factor and desiredSpeed's distance/relaxationTime
-      // term) negligible
-      maxSpeedRatio: 1000, // stage 6's real clamp is freeSpeed * maxSpeedRatio,
-      // not the (now-unused-by-this-integration) inherited `maxSpeed` field
-      // — this keeps that clamp from masking the one under test here.
-    });
+    const result = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      {
+        ...params,
+        anticipationRangeMeters: 5,
+        relaxationTime: 1e9, // makes relaxation's own contribution (both the
+        // exponential decay factor and desiredSpeed's distance/relaxationTime
+        // term) negligible
+        maxSpeedRatio: 1000, // stage 6's real clamp is freeSpeed * maxSpeedRatio,
+        // not the (now-unused-by-this-integration) inherited `maxSpeed` field
+        // — this keeps that clamp from masking the one under test here.
+      },
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
 
     // result.velocities ≈ initial velocity + force * dt (relax ≈ 1 with
     // relaxationTime this large, and the maxSpeedRatio clamp is a no-op),
@@ -717,6 +755,10 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
     setAgentRadius(agents, 0, 0.22);
     const targets = new Float32Array([0, 0]); // target = own position: zero relaxation pull
     const hazardAvoidance = new Float32Array([3, 0]);
+    // Holding exempts this isolation fixture from the stage 7/8 clamps,
+    // which would otherwise zero out the push-only velocity entirely at
+    // zero distance for a non-holding agent.
+    const holding = new Uint32Array([1]);
 
     const withHazard = stepGpuSimCoreSocialForceCpu(
       agents,
@@ -726,8 +768,18 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
       undefined,
       undefined,
       hazardAvoidance,
+      holding,
     );
-    const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    const without = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
 
     // Alone, no walls, target = own position (desiredSpeed and the target
     // velocity both zero): the push is Euler-added to velocity, then stage
@@ -1047,6 +1099,106 @@ describe("stage 7: the no-walking-backward clamp (crowdMovement.ts's if (!holdin
     setAgentPosition(agents, 1, 5.05, 5);
     setAgentRadius(agents, 1, 0.22);
     const targets = new Float32Array([55, 5, -45, 5]);
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(agents, targets, walls, params);
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+});
+
+describe("stage 8: the no-overshoot-past-target clamp (crowdMovement.ts's if (!holding && speed*dt > distance) { scale by distance/(speed*dt) })", () => {
+  it("never lets a non-holding agent step past a nearby target within one step", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // A large initial velocity survives relaxation and gets capped only by
+    // maxSpeedRatio (1.742 m/s here) — at 1/60s that step (0.029m) would
+    // sail straight past a target only 0.005m away without this clamp.
+    setAgentVelocity(agents, 0, 10, 0);
+    const targets = new Float32Array([0.005, 0]);
+
+    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    const distance = 0.005;
+    const stepLength = Math.hypot(result.positions[0], result.positions[1]);
+    // Lands (very nearly) exactly on the target — not short of it, not past
+    // it — since the clamp scales velocity by exactly distance / (speed*dt).
+    expect(stepLength).toBeCloseTo(distance, 5);
+  });
+
+  it("does NOT apply the overshoot clamp to a holding agent — crowdMovement.ts's own gate — so it can step past its own hold spot", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentVelocity(agents, 0, 10, 0);
+    const targets = new Float32Array([0.005, 0]);
+    const holding = new Uint32Array([1]);
+
+    const held = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+
+    // Same brutal initial velocity, same tiny distance — only the CLAMP
+    // differs. A holding agent's step is bounded solely by the
+    // maxSpeedRatio clamp (still real, still applies to holding agents),
+    // which at this velocity is far larger than the 0.005m distance.
+    const stepLength = Math.hypot(held.positions[0], held.positions[1]);
+    expect(stepLength).toBeGreaterThan(0.005 * 2);
+  });
+
+  it("does not clamp when the step would already land short of the target", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // A gentle initial velocity whose one-step displacement is well short
+    // of a far-away target — the clamp's `speed * dt > distance` guard
+    // must not fire and shrink a step that was never going to overshoot.
+    setAgentVelocity(agents, 0, 0.05, 0);
+    const targets = new Float32Array([50, 0]);
+
+    const unclamped = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
+      ...params,
+      relaxationTime: 1e9, // relaxation contributes ~nothing over one step
+    });
+
+    // The step is governed entirely by the initial velocity (minus
+    // negligible relaxation drift), not scaled down toward some tiny
+    // fraction of the 50m distance.
+    const stepLength = Math.hypot(unclamped.positions[0], unclamped.positions[1]);
+    expect(stepLength).toBeGreaterThan(0.0005);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with the overshoot clamp actively triggering", () => {
+    const N = 2;
+    const agents = createAgentSoA(N);
+    setAgentPosition(agents, 0, 5, 5);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentVelocity(agents, 0, 10, 0);
+    setAgentPosition(agents, 1, 5.05, 5);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([5.005, 5, 4.95, 5]);
     const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
 
     const allPairs = stepGpuSimCoreSocialForceCpu(agents, targets, walls, params);

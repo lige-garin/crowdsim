@@ -42,10 +42,9 @@ import type {
  * against the WGSL kernel on real hardware), not derived from one shared
  * implementation (WGSL and TypeScript cannot share a function body).
  *
- * Deliberately NOT ported here, left for a later stage per ADR-0015's own
- * order (base force first, since everything else assumes it's right): the
- * no-overshoot-past-target clamp. Leader-following is a decision-layer
- * target rewrite, not a 60Hz force — nothing to port.
+ * As of stage 8, every ADR-0015 stage is ported here except
+ * leader-following, which is a decision-layer target rewrite, not a 60Hz
+ * force — nothing to port.
  *
  * Stage 2 adds ONE piece of group behaviour: the in-formation spring force
  * (`crowdMovement.ts`'s own `formationGain * (slot - agent)` pull toward a
@@ -362,6 +361,13 @@ function clampAnticipation(
  * holding agent's "heading" is just the direction to its own spot, and
  * walking "backward" relative to that has no meaning the CPU original
  * assigns a rule to either.
+ *
+ * Stage 8: never walk past the target within one step. Applied LAST, after
+ * the maxSpeedRatio clamp — `crowdMovement.ts` scales velocity down using
+ * the ALREADY-clamped speed so this can only shrink a step, never re-widen
+ * one the speed clamp just shrank. Skipped for holding agents, matching
+ * `crowdMovement.ts`'s own `if (!holding)` gate — a holding agent's target
+ * distance is to its own hold spot, not a destination it should stop at.
  */
 function integrateWithRelaxation(
   vx: number,
@@ -371,6 +377,7 @@ function integrateWithRelaxation(
   desired: { x: number; y: number },
   desiredSpeed: number,
   freeSpeed: number,
+  distance: number,
   isHolding: boolean,
   params: GpuSimCoreSocialForceParams,
 ): { position: { x: number; y: number }; velocity: { x: number; y: number } } {
@@ -390,6 +397,12 @@ function integrateWithRelaxation(
   const clamped = clampMagnitude(vxNew, vyNew, freeSpeed * params.maxSpeedRatio);
   vxNew = clamped.x;
   vyNew = clamped.y;
+  const speed = Math.hypot(vxNew, vyNew);
+  if (!isHolding && speed * dt > distance && speed > 0) {
+    const overshootScale = distance / (speed * dt);
+    vxNew *= overshootScale;
+    vyNew *= overshootScale;
+  }
   return {
     position: { x: vxNew * dt, y: vyNew * dt },
     velocity: { x: vxNew, y: vyNew },
@@ -517,6 +530,7 @@ export function stepGpuSimCoreSocialForceCpu(
       desired,
       desiredSpeed,
       freeSpeed,
+      distance,
       isHolding,
       params,
     );
@@ -699,6 +713,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       desired,
       desiredSpeed,
       freeSpeed,
+      distance,
       isHolding,
       params,
     );

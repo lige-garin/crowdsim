@@ -150,6 +150,13 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // added, no new binding). Sideways motion is untouched; this only stops a
 // dense corridor's forward-pushing repulsion from driving someone backward
 // along their own route.
+//
+// Stage 8 (last stage in ADR-0015): never walk past the target within one
+// step. Applied LAST, after the maxSpeedRatio clamp — crowdMovement.ts
+// scales velocity down using the ALREADY-clamped speed, so this can only
+// shrink a step, never re-widen one the speed clamp just shrank. Never for
+// a holding agent, same gate as stages 6/7 (no new binding — reuses
+// `distance`, already computed above for the relaxation target).
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -390,6 +397,14 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
   let len = length(cv);
   let maxSpeed = freeSpeed * params.maxSpeedRatio;
   if (len > maxSpeed && len > 0.0001) { cv = (cv / len) * maxSpeed; }
+  // Stage 8: never walk past the target within one step. Ports
+  // gpuSimCoreSocialForce.ts's integrateWithRelaxation() exactly — uses the
+  // already-clamped speed, not the pre-maxSpeedRatio one.
+  let speed = length(cv);
+  if (!isHolding && speed * params.dt > distance && speed > 0.0) {
+    let overshootScale = distance / (speed * params.dt);
+    cv = cv * overshootScale;
+  }
   velocitiesOut[i] = cv;
   positionsOut[i] = p + cv * params.dt;
 }`;
