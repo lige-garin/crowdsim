@@ -1220,3 +1220,125 @@ describe("stage 8: the no-overshoot-past-target clamp (crowdMovement.ts's if (!h
     }
   });
 });
+
+describe("ADR-0033: routedHeading is the walking direction, decoupled from distance-to-target (crowdMovement.ts's router.direction() vs. its own literal targetX/targetY)", () => {
+  it("overrides the straight-line default when supplied — an agent walks the routed direction, not toward its literal target", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    // Target is straight ahead on +x; routedHeading instead points +y, as a
+    // router would when a wall blocks line of sight to that +x target.
+    const targets = new Float32Array([50, 0]);
+    const routedHeading = new Float32Array([0, 1]);
+
+    const straightLine = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+    const routed = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      routedHeading,
+    );
+
+    // Default (no routedHeading): relaxes toward +x, as before this stage.
+    expect(straightLine.velocities[0]).toBeGreaterThan(0);
+    expect(straightLine.velocities[1]).toBeCloseTo(0, 9);
+    // Routed: relaxes toward +y instead, even though the target is +x —
+    // the kernel no longer derives direction from the target at all.
+    expect(routed.velocities[1]).toBeGreaterThan(0);
+    expect(routed.velocities[0]).toBeCloseTo(0, 9);
+  });
+
+  it("does not change desired-speed magnitude — distance stays tied to the literal target regardless of which way routedHeading points", () => {
+    const agents = createAgentSoA(1);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    const targets = new Float32Array([50, 0]); // distance 50, same for both runs
+
+    const towardTarget = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new Float32Array([1, 0]),
+    );
+    const perpendicular = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      new Float32Array([0, 1]),
+    );
+
+    // Same distance to the same literal target -> same desired-speed
+    // magnitude (both agents start at rest with no other forces, so speed
+    // after one step is purely a function of distance-driven desiredSpeed),
+    // even though the two runs walk in completely different directions.
+    const speedToward = Math.hypot(
+      towardTarget.velocities[0],
+      towardTarget.velocities[1],
+    );
+    const speedPerpendicular = Math.hypot(
+      perpendicular.velocities[0],
+      perpendicular.velocities[1],
+    );
+    expect(speedToward).toBeCloseTo(speedPerpendicular, 9);
+  });
+
+  it("stays lossless under the 3x3 neighbourhood restriction with a non-default routedHeading", () => {
+    const N = 2;
+    const agents = createAgentSoA(N);
+    setAgentPosition(agents, 0, 5, 5);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 5.3, 5);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([55, 5, -45, 5]);
+    const routedHeading = new Float32Array([0, 1, 0, -1]);
+    const layout = createSpatialHashGridLayout({ width: 64, height: 64, cellSize: 2 });
+
+    const allPairs = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      routedHeading,
+    );
+    const neighborhood = stepGpuSimCoreSocialForceNeighborhoodCpu(
+      agents,
+      targets,
+      walls,
+      params,
+      layout,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      routedHeading,
+    );
+
+    for (let i = 0; i < N * 2; i++) {
+      expect(Math.abs(neighborhood.positions[i] - allPairs.positions[i])).toBeLessThan(
+        1e-9,
+      );
+      expect(
+        Math.abs(neighborhood.velocities[i] - allPairs.velocities[i]),
+      ).toBeLessThan(1e-9);
+    }
+  });
+});

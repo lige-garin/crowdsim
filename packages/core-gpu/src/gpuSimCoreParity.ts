@@ -11,6 +11,7 @@ import {
   SCAN_WORKGROUP,
   SORT_WORKGROUP,
 } from "./gpuSimCoreShaders";
+import { normalize2 } from "./mathUtils";
 import type { AgentSoA, SpatialHashGridLayout, WallSegment } from "./types";
 import type { GpuSimCoreSocialForceParams } from "./gpuSimCoreSocialForce";
 import {
@@ -182,6 +183,25 @@ export async function sortAgentsForParity(
   sortedAgentIdsReadback.destroy();
   return result;
 }
+/** Straight-line unit direction from each agent's current position to its
+ * own target — `stepForParity`'s default when no `routedHeading` is
+ * supplied (see that function's own doc comment for why this is a
+ * once-at-start, not per-step, computation). */
+function straightLineHeading(
+  positions: Float32Array,
+  targets: Float32Array,
+  count: number,
+): Float32Array {
+  const heading = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    const dx = targets[i * 2] - positions[i * 2];
+    const dy = targets[i * 2 + 1] - positions[i * 2 + 1];
+    const unit = normalize2(dx, dy);
+    heading[i * 2] = unit.x;
+    heading[i * 2 + 1] = unit.y;
+  }
+  return heading;
+}
 export async function stepForParity(
   device: GPUDevice,
   agents: AgentSoA,
@@ -194,6 +214,7 @@ export async function stepForParity(
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
   holding?: Uint32Array,
+  routedHeading?: Float32Array,
 ): Promise<StepParityReadback> {
   const count = agents.count;
   if (count === 0) {
@@ -277,6 +298,26 @@ export async function stepForParity(
     count * U32,
     GPUBufferUsage.COPY_DST,
   );
+  // ADR-0033: always bound, same reasoning as the buffers above. Unlike
+  // those, there is no "harmless when omitted" default the KERNEL itself
+  // can fall back to (the in-kernel straight-line fallback was removed —
+  // see gpuSimCoreShaders.ts's own doc comment) — so when the caller
+  // doesn't supply one, this function computes straight-line direction
+  // ONCE from the initial positions/targets and uploads it as a static
+  // array for the whole `steps`-step run. That's exactly what
+  // `router.direction()` degrades to whenever there's line of sight to the
+  // target the entire time (true of every existing caller of this
+  // function: open corridors, no walls between agent and target) — but it
+  // is a real limitation for a scenario whose line-of-sight genuinely
+  // changes mid-run, which this one-shot, no-CPU-in-the-loop benchmark
+  // helper cannot model (a live per-tick engine integration, unlike this
+  // function, re-routes every tick — see gpuSimCore.ts's uploadRoutedHeading).
+  const routedHeadingBuffer = createStorageBuffer(
+    device,
+    "step-routed-heading",
+    count * 2 * F32,
+    GPUBufferUsage.COPY_DST,
+  );
   const wallsBuffer = createStorageBuffer(
     device,
     "step-walls",
@@ -354,6 +395,13 @@ export async function stepForParity(
     0,
     holding ? holding.slice(0, count) : new Uint32Array(count),
   );
+  device.queue.writeBuffer(
+    routedHeadingBuffer,
+    0,
+    routedHeading
+      ? routedHeading.slice(0, count * 2)
+      : straightLineHeading(agents.positions, targetPositions, count),
+  );
   if (wallCount > 0) {
     device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(walls));
   }
@@ -421,6 +469,7 @@ export async function stepForParity(
         { binding: 12, resource: { buffer: formationSlotsBuffer } },
         { binding: 13, resource: { buffer: hazardAvoidanceBuffer } },
         { binding: 14, resource: { buffer: holdingBuffer } },
+        { binding: 15, resource: { buffer: routedHeadingBuffer } },
       ],
     });
   });
@@ -490,6 +539,7 @@ export async function stepForParity(
     formationSlotsBuffer,
     hazardAvoidanceBuffer,
     holdingBuffer,
+    routedHeadingBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,

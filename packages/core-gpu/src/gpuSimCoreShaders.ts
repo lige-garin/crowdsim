@@ -157,6 +157,20 @@ fn add_block_offsets(@builtin(global_invocation_id) gid: vec3<u32>,
 // shrink a step, never re-widen one the speed clamp just shrank. Never for
 // a holding agent, same gate as stages 6/7 (no new binding — reuses
 // `distance`, already computed above for the relaxation target).
+//
+// ADR-0033 (engine wiring, not a new ADR-0015 stage — the force math below
+// is unchanged, only where its direction input comes from): crowdMovement.ts
+// does NOT walk straight at `targetX`/`targetY` for a non-holding agent — it
+// calls `router.direction()`, which returns the straight-line direction only
+// when there is line of sight, and otherwise the steepest-descent direction
+// along a precomputed Dijkstra distance field (routing around walls/corners).
+// `distance` (used for desired-speed easing and the overshoot clamp) stays
+// tied to the literal target; only the WALKING DIRECTION is decoupled from
+// it. `routedHeading` carries that pre-routed direction from the host (which
+// alone has the routing grid) — the kernel no longer derives `desired` from
+// `targets` itself. A host that has nothing to route around (no walls) can
+// simply upload the straight-line direction, which is what routing degrades
+// to anyway (`straightLineRouter()` in crowdNavigation.ts).
 export const FUSED_MOVE_WORKGROUP = 64;
 export const fusedMoveShader = /* wgsl */ `
 struct MoveParams {
@@ -201,6 +215,7 @@ struct MoveParams {
 @group(0) @binding(12) var<storage, read> formationSlots: array<vec2<f32>>;
 @group(0) @binding(13) var<storage, read> hazardAvoidance: array<vec2<f32>>;
 @group(0) @binding(14) var<storage, read> holding: array<u32>;
+@group(0) @binding(15) var<storage, read> routedHeading: array<vec2<f32>>;
 
 const formationGain: f32 = 1.0;
 const formationRoomMeters: f32 = 1.0;
@@ -229,8 +244,10 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
 
   let toTarget = targets[i] - p;
   let distance = length(toTarget);
-  var desired = vec2<f32>(0.0, 0.0);
-  if (distance > 0.0001) { desired = toTarget / distance; }
+  // ADR-0033: the walking direction is the host-routed heading, NOT
+  // normalize(target - position) — see this file's own doc comment above
+  // the kernel string for why those are deliberately decoupled.
+  let desired = routedHeading[i];
   // Stage 6: crowdMovement.ts's own two-part integration (this file's own
   // doc comment below the kernel string has the full citation) — desired
   // speed eases with distance to target (even for non-holding agents, a

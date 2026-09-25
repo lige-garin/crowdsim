@@ -1,6 +1,34 @@
 # ADR 0033: Wiring the GPU step kernel into the live simulation engine
 
-- Status: **Proposed, staged plan below, stage 1 starting immediately.**
+- Status: **Stage 1 complete and hardware-verified** (2026-09-25): fixed
+  `GpuSimCore`'s broken bind group (11 of 15 bindings wired, stale 68-byte
+  `moveParamsBuffer`) and added the missing `uploadGroupIds`/
+  `uploadFormationSlots`/`uploadHazardAvoidance`/`uploadHolding`/persistent
+  `readback()` surface — see `docs/CLAIMS_LEDGER.md` for the full record,
+  including a second real bug (`velBuffers` missing `COPY_SRC`, caught by
+  the first real-hardware run of the new API). **A real gap surfaced while
+  scoping stage 2, closed the same session**: `crowdMovement.ts` does not
+  walk straight at its literal target for a non-holding agent — it calls
+  `router.direction()`, which returns the straight-line direction only
+  with line of sight, otherwise the steepest-descent direction along a
+  precomputed Dijkstra field (routing around walls/corners), decoupled
+  from the literal target used for distance/speed-easing/the overshoot
+  clamp. The kernel had no way to receive that pre-routed direction — it
+  derived `desired` from `targets` internally. Added a 16th binding,
+  `routedHeading` (a host-computed unit vector per agent, mirroring the
+  group/formation/hazard/holding pattern but with NO in-kernel
+  fallback — the CPU-oracle TS functions and `stepForParity` default to
+  straight-line when omitted, for backward compatibility with every
+  pre-existing test, but the WGSL kernel and `GpuSimCore`'s public API do
+  not, since a live engine integration always has a real routed value to
+  supply). Hardware-verified: exact parity with the CPU oracle given the
+  identical routed heading (maxDiff 0 / 4.77e-7 across two fixtures), plus
+  a decisive check that agents genuinely walk the routed direction, not
+  the target direction. This is additive to ADR-0015's already-complete 8
+  stages, not a revision of them (the force math per se is unchanged, only
+  where its direction input comes from). Remaining: stages 2 (the rest —
+  index recycling, per-floor pooling, the engine-side `advanceAgentsGpu`
+  function, the router-integration call site) through 4, unstarted.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
@@ -171,17 +199,21 @@ known-good oracle: same inputs, same outputs, on real hardware.
 
 **Stage 2 — engine-side wiring for a single plane.** Add
 `advanceAgentsGpu(plane)` as an alternate to the per-plane `stepCrowd(...)`
-call inside `advanceAgentsCpu()`: derive `holding` and fold
-`flightSpeedMetersPerSecond`/`smokeSpeedFactor` into `speed[]` (extracted,
-reusable functions per gap #6 above), upload via the index-recycling
-allocator (gap #4), step, read back, then run the _existing_
-`constrainMovement`/`clampPointToWorld`/exit-check logic against the
-returned positions exactly as `stepCrowd` does today — no kernel changes
-for wall/exit handling per the Context section above. One `GpuSimCore`
-instance per plane with create/reuse/destroy lifecycle (gap #5). Verified
-by running both backends against the same scene/seed and comparing
-positions within the disclosed tolerance, plus the existing RiMEA/benchmark
-suite re-run against GPU mode where currently CPU-only.
+call inside `advanceAgentsCpu()`: derive `holding`, fold
+`flightSpeedMetersPerSecond`/`smokeSpeedFactor` into `speed[]`, and compute
+each agent's `router.direction()` for `routedHeading` (three small,
+extracted, reusable functions per gap #6 above — the last of these calls
+the CPU router the engine already builds per plane, exactly as
+`crowdMovement.ts` does today, now confirmed to be a real, necessary, and
+already-supported upload rather than an assumption), upload via the
+index-recycling allocator (gap #4), step, read back, then run the
+_existing_ `constrainMovement`/`clampPointToWorld`/exit-check logic against
+the returned positions exactly as `stepCrowd` does today — no kernel
+changes for wall/exit handling per the Context section above. One
+`GpuSimCore` instance per plane with create/reuse/destroy lifecycle (gap
+#5). Verified by running both backends against the same scene/seed and
+comparing positions within the disclosed tolerance, plus the existing
+RiMEA/benchmark suite re-run against GPU mode where currently CPU-only.
 
 **Stage 3 — worker device lifecycle + real runtime switch.** Adapter/device
 acquisition inside `simulation.worker.ts` with lost-device fallback to CPU

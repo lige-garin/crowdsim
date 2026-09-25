@@ -16,26 +16,26 @@ const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | und
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
 
 // ADR-0033 stage 1: `GpuSimCore`'s public API (uploadSpawns +
-// uploadGroupIds/uploadFormationSlots/uploadHazardAvoidance/uploadHolding +
-// step + readback) had never been exercised end-to-end against real
-// hardware before this fix — its bind group only wired 11 of the 15
-// bindings `createMovePipeline` requires, and there was no public write
-// path or persistent readback for the group/formation/hazard/holding
-// buffers at all. This test drives the PUBLIC API exactly as a future
-// engine integration (ADR-0033 stage 2) would, and checks its output
-// against `stepForParity` — the internal test/benchmark harness that was
-// kept in sync with every ADR-0015 stage — for the identical inputs. If
-// `GpuSimCore`'s bind group or buffer layout is wrong in any way (stale
-// binding count, wrong byte offset, wrong default value), this diverges
-// from the oracle; if it's right, they must match within the same
-// tolerance every other real-hardware parity test in this suite uses.
+// uploadGroupIds/uploadFormationSlots/uploadHazardAvoidance/uploadHolding/
+// uploadRoutedHeading + step + readback) had never been exercised end-to-end
+// against real hardware before this fix — its bind group only wired 11 of
+// the 16 bindings `createMovePipeline` requires, and there was no public
+// write path or persistent readback for the group/formation/hazard/
+// holding/routedHeading buffers at all. This test drives the PUBLIC API
+// exactly as a future engine integration (ADR-0033 stage 2) would, and
+// checks its output against `stepForParity` — the internal test/benchmark
+// harness that was kept in sync with every ADR-0015 stage — for the
+// identical inputs. If `GpuSimCore`'s bind group or buffer layout is wrong
+// in any way (stale binding count, wrong byte offset, wrong default value),
+// this diverges from the oracle; if it's right, they must match within the
+// same tolerance every other real-hardware parity test in this suite uses.
 describe("GpuSimCore public API parity with stepForParity (real WebGPU)", () => {
   gpuTest(
-    "uploadSpawns + uploadGroupIds/uploadFormationSlots/uploadHazardAvoidance/uploadHolding + step + readback matches stepForParity over 20 steps",
+    "uploadSpawns + uploadGroupIds/uploadFormationSlots/uploadHazardAvoidance/uploadHolding/uploadRoutedHeading + step + readback matches stepForParity over 20 steps",
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -51,6 +51,12 @@ describe("GpuSimCore public API parity with stepForParity (real WebGPU)", () => 
       const formationSlots = new Float32Array(N * 2);
       const hazardAvoidance = new Float32Array(N * 2);
       const holding = new Uint32Array(N);
+      // ADR-0033: an explicit, straight-line routedHeading (correct here
+      // since this fixture has no walls — nothing to route around) fed to
+      // BOTH paths identically, rather than relying on GpuSimCore's "no
+      // default, zero until uploaded" and stepForParity's "computed once,
+      // internally" defaults to happen to agree.
+      const routedHeading = new Float32Array(N * 2);
       for (let pair = 0; pair < N / 2; pair++) {
         const y = 5 + pair * 1.5;
         const a = pair * 2;
@@ -75,6 +81,8 @@ describe("GpuSimCore public API parity with stepForParity (real WebGPU)", () => 
         hazardAvoidance[b * 2 + 1] = 0.3;
         holding[a] = a % 3 === 0 ? 1 : 0;
         holding[b] = b % 3 === 0 ? 1 : 0;
+        routedHeading[a * 2] = 1; // toward +x, matching agent a's target
+        routedHeading[b * 2] = -1; // toward -x, matching agent b's target
       }
       const walls: never[] = [];
       const params: GpuSimCoreSocialForceParams = {
@@ -117,6 +125,7 @@ describe("GpuSimCore public API parity with stepForParity (real WebGPU)", () => 
         formationSlots,
         hazardAvoidance,
         holding,
+        routedHeading,
       );
 
       const core = createGpuSimCore(device!, { capacity: N, layout, walls, params });
@@ -135,6 +144,7 @@ describe("GpuSimCore public API parity with stepForParity (real WebGPU)", () => 
       core.uploadFormationSlots(formationSlots);
       core.uploadHazardAvoidance(hazardAvoidance);
       core.uploadHolding(holding);
+      core.uploadRoutedHeading(routedHeading);
       for (let s = 0; s < STEPS; s++) {
         core.step(params.dt);
       }

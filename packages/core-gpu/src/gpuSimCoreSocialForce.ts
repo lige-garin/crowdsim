@@ -426,6 +426,7 @@ export function stepGpuSimCoreSocialForceCpu(
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
   holding?: Uint32Array,
+  routedHeading?: Float32Array,
 ): SocialForceStepResult {
   const nextPositions = agents.positions.slice(0, agents.count * 2);
   const nextVelocities = agents.velocities.slice(0, agents.count * 2);
@@ -442,7 +443,13 @@ export function stepGpuSimCoreSocialForceCpu(
     const dxTarget = targetX - px;
     const dyTarget = targetY - py;
     const distance = Math.hypot(dxTarget, dyTarget);
-    const desired = normalize2(dxTarget, dyTarget);
+    // ADR-0033: defaults to the straight-line direction (what routing
+    // degrades to with nothing to route around) when the caller doesn't
+    // supply a pre-routed heading — every pre-ADR-0033 test exercises this
+    // default and stays byte-for-byte unchanged.
+    const desired = routedHeading
+      ? { x: routedHeading[index * 2], y: routedHeading[index * 2 + 1] }
+      : normalize2(dxTarget, dyTarget);
     const isHolding = holding !== undefined && holding[index] !== 0;
     const desiredSpeed = isHolding
       ? Math.min(freeSpeed, (freeSpeed * distance) / params.holdEaseMeters)
@@ -565,6 +572,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
   formationSlots?: Float32Array,
   hazardAvoidance?: Float32Array,
   holding?: Uint32Array,
+  routedHeading?: Float32Array,
 ): SocialForceStepResult {
   if (params.interactionRangeMeters > layout.cellSize) {
     throw new Error(
@@ -611,7 +619,13 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     const dxTarget = targetX - px;
     const dyTarget = targetY - py;
     const distance = Math.hypot(dxTarget, dyTarget);
-    const desired = normalize2(dxTarget, dyTarget);
+    // ADR-0033: defaults to the straight-line direction (what routing
+    // degrades to with nothing to route around) when the caller doesn't
+    // supply a pre-routed heading — every pre-ADR-0033 test exercises this
+    // default and stays byte-for-byte unchanged.
+    const desired = routedHeading
+      ? { x: routedHeading[index * 2], y: routedHeading[index * 2 + 1] }
+      : normalize2(dxTarget, dyTarget);
     const isHolding = holding !== undefined && holding[index] !== 0;
     const desiredSpeed = isHolding
       ? Math.min(freeSpeed, (freeSpeed * distance) / params.holdEaseMeters)

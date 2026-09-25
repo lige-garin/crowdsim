@@ -22,7 +22,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -104,7 +104,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -195,7 +195,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -297,7 +297,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -379,7 +379,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -474,7 +474,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -568,7 +568,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -674,7 +674,7 @@ describe("fused move parity (real WebGPU)", () => {
     async () => {
       const adapter = await maybeNavigator?.gpu?.requestAdapter();
       const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 15 },
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
       });
       expect(device).toBeDefined();
 
@@ -761,6 +761,113 @@ describe("fused move parity (real WebGPU)", () => {
 
       for (let i = 0; i < N * 2; i++) {
         expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "fused GPU move (ADR-0033: routedHeading decoupled from target-derived direction) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
+      });
+      expect(device).toBeDefined();
+
+      // Targets are straight ahead on +x for every agent, but routedHeading
+      // points +y instead — as a router would when a wall blocks line of
+      // sight to that +x target. If the kernel still derived direction from
+      // `targets` (the pre-ADR-0033 behaviour), this would diverge sharply
+      // from the CPU oracle, which is given the identical routedHeading.
+      const N = 12;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      const routedHeading = new Float32Array(N * 2);
+      for (let i = 0; i < N; i++) {
+        const x = 5 + i * 3;
+        setAgentPosition(agents, i, x, 5);
+        setAgentSpeed(agents, i, 1.34);
+        setAgentRadius(agents, i, 0.22);
+        targets[i * 2] = x + 50;
+        targets[i * 2 + 1] = 5;
+        routedHeading[i * 2] = 0;
+        routedHeading[i * 2 + 1] = 1;
+      }
+      const walls: WallSegment[] = [];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 96,
+        height: 32,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          routedHeading,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        routedHeading,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+      // Decisive: every agent must have actually walked +y (routedHeading),
+      // not +x (the target direction) — proves the kernel is genuinely
+      // reading the new binding, not silently ignoring it and happening to
+      // land within tolerance some other way.
+      for (let i = 0; i < N; i++) {
+        const dy = gpu.positions[i * 2 + 1] - agents.positions[i * 2 + 1];
+        expect(dy).toBeGreaterThan(0.05);
       }
 
       device!.destroy();

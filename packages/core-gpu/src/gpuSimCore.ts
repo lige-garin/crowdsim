@@ -56,6 +56,19 @@ export type GpuSimCore = {
   uploadHazardAvoidance(hazardAvoidance: Float32Array): void;
   /** ADR-0015 stage 6's holding-state flag — 0 or 1 per agent. */
   uploadHolding(holding: Uint32Array): void;
+  /**
+   * ADR-0033's pre-routed walking direction, (x, y) unit vector per agent —
+   * REQUIRED before any `step()` that should produce real movement (no
+   * "harmless default" exists here, unlike the other upload methods: the
+   * kernel has no in-shader fallback for this one, see
+   * `gpuSimCoreShaders.ts`'s own doc comment for why). Zero-initialized at
+   * construction, which is harmless (zero desired velocity, agent doesn't
+   * move) but not a substitute for calling this. A live engine integration
+   * calls this every tick with the CPU router's own output — the whole
+   * reason this buffer exists is that only the CPU host has the routing
+   * grid to compute it from.
+   */
+  uploadRoutedHeading(routedHeading: Float32Array): void;
   setCount(count: number): void;
   step(dt: number): void;
   positionsBuffer(): GPUBuffer;
@@ -153,6 +166,16 @@ export function createGpuSimCore(
     device,
     "core-holding",
     capacity * U32,
+    GPUBufferUsage.COPY_DST,
+  );
+  // ADR-0033: always bound, zero-initialized by spec at creation — harmless
+  // (zero desired velocity) but NOT a substitute for a real
+  // uploadRoutedHeading() call, unlike the buffers above. See this type's
+  // own doc comment on uploadRoutedHeading.
+  const routedHeadingBuffer = createStorageBuffer(
+    device,
+    "core-routed-heading",
+    capacity * 2 * F32,
     GPUBufferUsage.COPY_DST,
   );
   const wallsBuffer = createStorageBuffer(
@@ -292,6 +315,7 @@ export function createGpuSimCore(
         { binding: 12, resource: { buffer: formationSlotsBuffer } },
         { binding: 13, resource: { buffer: hazardAvoidanceBuffer } },
         { binding: 14, resource: { buffer: holdingBuffer } },
+        { binding: 15, resource: { buffer: routedHeadingBuffer } },
       ],
     });
   });
@@ -313,6 +337,7 @@ export function createGpuSimCore(
     formationSlotsBuffer,
     hazardAvoidanceBuffer,
     holdingBuffer,
+    routedHeadingBuffer,
     wallsBuffer,
     gridParamsBuffer,
     moveParamsBuffer,
@@ -379,6 +404,9 @@ export function createGpuSimCore(
     },
     uploadHolding(holding: Uint32Array) {
       device.queue.writeBuffer(holdingBuffer, 0, holding);
+    },
+    uploadRoutedHeading(routedHeading: Float32Array) {
+      device.queue.writeBuffer(routedHeadingBuffer, 0, routedHeading);
     },
     step(nextDt: number) {
       if (count === 0) {
