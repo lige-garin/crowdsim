@@ -1,6 +1,6 @@
 # ADR 0033: Wiring the GPU step kernel into the live simulation engine
 
-- Status: **Stage 1 complete and hardware-verified** (2026-09-25): fixed
+- Status: **Stages 1-2 complete and hardware-verified** (2026-09-25). Stage 1: fixed
   `GpuSimCore`'s broken bind group (11 of 15 bindings wired, stale 68-byte
   `moveParamsBuffer`) and added the missing `uploadGroupIds`/
   `uploadFormationSlots`/`uploadHazardAvoidance`/`uploadHolding`/persistent
@@ -101,10 +101,45 @@
   depend on real compaction. The new `vx`/`vy` fields verified on real
   hardware — and caught their own test bug in the process: an exact-equality
   assertion (`toBe(0.8)`) failed because 0.8 has no exact float32
-  representation, fixed to `toBeCloseTo`. Remaining: per-floor `GpuSimCore`
-  instance pooling (gap #5, now correctly scoped to actually use this
-  allocator's `relocatedIds`) and the `advanceAgentsGpu` function itself,
-  unstarted; stages 3-4 unstarted.
+  representation, fixed to `toBeCloseTo`. **Stage 2 is now complete**: built
+  `createGpuCrowdPlanePool` (gap #5 — one `GpuSimCore`/`GpuSlotAllocator`
+  pair per plane, keyed by plane id, cell size derived from the widest of
+  `interactionRangeMeters`/`anticipationRangeMeters`/the hardcoded 1m
+  `formationRoomMeters`, since the neighbourhood-restricted kernel is only
+  lossless when the grid covers every range that must stay exact and only
+  `interactionRangeMeters` is checked at runtime) and `advanceAgentsGpu`, a
+  real, independently-callable async alternate to `stepCrowd` for one
+  plane's population — exit check before movement (identical to
+  `stepCrowd`'s own early continue, no kernel involvement), the allocator's
+  `sync()` per tick, a full-array-upload translation layer
+  (`buildGpuCrowdUploadArrays`, pure and Node-tested) correcting a real,
+  subtle discrepancy the naive translation would have missed (the formation
+  force's actual CPU gate is "has a `groupFormation` slot", not merely "has
+  a `groupId`" — a solo or non-moving grouped agent has the latter but not
+  the former, and uploading its real `groupId` regardless would let the GPU
+  kernel pull it toward `(0, 0)`), `uploadSpawns` for newly
+  spawned/relocated ids only, `step`+`readback`, then the exact same
+  `constrainMovement`/exit-tally logic `stepCrowd` uses reapplied to the
+  GPU-produced positions. Verified: 10 Node tests (a fake in-memory
+  `GpuSimCore` proves the orchestration — spawn/no-re-spawn-on-continuation/
+  wall-constraint-reapplication — without needing real hardware; physics
+  correctness is a separate concern), plus a real-hardware test comparing
+  `advanceAgentsGpu` against `stepCrowd` for a mixed 6-agent, 30-tick
+  scenario (a walking group, a solo walker, a holding/browsing agent, and a
+  head-on collision pair) — matched within 1.1e-5m, an order of magnitude
+  inside the 0.05m tolerance budgeted for accumulated floating-point drift
+  over 30 ticks. An early version of that test's own "did anyone actually
+  move" sanity check used an unrealistic threshold (assumed near-steady-
+  state speed within a 0.5-simulated-second window, well under the 0.644s
+  relaxation time) and failed on real hardware for that reason, not a
+  pipeline defect — corrected once the real hardware numbers made the
+  arithmetic error obvious. Self-applied ponytail-review caught the test
+  file itself hand-rolling a second, simplified copy of the already-tested
+  `GpuSlotAllocator` instead of importing the real one — replaced. Not
+  wired into `advanceAgentsCpu()`'s live per-tick loop or
+  `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection —
+  that real runtime switch, plus worker-side device lifecycle, is stage 3,
+  entirely unstarted, as is stage 4 (full-pipeline measurement).
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
