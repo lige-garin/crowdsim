@@ -1,6 +1,9 @@
 # ADR 0033: Wiring the GPU step kernel into the live simulation engine
 
-- Status: **Stages 1-3 complete and hardware-verified** (2026-09-25/26). Stage 1: fixed
+- Status: **Stages 1-3 complete and hardware-verified; stage 4 measured for
+  movement + decision + readback, rendering still unmeasured** (2026-09-25/26).
+  See the stage 4 entry below for the measured numbers and why rendering
+  is the one piece still open. Stage 1: fixed
   `GpuSimCore`'s broken bind group (11 of 15 bindings wired, stale 68-byte
   `moveParamsBuffer`) and added the missing `uploadGroupIds`/
   `uploadFormationSlots`/`uploadHazardAvoidance`/`uploadHolding`/persistent
@@ -225,6 +228,99 @@
   and the flag round-tripped cleanly back off. CPU stays the default
   throughout — this only ever adds a discoverable way to opt in, per
   ADR-0006.
+- **Stage 4, narrowed and measured (2026-09-26)**: the plan for stage 4 was
+  "measure actual frame time with GPU movement, CPU decision layer,
+  readback, and three.js rendering all in the loop". The rendering half of
+  that could not be measured honestly in this session: the browser
+  automation environment used for every prior stage's real-hardware
+  verification does not continuously composite the page when its pane is
+  not the foregrounded window, and `requestAnimationFrame` — which
+  `useSimulationWorkerController.ts`'s tick loop and three.js's own render
+  loop both depend on — simply never fires under that condition (confirmed
+  directly: a `requestAnimationFrame` callback armed and left running
+  recorded 0 invocations after 5+ real seconds of idle wait, while the
+  simulation kept advancing regardless via that same hook's `setInterval`
+  watchdog fallback for exactly this kind of starved-rAF case). Given that
+  hard constraint, **the user chose to scope stage 4 down to the
+  non-rendering three-quarters of the loop** (GPU movement + CPU decision
+  layer + readback) rather than fabricate a number for the fourth,
+  or block on tooling neither this session nor the user control.
+  - **Method**: a temporary, flag-gated timer (`window.__stage4Bench`,
+    checked in `useSimulationWorkerController.ts`'s `advance()`) wrapped
+    each real `client.tick()` call end to end — the same call this hook
+    already makes every real frame (or watchdog tick), driving
+    `SimulationEngine.tickAsync()` through the worker, which under
+    `movementBackend:"webgpu"` runs the GPU movement step, the CPU decision
+    layer, and the GPU readback, in that order, inside one call. No app
+    code changes survived past the measurement: the instrumentation was
+    added, used, and `git checkout`'d back out before this entry was
+    written — `git status` is clean of it.
+  - **Scenario**: the "Stadium Concourse" industry template (highest
+    default arrival rate among the six, 320/min), run at real time (1×,
+    after using 8× only to build up population faster, since `tickAsync`'s
+    per-call cost scales with how much simulated time one call has to
+    catch up — 8× numbers are not comparable to 1× numbers for this
+    reason). Every real tick's wall-clock duration was logged paired with
+    that tick's resulting `agentCount`, then bucketed by population range
+    after the fact, so one continuous run covers the whole scaling curve
+    rather than needing separately-launched runs per bucket. First tick of
+    each run (cold start, includes one-time worker/pipeline setup cost)
+    excluded from every bucket below.
+  - **Results** (mean tick duration, ms; NVIDIA Lovelace, this session's
+    real hardware):
+
+    | Agents present | cpu-compat (default) | webgpu        |
+    | -------------- | -------------------- | ------------- |
+    | 0-100          | 1.70 (n=137)         | 31.76 (n=147) |
+    | 100-250        | 5.49 (n=244)         | 30.81 (n=244) |
+    | 250-400        | 18.74 (n=248)        | 43.14 (n=250) |
+    | 400-600        | 26.96 (n=245)        | 47.54 (n=73)  |
+
+  - **This is not the result the project's earlier GPU-kernel benchmarks
+    would suggest, and it is reported exactly as measured.** `cpu-compat`
+    is faster than `webgpu` at every population bucket actually reached —
+    by roughly 18× at the low end, narrowing to roughly 1.8× by 400-600
+    agents. `webgpu`'s cost is nearly flat (31.76 → 30.81ms) from 0 to 250
+    agents, then climbs; `cpu-compat`'s cost grows faster with population
+    but starts from a much lower floor. The clear read: `webgpu` mode
+    currently pays a large, close-to-fixed per-tick cost (worker → GPU
+    device → async submit → readback → `postMessage` back to the main
+    thread) that is NOT the GPU kernel's own compute time (ADR-0015
+    measured that in isolation at 0.4-0.5ms for 100k agents on this same
+    class of hardware) — it is integration overhead this stage's own
+    plumbing adds around that kernel. That overhead does not shrink as
+    population grows, so at high enough agent counts `webgpu` should
+    eventually cross over and win; **this session could not observe that
+    crossover**, because this app's scenarios plateau in the few-hundred
+    range under their own arrival/exit dynamics, and the engine's own
+    `crowdBudget.maxAgents` hard-caps every scene at 2,000 regardless of
+    scenario design — nowhere near the tens of thousands where this
+    overhead should stop dominating.
+  - **Neither backend hits the 16.6ms (60fps) budget once population
+    passes roughly 250-300 agents in this measurement** (rendering not
+    included — the real, full-pipeline number would only be worse). Below
+    that, `cpu-compat` alone stays inside budget (1.70-5.49ms); `webgpu`
+    never does across any bucket measured, including its lowest (30.81ms
+    mean at 100-250 agents).
+  - **What this does and does not license saying**: it licenses saying
+    "webgpu movement is currently slower than cpu-compat, not faster, for
+    every population this app's default scenarios and engine cap can
+    reach" and "neither backend's non-rendering cost fits a 60fps budget
+    past roughly 250-300 agents" — both measured, both on one specific
+    machine, one scenario, one session. It does **not** license "the GPU
+    core doesn't work" (ADR-0015's isolated kernel numbers stand
+    unchanged) or "webgpu mode is broken" (it is precisely as fast as this
+    integration currently makes it, doing real, correct work each tick).
+    It also does not cover three.js rendering cost at all, which stage 4's
+    original plan explicitly wanted included and this session's tooling
+    could not measure — that half of stage 4 remains open, for a session
+    with an actually-foregrounded browser window.
+  - **Consequence for CPU staying the default (ADR-0006)**: this measurement
+    is now a second, independent reason `cpu-compat` should stay the
+    default beyond the policy reason ADR-0006 already gives — at every
+    population this app can currently produce, it is also the faster
+    choice, measured.
+
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
