@@ -2931,3 +2931,35 @@ Self-applied ponytail-review: one real finding (the `slotFor`/`release` speculat
 ### What remains
 
 Per-floor `GpuSimCore` instance pooling (gap #5, create-on-first-use/reuse-by-floorId/destroy-when-plane-disappears) and the `advanceAgentsGpu(plane)` function itself — the two pieces that actually combine everything built so far into a working, testable alternate to `stepCrowd` — are the last of stage 2's scope, still unstarted. Stages 3 (worker device lifecycle, real runtime switch) and 4 (full-pipeline measurement) remain entirely unstarted. Not wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection.
+
+## 2026-09-25 (fifty-fifth entry): ADR-0033 gap #4 corrected — the allocator needed real compaction, not free-list bookkeeping, plus `uploadSpawns`'s velocity-preserving extension
+
+While designing gap #5's per-floor `GpuSimCore` pooling (the piece that actually calls the allocator committed in the fifty-fourth entry), working through exactly what happens to a departed agent's freed slot surfaced that the allocator as built was not safe to use.
+
+### Why free-list bookkeeping alone is wrong
+
+`GpuSimCore.step()`'s WGSL kernel processes every index in `[0, count)` unconditionally — there is no per-agent "active" flag it checks (adding one would be a kernel change, and ADR-0033's whole premise is that the kernel itself is done, only the host-side wiring is left). The first `gpuSlotAllocator.ts` marked a departed agent's slot "free" and left it exactly as-is until some later arrival happened to reuse it. For any tick in between — the common case, since arrivals and departures are not paired 1:1 tick to tick — that freed slot still sits inside `[0, count)`, and the kernel still runs full physics for it: the departed agent's last known position keeps exerting repulsion, anticipation, and hazard-avoidance force on real neighbours nearby, a ghost nobody asked for.
+
+### The fix: genuine swap-compaction
+
+Redesigned `gpuSlotAllocator.ts` around the standard packed-array swap-remove technique: on every departure, the topmost currently-live slot is swapped into the hole the departure just opened, and the live count shrinks by one. This keeps the invariant "live agents occupy exactly `[0, count)`, no gaps" true after every single `sync()` call, with no kernel change. The cost: a live agent that never left can still have its **slot** (not its identity) change out from under it, when compaction happens to pick it as the one to move into someone else's hole. `sync()`'s return type grew a third field, `relocatedIds`, naming exactly which live ids that happened to.
+
+### Verified, including a hand-traced edge case
+
+8 Node tests (up from 5): basic allocation and stability across syncs; high-water-mark persistence; departing the topmost slot needing no swap; departing a non-topmost slot correctly relocating the topmost live id into the hole; a new arrival correctly reusing a hole opened by compaction rather than a fresh index; a hand-traced two-simultaneous-departures cascade — B (a middle slot) and E (the then-topmost slot) both depart in the same `sync()` call, where B's departure alone would provisionally relocate E into B's hole, but E is itself departing in this same call and must NOT be reported as relocated, while D (the new topmost after E's removal) must end up exactly where E was provisionally placed, not left at its original slot; and a general property check that after an arbitrary sequence of departures and arrivals, the live slots always form exactly `[0, count)` with no gaps. Decisive revert-verify: disabling the swap-compaction branch reproduced exactly the 3 tests that depend on real compaction (non-topmost relocation, the simultaneous-departure cascade, and the general no-gaps property), while the other 5 (which never require a swap to hold) stayed green.
+
+### A necessary companion fix: `uploadSpawns` gained optional `vx`/`vy`
+
+A relocated agent's new slot has to be re-established via `uploadSpawns` — the only public write path for position — but `uploadSpawns` always wrote `vx = vy = 0`, correct for a genuinely new agent and wrong for a relocated one, whose actual GPU-resident velocity (available from the readback a live engine already does every tick) would otherwise be silently discarded. Added optional `vx`/`vy` fields to `AgentSpawn`, defaulting to 0 when omitted — every pre-existing caller's shape is unchanged (confirmed: no existing test needed updating).
+
+**Real-hardware verification caught a bug in its own test, not in the implementation**: the first version of the new `coreApi.webgpu.ts` test asserted `expect(result.velocities[2]).toBe(0.8)` — exact equality — which failed on real hardware even though the value was correctly preserved, because 0.8 has no exact float32 representation (`writeBuffer`/`Float32Array` rounds it to `0.800000011920929`). Fixed to `toBeCloseTo(0.8, 6)`, matching the tolerance already used for the paired `vy` assertion in the same test. Reproduced first via this session's established temporary browser-tool harness before fixing the committed test, confirming the failure was the assertion's strictness, not the underlying write.
+
+### Verified
+
+`pnpm typecheck` (all packages), `pnpm lint`, `npx prettier . --check` all clean. Full test suite: core-gpu 85 (80 passed + 5 skipped, 82 baseline + 3 allocator tests + 1 new `coreApi.webgpu.ts` test), app 1162 passed + 2 skipped (unaffected), scene-schema 35, Rust 11 — all passing.
+
+Self-applied ponytail-review: no findings — the compaction algorithm is the minimum necessary to keep the existing kernel's `[0, count)`-processes-everything contract correct (not a speculative generalization), the `vx`/`vy` extension is two optional fields with a backward-compatible default, and every new test proves a distinct property (the cascade test in particular exists specifically because it is the one scenario simpler tests cannot exercise).
+
+### What remains
+
+Per-floor `GpuSimCore` instance pooling (gap #5) — now correctly scoped to actually consume `relocatedIds` when re-establishing agents after a compaction swap — and the `advanceAgentsGpu(plane)` function itself are the last of stage 2's scope, still unstarted. Stages 3 (worker device lifecycle, real runtime switch) and 4 (full-pipeline measurement) remain entirely unstarted. Not wired into `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection.

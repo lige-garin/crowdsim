@@ -74,9 +74,37 @@
   opposite; caught only because this spec self-skips in every sandboxed
   run and had never actually executed since. Fixed by supplying a
   straight-line `routedHeading`, confirmed on real hardware (identical
-  centre of mass without it, genuine convergence with it). Remaining:
-  per-floor `GpuSimCore` instance pooling (gap #5) and the
-  `advanceAgentsGpu` function itself, unstarted; stages 3-4 unstarted.
+  centre of mass without it, genuine convergence with it). **A fourth real
+  gap found while designing gap #5's pooling, closed the same session**:
+  the first `gpuSlotAllocator.ts` only did free-list bookkeeping (mark a
+  departed id's slot free, hand it to the next new arrival) — insufficient,
+  because the WGSL kernel processes every index in `[0, count)`
+  unconditionally with no per-agent "active" flag. A freed-but-not-yet-
+  reused slot inside `[0, count)` is a ghost: the departed agent's last
+  known position, still exerting full repulsion/anticipation/hazard force
+  on real neighbours every tick until something happens to overwrite it.
+  Redesigned as genuine swap-compaction (the standard packed-array
+  swap-remove technique): every departure swaps the topmost live slot into
+  the hole it left, keeping live agents packed into exactly `[0, count)`
+  with no gaps, at the cost of a live agent's **slot** (not identity)
+  sometimes changing underneath it — `sync()` now also returns
+  `relocatedIds` for exactly those. A relocated agent's position is
+  re-established via `uploadSpawns`, extended with optional `vx`/`vy`
+  fields (omitted, the default, means a genuine new agent starting from
+  rest, unchanged for every pre-existing caller) so relocation can preserve
+  its actual GPU-resident velocity from the same readback a live engine
+  already does every tick, rather than silently zeroing it. Verified with 8
+  Node tests including a hand-traced two-simultaneous-departures cascade
+  (one relocation itself becoming a departure within the same `sync()`
+  call) and a general "always packed, no gaps" property check; a decisive
+  revert-verify (disabling the swap) reproduced exactly the 3 tests that
+  depend on real compaction. The new `vx`/`vy` fields verified on real
+  hardware — and caught their own test bug in the process: an exact-equality
+  assertion (`toBe(0.8)`) failed because 0.8 has no exact float32
+  representation, fixed to `toBeCloseTo`. Remaining: per-floor `GpuSimCore`
+  instance pooling (gap #5, now correctly scoped to actually use this
+  allocator's `relocatedIds`) and the `advanceAgentsGpu` function itself,
+  unstarted; stages 3-4 unstarted.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,

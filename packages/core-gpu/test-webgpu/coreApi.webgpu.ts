@@ -249,4 +249,88 @@ describe("createGpuSimCore (real WebGPU)", () => {
       device!.destroy();
     },
   );
+
+  // ADR-0033: `GpuSlotAllocator`'s swap-compaction (`gpuSlotAllocator.ts`)
+  // can relocate a still-live agent to a new slot — a caller re-establishes
+  // that agent there via `uploadSpawns` (the only write path for
+  // position), but MUST supply its own current velocity via the new
+  // vx/vy fields, or the relocation would silently reset it to rest. This
+  // proves the fields actually reach the GPU buffer (not merely that they
+  // typecheck), by immediate readback with zero steps run.
+  gpuTest(
+    "uploadSpawns's optional vx/vy write the given velocity instead of zero",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
+      });
+      expect(device).toBeDefined();
+
+      const layout = createSpatialHashGridLayout({
+        width: 32,
+        height: 32,
+        cellSize: 4,
+      });
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 3,
+        anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
+      };
+
+      const core = createGpuSimCore(device!, {
+        capacity: 2,
+        layout,
+        walls: [],
+        params,
+      });
+      core.setCount(2);
+      core.uploadSpawns([
+        // Index 0: no vx/vy supplied -- every pre-existing caller's shape,
+        // must still start from rest.
+        { index: 0, x: 0, y: 0, speed: 1.34, radius: 0.22, targetX: 10, targetY: 0 },
+        // Index 1: a "relocated" agent carrying its own real velocity.
+        {
+          index: 1,
+          x: 5,
+          y: 5,
+          speed: 1.34,
+          radius: 0.22,
+          targetX: 10,
+          targetY: 5,
+          vx: 0.8,
+          vy: -0.3,
+        },
+      ]);
+
+      const result = await core.readback();
+      expect(result.velocities[0]).toBe(0);
+      expect(result.velocities[1]).toBe(0);
+      // toBeCloseTo, not toBe: 0.8 has no exact float32 representation
+      // (writeBuffer/Float32Array rounds it) -- caught on real hardware,
+      // where an earlier version of this assertion using exact equality
+      // failed even though the value was correctly preserved to within
+      // float32 precision.
+      expect(result.velocities[2]).toBeCloseTo(0.8, 6);
+      expect(result.velocities[3]).toBeCloseTo(-0.3, 6);
+
+      core.destroy();
+      device!.destroy();
+    },
+  );
 });

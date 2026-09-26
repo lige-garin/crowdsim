@@ -32,6 +32,18 @@ export type AgentSpawn = {
   targetY: number;
   /** Body radius, m — feeds the contact-stiffness term (`gpuSimCoreSocialForce.ts`). */
   radius: number;
+  /**
+   * ADR-0033: velocity to write at this slot, m/s — omitted (the default,
+   * every pre-existing caller) means a genuinely new agent, correctly
+   * starting from rest. A caller relocating a still-live agent to a new
+   * slot (`GpuSlotAllocator`'s swap-compaction, see its own doc comment)
+   * supplies that agent's own last-known velocity here instead, from the
+   * same readback a live engine already does every tick — writing 0 would
+   * silently discard a real agent's GPU-resident velocity, which is exactly
+   * the bug `uploadTargets`/`uploadSpeeds` exist to avoid for target/speed.
+   */
+  vx?: number;
+  vy?: number;
 };
 export type GpuSimCoreOptions = {
   capacity: number;
@@ -399,6 +411,8 @@ export function createGpuSimCore(
           const spawn = sorted[runStart + k];
           pos[k * 2] = spawn.x;
           pos[k * 2 + 1] = spawn.y;
+          vel[k * 2] = spawn.vx ?? 0;
+          vel[k * 2 + 1] = spawn.vy ?? 0;
           spd[k] = spawn.speed;
           rad[k] = spawn.radius;
           tgt[k * 2] = spawn.targetX;
