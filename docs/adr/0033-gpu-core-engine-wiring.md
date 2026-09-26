@@ -177,11 +177,59 @@
   counts climbing, the "实测" panel's live chart rising) and zero console
   errors — not a silently-idle "empty city". Stage 4 (full-pipeline
   measurement) is entirely unstarted.
+- **Stage 3 gap closed (2026-09-26)**: this ADR's own text for stage 3 says
+  "surface as an explicit, labelled toggle ... in the readiness panel" —
+  what shipped was the `?gpumove` URL flag alone, real but with no click
+  target anywhere in the app. Added a button next to the movement-backend
+  row in `AppInspector.tsx`'s "engineering signals" dock: labelled ("GPU
+  movement (experimental)"), shows its current requested state. It flips
+  the same `?gpumove` flag and reloads rather than flipping React state,
+  because that flag is deliberately read once at mount and never switched
+  reactively (`App.tsx`'s own comment, the "empty city" lesson) — a new
+  pure `toggleUrlFlag()` (`urlFlagToggle.ts`, 4 tests) does the URL
+  rewrite, `window.location.assign` does the reload.
+  **An initial version gated the button's `disabled` state on
+  `webGpuProbe.supported` — a self-run 3-angle ponytail-review caught this
+  as a real, disclosed-elsewhere-in-this-project class of bug**: that probe
+  (`webgpuProbe.ts`) requests a device with no `requiredLimits`, while the
+  worker's real GPU-movement device acquisition (`simulation.worker.ts`)
+  requires `maxStorageBuffersPerShaderStage: 16` — a device satisfying the
+  probe's looser request can still fail the worker's stricter one, which
+  would have left the button enabled/labelled "requested" while the
+  backend silently stayed cpu-compat (the same "looks green, isn't"
+  pattern this project's 2026-08-31 entry already fixed everywhere else
+  with fail-loud `requiredLimits` checks). Fixed by removing that gate
+  entirely rather than reconciling the two probes: the worst case of never
+  gating on it is a click that reloads and gracefully falls back — already
+  the designed behaviour — with the movement-backend row remaining the
+  honest source of truth regardless. The button is now disabled only when
+  `?mainsim` forces the main-thread path (the only path that never honours
+  `?gpumove` at all — a fact this app has already decided, not a hardware
+  probe that can race or disagree with the worker's own check). Decisive
+  revert-verify: temporarily restored the old `webGpuProbe.supported` gate
+  and confirmed the new "stays enabled regardless of webGpuProbe's state"
+  test (and, as a side effect, the click test) went red; restored the fix
+  and both passed again. A second review finding (no dedicated test for
+  `App.tsx`'s own `onToggleGpuMovement` glue calling `window.location`)
+  was considered and declined — this codebase has never tested that class
+  of one-line browser-primitive glue (`ValidationReportPanel.tsx`'s and
+  `ScenarioDiffPanel.tsx`'s `window.open(...)` calls have none either),
+  and `toggleUrlFlag`, the actual computation feeding it, is already
+  tested. 4 `AppInspector.test.tsx` tests attach to this button (disabled
+  under `?mainsim`, enabled and fires the callback on the worker path,
+  stays enabled regardless of `webGpuProbe`'s state, label matches actual
+  state in both directions). Confirmed on real hardware: clicked the
+  toggle, page reloaded to `?gpumove=`, the movement-backend row read
+  "webgpu active @ 60Hz" with a genuinely growing crowd (spawned 143,
+  present 143), `aria-pressed="true"`, zero console errors; clicked again
+  and the flag round-tripped cleanly back off. CPU stays the default
+  throughout — this only ever adds a discoverable way to opt in, per
+  ADR-0006.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
   `useSimulationWorkerController.ts`, `simulationRuntimeArtifact.ts`,
-  `appSignals.ts`, `AppInspector.tsx`
+  `appSignals.ts`, `AppInspector.tsx`, `urlFlagToggle.ts`
 - Related: ADR-0015 (staged behaviour port to the WGSL kernel — now complete,
   all 8 stages), ADR-0002 (100k GPU rewrite, accepted tolerance-based
   determinism trade-off), ADR-0006 (WebGPU compute / labelled WebGL-CPU

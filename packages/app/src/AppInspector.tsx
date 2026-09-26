@@ -15,10 +15,23 @@ type AppInspectorProps = {
   dashboardSamples: readonly DashboardSample[];
   elapsedSeconds: number;
   evacuation: EvacuationState;
+  /**
+   * Whether requesting GPU movement can do anything at all right now --
+   * i.e. the worker simulation path is actually in use (`App.tsx`'s
+   * `usesWorkerSimulation`). Under `?mainsim` the flag below is read but
+   * never consumed (only `useSimulationWorkerController` honours it), so
+   * offering the toggle enabled there would let it claim "requested" while
+   * having zero effect on which backend runs.
+   */
+  gpuMovementAvailable: boolean;
+  /** ADR-0033 stage 3's own URL flag, read once at mount (see `App.tsx`). */
+  gpuMovementRequested: boolean;
   heatmapCells: readonly HeatmapCell[];
   journeyDurations: () => number[];
   minuteFlows: () => MinuteFlow[];
   onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
+  /** Flips the flag above and reloads -- see `urlFlagToggle.ts`. */
+  onToggleGpuMovement: () => void;
   runSummary: RunAnalyticsSummary;
   scene: CrowdSimScene;
   signals: readonly SystemSignal[];
@@ -31,10 +44,13 @@ export function AppInspector({
   dashboardSamples,
   elapsedSeconds,
   evacuation,
+  gpuMovementAvailable,
+  gpuMovementRequested,
   heatmapCells,
   journeyDurations,
   minuteFlows,
   onExportRunAnalytics,
+  onToggleGpuMovement,
   runSummary,
   scene,
   signals,
@@ -172,6 +188,60 @@ export function AppInspector({
             <Row key={signal.label} label={signal.label} value={signal.value} />
           ))}
         </div>
+        {/*
+          ADR-0033 stage 3 called for "an explicit, labelled toggle (not a
+          default) in the readiness panel" and shipped only a URL flag
+          (`?gpumove`) instead -- real, but with no click target anywhere in
+          the app. This is that toggle: it flips the same flag and reloads
+          (the flag is deliberately read once at mount, never reactively --
+          see `App.tsx`'s own comment on it), so clicking it is exactly
+          what typing the URL by hand already did, just discoverable. CPU
+          stays the default either way (ADR-0006); this only ever requests
+          GPU mode, the worker still falls back to cpu-compat on any real
+          failure -- which is exactly why this button does NOT gate on
+          `webGpuProbe.supported`, despite an earlier version of this
+          change doing so. That probe requests a device with no
+          `requiredLimits`, while the worker's real GPU-movement device
+          request needs `maxStorageBuffersPerShaderStage: 16`
+          (`simulation.worker.ts`) -- a device that satisfies the probe can
+          still fail the worker's stricter request, which would have left
+          this button enabled and labelled "requested" while the backend
+          silently stayed cpu-compat: the exact "looks green, isn't"
+          failure this project got burned by once already (see CLAUDE.md's
+          2026-08-31 entry on `requiredLimits`) and fixed everywhere else
+          with fail-loud checks. Gating on a mismatched probe would have
+          reintroduced it here. The worst case of never gating on it is a
+          click that reloads and gracefully falls back -- already covered,
+          and the movement-backend row right above stays the honest source
+          of truth for what actually ran either way. The button is only
+          disabled when the worker path itself is not in use (see
+          `gpuMovementAvailable`'s own comment) -- that is a fact this app
+          already decided this session, not a hardware guess that can be
+          wrong or still mid-flight.
+        */}
+        <button
+          type="button"
+          className="gpu-movement-toggle"
+          aria-pressed={gpuMovementRequested}
+          disabled={!gpuMovementAvailable}
+          title={
+            gpuMovementAvailable
+              ? undefined
+              : language === "zh"
+                ? "当前强制主线程仿真（?mainsim）,GPU 移动请求不会生效"
+                : "Main-thread simulation is forced (?mainsim) -- a GPU movement request would have no effect"
+          }
+          onClick={onToggleGpuMovement}
+        >
+          {language === "zh" ? "GPU 移动(实验性)" : "GPU movement (experimental)"}:{" "}
+          {gpuMovementRequested
+            ? language === "zh"
+              ? "已请求,点击关闭"
+              : "requested, click to turn off"
+            : language === "zh"
+              ? "CPU 默认,点击请求"
+              : "CPU default, click to request"}
+        </button>
       </section>
     </aside>
   );

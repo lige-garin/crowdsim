@@ -360,6 +360,30 @@
   display: none;
 }
 
+/* ADR-0033 stage 3's own readiness-panel toggle -- see AppInspector.tsx. */
+.gpu-movement-toggle {
+  padding: 7px 10px;
+  border: 1px solid rgba(126, 176, 215, 0.24);
+  border-radius: 7px;
+  background: rgba(5, 15, 25, 0.58);
+  color: var(--lab-ink);
+  font-family: var(--lab-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gpu-movement-toggle[aria-pressed="true"] {
+  border-color: rgba(126, 214, 176, 0.55);
+  color: #7ed6b0;
+}
+
+.gpu-movement-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Each count line's row grows a third cell (the flow chart) below its
    label/value pair, spanning both grid columns rather than wrapping into
    the next row's label column. */

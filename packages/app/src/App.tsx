@@ -26,6 +26,7 @@ import { createLiveCrowd } from "./liveCrowd";
 import { downloadCsv } from "./runAnalytics";
 import { useRunSeries } from "./useRunSeries";
 import { trajectoryCsv } from "./trajectoryRecording";
+import { toggleUrlFlag } from "./urlFlagToggle";
 import type { RunAnalyticsExport } from "./RunAnalyticsPanel";
 import {
   defaultViewportLayers,
@@ -67,6 +68,14 @@ function AppContent() {
   const requestGpuMovement =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("gpumove");
+  // The "explicit, labelled toggle" ADR-0033 stage 3 itself calls for, that
+  // stage originally shipped without (a URL flag alone, no click target
+  // anywhere in the app). A real reload, not a state flip, because the flag
+  // above is deliberately read-once-at-mount -- see its own comment.
+  const onToggleGpuMovement = () => {
+    if (typeof window === "undefined") return;
+    window.location.assign(toggleUrlFlag(window.location.href, "gpumove"));
+  };
   // Both paths run the same CPU social-force model by default. The main-thread
   // path used to hand movement to a separate WebGPU backend (its own GPU
   // device, an O(N²) shader, no notion of browsing or queuing), so `?mainsim`
@@ -496,6 +505,8 @@ function AppContent() {
             dashboardSamples,
             elapsedSeconds: simulation.snapshot.elapsedSeconds,
             evacuation,
+            gpuMovementAvailable: usesWorkerSimulation,
+            gpuMovementRequested: requestGpuMovement,
             journeyDurations,
             minuteFlows,
             onExportRunAnalytics: (kind: RunAnalyticsExport) =>
@@ -503,6 +514,7 @@ function AppContent() {
                 `${scene.id}-${kind}-${Math.floor(simulation.snapshot.elapsedSeconds)}s.csv`,
                 runSeries.exportAnalyticsCsv(kind),
               ),
+            onToggleGpuMovement,
             runSummary,
             heatmapCells,
             scene: scene,

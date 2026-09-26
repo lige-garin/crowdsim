@@ -1,6 +1,6 @@
 import { parseScene } from "@crowdsim/scene-schema";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppInspector } from "./AppInspector";
 import { I18nProvider, translate } from "./i18n";
 import { createRunAnalytics } from "./runAnalytics";
@@ -38,7 +38,18 @@ const signals: SystemSignal[] = [
   { label: movementBackendLabel, value: "webgpu active @ 60Hz" },
 ];
 
-function renderInspector(overrideSignals: readonly SystemSignal[] = signals) {
+function renderInspector(
+  overrideSignals: readonly SystemSignal[] = signals,
+  overrides: {
+    gpuMovementAvailable?: boolean;
+    gpuMovementRequested?: boolean;
+    onToggleGpuMovement?: () => void;
+    // Deliberately still an override, not removed: the "does the toggle
+    // ignore this?" test below needs to set it to a state that would have
+    // disabled the old (removed) gating logic, to prove it no longer does.
+    webGpuSupported?: boolean;
+  } = {},
+) {
   render(
     <I18nProvider>
       <AppInspector
@@ -52,10 +63,13 @@ function renderInspector(overrideSignals: readonly SystemSignal[] = signals) {
           label: "",
           startedAtSeconds: 0,
         }}
+        gpuMovementAvailable={overrides.gpuMovementAvailable ?? true}
+        gpuMovementRequested={overrides.gpuMovementRequested ?? false}
         heatmapCells={[]}
         journeyDurations={() => []}
         minuteFlows={() => []}
         onExportRunAnalytics={() => undefined}
+        onToggleGpuMovement={overrides.onToggleGpuMovement ?? (() => undefined)}
         runSummary={createRunAnalytics().summary()}
         scene={scene}
         signals={overrideSignals}
@@ -72,13 +86,23 @@ function renderInspector(overrideSignals: readonly SystemSignal[] = signals) {
           sceneId: scene.id,
           seed: 1,
         })}
-        webGpuProbe={{
-          input: [],
-          message: "",
-          output: [],
-          status: "unsupported",
-          supported: false,
-        }}
+        webGpuProbe={
+          overrides.webGpuSupported
+            ? {
+                input: [],
+                message: "",
+                output: [],
+                status: "ready",
+                supported: true,
+              }
+            : {
+                input: [],
+                message: "",
+                output: [],
+                status: "unsupported",
+                supported: false,
+              }
+        }
       />
     </I18nProvider>,
   );
@@ -100,5 +124,48 @@ describe("AppInspector", () => {
     renderInspector(reordered);
     const dock = screen.getByRole("region", { name: /工程状态/ });
     expect(within(dock).getAllByText(movementBackendLabel)).toHaveLength(1);
+  });
+
+  // ADR-0033 stage 3 called for "an explicit, labelled toggle ... in the
+  // readiness panel"; these are the decisive checks for that, not just
+  // "the button renders" -- each one would fail if the wiring were removed.
+  it("disables the toggle when the worker simulation path is not in use (?mainsim)", () => {
+    renderInspector(signals, { gpuMovementAvailable: false });
+    expect(screen.getByRole("button", { name: /GPU/ })).toBeDisabled();
+  });
+
+  it("enables the toggle and calls onToggleGpuMovement when clicked, when the worker path is in use", () => {
+    const onToggle = vi.fn();
+    renderInspector(signals, {
+      gpuMovementAvailable: true,
+      onToggleGpuMovement: onToggle,
+    });
+    const button = screen.getByRole("button", { name: /GPU/ });
+
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  // A self-review of this change (2026-09-26) found the toggle originally
+  // gated on `webGpuProbe.supported` instead -- a *different* probe than
+  // the one the worker actually uses to acquire its GPU device (the probe
+  // requests no `requiredLimits`; the worker's real request needs
+  // `maxStorageBuffersPerShaderStage: 16`), which could disable-or-not
+  // disagree with what the worker would really do. Removed rather than
+  // reconciled (see AppInspector.tsx's own comment): this is the decisive
+  // proof that a hostile `webGpuProbe` state (unsupported) no longer
+  // disables the button when the worker path is otherwise available.
+  it("stays enabled regardless of webGpuProbe's state, when the worker path is available", () => {
+    renderInspector(signals, { gpuMovementAvailable: true, webGpuSupported: false });
+    expect(screen.getByRole("button", { name: /GPU/ })).toBeEnabled();
+  });
+
+  it("labels the toggle by its actual requested state, not a fixed caption", () => {
+    renderInspector(signals, { gpuMovementRequested: false });
+    expect(screen.getByRole("button", { name: /CPU 默认/ })).toBeInTheDocument();
+    cleanup();
+    renderInspector(signals, { gpuMovementRequested: true });
+    expect(screen.getByRole("button", { name: /已请求/ })).toBeInTheDocument();
   });
 });
