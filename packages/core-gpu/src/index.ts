@@ -25,6 +25,8 @@ export {
 export { sampleFlowFieldGpu, stepSocialForceGpu } from "./motionGpu";
 export { createGpuSimCore } from "./gpuSimCore";
 export type { AgentSpawn, GpuSimCore, GpuSimCoreOptions } from "./gpuSimCore";
+export { createGpuSlotAllocator } from "./gpuSlotAllocator";
+export type { GpuSlotAllocator } from "./gpuSlotAllocator";
 export {
   stepGpuSimCoreSocialForceCpu,
   stepGpuSimCoreSocialForceNeighborhoodCpu,

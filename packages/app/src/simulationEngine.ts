@@ -455,6 +455,17 @@ export function createSimulationEngine(
     id?: string;
     router: Router;
     walls: WallIndex;
+    /**
+     * The same walls `walls` indexes, kept alongside it: `WallIndex` is a
+     * closure over a spatial bucket map with no way to get the raw segments
+     * back out (`near`/`clearOf` are its only query surface). ADR-0033's GPU
+     * wiring needs a real `WallSegment[]` to hand `createGpuSimCore` — this
+     * is that, not a second source of truth (both are built from the same
+     * `plane.walls` at construction, and never diverge afterward since
+     * neither field is mutated in place, only replaced wholesale on the next
+     * `buildFloors`/`buildFlightFloors` call).
+     */
+    rawWalls: WallSegment[];
     world?: SceneWorldBounds;
   };
   function buildFloors(geometry: {
@@ -470,6 +481,7 @@ export function createSimulationEngine(
       id: plane.id,
       router: createRouter(plane.world, plane.walls),
       walls: createWallIndex(plane.walls),
+      rawWalls: plane.walls,
       world: plane.world,
     }));
   }
@@ -503,6 +515,7 @@ export function createSimulationEngine(
         id,
         router: createRouter(lane.world, []),
         walls: createWallIndex(lane.walls),
+        rawWalls: lane.walls,
         world: lane.world,
       });
 

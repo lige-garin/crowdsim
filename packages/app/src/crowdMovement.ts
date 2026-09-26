@@ -88,6 +88,73 @@ const formationRoomMeters = 1;
 /** States in which a person stands at a spot rather than walking somewhere. */
 const holdingStates = new Set(["browse", "enterStore", "queue"]);
 
+/**
+ * Whether this person stands at a spot rather than walking somewhere this
+ * tick — standing in a checkout line holds a slot like any other line, and
+ * so, in the sense that matters here (nobody is walked toward a target),
+ * does someone incapacitated (ADR-0012): pinned where they went down.
+ *
+ * Extracted (ADR-0033) so the GPU wiring's per-agent upload arrays and this
+ * file's own CPU step derive the exact same boolean from the exact same
+ * rule, rather than one copying the other's logic by hand and risking drift.
+ */
+export function deriveHolding(agent: SimulationAgent): boolean {
+  return (
+    agent.incapacitated === true ||
+    holdingStates.has(agent.lifecycleState ?? "") ||
+    (agent.lifecycleState === "checkout" && agent.queueJoinedSeconds !== undefined)
+  );
+}
+
+/**
+ * This agent's free walking speed this tick, m/s: a stair or escalator has
+ * its own literature speed (floorRouting), not a multiple of the scene's
+ * level walking speed — floorTransfers sets `flightSpeedMetersPerSecond` when
+ * someone boards a flight and clears it when they step off, so it never
+ * leaks into their walk on a real floor. Fire/smoke exposure (ADR-0012,
+ * simulationEngine's applyHazardExposure) then scales whatever that speed
+ * is, on top of everything else.
+ *
+ * Extracted (ADR-0033) for the same reason as `deriveHolding`.
+ */
+export function deriveFreeSpeed(
+  agent: SimulationAgent,
+  meanSpeedMetersPerSecond: number,
+  speedFactor: number,
+): number {
+  return (
+    (agent.flightSpeedMetersPerSecond ?? meanSpeedMetersPerSecond * speedFactor) *
+    (agent.smokeSpeedFactor ?? 1)
+  );
+}
+
+/**
+ * The unit direction this agent walks in this tick: straight at the target
+ * while holding (a hold spot is never routed around obstacles — it is
+ * reached directly or not stood at all), otherwise the router's
+ * obstacle-aware direction, which only equals straight-line when there is
+ * line of sight to the target (`crowdNavigation.ts`).
+ *
+ * Extracted (ADR-0033): this is the same value the GPU kernel's
+ * `routedHeading` binding needs uploaded fresh every tick (a live engine
+ * integration always has a real routed value to supply — see
+ * `GpuSimCore.uploadRoutedHeading`'s own doc comment), computed by the exact
+ * same rule this file's own CPU step already used inline.
+ */
+export function deriveWalkingHeading(
+  agent: SimulationAgent,
+  router: Pick<Router, "direction">,
+  holding: boolean,
+  dx: number,
+  dy: number,
+  distance: number,
+): ScenePoint {
+  if (holding) {
+    return distance > 1e-9 ? { x: dx / distance, y: dy / distance } : { x: 0, y: 0 };
+  }
+  return router.direction(agent, { x: agent.targetX, y: agent.targetY });
+}
+
 export type CrowdStepInput = {
   agents: readonly SimulationAgent[];
   dtSeconds: number;
@@ -148,27 +215,20 @@ export function stepCrowd(input: CrowdStepInput): {
 
     const radius = agent.radius ?? sampleBodyRadius(input.seed, agent.id);
     const speedFactor = agent.speedFactor ?? sampleSpeedFactor(input.seed, agent.id);
-    // A stair or escalator has its own literature speed (floorRouting), not a
-    // multiple of the scene's level walking speed: floorTransfers sets this
-    // when someone boards a flight and clears it when they step off, so it
-    // never leaks into their walk on a real floor. Fire/smoke exposure
-    // (ADR-0012, simulationEngine's applyHazardExposure) then scales
-    // whatever that speed is, on top of everything else.
-    const freeSpeed =
-      (agent.flightSpeedMetersPerSecond ??
-        input.meanSpeedMetersPerSecond * speedFactor) * (agent.smokeSpeedFactor ?? 1);
-    // Standing in a checkout line holds a slot like any other line — and so,
-    // in the sense that matters here (nobody is walked toward a target), does
-    // someone incapacitated (ADR-0012): pinned where they went down.
-    const holding =
-      agent.incapacitated === true ||
-      holdingStates.has(agent.lifecycleState ?? "") ||
-      (agent.lifecycleState === "checkout" && agent.queueJoinedSeconds !== undefined);
-    const heading: ScenePoint = holding
-      ? distance > 1e-9
-        ? { x: dx / distance, y: dy / distance }
-        : { x: 0, y: 0 }
-      : input.router.direction(agent, { x: agent.targetX, y: agent.targetY });
+    const freeSpeed = deriveFreeSpeed(
+      agent,
+      input.meanSpeedMetersPerSecond,
+      speedFactor,
+    );
+    const holding = deriveHolding(agent);
+    const heading = deriveWalkingHeading(
+      agent,
+      input.router,
+      holding,
+      dx,
+      dy,
+      distance,
+    );
 
     let ax = 0;
     let ay = 0;

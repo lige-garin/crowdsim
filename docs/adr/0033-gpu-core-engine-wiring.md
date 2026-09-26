@@ -47,9 +47,36 @@
   Hardware-verified via a single-step isolation check (not the standard
   20-step trajectory — a genuine second-order neighbour-coupling effect
   would otherwise confound a holding agent's position over multiple
-  steps, see the ledger entry for why). Remaining: stage 2 (the rest —
-  index recycling, per-floor pooling, the engine-side `advanceAgentsGpu`
-  function, the router-integration call site) through 4, unstarted.
+  steps, see the ledger entry for why). **Continuing stage 2's remaining
+  scope, closed the same session**: extracted gap #6's three reusable
+  derivation functions (`deriveHolding`/`deriveFreeSpeed`/
+  `deriveWalkingHeading`) from `crowdMovement.ts`'s inline logic into
+  named exports `stepCrowd` now calls itself (a pure refactor, verified
+  behaviour-identical against the full app suite); added the missing
+  `rawWalls: WallSegment[]` field to `FloorRuntime` (`WallIndex` is a pure
+  closure with no way to yield its segments back out); built gap #4's
+  index-recycling allocator (`gpuSlotAllocator.ts`, a single `sync(liveIds)`
+  entry point — no standalone allocate/release in the public surface, since
+  nothing calls them outside a full per-tick sync). **A third real gap
+  surfaced while designing `advanceAgentsGpu`, closed the same session**:
+  `uploadSpawns` was the only public write path for `targetsBuffer`/
+  `speedBuffer`, but it also zeroes velocity — correct for a brand-new
+  agent, wrong for a continuing one whose velocity is GPU-resident and
+  whose target/speed change every tick (retargeting, hazard exposure,
+  connector boarding). Added `uploadTargets`/`uploadSpeeds`, full-rewrite
+  methods mirroring `uploadGroupIds`/`uploadHazardAvoidance`/`uploadHolding`.
+  **Also found and fixed, while verifying the above on real hardware, a
+  genuine regression in the earlier `routedHeading` commit**:
+  `coreApi.webgpu.ts` was the one real-hardware spec that commit forgot to
+  update — it never calls `uploadRoutedHeading`, so since that commit it
+  had silently been testing a crowd that cannot move at all (zero desired
+  velocity, no in-kernel fallback) against an assertion that says the
+  opposite; caught only because this spec self-skips in every sandboxed
+  run and had never actually executed since. Fixed by supplying a
+  straight-line `routedHeading`, confirmed on real hardware (identical
+  centre of mass without it, genuine convergence with it). Remaining:
+  per-floor `GpuSimCore` instance pooling (gap #5) and the
+  `advanceAgentsGpu` function itself, unstarted; stages 3-4 unstarted.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,

@@ -69,6 +69,25 @@ export type GpuSimCore = {
    * grid to compute it from.
    */
   uploadRoutedHeading(routedHeading: Float32Array): void;
+  /**
+   * ADR-0033: a continuing agent's target changes every decision tick (a
+   * decision can retarget someone), and `uploadSpawns` cannot be reused to
+   * push that update — it also resets position and velocity to the spawn
+   * values, which is correct for a brand-new agent and wrong for one whose
+   * velocity is GPU-resident from the previous `step()`. Full rewrite from
+   * offset 0 each call (not run-coalesced like `uploadSpawns`), same
+   * reasoning as `uploadGroupIds`/`uploadHazardAvoidance`/`uploadHolding`:
+   * a target changes for most live agents most ticks, so a full rewrite is
+   * both simpler and no more expensive than diffing.
+   */
+  uploadTargets(targets: Float32Array): void;
+  /**
+   * ADR-0033: a continuing agent's free speed changes tick to tick (fire/
+   * smoke exposure scales it, boarding or leaving a connector swaps it for
+   * a flight speed) — same gap and same fix as `uploadTargets` above, for
+   * the same reason `uploadSpawns` cannot be reused mid-life.
+   */
+  uploadSpeeds(speed: Float32Array): void;
   setCount(count: number): void;
   step(dt: number): void;
   positionsBuffer(): GPUBuffer;
@@ -407,6 +426,12 @@ export function createGpuSimCore(
     },
     uploadRoutedHeading(routedHeading: Float32Array) {
       device.queue.writeBuffer(routedHeadingBuffer, 0, routedHeading);
+    },
+    uploadTargets(targets: Float32Array) {
+      device.queue.writeBuffer(targetsBuffer, 0, targets);
+    },
+    uploadSpeeds(speed: Float32Array) {
+      device.queue.writeBuffer(speedBuffer, 0, speed);
     },
     step(nextDt: number) {
       if (count === 0) {
