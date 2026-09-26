@@ -496,9 +496,24 @@ export function stepGpuSimCoreSocialForceCpu(
       anticipationX += anticipate.x;
       anticipationY += anticipate.y;
     }
-    const anticipation = clampAnticipation(anticipationX, anticipationY, params);
-    ax += anticipation.x;
-    ay += anticipation.y;
+    // ADR-0033: crowdMovement.ts gates BOTH anticipation and hazard
+    // avoidance behind `!holding` (`if (anticipating && !holding)`,
+    // `if (agent.hazardAvoidance && !holding)`) — a real discrepancy this
+    // file and the WGSL kernel both had since stages 4/5, disclosed at the
+    // time as an accepted gap tied to holding not yet existing as a
+    // concept (stage 6 introduced it, but never revisited this). A holding
+    // agent (browsing, queueing, checking out — the common case) should
+    // not swerve to anticipate a collision or flee a hazard; the pair loop
+    // above still runs unconditionally (repulsion/sidestep apply to
+    // holding agents on the CPU too — only anticipation and hazard are
+    // gated), so this only discards the summed result, matching
+    // crowdMovement.ts's own choice to skip the computation entirely
+    // (observably identical — nothing else reads `anticipationX`/`Y`).
+    if (!isHolding) {
+      const anticipation = clampAnticipation(anticipationX, anticipationY, params);
+      ax += anticipation.x;
+      ay += anticipation.y;
+    }
 
     const wall = wallForce(px, py, walls, params);
     ax += wall.x;
@@ -524,7 +539,7 @@ export function stepGpuSimCoreSocialForceCpu(
     // `formationSlots` already is: a higher-level system's per-agent
     // output, not a neighbour-summed force, so there is no loop here at
     // all, just an add.
-    if (hazardAvoidance) {
+    if (hazardAvoidance && !isHolding) {
       ax += hazardAvoidance[index * 2];
       ay += hazardAvoidance[index * 2 + 1];
     }
@@ -694,9 +709,24 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
         }
       }
     }
-    const anticipation = clampAnticipation(anticipationX, anticipationY, params);
-    ax += anticipation.x;
-    ay += anticipation.y;
+    // ADR-0033: crowdMovement.ts gates BOTH anticipation and hazard
+    // avoidance behind `!holding` (`if (anticipating && !holding)`,
+    // `if (agent.hazardAvoidance && !holding)`) — a real discrepancy this
+    // file and the WGSL kernel both had since stages 4/5, disclosed at the
+    // time as an accepted gap tied to holding not yet existing as a
+    // concept (stage 6 introduced it, but never revisited this). A holding
+    // agent (browsing, queueing, checking out — the common case) should
+    // not swerve to anticipate a collision or flee a hazard; the pair loop
+    // above still runs unconditionally (repulsion/sidestep apply to
+    // holding agents on the CPU too — only anticipation and hazard are
+    // gated), so this only discards the summed result, matching
+    // crowdMovement.ts's own choice to skip the computation entirely
+    // (observably identical — nothing else reads `anticipationX`/`Y`).
+    if (!isHolding) {
+      const anticipation = clampAnticipation(anticipationX, anticipationY, params);
+      ax += anticipation.x;
+      ay += anticipation.y;
+    }
 
     const wall = wallForce(px, py, walls, params);
     ax += wall.x;
@@ -714,7 +744,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
     ax += formation.x;
     ay += formation.y;
 
-    if (hazardAvoidance) {
+    if (hazardAvoidance && !isHolding) {
       ax += hazardAvoidance[index * 2];
       ay += hazardAvoidance[index * 2 + 1];
     }

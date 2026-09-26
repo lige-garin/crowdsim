@@ -601,6 +601,58 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     expect(withAnticipation.velocities[0]).toBeLessThan(without.velocities[0]);
   });
 
+  it("gates anticipation off for a holding agent — crowdMovement.ts's own `if (anticipating && !holding)`, even on a head-on collision course that would otherwise trigger a strong push", () => {
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentVelocity(agents, 0, 1.34, 0);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 1.5, 0);
+    setAgentVelocity(agents, 1, -1.34, 0);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([10, 0, -10, 0]);
+    const holding = new Uint32Array([1, 0]); // only agent 0 holds
+
+    const withAnticipation = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+    const anticipationOff = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      { ...params, anticipationStrength: 0 },
+      undefined,
+      undefined,
+      undefined,
+      holding,
+    );
+
+    // If holding truly gates agent 0's anticipation off, turning
+    // anticipationStrength off globally makes no observable difference to
+    // it — agent 0 was already getting zero contribution either way.
+    expect(withAnticipation.velocities[0]).toBeCloseTo(
+      anticipationOff.velocities[0],
+      9,
+    );
+    expect(withAnticipation.velocities[1]).toBeCloseTo(
+      anticipationOff.velocities[1],
+      9,
+    );
+    // Not vacuous: agent 1 (not holding) must show the opposite — a real
+    // difference — proving anticipationStrength:0 genuinely disables the
+    // force globally rather than this test comparing two runs that were
+    // already identical for an unrelated reason.
+    expect(
+      Math.abs(withAnticipation.velocities[2] - anticipationOff.velocities[2]),
+    ).toBeGreaterThan(1e-6);
+  });
+
   it("does nothing between two agents moving apart (not on a collision course)", () => {
     const agents = createAgentSoA(2);
     setAgentPosition(agents, 0, 0, 0);
@@ -640,32 +692,27 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     setAgentPosition(agents, 1, 3, 0);
     setAgentVelocity(agents, 1, -3, -0.01);
     setAgentRadius(agents, 1, 0.22);
-    const targets = new Float32Array([0, 0, 3, 0]); // target = own position: zero desired-velocity pull
-    // Both agents start at real speed with target = own position (distance
-    // 0) — holding exempts them from the stage 7/8 clamps, which would
-    // otherwise zero this out entirely at zero distance (speed * dt always
-    // exceeds a distance of 0).
-    const holding = new Uint32Array([1, 1]);
+    // Targets are far away (not "own position") for two reasons that used
+    // to be one: (1) a huge distance keeps the stage 8 overshoot clamp from
+    // firing (it triggers whenever speed * dt > distance, trivially true at
+    // distance 0) without needing `holding` — and NOT `holding`, deliberately,
+    // because crowdMovement.ts gates anticipation itself off for a holding
+    // agent (`if (anticipating && !holding)`), which is exactly the force
+    // under test here; (2) combined with relaxationTime below, keeps
+    // desiredSpeed negligible so relaxation doesn't contaminate the isolated
+    // anticipation force this test is measuring.
+    const targets = new Float32Array([1000, 0, -1000, 0]);
 
-    const result = stepGpuSimCoreSocialForceCpu(
-      agents,
-      targets,
-      [],
-      {
-        ...params,
-        anticipationRangeMeters: 5,
-        relaxationTime: 1e9, // makes relaxation's own contribution (both the
-        // exponential decay factor and desiredSpeed's distance/relaxationTime
-        // term) negligible
-        maxSpeedRatio: 1000, // stage 6's real clamp is freeSpeed * maxSpeedRatio,
-        // not the (now-unused-by-this-integration) inherited `maxSpeed` field
-        // — this keeps that clamp from masking the one under test here.
-      },
-      undefined,
-      undefined,
-      undefined,
-      holding,
-    );
+    const result = stepGpuSimCoreSocialForceCpu(agents, targets, [], {
+      ...params,
+      anticipationRangeMeters: 5,
+      relaxationTime: 1e9, // makes relaxation's own contribution (both the
+      // exponential decay factor and desiredSpeed's distance/relaxationTime
+      // term) negligible
+      maxSpeedRatio: 1000, // stage 6's real clamp is freeSpeed * maxSpeedRatio,
+      // not the (now-unused-by-this-integration) inherited `maxSpeed` field
+      // — this keeps that clamp from masking the one under test here.
+    });
 
     // result.velocities ≈ initial velocity + force * dt (relax ≈ 1 with
     // relaxationTime this large, and the maxSpeedRatio clamp is a no-op),
@@ -753,12 +800,65 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
     const agents = createAgentSoA(1);
     setAgentPosition(agents, 0, 0, 0);
     setAgentRadius(agents, 0, 0.22);
-    const targets = new Float32Array([0, 0]); // target = own position: zero relaxation pull
+    // Target is at a real, nonzero distance (not "own position") and in the
+    // SAME direction as the hazard push below, for two reasons:
+    // crowdMovement.ts gates hazard avoidance off entirely for a holding
+    // agent (`if (agent.hazardAvoidance && !holding)`) — exactly the force
+    // under test here, so this agent must stay non-holding, which means
+    // distance must be nonzero (at distance 0 the stage 8 overshoot clamp
+    // fires unconditionally for a non-holding agent, zeroing both runs
+    // identically); and keeping hazard and target aligned means the stage 7
+    // backward clamp never engages in either run. The isolation no longer
+    // relies on "no relaxation pull at all" (only true at distance 0) —
+    // the WITH/WITHOUT delta below cancels out whatever relaxation
+    // contribution the (now nonzero) target produces, since it is identical
+    // in both runs.
+    const targets = new Float32Array([10, 0]);
     const hazardAvoidance = new Float32Array([3, 0]);
-    // Holding exempts this isolation fixture from the stage 7/8 clamps,
-    // which would otherwise zero out the push-only velocity entirely at
-    // zero distance for a non-holding agent.
-    const holding = new Uint32Array([1]);
+
+    const withHazard = stepGpuSimCoreSocialForceCpu(
+      agents,
+      targets,
+      [],
+      params,
+      undefined,
+      undefined,
+      hazardAvoidance,
+    );
+    const without = stepGpuSimCoreSocialForceCpu(agents, targets, [], params);
+
+    // The push is Euler-added to velocity, then stage 6's exact exponential
+    // relaxation decays the whole thing (not just the "desired heading"
+    // term) toward the shared relaxation target — so the ONLY difference
+    // between the two runs is that decayed push: (hazard * dt) * relax,
+    // exactly, since both runs share the same initial velocity and the same
+    // relaxation target.
+    const relax = Math.exp(-params.dt / params.relaxationTime);
+    const expectedDelta = 3 * params.dt * relax;
+    expect(withHazard.velocities[0] - without.velocities[0]).toBeCloseTo(
+      expectedDelta,
+      5,
+    );
+    // Not vacuous: the two runs must actually differ.
+    expect(withHazard.velocities[0]).toBeGreaterThan(without.velocities[0]);
+  });
+
+  it("gates hazard avoidance off for a holding agent — crowdMovement.ts's own `if (agent.hazardAvoidance && !holding)`", () => {
+    // Two agents, far enough apart (100m) that repulsion/anticipation never
+    // engage — agent 0 holds, agent 1 doesn't. Both get the identical
+    // hazard vector, so this test can tell "the gate zeroed it for the
+    // holding agent" apart from "hazard avoidance is broken for everyone"
+    // (the earlier version of this test could not: it only had a holding
+    // agent, so it stayed vacuously green even with hazard entirely
+    // disabled — caught by a decisive revert-verify pass).
+    const agents = createAgentSoA(2);
+    setAgentPosition(agents, 0, 0, 0);
+    setAgentRadius(agents, 0, 0.22);
+    setAgentPosition(agents, 1, 100, 0);
+    setAgentRadius(agents, 1, 0.22);
+    const targets = new Float32Array([10, 0, 110, 0]);
+    const hazardAvoidance = new Float32Array([3, 0, 3, 0]);
+    const holding = new Uint32Array([1, 0]);
 
     const withHazard = stepGpuSimCoreSocialForceCpu(
       agents,
@@ -770,7 +870,7 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
       hazardAvoidance,
       holding,
     );
-    const without = stepGpuSimCoreSocialForceCpu(
+    const withoutHazard = stepGpuSimCoreSocialForceCpu(
       agents,
       targets,
       [],
@@ -781,17 +881,14 @@ describe("stage 5: hazard avoidance (ADR-0012's precomputed per-agent push, adde
       holding,
     );
 
-    // Alone, no walls, target = own position (desiredSpeed and the target
-    // velocity both zero): the push is Euler-added to velocity, then stage
-    // 6's exact exponential relaxation decays that toward the (zero) target
-    // velocity within the same step — not the old naive `3 * dt`, since
-    // relaxation now applies to everything, not just the "desired heading"
-    // term.
-    const relax = Math.exp(-params.dt / params.relaxationTime);
-    const expectedVx = 3 * params.dt * relax;
-    expect(withHazard.velocities[0]).toBeGreaterThan(0);
-    expect(withHazard.velocities[0]).toBeCloseTo(expectedVx, 5);
-    expect(without.velocities[0]).toBeCloseTo(0, 9);
+    // Holding agent 0: gated off entirely — supplying the push or not makes
+    // zero observable difference while holding.
+    expect(withHazard.velocities[0]).toBeCloseTo(withoutHazard.velocities[0], 9);
+    expect(withHazard.velocities[1]).toBeCloseTo(withoutHazard.velocities[1], 9);
+    // Not vacuous: non-holding agent 1, given the identical hazard vector,
+    // must show a real difference — proving hazard avoidance itself still
+    // works and only the holding gate suppresses it, not the whole mechanism.
+    expect(withHazard.velocities[2]).toBeGreaterThan(withoutHazard.velocities[2]);
   });
 
   it("leaves the result unchanged when hazard avoidance is not supplied at all (backward compatible)", () => {

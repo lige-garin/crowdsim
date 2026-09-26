@@ -873,4 +873,165 @@ describe("fused move parity (real WebGPU)", () => {
       device!.destroy();
     },
   );
+
+  gpuTest(
+    "fused GPU move (ADR-0033: anticipation and hazard avoidance gated off for a holding agent) matches stepGpuSimCoreSocialForceCpu within 1e-3 over 20 steps",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
+      });
+      expect(device).toBeDefined();
+
+      // Head-on collision pairs (triggers anticipation) each also given a
+      // nonzero hazard-avoidance vector, with every third agent held —
+      // crowdMovement.ts skips BOTH anticipation and hazard avoidance
+      // entirely for a holding agent, a real gap this kernel had since
+      // stages 4/5 that went unnoticed until scoping ADR-0033's engine
+      // wiring (holding didn't exist as a concept until stage 6, and
+      // nobody revisited anticipation/hazard once it did).
+      const N = 12;
+      const agents = createAgentSoA(N);
+      const targets = new Float32Array(N * 2);
+      const hazardAvoidance = new Float32Array(N * 2);
+      const holding = new Uint32Array(N);
+      for (let pair = 0; pair < N / 2; pair++) {
+        const y = 5 + pair * 3;
+        const a = pair * 2;
+        const b = pair * 2 + 1;
+        setAgentPosition(agents, a, 10, y);
+        setAgentVelocity(agents, a, 1.34, 0);
+        setAgentRadius(agents, a, 0.22);
+        setAgentPosition(agents, b, 11.5, y);
+        setAgentVelocity(agents, b, -1.34, 0);
+        setAgentRadius(agents, b, 0.22);
+        targets[a * 2] = 40;
+        targets[a * 2 + 1] = y;
+        targets[b * 2] = -20;
+        targets[b * 2 + 1] = y;
+        hazardAvoidance[a * 2 + 1] = 0.5;
+        hazardAvoidance[b * 2 + 1] = -0.5;
+        holding[a] = a % 3 === 0 ? 1 : 0;
+        holding[b] = b % 3 === 0 ? 1 : 0;
+      }
+      const walls: WallSegment[] = [];
+      const params: GpuSimCoreSocialForceParams = {
+        dt: 1 / 60,
+        desiredSpeed: 1.34,
+        relaxationTime: 0.644,
+        agentRepulsionStrength: 1.966,
+        agentRepulsionRange: 0.307,
+        wallRepulsionStrength: 3,
+        wallRepulsionRange: 0.2,
+        maxSpeed: 1.7,
+        anisotropy: 0.287,
+        contactStiffness: 1500,
+        interactionRangeMeters: 2,
+        sidestep: 0.6,
+        sidestepCone: 0.7,
+        anticipationStrength: 1.5,
+        anticipationHorizonSeconds: 3,
+        anticipationRangeMeters: 2,
+        anticipationMaxAcceleration: 5,
+        holdEaseMeters: 1,
+        maxSpeedRatio: 1.3,
+      };
+      const layout = createSpatialHashGridLayout({
+        width: 96,
+        height: 32,
+        cellSize: 2,
+      });
+
+      let cpuAgents = agents;
+      for (let s = 0; s < 20; s++) {
+        const result = stepGpuSimCoreSocialForceCpu(
+          cpuAgents,
+          targets,
+          walls,
+          params,
+          undefined,
+          undefined,
+          hazardAvoidance,
+          holding,
+        );
+        cpuAgents = {
+          ...cpuAgents,
+          positions: result.positions,
+          velocities: result.velocities,
+        };
+      }
+
+      const gpu = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        20,
+        undefined,
+        undefined,
+        hazardAvoidance,
+        holding,
+      );
+
+      for (let i = 0; i < N * 2; i++) {
+        expect(Math.abs(gpu.positions[i] - cpuAgents.positions[i])).toBeLessThan(1e-3);
+      }
+      // Decisive: a SEPARATE single-step comparison (not the 20-step
+      // trajectory above) against anticipationStrength:0 and no hazard
+      // vector at all, from the same initial configuration. Single-step is
+      // deliberate: over the full 20-step run, a holding agent's position
+      // still drifts a little between these two param sets, NOT because the
+      // gate leaked, but because its non-holding NEIGHBOUR receives a real
+      // anticipation/hazard push in one run and not the other, ends up
+      // somewhere else, and repulsion/sidestep (never gated by holding —
+      // only anticipation/hazard are) then differs by proxy through that
+      // neighbour's shifted position — a genuine second-order coupling
+      // effect, not the gate failing. At exactly one step, a holding
+      // agent's own resulting position depends only on the shared, still
+      // -identical initial configuration, so this confound cannot occur:
+      // if the gate holds, a holding agent's one-step position must be
+      // (near-)identical between the two parameter sets; a non-holding
+      // agent's must not be.
+      const gpuOneStep = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        params,
+        layout,
+        1,
+        undefined,
+        undefined,
+        hazardAvoidance,
+        holding,
+      );
+      const bareOneStep = await stepForParity(
+        device!,
+        agents,
+        targets,
+        walls,
+        { ...params, anticipationStrength: 0 },
+        layout,
+        1,
+        undefined,
+        undefined,
+        undefined,
+        holding,
+      );
+      for (let i = 0; i < N; i++) {
+        const dx = gpuOneStep.positions[i * 2] - bareOneStep.positions[i * 2];
+        const dy = gpuOneStep.positions[i * 2 + 1] - bareOneStep.positions[i * 2 + 1];
+        const diff = Math.hypot(dx, dy);
+        if (holding[i] === 1) {
+          expect(diff).toBeLessThan(1e-4);
+        } else {
+          expect(diff).toBeGreaterThan(1e-3);
+        }
+      }
+
+      device!.destroy();
+    },
+  );
 });

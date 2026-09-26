@@ -363,8 +363,18 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
     antX = antX * antScale;
     antY = antY * antScale;
   }
-  force.x = force.x + antX;
-  force.y = force.y + antY;
+  // ADR-0033: crowdMovement.ts skips anticipation entirely for a holding
+  // agent (anticipating AND not holding is its own condition for the whole
+  // computation) — a real discrepancy this kernel had since stage 4,
+  // disclosed at the time as an accepted gap tied to holding not yet
+  // existing as a concept (stage 6 introduced it but never revisited this).
+  // The loop above still runs (recompute-then-discard, not skip — cheaper
+  // than branching a whole neighbourhood loop per invocation, and
+  // observably identical since nothing else reads antX/Y).
+  if (!isHolding) {
+    force.x = force.x + antX;
+    force.y = force.y + antY;
+  }
 
   // wall repulsion, and wallClose (formation force's other gate: the crowd
   // falls into single file near a wall instead of holding a side-by-side
@@ -390,7 +400,11 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
     force = force + formationGain * (formationSlots[i] - p);
   }
 
-  force = force + hazardAvoidance[i];
+  // ADR-0033: crowdMovement.ts also skips hazard avoidance entirely for a
+  // holding agent — same reasoning as anticipation above.
+  if (!isHolding) {
+    force = force + hazardAvoidance[i];
+  }
 
   // Stage 6: pushes Euler-integrated into velocity first, then relaxation
   // toward (desired * desiredSpeed) solved exactly as a linear ODE over dt

@@ -26,7 +26,28 @@
   a decisive check that agents genuinely walk the routed direction, not
   the target direction. This is additive to ADR-0015's already-complete 8
   stages, not a revision of them (the force math per se is unchanged, only
-  where its direction input comes from). Remaining: stages 2 (the rest —
+  where its direction input comes from). **A second real gap surfaced while
+  continuing to scope stage 2, closed the same session**: the kernel (both
+  the CPU-oracle TS functions and the WGSL kernel) applied anticipation and
+  hazard avoidance unconditionally, while `crowdMovement.ts` gates BOTH
+  behind `!holding` (`if (anticipating && !holding)`,
+  `if (agent.hazardAvoidance && !holding)`) — a holding agent (browsing,
+  queueing, checking out — the common case) should not swerve to anticipate
+  a collision or flee a hazard. This discrepancy dates to ADR-0015 stages
+  4/5, disclosed at the time as an accepted gap tied to holding not yet
+  existing as a concept, but never revisited once stage 6 introduced
+  holding as a first-class concept. Fixed in all three synchronized
+  locations (`gpuSimCoreSocialForce.ts`'s two CPU-oracle functions,
+  `gpuSimCoreShaders.ts`'s WGSL kernel) by wrapping both force-adds in
+  `if (!isHolding)`. Two existing isolation tests needed redesigning (the
+  established "target = own position + holding = true" isolation trick
+  now conflicts with a gate that also keys off holding), and a
+  decisive revert-verify pass caught one of the two new tests as
+  initially vacuous (see `docs/CLAIMS_LEDGER.md` for the full account).
+  Hardware-verified via a single-step isolation check (not the standard
+  20-step trajectory — a genuine second-order neighbour-coupling effect
+  would otherwise confound a holding agent's position over multiple
+  steps, see the ledger entry for why). Remaining: stage 2 (the rest —
   index recycling, per-floor pooling, the engine-side `advanceAgentsGpu`
   function, the router-integration call site) through 4, unstarted.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
