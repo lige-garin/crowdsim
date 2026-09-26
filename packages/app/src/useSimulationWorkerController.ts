@@ -14,6 +14,7 @@ import {
   readSimulationSharedAgents,
   readSimulationSharedMemory,
   type SimulationWorkerClient,
+  type SimulationWorkerMovementBackendStatus,
   type SimulationWorkerSharedMemory,
 } from "./simulationWorkerClient";
 import type { SimulationSnapshot } from "./simulationEngine";
@@ -32,11 +33,20 @@ export type SimulationWorkerControllerState = {
 
 export type SimulationWorkerController = SimulationController & {
   worker: SimulationWorkerControllerState;
+  /**
+   * ADR-0033 stage 3: which movement backend actually ended up running, and
+   * why. `undefined` until the worker's first push arrives (right after
+   * `init` resolves). This is real runtime state, not a hardcoded label —
+   * the whole point of stage 3's "real switch".
+   */
+  movementBackend?: SimulationWorkerMovementBackendStatus;
 };
 
 export function useSimulationWorkerController(
   scene: CrowdSimScene,
+  options: { requestGpuMovement?: boolean } = {},
 ): SimulationWorkerController {
+  const requestGpuMovement = options.requestGpuMovement ?? false;
   const sharedMemory = useMemo(() => createSimulationSharedMemory(), []);
   const { reinit, runScene } = useRunScene(scene);
   // The newest scene, and the one the engine is actually running. Written by
@@ -60,6 +70,9 @@ export function useSimulationWorkerController(
     sharedMemory: Boolean(sharedMemory),
     status: "checking",
   });
+  const [movementBackend, setMovementBackend] = useState<
+    SimulationWorkerMovementBackendStatus | undefined
+  >(undefined);
   const publish = useCallback((nextSnapshot: SimulationSnapshot) => {
     setSnapshot(nextSnapshot);
     setWorker((current) => ({
@@ -116,13 +129,28 @@ export function useSimulationWorkerController(
     // setup always has a live worker.
     const currentClient = createSimulationWorkerClient();
     clientRef.current = currentClient;
+    // ADR-0033 stage 3: attached before init, so the very first push (right
+    // after init resolves either way) is never missed. `requestGpuMovement`
+    // is a stable, caller-decided flag (an explicit URL opt-in, not a
+    // reactive probe) — see this hook's own doc comment and
+    // `simulationThread.ts`'s "empty city" lesson for why that distinction
+    // matters here.
+    currentClient.onMovementBackendStatus = (status) => {
+      if (cancelled) {
+        return;
+      }
+      setMovementBackend(status);
+    };
 
     currentClient
       .init(initScene, {
         // Use the engine's default mall-crowd decision backend (enter -> shop ->
         // browse -> leave) instead of the generic wasm DES, so the crowd has a
         // reason to move.
-        runtime: { wasmDecisionBackend: false },
+        runtime: {
+          movementBackend: requestGpuMovement ? "webgpu" : "cpu-compat",
+          wasmDecisionBackend: false,
+        },
         sharedMemory: sharedMemoryRef.current,
       })
       .then((nextSnapshot) => {
@@ -163,7 +191,7 @@ export function useSimulationWorkerController(
 
       currentClient.dispose();
     };
-  }, [runScene]);
+  }, [requestGpuMovement, runScene]);
 
   // Hot scene update (ADR-0007). Declared after the init effect: on a re-init
   // that effect has already recorded the new scene, so this one does nothing.
@@ -292,6 +320,7 @@ export function useSimulationWorkerController(
   );
 
   return {
+    movementBackend,
     pause,
     reset,
     setEvacuation,

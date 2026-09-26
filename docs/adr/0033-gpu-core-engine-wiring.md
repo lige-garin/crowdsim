@@ -1,6 +1,6 @@
 # ADR 0033: Wiring the GPU step kernel into the live simulation engine
 
-- Status: **Stages 1-2 complete and hardware-verified** (2026-09-25). Stage 1: fixed
+- Status: **Stages 1-3 complete and hardware-verified** (2026-09-25/26). Stage 1: fixed
   `GpuSimCore`'s broken bind group (11 of 15 bindings wired, stale 68-byte
   `moveParamsBuffer`) and added the missing `uploadGroupIds`/
   `uploadFormationSlots`/`uploadHazardAvoidance`/`uploadHolding`/persistent
@@ -135,15 +135,53 @@
   pipeline defect — corrected once the real hardware numbers made the
   arithmetic error obvious. Self-applied ponytail-review caught the test
   file itself hand-rolling a second, simplified copy of the already-tested
-  `GpuSlotAllocator` instead of importing the real one — replaced. Not
-  wired into `advanceAgentsCpu()`'s live per-tick loop or
-  `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection —
-  that real runtime switch, plus worker-side device lifecycle, is stage 3,
-  entirely unstarted, as is stage 4 (full-pipeline measurement).
+  `GpuSlotAllocator` instead of importing the real one — replaced. **Stage 3 — worker device lifecycle + real runtime switch — is now
+  complete**, done strictly additively so the ~35 existing files calling
+  `engine.step()`/`.tick()` synchronously in tight physics loops (RiMEA
+  scenarios, benchmarks) are completely unaffected: `SimulationEngine`
+  gained `stepAsync`/`tickAsync` (identical to the sync methods when
+  `movementBackend==="cpu-compat"`, the only entry point that can serve
+  `"webgpu"` since a GPU readback is inherently asynchronous) and
+  `setMovementBackend(backend, pool?)`, while the sync `step()`/`tick()`
+  fail loud (ADR-0006: no silent downgrade) if called while
+  `movementBackend==="webgpu"` — a caller in that mode has no way to know
+  its GPU request was silently ignored otherwise. The worker
+  (`simulation.worker.ts`) now genuinely acquires a GPU device once, at
+  `init`, only when the client explicitly requests it
+  (`runtime.movementBackend==="webgpu"`) — never reactively, per the
+  project's own "empty city" lesson (`simulationThread.ts`) about never
+  switching a _running_ simulation's path on an async signal — falls back
+  to `"cpu-compat"` transparently on any failure (no `navigator.gpu`, no
+  adapter, a rejected `requestDevice`), and listens for `device.lost` to
+  fall back live mid-run rather than silently keep claiming a backend that
+  is no longer real. The worker pushes an unsolicited
+  `movement-backend-status` message (no request id — the client and
+  `useSimulationWorkerController` both had to learn to route it outside
+  the existing id-keyed request/response map) so the real, current backend
+  is always known, not assumed. `App.tsx` gates the request behind a
+  stable, mount-time-only `?gpumove` URL flag (same pattern as the
+  existing `?mainsim` flag, for the same reason). **A real, disclosed gap
+  found and fixed the same day**: the readiness panel's collapsed
+  "engineering signals" dock (`AppInspector.tsx`) hardcoded
+  `signals.slice(0, 4)`, and the movement-backend row sits around position
+  9 in the full signal list — so the real runtime state this stage exists
+  to surface was computed correctly but never visible in the UI. Fixed by
+  always appending the movement-backend row to the docked list when it
+  is not already among the first four, verified with a new
+  `AppInspector.test.tsx` (2 tests, one for the append, one proving no
+  duplicate row when it already lands in the first four — a decisive
+  revert-verify confirmed each test depends on a distinct, non-overlapping
+  behaviour) and confirmed on real hardware in both modes: default path
+  shows "移动后端 / cpu-compat active @ 60Hz", `?gpumove` shows "移动后端 /
+  webgpu active @ 60Hz" with the crowd genuinely growing (spawned/present
+  counts climbing, the "实测" panel's live chart rising) and zero console
+  errors — not a silently-idle "empty city". Stage 4 (full-pipeline
+  measurement) is entirely unstarted.
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
-  `useSimulationWorkerController.ts`
+  `useSimulationWorkerController.ts`, `simulationRuntimeArtifact.ts`,
+  `appSignals.ts`, `AppInspector.tsx`
 - Related: ADR-0015 (staged behaviour port to the WGSL kernel — now complete,
   all 8 stages), ADR-0002 (100k GPU rewrite, accepted tolerance-based
   determinism trade-off), ADR-0006 (WebGPU compute / labelled WebGL-CPU

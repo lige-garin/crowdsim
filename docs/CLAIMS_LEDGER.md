@@ -2999,3 +2999,47 @@ The test file's fake `GpuSimCore` (necessarily hand-written, since no such doubl
 ### ADR-0033 stage 2 is now complete
 
 Every piece stage 2's own text called for — the index-recycling allocator (gap #4, corrected), per-floor `GpuSimCore` pooling (gap #5), the two reusable derivation-function extractions and `rawWalls` field (gap #6 and its prerequisite), and `advanceAgentsGpu` itself — is built and verified, both by fake-core orchestration tests and by a real-hardware comparison against the CPU backend. **Not wired into `advanceAgentsCpu()`'s live per-tick loop, or `movementBackend.ts`/`App.tsx`'s hardcoded `"cpu-compat"` selection.** That real runtime switch — plus worker-side GPU device acquisition and lost-device fallback — is stage 3, entirely unstarted. Stage 4 (full-pipeline measurement, the first point at which any end-to-end "N agents at 60fps" claim becomes honest) remains entirely unstarted too.
+
+## 2026-09-26 (fifty-eighth entry): ADR-0033 stage 3 complete — worker device lifecycle, the real runtime switch, and a UI gap the verification process caught on its own
+
+With stage 2 complete (fifty-seventh entry), stage 3 answers the question stage 2 deliberately left open: who decides which backend actually runs, when is that decision made, and what happens if GPU acquisition fails. Done strictly additively — no existing synchronous `SimulationEngine.step()`/`.tick()` caller (roughly 35 files, many in tight physics loops: RiMEA scenarios, benchmarks) needed to change.
+
+### The engine layer: additive async methods, not a global rewrite
+
+`SimulationEngine` gained `stepAsync(steps?)` and `tickAsync(realDeltaSeconds)`, identical to the existing sync `step`/`tick` when `movementBackend === "cpu-compat"` (verified with two tests asserting bit-for-bit identical snapshots), and the only entry points that can serve `"webgpu"` mode at all — a GPU readback is inherently asynchronous, so no synchronous API can ever honestly serve it. The sync `step()`/`tick()` now **fail loud** the moment `movementBackend === "webgpu"` (ADR-0006: no silent downgrade) rather than silently running on CPU — a caller in GPU mode has no way to detect that its request was quietly ignored otherwise. `setMovementBackend(backend, pool?)` lets a running engine switch live (used by the worker's lost-device fallback, below).
+
+Two decisive revert-verify passes confirmed both fail-loud checks are real: temporarily disabling the "no plane pool configured" check surfaced the _next_ line's "plane.world is required" check instead (not a false pass — both guards are genuinely present, layered), and temporarily disabling the "webgpu requires async API" check reproduced the corresponding test's failure while leaving every other test green.
+
+### The worker layer: real device acquisition, once, only on request, never reactively
+
+`simulation.worker.ts`'s new `acquireGpuMovement` calls `navigator.gpu.requestAdapter()`/`adapter.requestDevice()` exactly once, only during `init`, and only when the client's `runtime.movementBackend === "webgpu"` — never in response to any later, asynchronous signal. This is a direct application of a lesson this project already paid for once (`simulationThread.ts`'s own "empty city bug" write-up): switching a _running_ simulation's path reactively on an async result is the failure mode to avoid, not a convenience to add. Any failure along the way (no `navigator.gpu`, no adapter, a rejected `requestDevice`) returns `undefined` rather than throwing, so `init` always succeeds with a transparent fallback to `cpu-compat`. A `device.lost` listener (deliberately fire-and-forget — there is no request this belongs to, and nothing to do if it never fires) calls `engine.setMovementBackend("cpu-compat")` and pushes a real status update the moment the device is actually lost, rather than continuing to silently claim a backend that no longer exists.
+
+The worker's `tick` handler now calls `engine.tickAsync(...)` unconditionally — safe in `cpu-compat` mode (identical result to the old `tick()`) and the only path that can serve `webgpu` mode.
+
+### Surfacing the real state: a new unsolicited message type
+
+Every prior worker↔client message was a request/response pair matched by id. `movement-backend-status` is the first push with no corresponding request — sent once right after `init` resolves either way, and again if `device.lost` fires later. `simulationWorkerClient.ts`'s `onmessage` handler and `useSimulationWorkerController.ts`'s state both had to learn to route this message type outside the existing id-keyed pending map, attaching the subscription before `init` is even called so the very first push is never missed.
+
+`App.tsx` gates the GPU request behind `requestGpuMovement`, a stable, mount-time-only `?gpumove` URL flag — the same pattern, for the same reason, as the existing `?mainsim` flag: a decision made once at mount, never reactively re-evaluated.
+
+### Type system: keeping two genuinely different "movementBackend" concepts apart
+
+`MovementBackendId` (`"cpu-compat" | "webgpu-ready"`) describes an entirely separate, older concept: the standalone linear-model consistency probe (`movementBackend.ts`/`movementBackendProbe.ts`) that checks whether a GPU device reproduces a CPU result on a four-agent fixture. `"webgpu-ready"` means "the probe once verified consistency", never "the simulation is currently running on GPU". Rather than fold stage 3's genuinely new runtime state into that type, `SimulationRuntimeArtifact.movementBackend` and `SystemSignalOptions.movementBackend` were widened to `MovementBackendId | "webgpu"`, each with a doc comment spelling out the distinction — collapsing them into one type would have made two unrelated facts look like the same fact.
+
+### A real gap the verification process found on its own: computed correctly, invisible in the UI
+
+Real-hardware verification of the default path (no `?gpumove`) succeeded immediately, but searching the running app's UI for any visible movement-backend indicator repeatedly failed — `find`, `get_page_text`, and a direct `document.body.innerText.includes(...)` check all came back empty. Tracing this to source (not assuming it was a rendering bug) found the actual cause: `AppInspector.tsx`'s collapsed "engineering signals" dock hardcoded `signals.slice(0, 4)` — the first four entries only (simulation clock, agent count, spawned, exited) — while `createSystemSignals` places the movement-backend row around position 9 in the full list. So the real runtime state stage 3 exists to surface was computed correctly the whole time, but structurally could never appear in this default collapsed view — a leftover from an earlier "cockpit-style" UI pass that folded most engineering detail behind this four-row summary.
+
+Fixed by finding the movement-backend signal by its translated label and always appending it to the docked list when it is not already among the first four (leaving every other collapsed-view behaviour untouched). `AppInspector.tsx` had no dedicated test file before this change; added `AppInspector.test.tsx` with 2 tests: one confirming the row is appended when absent from the first four, one confirming no duplicate row when it already lands there naturally. A decisive revert-verify (temporarily setting `dockedSignals = activeSignals`, undoing the append) reproduced exactly the first test's failure while the second stayed green — proving the two tests check genuinely distinct, non-overlapping behaviour rather than the same fact twice.
+
+### Real-hardware verification, both paths
+
+Default path (no `?gpumove`): the "工程状态" (engineering signals) dock now shows "移动后端 / cpu-compat active @ 60Hz" — visible for the first time, behaviour otherwise unchanged from before stage 3. `?gpumove` path: the worker genuinely acquired a real GPU device (NVIDIA Lovelace, the same hardware this project's other ADR-0015/ADR-0033 real-hardware verification passes have used), the dock shows "移动后端 / webgpu active @ 60Hz", and the crowd is genuinely growing under GPU-driven movement — spawned/present counts climbing (92 spawned, 91 present), the "实测" (measured) panel's live chart rising — with zero console errors. Not a silently-idle "empty city".
+
+### Verified
+
+`pnpm typecheck` (all packages), `pnpm lint`, `npx prettier . --check` all clean. Full test suite: app 1184 passed + 3 skipped (1172 baseline + 5 `simulationEngine.test.ts` + 2 `simulationWorkerClient.test.ts` + 2 `simulation.worker.test.ts` + 1 `useSimulationWorkerController.hotscene.test.tsx` + 2 `AppInspector.test.tsx`, 12 new tests total), core-gpu 85 (unaffected), scene-schema 35, Rust 11 — all passing.
+
+### What remains
+
+Stage 4 (full-pipeline measurement — GPU movement, CPU decision layer, readback, and three.js rendering all in the loop, the first point at which any end-to-end "N agents at 60fps" claim becomes honest) is entirely unstarted. A disclosed, unresolved limitation carried over from stage 2: editing a floor's walls mid-run still requires destroying and rebuilding that floor's `GpuSimCore` (walls are fixed at construction) — left for a future hot-update pass, since neither stage 2's nor stage 3's own verification plans edit a scene mid-run.

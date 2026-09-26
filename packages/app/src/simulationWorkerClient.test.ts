@@ -236,6 +236,40 @@ describe("simulation worker client", () => {
       "Simulation worker is not initialized",
     );
   });
+
+  it("ADR-0033 stage 3: the inline (no-Worker) path always reports cpu-compat, honestly, even when webgpu was requested", async () => {
+    const client = createSimulationWorkerClient({ workerFactory: null });
+    const statuses: Array<{ active: string; message: string }> = [];
+    client.onMovementBackendStatus = (status) => statuses.push(status);
+
+    await client.init(demoScene, { runtime: { movementBackend: "webgpu" } });
+
+    expect(statuses).toEqual([
+      {
+        active: "cpu-compat",
+        message: expect.stringContaining("inline"),
+      },
+    ]);
+    client.dispose();
+  });
+
+  it("ADR-0033 stage 3: a movement-backend-status push routes to the handler, not the pending-request map (it has no request id)", async () => {
+    const worker = new FakeSimulationWorker();
+    const client = createSimulationWorkerClient({ workerFactory: () => worker });
+    const statuses: Array<{ active: string; message: string }> = [];
+    client.onMovementBackendStatus = (status) => statuses.push(status);
+
+    // Init itself resolves normally via the pending-request map -- the push
+    // below is a SEPARATE message with no `id`, sent independently.
+    await client.init(demoScene);
+    worker.pushMovementBackendStatus({
+      active: "webgpu",
+      message: "webgpu device acquired",
+    });
+
+    expect(statuses).toEqual([{ active: "webgpu", message: "webgpu device acquired" }]);
+    client.dispose();
+  });
 });
 
 class SilentSimulationWorker implements SimulationWorkerLike {
@@ -279,6 +313,15 @@ class FakeSimulationWorker implements SimulationWorkerLike {
 
   terminate() {
     this.terminated = true;
+  }
+
+  /** A worker-initiated push, unrelated to any request id (ADR-0033 stage 3). */
+  pushMovementBackendStatus(status: { active: string; message: string }) {
+    this.emit({
+      active: status.active as "cpu-compat" | "webgpu",
+      message: status.message,
+      type: "movement-backend-status",
+    });
   }
 
   private emit(message: SimulationWorkerResponse) {

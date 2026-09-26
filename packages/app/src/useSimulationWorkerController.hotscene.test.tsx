@@ -82,6 +82,16 @@ describe("hot scene update through the worker controller", () => {
     expect(hook.result.current.snapshot.status).toBe("paused");
     hook.unmount();
   });
+
+  it("ADR-0033 stage 3: reports movementBackend as real runtime state (cpu-compat via the inline no-Worker path), not a hardcoded label", async () => {
+    const { hook } = await runningController();
+
+    expect(hook.result.current.movementBackend).toEqual({
+      active: "cpu-compat",
+      message: expect.any(String),
+    });
+    hook.unmount();
+  });
 });
 
 describe("useRunScene", () => {

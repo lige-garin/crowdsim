@@ -44,6 +44,18 @@ export function AppInspector({
 }: AppInspectorProps) {
   const { language, t } = useI18n();
   const activeSignals = signals.slice(0, 4);
+  // ADR-0033 stage 3: the movement backend row is real runtime state now
+  // (cpu-compat by default, webgpu only when a device was actually
+  // acquired) -- always shown in the collapsed dock, not just when it
+  // happens to land in the first four, since this is exactly the kind of
+  // "which backend actually ran" fact the readiness surface exists for.
+  const movementBackendSignal = signals.find(
+    (signal) => signal.label === t("movementBackend"),
+  );
+  const dockedSignals =
+    movementBackendSignal && !activeSignals.includes(movementBackendSignal)
+      ? [...activeSignals, movementBackendSignal]
+      : activeSignals;
   const areaCount = scene.areas.length + scene.roads.length + scene.buildings.length;
 
   return (
@@ -156,7 +168,7 @@ export function AppInspector({
           <strong>{language === "zh" ? "已收起" : "Collapsed"}</strong>
         </header>
         <div className="status-list">
-          {activeSignals.map((signal) => (
+          {dockedSignals.map((signal) => (
             <Row key={signal.label} label={signal.label} value={signal.value} />
           ))}
         </div>

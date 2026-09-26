@@ -44,6 +44,16 @@ export type SimulationSharedAgentFrame = {
 };
 export type SimulationWorkerRuntimeOptions = {
   wasmDecisionBackend?: boolean;
+  /**
+   * ADR-0033 stage 3: requests GPU-backed movement for this run. A request,
+   * not a guarantee — the worker attempts real WebGPU device acquisition
+   * (async, can fail: no adapter, `requestDevice` rejects) and falls back to
+   * `"cpu-compat"` transparently if it does, reporting the outcome via a
+   * `movement-backend-status` push rather than silently pretending to
+   * honour the request. Absent or `"cpu-compat"` means what every scene has
+   * always run: no device is ever touched.
+   */
+  movementBackend?: "cpu-compat" | "webgpu";
 };
 export type SimulationWorkerInitRequest = {
   id: number;
@@ -85,6 +95,18 @@ export type SimulationWorkerRequest =
   | SimulationWorkerSetTimeScaleRequest
   | SimulationWorkerTickRequest
   | SimulationWorkerUpdateSceneRequest;
+/**
+ * ADR-0033 stage 3: which movement backend actually ended up running, and
+ * why -- pushed by the worker whenever this changes (once, right after
+ * `init` resolves either way; again if a live GPU device is later lost).
+ * Not a response to any specific request (no `id`): the worker sends this
+ * on its own, since a lost device can happen at any time, not just in
+ * reply to something the client asked for.
+ */
+export type SimulationWorkerMovementBackendStatus = {
+  active: "cpu-compat" | "webgpu";
+  message: string;
+};
 export type SimulationWorkerResponse =
   | {
       id: number;
@@ -95,7 +117,8 @@ export type SimulationWorkerResponse =
       id: number;
       message: string;
       type: "error";
-    };
+    }
+  | ({ type: "movement-backend-status" } & SimulationWorkerMovementBackendStatus);
 type SimulationWorkerRequestPayload =
   | Omit<SimulationWorkerCommandRequest, "id">
   | Omit<SimulationWorkerInitRequest, "id">
@@ -111,6 +134,13 @@ export type SimulationWorkerLike = {
 };
 export type SimulationWorkerClient = {
   dispose: () => void;
+  /**
+   * ADR-0033 stage 3: set to receive movement-backend status pushes. Not a
+   * constructor option — a caller attaches this right after creating the
+   * client, before calling `init`, so the very first push (right after
+   * `init` resolves) is never missed.
+   */
+  onMovementBackendStatus?: (status: SimulationWorkerMovementBackendStatus) => void;
   init: (
     scene: CrowdSimScene,
     options?: {
@@ -373,6 +403,16 @@ export function createSimulationWorkerClient(
   >();
   worker.onmessage = (event) => {
     const message = event.data;
+    if (message.type === "movement-backend-status") {
+      // Not a response to any pending request (no `id` to look up) -- the
+      // worker sends this on its own, so route it to whatever handler is
+      // attached right now rather than through the request/response map.
+      client.onMovementBackendStatus?.({
+        active: message.active,
+        message: message.message,
+      });
+      return;
+    }
     const request = pending.get(message.id);
     if (!request) {
       return;
@@ -401,7 +441,7 @@ export function createSimulationWorkerClient(
       worker.postMessage({ ...message, id } as SimulationWorkerRequest);
     });
   }
-  return {
+  const client: SimulationWorkerClient = {
     dispose() {
       disposed = true;
       worker.terminate();
@@ -428,6 +468,7 @@ export function createSimulationWorkerClient(
     tick: (realDeltaSeconds) => send({ realDeltaSeconds, type: "tick" }),
     updateScene: (scene) => send({ scene, type: "update-scene" }),
   };
+  return client;
 }
 function createInlineSimulationWorkerClient(): SimulationWorkerClient {
   let engine: SceneSimulationEngine | undefined;
@@ -451,7 +492,7 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
       );
     }
   }
-  return {
+  const client: SimulationWorkerClient = {
     dispose() {
       engine = undefined;
       sharedMemory = undefined;
@@ -465,7 +506,19 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
         ...options?.simulation,
         decisionBackend,
       });
-      return publish(engine.snapshot());
+      const snapshot = await publish(engine.snapshot());
+      // GPU device lifecycle (ADR-0033 stage 3) is a worker-only design —
+      // this inline path only exists when there is no real Worker to own a
+      // device, so it always reports cpu-compat, honestly, rather than
+      // silently ignoring a `movementBackend: "webgpu"` request.
+      client.onMovementBackendStatus?.({
+        active: "cpu-compat",
+        message:
+          options?.runtime?.movementBackend === "webgpu"
+            ? "webgpu requested, but the inline (no-Worker) simulation path never acquires a GPU device"
+            : "cpu-compat (default)",
+      });
+      return snapshot;
     },
     pause: () => run((current) => current.pause()),
     reset: () => run((current) => current.reset()),
@@ -476,4 +529,5 @@ function createInlineSimulationWorkerClient(): SimulationWorkerClient {
     tick: (realDeltaSeconds) => run((current) => current.tick(realDeltaSeconds)),
     updateScene: (scene) => run((current) => current.updateScene(scene)),
   };
+  return client;
 }

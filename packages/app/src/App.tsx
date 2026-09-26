@@ -51,24 +51,43 @@ function AppContent() {
   // editor -> simulation loop that used to be hard-wired to the demo scene.
   const [scene, setScene] = useState(initialScene);
   const probes = useAppProbes();
-  // Both paths run the same CPU social-force model. The main-thread path used
-  // to hand movement to a separate WebGPU backend (its own GPU device, an
-  // O(N²) shader, no notion of browsing or queuing), so `?mainsim` simulated a
-  // different crowd from the default worker path.
-  const mainThreadSimulation = useSimulationController(scene, {});
-  const workerSimulation = useSimulationWorkerController(scene);
   // `?mainsim` forces the main-thread CPU simulation. It is the working path
   // when there is no WebGPU (otherwise the app falls back to the worker path)
   // and is also what headless visual testing uses to render a live crowd.
   const forceMainSim =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("mainsim");
+  // ADR-0033 stage 3: the explicit, labelled, opt-in toggle for GPU-backed
+  // movement -- read ONCE from a stable URL flag, exactly like `?mainsim`
+  // above, never from an async probe (same "empty city" lesson this file
+  // already learned once: switching a running simulation's behaviour
+  // reactively off something that resolves later abandons real work). Only
+  // the worker path can honour this (see `useSimulationWorkerController`'s
+  // own doc comment) -- the main-thread fallback stays cpu-compat always.
+  const requestGpuMovement =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("gpumove");
+  // Both paths run the same CPU social-force model by default. The main-thread
+  // path used to hand movement to a separate WebGPU backend (its own GPU
+  // device, an O(N²) shader, no notion of browsing or queuing), so `?mainsim`
+  // simulated a different crowd from the default worker path.
+  const mainThreadSimulation = useSimulationController(scene, {});
+  const workerSimulation = useSimulationWorkerController(scene, {
+    requestGpuMovement,
+  });
   // Pick the simulation path from the stable ?mainsim flag only, never from the
   // async WebGPU probe. Gating on webGpuMovementBackend.backend flipped the path
   // worker -> main the moment the probe resolved, abandoning the running worker
   // sim for a never-started main engine: the "empty city" bug on WebGPU machines.
   const usesWorkerSimulation = usesWorkerSimulationPath({ forceMainSim });
   const simulation = usesWorkerSimulation ? workerSimulation : mainThreadSimulation;
+  // The real, currently-active backend (ADR-0033 stage 3) -- the main-thread
+  // fallback never runs GPU movement, and the worker path reports "cpu-compat"
+  // until its own first status push arrives (right after init, which is
+  // accurate: nothing GPU-backed has run yet at that point either).
+  const activeMovementBackend: "cpu-compat" | "webgpu" = usesWorkerSimulation
+    ? (workerSimulation.movementBackend?.active ?? "cpu-compat")
+    : "cpu-compat";
   const sharedAgentOverlay =
     simulation === workerSimulation
       ? workerSimulation.worker.sharedAgentOverlay
@@ -86,11 +105,11 @@ function AppContent() {
   const currentRuntime = useMemo(
     () =>
       createLiveSimulationRuntimeArtifact({
-        movementBackend: "cpu-compat",
+        movementBackend: activeMovementBackend,
         sharedMemory: workerSimulation.worker.sharedMemory ? "sab" : "fallback",
         thread: usesWorkerSimulation ? "worker" : "main",
       }),
-    [usesWorkerSimulation, workerSimulation.worker.sharedMemory],
+    [activeMovementBackend, usesWorkerSimulation, workerSimulation.worker.sharedMemory],
   );
   const wasmDecisionRuntime = useWasmDecisionRuntime(simulation.snapshot.stepCount);
   const simulationSnapshotRef = useRef(simulation.snapshot);
@@ -379,7 +398,7 @@ function AppContent() {
     heatmapProbe: probes.heatmapProbe,
     heatmapValue,
     language,
-    movementBackend: "cpu-compat",
+    movementBackend: activeMovementBackend,
     movementBackendProbe: probes.movementBackendProbe,
     queueSystemProbe: probes.queueSystemProbe,
     scene: scene,

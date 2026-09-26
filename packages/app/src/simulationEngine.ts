@@ -18,6 +18,7 @@ import {
 import { createElevatorRuntime, stepElevatorTravel } from "./elevatorTransfers";
 import { riderDisplayPosition } from "./floorTransferDisplay";
 import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
+import { advanceAgentsGpu, type GpuCrowdPlanePool } from "./gpuCrowdBackend";
 import {
   createAssimilationRandom,
   createEnkfEnsemble,
@@ -254,6 +255,28 @@ export type SimulationEngineConfig = {
    * before this existed and everywhere a scene does not ask otherwise.
    */
   movementParameters?: Partial<SocialForceParameters>;
+  /**
+   * ADR-0033 stage 3: which backend computes the 60Hz movement step.
+   * `"cpu-compat"` (default, always available) calls `stepCrowd` exactly as
+   * every scene has always run. `"webgpu"` is only ever honoured by the
+   * async `tickAsync`/`stepAsync` entry points — the synchronous `tick`/
+   * `step` refuse it outright (throw) rather than silently falling back to
+   * CPU, since GPU readback is inherently asynchronous and a caller using
+   * the synchronous API has no way to know its request was ignored.
+   * Decided at construction and changed only by an explicit
+   * `setMovementBackend` call (a lost GPU device demoting to CPU, say) —
+   * never reactively from an async signal on its own. This project has
+   * already been burned once by switching a *running* simulation's path
+   * reactively on an async probe (`simulationThread.ts`'s "empty city"
+   * lesson) — `setMovementBackend` is a deliberate, single authoritative
+   * transition, not that same anti-pattern.
+   */
+  movementBackend?: "cpu-compat" | "webgpu";
+  /** Required when `movementBackend` is `"webgpu"`: the already-constructed
+   * per-plane `GpuSimCore` pool. Device acquisition is itself asynchronous,
+   * so it happens once, externally, before this (synchronous) constructor
+   * runs — see `simulation.worker.ts`. */
+  gpuMovement?: { pool: GpuCrowdPlanePool };
   fixedDtSeconds?: number;
   maxAgents?: number;
   seed?: number;
@@ -318,6 +341,27 @@ export type SimulationEngine = {
   start: () => SimulationSnapshot;
   step: (steps?: number) => SimulationSnapshot;
   tick: (realDeltaSeconds: number) => SimulationSnapshot;
+  /**
+   * ADR-0033 stage 3: the GPU-aware counterparts of `step`/`tick`. Behave
+   * identically to the synchronous versions when `movementBackend` is
+   * `"cpu-compat"` (the default) — genuinely safe to call instead of the
+   * synchronous ones in any context that can await, since nothing changes
+   * for CPU mode. Only when `movementBackend` is `"webgpu"` do these await
+   * a real GPU readback per plane (`advanceAgentsGpu`).
+   */
+  stepAsync: (steps?: number) => Promise<SimulationSnapshot>;
+  tickAsync: (realDeltaSeconds: number) => Promise<SimulationSnapshot>;
+  /**
+   * The one sanctioned way to change `movementBackend` after construction —
+   * a lost GPU device demoting a running engine to CPU, for instance. Not a
+   * reactive path switch (see `movementBackend`'s own doc comment): this is
+   * an explicit, single transition a caller decides to make, not something
+   * that fires itself off an async signal.
+   */
+  setMovementBackend: (
+    backend: "cpu-compat" | "webgpu",
+    pool?: GpuCrowdPlanePool,
+  ) => void;
   /** Swap scene-derived geometry in place; agents, clock and counters carry on. */
   replaceGeometry: (geometry: SceneGeometry) => SimulationSnapshot;
   /**
@@ -339,7 +383,7 @@ export type SceneSimulationEngine = SimulationEngine & {
   /** Throws when `hotUpdateBlocker` refuses; the caller must then re-init. */
   updateScene: (scene: CrowdSimScene) => SimulationSnapshot;
 };
-const defaultFixedDtSeconds = 1 / 60;
+export const defaultFixedDtSeconds = 1 / 60;
 // Measured 2026-09-14 in Node on the rainy high street with the social-force
 // model (`crowdMovement`): 2,000 agents = 4.2 ms/step (the kinematic model it
 // replaced measured 8.64 ms at 2k on 2026-09-12). Cost grows with local density,
@@ -431,6 +475,10 @@ export function createSimulationEngine(
   let decisionBackend = config.decisionBackend;
   const maxAgents = config.maxAgents ?? defaultMaxAgents;
   const movementParameters = config.movementParameters;
+  // ADR-0033 stage 3: mutable only via setMovementBackend (an explicit,
+  // authoritative transition), never reactively.
+  let movementBackend = config.movementBackend ?? "cpu-compat";
+  let gpuMovementPool = config.gpuMovement?.pool;
   // Scene-derived: replaced as a set by replaceGeometry (ADR-0007).
   let speedMetersPerSecond = config.speedMetersPerSecond ?? defaultSpeedMetersPerSecond;
   let sources = config.sources;
@@ -694,9 +742,35 @@ export function createSimulationEngine(
       : {};
   }
   function runFixedStep() {
+    if (movementBackend === "webgpu") {
+      // Fail loud, not silent (ADR-0006): the synchronous API cannot await a
+      // GPU readback, so honouring this request by quietly running CPU
+      // instead would let a caller believe it got GPU movement when it did
+      // not. `tickAsync`/`stepAsync` are the only entry points that can
+      // actually serve this mode.
+      throw new Error(
+        "GPU movement backend requires the async tickAsync/stepAsync API",
+      );
+    }
     spawnArrivals();
     runDecisionTickIfNeeded();
     advanceAgentsCpu();
+    elapsedSeconds += fixedDtSeconds;
+    stepCount++;
+  }
+  /** ADR-0033 stage 3: `runFixedStep`'s GPU-aware counterpart — identical
+   * except it awaits `advanceAgentsGpuTick()` instead of calling the
+   * synchronous `advanceAgentsCpu()` when `movementBackend` is `"webgpu"`.
+   * Falls through to the exact same CPU path otherwise, so calling this
+   * unconditionally (as `tickAsync`/`stepAsync` do) is always correct. */
+  async function runFixedStepAsync() {
+    spawnArrivals();
+    runDecisionTickIfNeeded();
+    if (movementBackend === "webgpu") {
+      await advanceAgentsGpuTick();
+    } else {
+      advanceAgentsCpu();
+    }
     elapsedSeconds += fixedDtSeconds;
     stepCount++;
   }
@@ -912,60 +986,41 @@ export function createSimulationEngine(
     vehicles = stepped;
   }
 
-  function advanceAgentsCpu() {
-    applyHazardExposure();
-    // Only handed over during an evacuation, so a normal step allocates
-    // nothing for the per-exit tally.
-    const exitedSinkIds: string[] = [];
-    const stepped: SimulationAgent[] = [];
-    // A flight lane is its own plane, stepped by the same loop as a real
-    // floor: a rider pushes, and is pushed by, whoever else is on the same
-    // flight, exactly as in any corridor (buildFlightFloors). No scene has a
-    // connector without at least two real floors, so this is only ever
-    // non-empty alongside more than one floor.
-    const planes = flightFloors.length === 0 ? floors : [...floors, ...flightFloors];
-
-    for (const plane of planes) {
-      // One plane's crowd pushes only itself: two people at the same
-      // coordinates on different floors, or on two different flights, are
-      // not near each other.
-      const onPlane =
-        planes.length === 1
-          ? agents
-          : agents.filter((agent) => (agent.floorId ?? baseFloor()) === plane.id);
-
-      if (onPlane.length === 0) {
-        continue;
-      }
-
-      const result = stepCrowd({
-        agents: onPlane,
-        dtSeconds: fixedDtSeconds,
-        replanAnticipation: stepCount % anticipationReplanSteps === 0,
-        // Every agent is spawned with an exit, and reconciliation re-points it
-        // whenever that exit is removed. Never read for a rider: isExitBound
-        // is always false while `transfer` is set. A boarded transit rider's
-        // `targetSinkId` names a transit stop (ADR-0024), never a `sinks`
-        // entry — deliberately, so ordinary door-exit and evacuation choice
-        // never see a bus stop as a candidate exit — so the lookup falls
-        // back to `transitStops` for that one case.
-        exitRadius: (agent) =>
-          (sinks.find((sink) => sink.id === agent.targetSinkId) ??
-            transitStops.find((stop) => stop.id === agent.targetSinkId))!.radius,
-        exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
-        isExitBound,
-        meanSpeedMetersPerSecond: speedMetersPerSecond,
-        parameters: movementParameters,
-        router: plane.router,
-        seed,
-        walls: plane.walls,
-        world: plane.world,
-      });
-
-      stepped.push(...result.agents);
-      exitedCount += result.exitedCount;
-    }
-
+  /** Which floors/flight-lanes need stepping this tick. A flight lane is its
+   * own plane, stepped by the same loop as a real floor: a rider pushes, and
+   * is pushed by, whoever else is on the same flight, exactly as in any
+   * corridor (buildFlightFloors). No scene has a connector without at least
+   * two real floors, so this is only ever non-empty alongside more than one
+   * floor. */
+  function activePlanes() {
+    return flightFloors.length === 0 ? floors : [...floors, ...flightFloors];
+  }
+  /** One plane's crowd pushes only itself: two people at the same
+   * coordinates on different floors, or on two different flights, are not
+   * near each other. */
+  function agentsOnPlane(plane: FloorRuntime, planeCount: number) {
+    return planeCount === 1
+      ? agents
+      : agents.filter((agent) => (agent.floorId ?? baseFloor()) === plane.id);
+  }
+  /** Arrival radius of the exit a boarded transit rider's `targetSinkId`
+   * names a transit stop (ADR-0024), never a `sinks` entry — deliberately,
+   * so ordinary door-exit and evacuation choice never see a bus stop as a
+   * candidate exit — so the lookup falls back to `transitStops` for that
+   * one case. Shared by both movement backends: the exit radius rule does
+   * not depend on who computed the step. */
+  function exitRadiusFor(agent: SimulationAgent) {
+    return (sinks.find((sink) => sink.id === agent.targetSinkId) ??
+      transitStops.find((stop) => stop.id === agent.targetSinkId))!.radius;
+  }
+  /**
+   * Everything after the per-plane movement step: floor/elevator transfers,
+   * vehicle stepping, evacuation tally. Identical regardless of which
+   * backend computed `stepped`'s positions (ADR-0033's whole premise — see
+   * `gpuCrowdBackend.ts`'s own doc comment), so this is the single shared
+   * tail both `advanceAgentsCpu` and `advanceAgentsGpuTick` call.
+   */
+  function finalizeMovementStep(stepped: SimulationAgent[], exitedSinkIds: string[]) {
     connectorTraffic.replenish(fixedDtSeconds);
     agents = stepConnectorTravel({
       agents: stepped,
@@ -991,6 +1046,96 @@ export function createSimulationEngine(
       // building, so the figure ends up being the last departure of the run.
       evacuationClearSeconds = elapsedSeconds - evacuationStartedSeconds;
     }
+  }
+  function advanceAgentsCpu() {
+    applyHazardExposure();
+    // Only handed over during an evacuation, so a normal step allocates
+    // nothing for the per-exit tally.
+    const exitedSinkIds: string[] = [];
+    const stepped: SimulationAgent[] = [];
+    const planes = activePlanes();
+
+    for (const plane of planes) {
+      const onPlane = agentsOnPlane(plane, planes.length);
+      if (onPlane.length === 0) {
+        continue;
+      }
+
+      const result = stepCrowd({
+        agents: onPlane,
+        dtSeconds: fixedDtSeconds,
+        replanAnticipation: stepCount % anticipationReplanSteps === 0,
+        exitRadius: exitRadiusFor,
+        exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
+        isExitBound,
+        meanSpeedMetersPerSecond: speedMetersPerSecond,
+        parameters: movementParameters,
+        router: plane.router,
+        seed,
+        walls: plane.walls,
+        world: plane.world,
+      });
+
+      stepped.push(...result.agents);
+      exitedCount += result.exitedCount;
+    }
+
+    finalizeMovementStep(stepped, exitedSinkIds);
+  }
+  /**
+   * ADR-0033 stage 3: the GPU-backed alternate to `advanceAgentsCpu`, used
+   * only by `runFixedStepAsync` when `movementBackend === "webgpu"`. Same
+   * per-plane structure, same shared tail (`finalizeMovementStep`) — the
+   * only difference is `advanceAgentsGpu` (async, real GPU readback)
+   * instead of `stepCrowd` (sync) computing each plane's movement.
+   */
+  async function advanceAgentsGpuTick() {
+    if (!gpuMovementPool) {
+      // Fail loud, not silent (ADR-0006): this should be unreachable —
+      // runFixedStepAsync only calls this when a pool is configured — but a
+      // caller that mutates movementBackend without a pool deserves a clear
+      // error, not a step that quietly does nothing.
+      throw new Error("GPU movement backend selected but no plane pool is configured");
+    }
+    const pool = gpuMovementPool;
+    applyHazardExposure();
+    const exitedSinkIds: string[] = [];
+    const stepped: SimulationAgent[] = [];
+    const planes = activePlanes();
+
+    for (const plane of planes) {
+      const onPlane = agentsOnPlane(plane, planes.length);
+      if (onPlane.length === 0) {
+        continue;
+      }
+      if (!plane.world) {
+        // Every real scene-derived floor has a world (scene.world is a
+        // required schema field); only a hand-built test config could omit
+        // it. GPU mode needs real bounds to size its spatial-hash layout, so
+        // this fails loud rather than guessing a default.
+        throw new Error(`GPU movement backend requires a world for plane ${plane.id}`);
+      }
+      const gpuPlane = pool.forPlane(plane.id, plane.rawWalls, plane.world);
+
+      const result = await advanceAgentsGpu({
+        agents: onPlane,
+        dtSeconds: fixedDtSeconds,
+        exitRadius: exitRadiusFor,
+        exitedSinkIds: evacuationActive ? exitedSinkIds : undefined,
+        isExitBound,
+        meanSpeedMetersPerSecond: speedMetersPerSecond,
+        plane: gpuPlane,
+        router: plane.router,
+        seed,
+        wallIndex: plane.walls,
+        world: plane.world,
+      });
+
+      stepped.push(...result.agents);
+      exitedCount += result.exitedCount;
+    }
+
+    finalizeMovementStep(stepped, exitedSinkIds);
   }
   /**
    * Only an agent that a decision sent to an exit may leave the world. The old
@@ -1175,6 +1320,28 @@ export function createSimulationEngine(
         accumulatorSeconds -= fixedDtSeconds;
       }
       return makeSnapshot();
+    },
+    async stepAsync(steps = 1) {
+      for (let index = 0; index < steps; index++) {
+        await runFixedStepAsync();
+      }
+      return makeSnapshot();
+    },
+    async tickAsync(realDeltaSeconds: number) {
+      if (status !== "running") {
+        return makeSnapshot();
+      }
+      accumulatorSeconds +=
+        Math.min(Math.max(realDeltaSeconds, 0), maxRealDeltaSeconds) * timeScale;
+      while (accumulatorSeconds >= fixedDtSeconds) {
+        await runFixedStepAsync();
+        accumulatorSeconds -= fixedDtSeconds;
+      }
+      return makeSnapshot();
+    },
+    setMovementBackend(backend, pool) {
+      movementBackend = backend;
+      gpuMovementPool = pool;
     },
   };
 }

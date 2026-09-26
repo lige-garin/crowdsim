@@ -40,7 +40,13 @@ type SystemSignalOptions = {
   heatmapProbe: HeatmapProbeResult;
   heatmapValue: string;
   language: Language;
-  movementBackend: MovementBackendId;
+  /**
+   * The real, currently-active movement backend (ADR-0033 stage 3) — not
+   * `MovementBackendId`'s own values, which describe the OLD linear-model
+   * consistency probe below this same row (`movementBackendProbe`),
+   * something else entirely (see that field's own doc comment).
+   */
+  movementBackend: MovementBackendId | "webgpu";
   movementBackendProbe: MovementBackendProbeState;
   queueSystemProbe: QueueSystemProbeState;
   scene: CrowdSimScene;

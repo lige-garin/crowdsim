@@ -4,7 +4,17 @@ import { simulationRuntimeProfile } from "./simulationEngine";
 export type SimulationRuntimeArtifact = {
   decisionBackend: "rule-ts" | "wasm-ready";
   decisionHz: number;
-  movementBackend: MovementBackendId;
+  /**
+   * `MovementBackendId`'s own values (`"cpu-compat"` / `"webgpu-ready"`)
+   * describe the OLD linear-model consistency probe (`movementBackend.ts`) —
+   * `"webgpu-ready"` means "a GPU device reproduced the CPU result on a
+   * trivial fixture", never "GPU movement is actually running". `"webgpu"`
+   * is the real thing (ADR-0033 stage 3): this run's crowd was genuinely
+   * stepped on a GPU device. Kept as a widened union, not folded into
+   * `MovementBackendId` itself, so the probe's own type still cannot claim
+   * a state it never produces.
+   */
+  movementBackend: MovementBackendId | "webgpu";
   movementHz: number;
   sharedMemory: "fallback" | "sab";
   thread: "main" | "worker";

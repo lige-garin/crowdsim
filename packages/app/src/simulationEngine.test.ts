@@ -744,3 +744,102 @@ describe("real data assimilation (ADR-0026)", () => {
     expect(afterReset!.spread).toBeGreaterThan(converged!.spread * 3);
   });
 });
+
+describe("ADR-0033 stage 3: tickAsync/stepAsync, and the movementBackend switch", () => {
+  it("stepAsync produces the exact same result as step() when movementBackend is cpu-compat (the default)", async () => {
+    const sync = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    const async_ = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    sync.start();
+    async_.start();
+
+    const syncSnapshot = sync.step(30);
+    const asyncSnapshot = await async_.stepAsync(30);
+
+    expect(asyncSnapshot.stepCount).toBe(syncSnapshot.stepCount);
+    expect(asyncSnapshot.agentCount).toBe(syncSnapshot.agentCount);
+    expect(asyncSnapshot.agents.map((agent) => [agent.x, agent.y])).toEqual(
+      syncSnapshot.agents.map((agent) => [agent.x, agent.y]),
+    );
+  });
+
+  it("tickAsync produces the exact same result as tick() when movementBackend is cpu-compat", async () => {
+    const sync = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    const async_ = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    sync.start();
+    async_.start();
+
+    const syncSnapshot = sync.tick(0.5);
+    const asyncSnapshot = await async_.tickAsync(0.5);
+
+    expect(asyncSnapshot.elapsedSeconds).toBe(syncSnapshot.elapsedSeconds);
+    expect(asyncSnapshot.agents.map((agent) => [agent.x, agent.y])).toEqual(
+      syncSnapshot.agents.map((agent) => [agent.x, agent.y]),
+    );
+  });
+
+  it("decisive: the synchronous step()/tick() refuse to run when movementBackend is webgpu, rather than silently falling back to CPU", () => {
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      movementBackend: "webgpu",
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    engine.start();
+
+    expect(() => engine.step(1)).toThrow(/tickAsync\/stepAsync/);
+    expect(() => engine.tick(1 / 60)).toThrow(/tickAsync\/stepAsync/);
+  });
+
+  it("decisive: stepAsync/tickAsync fail loud (not silently) when movementBackend is webgpu but no plane pool is configured", async () => {
+    // movementBackend starts cpu-compat so step() can spawn a crowd first --
+    // an empty crowd would never reach the plane loop's "no pool" check,
+    // making the real assertion below vacuous.
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    engine.start();
+    engine.step(60);
+    engine.setMovementBackend("webgpu");
+
+    await expect(engine.stepAsync(1)).rejects.toThrow(/no plane pool is configured/);
+  });
+
+  it("setMovementBackend switches a running engine from webgpu back to cpu-compat, and stepAsync then runs normally", async () => {
+    const engine = createSimulationEngine({
+      fixedDtSeconds: 1 / 60,
+      movementBackend: "webgpu",
+      seed: 11,
+      sources: [source],
+      sinks: [sink],
+    });
+    engine.start();
+    engine.setMovementBackend("cpu-compat");
+
+    const snapshot = await engine.stepAsync(30);
+    expect(snapshot.spawnedCount).toBeGreaterThan(0);
+  });
+});

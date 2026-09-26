@@ -54,16 +54,81 @@ describe("simulation worker", () => {
       });
       post({ id: 2, type: "start" });
 
-      await vi.waitFor(() => expect(responses).toHaveLength(2));
+      // init also pushes a movement-backend-status message (ADR-0033 stage
+      // 3, unrelated to what this test checks) -- filter to the two
+      // request/response snapshots this test actually cares about.
+      await vi.waitFor(() =>
+        expect(responses.filter((r) => r.type === "snapshot")).toHaveLength(2),
+      );
 
-      expect(responses.map((response) => response.type)).toEqual([
-        "snapshot",
-        "snapshot",
-      ]);
-      expect(responses[1]).toMatchObject({ id: 2 });
+      const snapshots = responses.filter((r) => r.type === "snapshot");
+      expect(snapshots[1]).toMatchObject({ id: 2 });
       expect(
-        responses[1].type === "snapshot" ? responses[1].snapshot.status : undefined,
+        snapshots[1].type === "snapshot" ? snapshots[1].snapshot.status : undefined,
       ).toBe("running");
+    } finally {
+      scope.postMessage = originalPostMessage;
+    }
+  });
+
+  it("ADR-0033 stage 3: pushes a movement-backend-status of cpu-compat after a normal init (no webgpu requested)", async () => {
+    const responses: SimulationWorkerResponse[] = [];
+    const originalPostMessage = scope.postMessage;
+    scope.postMessage = (message) => responses.push(message);
+
+    try {
+      vi.resetModules();
+      await import("./simulation.worker");
+
+      scope.onmessage?.({
+        data: { id: 1, type: "init", scene: demoScene },
+      } as MessageEvent<SimulationWorkerRequest>);
+
+      await vi.waitFor(() =>
+        expect(responses.some((r) => r.type === "movement-backend-status")).toBe(true),
+      );
+
+      const status = responses.find((r) => r.type === "movement-backend-status");
+      expect(status).toMatchObject({ active: "cpu-compat" });
+    } finally {
+      scope.postMessage = originalPostMessage;
+    }
+  });
+
+  it("ADR-0033 stage 3: requesting webgpu with no navigator.gpu available (this test environment) falls back to cpu-compat rather than failing init", async () => {
+    const responses: SimulationWorkerResponse[] = [];
+    const originalPostMessage = scope.postMessage;
+    scope.postMessage = (message) => responses.push(message);
+
+    try {
+      vi.resetModules();
+      await import("./simulation.worker");
+
+      scope.onmessage?.({
+        data: {
+          id: 1,
+          type: "init",
+          scene: demoScene,
+          runtime: { movementBackend: "webgpu" },
+        },
+      } as MessageEvent<SimulationWorkerRequest>);
+
+      await vi.waitFor(() =>
+        expect(responses.some((r) => r.type === "snapshot")).toBe(true),
+      );
+      await vi.waitFor(() =>
+        expect(responses.some((r) => r.type === "movement-backend-status")).toBe(true),
+      );
+
+      // init itself succeeded (a snapshot came back), and the honest status
+      // push says webgpu was NOT actually achieved -- not silence, and not
+      // a thrown error that would have failed the whole init.
+      expect(responses.some((r) => r.type === "error")).toBe(false);
+      const status = responses.find((r) => r.type === "movement-backend-status");
+      expect(status).toMatchObject({ active: "cpu-compat" });
+      expect(status && "message" in status ? status.message : undefined).toMatch(
+        /unavailable/,
+      );
     } finally {
       scope.postMessage = originalPostMessage;
     }
