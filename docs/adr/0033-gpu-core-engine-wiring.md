@@ -1,9 +1,11 @@
 # ADR 0033: Wiring the GPU step kernel into the live simulation engine
 
-- Status: **Stages 1-3 complete and hardware-verified; stage 4 measured for
-  movement + decision + readback, rendering still unmeasured** (2026-09-25/26).
-  See the stage 4 entry below for the measured numbers and why rendering
-  is the one piece still open. Stage 1: fixed
+- Status: **Stages 1-4 complete and hardware-verified — as two separate
+  per-thread numbers, not the single end-to-end figure stage 4's own plan
+  text originally envisioned** (2026-09-25/28). See the stage 4 entries
+  below for the measured numbers, including a follow-up (2026-09-28) that
+  measured the rendering third this ADR's own stage 4 plan originally left
+  open. Stage 1: fixed
   `GpuSimCore`'s broken bind group (11 of 15 bindings wired, stale 68-byte
   `moveParamsBuffer`) and added the missing `uploadGroupIds`/
   `uploadFormationSlots`/`uploadHazardAvoidance`/`uploadHolding`/persistent
@@ -320,6 +322,82 @@
     default beyond the policy reason ADR-0006 already gives — at every
     population this app can currently produce, it is also the faster
     choice, measured.
+  - **The rendering quarter, measured (2026-09-28)**: rather than wait for
+    a session with an actually-foregrounded browser window, this bypassed
+    `requestAnimationFrame` entirely. The render loop's real per-frame
+    function (`renderFrame` in `useSimulationViewportRenderer.ts`) is an
+    ordinary function that `scheduleAnimationFrame` happens to invoke via
+    rAF (or that hook's own `setInterval` watchdog fallback, the same
+    starved-rAF safety net pattern as the worker tick loop above) — a
+    temporary hook exposed it and the live renderer instance to `window`,
+    called directly from the console, no rAF involved.
+    - **Same scenario as the earlier stage 4 entry above**: the "Stadium
+      Concourse" industry template — stated once there, not repeated here
+      originally; a self-review flagged the omission as a real
+      reproducibility gap (a reader could not otherwise confirm the two
+      entries measured the same thing), added back here explicitly.
+    - **First attempt gave an untrustworthy number and was discarded**:
+      calling straight through gave a 0.29ms mean — implausibly fast,
+      because a WebGPU/WebGL `render()` call only submits GPU commands and
+      returns immediately; it does not wait for the GPU to actually finish.
+      Repeated calls just queue more work without measuring it. Fixed by
+      awaiting `device.queue.onSubmittedWorkDone()` after each call — the
+      same real-completion sync point stage 3's own hardware verification
+      already used — forcing each measurement to include actual GPU
+      execution, not just CPU-side submission.
+    - **Results** (real hardware, NVIDIA Lovelace; confirmed the live
+      renderer is `WebGPURenderer`/`WebGPUBackend`, not the WebGL fallback
+      path): 44 agents, mean 5.43ms (p50 4.33, p95 16.83, max 19.74 — high
+      variance); 607 agents, mean 4.05ms (p50 3.56, p95 7.00, max 10.58 —
+      much steadier). Render cost does not track agent count over this
+      range, and the smaller population was both slower and noisier —
+      consistent with `crowdFigures.ts`'s own design (the whole walking
+      crowd compresses to ~20 draw calls via `InstancedMesh`, so agent
+      count has little effect on render cost, which is likely dominated by
+      fixed scene/post-processing work instead). The 44-agent run's wide
+      variance (p95 triple the mean) is more likely this session's
+      documented pattern of CPU oversubscription noise from concurrent
+      background processes (see the 2026-09-21/24 entries) than a genuine
+      rendering instability — not chased further; reported as-is rather
+      than picking the tidier number.
+    - **What the three measured pieces say together**: movement/decision/
+      readback run on the worker thread; rendering runs on the main thread
+      — they do not simply add, they run in parallel. At **close to** the
+      population this session measured both at — the worker-side entry
+      above bucketed 400-600 agents, this rendering run measured 607, one
+      agent past that bucket's own upper edge, so this is a near-population
+      comparison across two separate runs, not two readings from the same
+      run — the worker side costs ~27ms per tick under `cpu-compat` (over
+      the 16.6ms/60fps budget) while rendering costs ~4ms (comfortably
+      under it). **The bottleneck for "does this look smooth" is how often
+      the worker produces a new simulation state, not how long the main
+      thread takes to draw whatever state it last received** — the render
+      loop itself could sustain far more than 60fps if fed fresh data every
+      frame; it just is not fed that often. This is why stage 4's original
+      single "N agents at 60fps end-to-end" framing does not have one
+      answer: the two threads have different answers, and the true
+      end-to-end number a user experiences is gated by the slower of the
+      two, not their sum.
+    - **What this does and does not license saying** (same bar as the
+      entry above): it licenses saying "on this machine, this scenario,
+      this session, rendering cost is far below the worker-side cost, and
+      the bottleneck is the worker, not rendering." It does **not** license
+      generalising to other hardware, other scenarios, or higher
+      population — in particular, whether rendering would still be the
+      cheap side under `movementBackend:"webgpu"` (whose own worker-side
+      cost is even higher than `cpu-compat`'s) was not tested. It also does
+      not license treating two data points (44 and 607 agents) as a
+      confirmed "render cost barely depends on population" curve — that is
+      what these two points show, not a trend established with enough
+      samples to rule out coincidence.
+    - **Verified**: `pnpm typecheck`/`git status` clean (the temporary
+      `renderFrame`/renderer-exposure hook was `git checkout`'d back out
+      before this entry was written). All three pieces stage 4 originally
+      asked for — GPU movement, CPU decision + readback, and three.js
+      rendering — now have real, hardware-measured numbers, though as two
+      separate per-thread numbers rather than the single end-to-end figure
+      stage 4's own plan text originally envisioned (see this ADR's Status
+      line for that same qualifier).
 
 - **Per-floor hot-reload gap closed (2026-09-28)**: `GpuCrowdPlanePool
 .forPlane` cached a `GpuSimCore` forever per `planeId`, ignoring the
