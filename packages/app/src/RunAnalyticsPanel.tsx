@@ -1,6 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { CountLineFlowChart } from "./CountLineFlowChart";
 import type { DashboardSample } from "./dashboardStats";
+import { FruinLosGauge } from "./FruinLosGauge";
 import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
 import { JourneyTimeHistogram } from "./JourneyTimeHistogram";
@@ -167,6 +168,7 @@ export function RunAnalyticsPanel({
             )}
             {occupied === 0 ? <span className="los-bar-empty">–</span> : null}
           </div>
+          <FruinLosGauge peakDensity={los.peakDensity} peakLevel={los.peakLevel} />
           <div className="status-list">
             <div>
               <span>{text.peak}</span>

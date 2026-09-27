@@ -1034,6 +1034,15 @@
   color: var(--lab-faint);
 }
 
+.fruin-los-gauge {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  margin: 4px auto 0;
+  color: var(--lab-ink);
+}
+
 .run-analytics-exports {
   display: flex;
   flex-wrap: wrap;

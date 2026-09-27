@@ -190,6 +190,93 @@ describe("RunAnalyticsPanel", () => {
   });
 });
 
+describe("Fruin LOS gauge", () => {
+  it("draws a needle at the real peak density from the summary, not a fixture", () => {
+    const analytics = createRunAnalytics();
+    // One agent alone in a 2m density cell -> 1 person / 4 m^2 = 0.25 P/m^2
+    // (runAnalytics.test.ts's own precedent for this exact recipe).
+    analytics.record(scene, at(1, 19));
+    const summary = analytics.summary();
+    expect(summary.levelOfService.peakDensity).toBeCloseTo(0.25, 6);
+
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={analytics.journeyDurations}
+        language="zh"
+        minuteFlows={analytics.minuteFlows}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={summary}
+      />,
+    );
+
+    const gauge = document.querySelector(".fruin-los-gauge");
+    expect(gauge).not.toBeNull();
+    expect(gauge!.getAttribute("aria-label")).toBe(
+      `${summary.levelOfService.peakDensity.toFixed(2)} P/m² · ${summary.levelOfService.peakLevel}`,
+    );
+    // Six A-F band arcs, always drawn regardless of where the needle sits.
+    expect(gauge!.querySelectorAll("path")).toHaveLength(6);
+  });
+
+  it("moves the needle when a second, denser run reports a higher peak", () => {
+    const sparse = createRunAnalytics();
+    sparse.record(scene, at(1, 19));
+    const denseSnapshot: SimulationSnapshot = {
+      agentCount: 4,
+      agents: [
+        { id: 1, targetX: 40, targetY: 10, vx: 0, vy: 0, x: 19, y: 10 },
+        { id: 2, targetX: 40, targetY: 10, vx: 0, vy: 0, x: 19.2, y: 10 },
+        { id: 3, targetX: 40, targetY: 10, vx: 0, vy: 0, x: 19.4, y: 10 },
+        { id: 4, targetX: 40, targetY: 10, vx: 0, vy: 0, x: 19.6, y: 10 },
+      ],
+      elapsedSeconds: 1,
+      exitedCount: 0,
+      spawnedCount: 4,
+      status: "running",
+      stepCount: 0,
+      timeScale: 1,
+    };
+    const dense = createRunAnalytics();
+    dense.record(scene, denseSnapshot);
+
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={sparse.journeyDurations}
+        language="zh"
+        minuteFlows={sparse.minuteFlows}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={sparse.summary()}
+      />,
+    );
+    const sparseNeedle = document.querySelector(".fruin-los-gauge line")!;
+    const sparseX = Number(sparseNeedle.getAttribute("x2"));
+    cleanup();
+
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={dense.journeyDurations}
+        language="zh"
+        minuteFlows={dense.minuteFlows}
+        onExport={vi.fn()}
+        scene={scene}
+        summary={dense.summary()}
+      />,
+    );
+    const denseNeedle = document.querySelector(".fruin-los-gauge line")!;
+    const denseX = Number(denseNeedle.getAttribute("x2"));
+
+    expect(dense.summary().levelOfService.peakDensity).toBeGreaterThan(
+      sparse.summary().levelOfService.peakDensity,
+    );
+    expect(denseX).toBeGreaterThan(sparseX);
+  });
+});
+
 describe("what the measured numbers are", () => {
   it("says they come from one run and carry no interval", () => {
     render(
