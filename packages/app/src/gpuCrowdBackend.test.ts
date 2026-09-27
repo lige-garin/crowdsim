@@ -7,6 +7,7 @@ import {
   advanceAgentsGpu,
   buildGpuCrowdUploadArrays,
   createGpuCrowdPlanePool,
+  planeFingerprint,
   toGpuSimCoreParams,
   type GpuCrowdPlane,
 } from "./gpuCrowdBackend";
@@ -20,6 +21,19 @@ import { createWallIndex } from "./wallIndex";
 // when driven through a real browser (this session's browser-tool harness).
 const maybeNavigator = globalThis.navigator as (Navigator & { gpu?: GPU }) | undefined;
 const gpuTest = maybeNavigator?.gpu ? it : it.skip;
+
+// Shared by every `gpuTest` below (self-reviewed: this exact 3-line
+// adapter/device sequence, with the same `requiredLimits`, was duplicated
+// three times before this extraction -- one place to update if the limit
+// or the acquisition pattern ever changes).
+async function acquireGpuTestDevice(): Promise<GPUDevice> {
+  const adapter = await maybeNavigator?.gpu?.requestAdapter();
+  const device = await adapter?.requestDevice({
+    requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
+  });
+  expect(device).toBeDefined();
+  return device!;
+}
 
 function agent(overrides: Partial<SimulationAgent> & { id: number }): SimulationAgent {
   return {
@@ -240,7 +254,7 @@ describe("advanceAgentsGpu (orchestration, fake GpuSimCore -- no real GPU needed
   it("removes an exit-bound agent within its exit radius before it ever reaches the GPU plane", async () => {
     const { core, spawnCalls } = createFakeGpuSimCore(4);
     const allocator = createGpuSlotAllocator();
-    const plane: GpuCrowdPlane = { core, allocator };
+    const plane: GpuCrowdPlane = { core, allocator, fingerprint: "" };
     const exitedSinkIds: string[] = [];
 
     const departing = agent({
@@ -274,7 +288,7 @@ describe("advanceAgentsGpu (orchestration, fake GpuSimCore -- no real GPU needed
   it("a brand-new agent is uploaded via uploadSpawns and comes back moved after step+readback", async () => {
     const { core, spawnCalls } = createFakeGpuSimCore(4);
     const allocator = createGpuSlotAllocator();
-    const plane: GpuCrowdPlane = { core, allocator };
+    const plane: GpuCrowdPlane = { core, allocator, fingerprint: "" };
 
     const walker = agent({ id: 1, x: 0, y: 0, targetX: 10, targetY: 0 });
     const result = await advanceAgentsGpu({
@@ -300,7 +314,7 @@ describe("advanceAgentsGpu (orchestration, fake GpuSimCore -- no real GPU needed
   it("a continuing agent (same slot both ticks) is NOT re-uploaded via uploadSpawns on its second tick", async () => {
     const { core, spawnCalls } = createFakeGpuSimCore(4);
     const allocator = createGpuSlotAllocator();
-    const plane: GpuCrowdPlane = { core, allocator };
+    const plane: GpuCrowdPlane = { core, allocator, fingerprint: "" };
 
     const walker = agent({ id: 1, x: 0, y: 0, targetX: 10, targetY: 0 });
     const first = await advanceAgentsGpu({
@@ -335,7 +349,7 @@ describe("advanceAgentsGpu (orchestration, fake GpuSimCore -- no real GPU needed
   it("the hard wall constraint is reapplied to the GPU-produced position, exactly as stepCrowd does", async () => {
     const { core } = createFakeGpuSimCore(4);
     const allocator = createGpuSlotAllocator();
-    const plane: GpuCrowdPlane = { core, allocator };
+    const plane: GpuCrowdPlane = { core, allocator, fingerprint: "" };
 
     // A wall directly between the walker and its target -- the fake core's
     // own step() has no concept of walls, so any blocking must come from
@@ -366,11 +380,7 @@ describe("advanceAgentsGpu vs stepCrowd (real WebGPU, same scenario)", () => {
   gpuTest(
     "matches the CPU backend within tolerance over 30 ticks, for a mixed scenario (walking group, solo walker, holding agent, head-on pair)",
     async () => {
-      const adapter = await maybeNavigator?.gpu?.requestAdapter();
-      const device = await adapter?.requestDevice({
-        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
-      });
-      expect(device).toBeDefined();
+      const device = await acquireGpuTestDevice();
 
       const world = { width: 80, height: 20 };
       const router = createRouter(world, []); // no walls -> straight-line router
@@ -515,6 +525,124 @@ describe("advanceAgentsGpu vs stepCrowd (real WebGPU, same scenario)", () => {
           expect(moved).toBeGreaterThan(0.1); // walking: genuinely progressed
         }
       }
+
+      pool.destroyAll();
+      device!.destroy();
+    },
+  );
+});
+
+describe("planeFingerprint (pure, no GPU needed)", () => {
+  it("is identical for the same walls/world content, even as different array/object instances", () => {
+    const wallsA = [{ x1: 0, y1: 0, x2: 10, y2: 0 }];
+    const wallsB = [{ x1: 0, y1: 0, x2: 10, y2: 0 }]; // distinct array, same content
+    expect(planeFingerprint(wallsA, { width: 40, height: 20 })).toBe(
+      planeFingerprint(wallsB, { width: 40, height: 20 }),
+    );
+  });
+
+  it("differs when a wall's coordinates change", () => {
+    const before = planeFingerprint([{ x1: 0, y1: 0, x2: 10, y2: 0 }], {
+      width: 40,
+      height: 20,
+    });
+    const after = planeFingerprint(
+      [{ x1: 0, y1: 0, x2: 12, y2: 0 }], // one endpoint moved
+      { width: 40, height: 20 },
+    );
+    expect(before).not.toBe(after);
+  });
+
+  it("differs when a wall is added or removed", () => {
+    const one = planeFingerprint([{ x1: 0, y1: 0, x2: 10, y2: 0 }], {
+      width: 40,
+      height: 20,
+    });
+    const two = planeFingerprint(
+      [
+        { x1: 0, y1: 0, x2: 10, y2: 0 },
+        { x1: 5, y1: -5, x2: 5, y2: 5 },
+      ],
+      { width: 40, height: 20 },
+    );
+    expect(one).not.toBe(two);
+  });
+
+  it("differs when world size changes, even with identical walls", () => {
+    const walls = [{ x1: 0, y1: 0, x2: 10, y2: 0 }];
+    expect(planeFingerprint(walls, { width: 40, height: 20 })).not.toBe(
+      planeFingerprint(walls, { width: 41, height: 20 }),
+    );
+  });
+});
+
+describe("GpuCrowdPlanePool.forPlane hot-reload (real WebGPU)", () => {
+  gpuTest(
+    "rebuilds the GpuSimCore for a planeId once its walls/world content changes, and only then",
+    async () => {
+      // Not a physics/trajectory test: an earlier version of this test tried
+      // to prove the rebuild by walking an agent into where a wall used to
+      // be, but that measures the wrong mechanism. Hard wall-blocking comes
+      // entirely from `wallIndex` -- a parameter `advanceAgentsGpu`'s caller
+      // passes fresh on every call (ADR-0033's Context section: "no kernel
+      // involvement" for walls/exits) -- never from `plane.core`'s own
+      // baked-in geometry. A stale `plane.core` only mismatches on the WGSL
+      // kernel's own soft wall-repulsion force, not on whether an agent can
+      // cross a removed wall; a first draft of this test passed identically
+      // whether or not `forPlane` actually rebuilt, because it kept passing
+      // a correct, freshly-built `wallIndex` regardless. The decisive,
+      // direct thing to check is what `forPlane` itself decides: does a
+      // geometry change get a new `GpuSimCore`, does an unchanged one not.
+      const device = await acquireGpuTestDevice();
+
+      const world = { width: 40, height: 20 };
+      const dt = 1 / 60;
+      const pool = createGpuCrowdPlanePool(device!, {
+        capacity: 8,
+        params: toGpuSimCoreParams(socialForceParameters, dt),
+      });
+
+      const wallsA = [{ x1: 6, y1: 3, x2: 6, y2: 13 }];
+      const wallsB: typeof wallsA = []; // genuinely different geometry
+      const wallsA2 = [{ x1: 6, y1: 3, x2: 6, y2: 13 }]; // same content as A, new array instance
+
+      const planeA = pool.forPlane("floor-a", wallsA, world);
+      const planeB = pool.forPlane("floor-a", wallsB, world);
+      // Back to A's content: if the pool correctly rebuilt for B, it must
+      // rebuild again here too -- proves this isn't just "always rebuild
+      // once" but a real content comparison against whatever is cached now.
+      const planeA2 = pool.forPlane("floor-a", wallsA2, world);
+      // Same call again, content unchanged from planeA2: must NOT rebuild --
+      // the performance half of this fix (an unrelated floor's hot update
+      // should not pay for a `GpuSimCore` rebuild it does not need).
+      const planeA2Repeat = pool.forPlane("floor-a", wallsA2, world);
+
+      expect(planeA.core).not.toBe(planeB.core); // geometry changed -> rebuilt
+      expect(planeB.core).not.toBe(planeA2.core); // changed back -> rebuilt again
+      expect(planeA2.core).toBe(planeA2Repeat.core); // unchanged -> reused, not rebuilt
+
+      pool.destroyAll();
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "a distinct planeId always gets its own GpuSimCore, even with identical walls/world",
+    async () => {
+      const device = await acquireGpuTestDevice();
+
+      const world = { width: 40, height: 20 };
+      const dt = 1 / 60;
+      const pool = createGpuCrowdPlanePool(device!, {
+        capacity: 8,
+        params: toGpuSimCoreParams(socialForceParameters, dt),
+      });
+      const walls = [{ x1: 6, y1: 3, x2: 6, y2: 13 }];
+
+      const floorOne = pool.forPlane("floor-1", walls, world);
+      const floorTwo = pool.forPlane("floor-2", walls, world);
+
+      expect(floorOne.core).not.toBe(floorTwo.core);
 
       pool.destroyAll();
       device!.destroy();

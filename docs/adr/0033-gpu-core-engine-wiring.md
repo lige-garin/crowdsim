@@ -321,11 +321,64 @@
     population this app can currently produce, it is also the faster
     choice, measured.
 
+- **Per-floor hot-reload gap closed (2026-09-28)**: `GpuCrowdPlanePool
+.forPlane` cached a `GpuSimCore` forever per `planeId`, ignoring the
+  `rawWalls`/`world` it was called with on every later call — a scene edit
+  that changed a floor's walls silently never reached the GPU kernel,
+  since walls are fixed at `GpuSimCore` construction. Fixed with
+  `planeFingerprint(rawWalls, world)`, a pure content key; `forPlane` now
+  destroys and rebuilds when it changes, with a fresh `GpuSlotAllocator` so
+  every walking agent looks "new" to it and gets re-spawned from its own
+  (already-accurate) `SimulationAgent` position/velocity — no state lost,
+  only the stale core's now-irrelevant buffers. A first version of the
+  real-hardware test measured the wrong mechanism (hard wall-blocking comes
+  entirely from the `wallIndex` parameter `advanceAgentsGpu`'s caller
+  passes fresh every call, never from `plane.core`'s own geometry) and
+  passed identically whether or not the fix was even present — caught by
+  running it against a temporarily-reverted module and finding it green
+  either way. Replaced with a direct check of `forPlane`'s own decision
+  (`core` object identity across changed/unchanged/reverted-then-restored
+  geometry, plus a distinct-`planeId`-never-shares-a-core case), confirmed
+  decisive on real hardware against both the fixed and reverted module.
+  **Self-reviewed (3-angle parallel ponytail-review) and it caught a real,
+  previously-undisclosed cost**: `createGpuSimCore` does not just allocate
+  ~15 GPU buffers — it also calls `createSortPipelines` (4
+  `device.createComputePipeline` calls) and `createMovePipeline` (1 more),
+  5 WGSL shader compilations total, typically the single most expensive
+  step in standing up a GPU pipeline. Destroying and rebuilding on every
+  content change pays that cost again, even though wall data is not baked
+  into any shader — it is only buffer contents (`wallsBuffer` plus a
+  `wallCount` field in `moveParamsBuffer`), so a cheaper `updateWalls()`
+  API that rewrites those in place without touching any pipeline is
+  possible. Not built this round: it is new public surface on `core-gpu`
+  itself, a distinct piece of work from "make an edited wall reach the GPU
+  kernel at all" (this entry's actual scope), so it is disclosed here as a
+  known, undone optimization rather than attempted. The cost is paid only
+  on the tick a floor's walls actually change while it is live-simulating
+  (`forPlane` runs every movement tick, but rebuilds only on a genuine
+  content change), not on every tick. A second, independently-flagged
+  finding from the same review — `planeFingerprint` was recomputed from
+  every wall's coordinates on every single `forPlane` call, including the
+  overwhelming majority where nothing changed — was fixed: a reference
+  check against the previous call's `rawWalls`/`world` short-circuits
+  before the content comparison, since `buildFloors`/`buildFlightFloors`
+  only produce new array/object instances on an actual hot scene update
+  (ADR-0007), not every tick. Verified on real hardware (same-reference
+  calls skip rebuilding; different-reference-same-content still correctly
+  avoids rebuilding; genuinely different content still correctly rebuilds).
+  A third finding (does the discarded `GpuSlotAllocator` need explicit
+  disposal?) was checked and closed with no change needed: its public type
+  is only `sync()`/`highWaterMark()`, pure JS bookkeeping with no GPU-side
+  resources. A fourth (three near-identical adapter/device-acquisition
+  blocks in the test file) was extracted into a shared
+  `acquireGpuTestDevice()` helper.
+
 - Touches: `packages/core-gpu/src/gpuSimCore.ts`, `gpuSimCorePipelines.ts`,
   `packages/app/src/simulationEngine.ts`, `simulation.worker.ts`,
   `simulationWorkerClient.ts`, `movementBackend.ts`, `App.tsx`,
   `useSimulationWorkerController.ts`, `simulationRuntimeArtifact.ts`,
-  `appSignals.ts`, `AppInspector.tsx`, `urlFlagToggle.ts`
+  `appSignals.ts`, `AppInspector.tsx`, `urlFlagToggle.ts`,
+  `gpuCrowdBackend.ts`
 - Related: ADR-0015 (staged behaviour port to the WGSL kernel — now complete,
   all 8 stages), ADR-0002 (100k GPU rewrite, accepted tolerance-based
   determinism trade-off), ADR-0006 (WebGPU compute / labelled WebGL-CPU

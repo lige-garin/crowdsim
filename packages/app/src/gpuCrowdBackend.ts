@@ -33,17 +33,54 @@ import type { WallIndex } from "./wallIndex";
 export type GpuCrowdPlane = {
   core: GpuSimCore;
   allocator: GpuSlotAllocator;
+  /** The `rawWalls`/`world` this plane's `core` was actually built from —
+   * see `planeFingerprint`'s own comment for why `forPlane` needs it. */
+  fingerprint: string;
 };
+
+/**
+ * A cheap content key for "would `createGpuSimCore` need to be called
+ * again for this geometry" — walls are fixed at `GpuSimCore` construction
+ * (ADR-0033's Context section), so a scene edit that changes a floor's
+ * walls has to be detected, not just a changed `planeId`.
+ *
+ * Reference equality does not work here: `simulationEngine.ts`'s
+ * `buildFloors`/`buildFlightFloors` rebuild the entire `FloorRuntime[]`
+ * fresh on every hot scene update (ADR-0007), including floors whose own
+ * geometry did not change — so `rawWalls`/`world` are new array/object
+ * instances on every edit regardless of which floor was actually touched.
+ * Content comparison is what tells "floor 2's walls changed" apart from
+ * "floor 1 got a new array with the same four numbers in it".
+ *
+ * Wall order is assumed stable for unchanged input (true for this
+ * codebase's own deterministic `buildFloors`/`buildFlightFloors`) — a
+ * hypothetical scene producing the same walls in a different order would
+ * cause one needless rebuild, not an incorrect one.
+ */
+export function planeFingerprint(
+  rawWalls: readonly WallSegment[],
+  world: SceneWorldBounds,
+): string {
+  let key = `${world.width}x${world.height}`;
+  for (const wall of rawWalls) {
+    key += `|${wall.x1},${wall.y1},${wall.x2},${wall.y2}`;
+  }
+  return key;
+}
 
 export type GpuCrowdPlanePool = {
   /**
    * The plane for `planeId`, creating it (from `rawWalls`/`world`) the
-   * first time this id is seen and reusing it on every later call. Not yet
-   * handled: a scene edit that changes a floor's own geometry needs that
-   * plane destroyed and rebuilt from scratch (walls are fixed at
-   * construction) — left for stage 3's hot-update integration, since
-   * stage 2's own verification plan (run both backends against the same
-   * scene/seed) never edits a scene mid-run.
+   * first time this id is seen. On a later call whose `rawWalls`/`world`
+   * content differs from what the cached plane was built with (a scene
+   * edit changed that floor's geometry), the stale `core` is destroyed and
+   * a fresh one built in its place, along with a fresh `allocator` --
+   * every currently-walking agent on this plane will look "new" to that
+   * allocator's very next `sync()`, so `advanceAgentsGpu` re-spawns each
+   * one from its own CPU-resident `x`/`y`/`vx`/`vy` (already accurate --
+   * every readback writes it straight back onto `SimulationAgent`), the
+   * same path a plane's first-ever agents already go through. No agent
+   * state is lost, only the destroyed core's now-irrelevant GPU buffers.
    */
   forPlane(
     planeId: string | undefined,
@@ -63,6 +100,21 @@ export function createGpuCrowdPlanePool(
   options: { capacity: number; params: GpuSimCoreSocialForceParams },
 ): GpuCrowdPlanePool {
   const planes = new Map<string | undefined, GpuCrowdPlane>();
+  // Self-reviewed (2026-09-28): the first version of this fix recomputed
+  // `planeFingerprint` -- a string built from every wall's coordinates --
+  // on every single call, including the overwhelming majority where
+  // nothing changed (`forPlane` runs once per active plane per movement
+  // tick, `simulationEngine.ts`'s `advanceAgentsGpuTick`). `buildFloors`/
+  // `buildFlightFloors` only produce a *new* `rawWalls`/`world` when a
+  // scene is actually hot-updated (ADR-0007) -- between updates, the same
+  // `FloorRuntime` (and so the same array/object references) is reused
+  // call after call. A cheap reference check catches that common case
+  // before paying for the content comparison, which only has to run on
+  // the rare tick right after an edit.
+  const lastInputs = new Map<
+    string | undefined,
+    { rawWalls: WallSegment[]; world: SceneWorldBounds }
+  >();
   // The neighbourhood-restricted kernel is only lossless when cellSize
   // covers every range it needs to be exact for -- interactionRangeMeters
   // (checked by createGpuSimCore itself) AND anticipationRangeMeters AND
@@ -81,7 +133,16 @@ export function createGpuCrowdPlanePool(
   return {
     forPlane(planeId, rawWalls, world) {
       const existing = planes.get(planeId);
-      if (existing) return existing;
+      const last = lastInputs.get(planeId);
+      // Same array/object instances as last call -> definitely unchanged,
+      // skip building a fingerprint at all (this is the common case).
+      if (existing && last && last.rawWalls === rawWalls && last.world === world) {
+        return existing;
+      }
+      lastInputs.set(planeId, { rawWalls, world });
+      const fingerprint = planeFingerprint(rawWalls, world);
+      if (existing && existing.fingerprint === fingerprint) return existing;
+      if (existing) existing.core.destroy();
       const layout = createSpatialHashGridLayout({
         width: world.width,
         height: world.height,
@@ -95,6 +156,7 @@ export function createGpuCrowdPlanePool(
           params: options.params,
         }),
         allocator: createGpuSlotAllocator(),
+        fingerprint,
       };
       planes.set(planeId, plane);
       return plane;
@@ -104,12 +166,14 @@ export function createGpuCrowdPlanePool(
         if (!activePlaneIds.has(id)) {
           plane.core.destroy();
           planes.delete(id);
+          lastInputs.delete(id);
         }
       }
     },
     destroyAll() {
       for (const plane of planes.values()) plane.core.destroy();
       planes.clear();
+      lastInputs.clear();
     },
   };
 }
