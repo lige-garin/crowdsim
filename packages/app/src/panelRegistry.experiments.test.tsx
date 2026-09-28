@@ -17,6 +17,9 @@ const ctx = {
 } as unknown as PanelDockContext;
 
 describe("experiment + analytics panels are registered and render", () => {
+  // experiment-summary was deleted 2026-09-29: a fixed two-variant subset of
+  // experiment-sweep that ran its simulations synchronously on the main
+  // thread and printed mean ± sd with no interval.
   // scenario-comparison was deleted 2026-09-24: ADR-0019 found it a
   // narrower, superseded predecessor of scenario-diff-report (it only
   // ranked parameter variants of one hardcoded fixture scene, never
@@ -24,7 +27,6 @@ describe("experiment + analytics panels are registered and render", () => {
   for (const id of [
     "scenario-diff-report",
     "experiment-sweep",
-    "experiment-summary",
     "sensitivity-screening",
     "validation-report",
   ]) {

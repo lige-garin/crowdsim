@@ -51,7 +51,7 @@ and why.
   no real capability over the two buttons that survived. Each surviving
   module carries its own `HONESTY NOTE` explaining what it actually does.
 - **Most of the analysis panel dock reports on built-in sample scenarios,
-  not your project.** 6 of 9 panels are labeled `dataSource: "fixture"`
+  not your project.** 5 of 9 panels are labeled `dataSource: "fixture"`
   in the UI itself, not just in this README — the label is load-bearing,
   not decorative.
 - **There is no account system, and none is required.** The app persists

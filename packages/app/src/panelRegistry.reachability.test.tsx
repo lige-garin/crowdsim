@@ -8,11 +8,11 @@ import { panelRegistry } from "./panelRegistry";
 // (undeployable as shipped, unreachable from the client); scenario-comparison
 // as a narrower, superseded predecessor of scenario-diff-report (ADR-0019);
 // and scale-readiness as a fixture of projected, unmeasured constants (see
-// docs/CLAIMS_LEDGER.md). The remaining 6 are still expected to be reachable
+// docs/CLAIMS_LEDGER.md). experiment-summary was folded into experiment-sweep on 2026-09-29 (a
+// synchronous, interval-free subset of it). The remaining 5 are still expected to be reachable
 // exactly once.
 const EXPECTED = [
   "experiment-sweep",
-  "experiment-summary",
   "validation-report",
   "brand-intelligence",
   "template-library",

@@ -79,7 +79,7 @@ describe("RunAnalyticsPanel", () => {
     expect(onExport).toHaveBeenCalledWith("journeys");
   });
 
-  it("draws a flow chart per count line, sized by that line's own minute flows", () => {
+  it("keeps each count line's flow chart collapsed until opened, then draws it from that line's own minute flows", () => {
     const analytics = createRunAnalytics();
     analytics.record(scene, at(1, 19));
     analytics.record(scene, at(2, 21));
@@ -96,9 +96,14 @@ describe("RunAnalyticsPanel", () => {
       />,
     );
 
-    const chart = screen
-      .getByTestId("count-line-gate")
-      .querySelector(".echart-container");
+    const row = screen.getByTestId("count-line-gate");
+    expect(row.querySelector(".echart-container")).toBeNull();
+
+    const details = row.querySelector("details.count-line-chart") as HTMLDetailsElement;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+
+    const chart = row.querySelector(".echart-container");
     expect(chart).not.toBeNull();
     expect(chart).toHaveAttribute("aria-label", expect.stringContaining("Main gate"));
   });

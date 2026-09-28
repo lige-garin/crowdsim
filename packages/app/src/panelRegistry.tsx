@@ -6,7 +6,6 @@ import { ScenarioDiffPanel } from "./ScenarioDiffPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { SensitivityPanel } from "./SensitivityPanel";
 import { RimeaReportPanel } from "./RimeaReportPanel";
-import { ExperimentSummaryPanel } from "./ExperimentSummaryPanel";
 import { ValidationReportPanel } from "./ValidationReportPanel";
 import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
@@ -65,13 +64,6 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "参数扫描",
     labelEn: "Experiment sweep",
     render: () => <ExperimentSweepPanel />,
-  },
-  {
-    dataSource: "fixture",
-    id: "experiment-summary",
-    labelZh: "实验汇总",
-    labelEn: "Experiment summary",
-    render: () => <ExperimentSummaryPanel />,
   },
   {
     dataSource: "fixture",
