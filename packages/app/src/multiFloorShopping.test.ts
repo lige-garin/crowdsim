@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { demoScene } from "./demoScene";
-import { createSimulationEngineFromScene } from "./simulationEngine";
+import { demoScene } from "./scenes/demoScene";
+import { createSimulationEngineFromScene } from "./engine/simulationEngine";
 
 /**
  * Shopping in a building with floors (ADR-0010).

@@ -16,8 +16,8 @@ import {
   type SimulationWorkerClient,
   type SimulationWorkerMovementBackendStatus,
   type SimulationWorkerSharedMemory,
-} from "./simulationWorkerClient";
-import type { SimulationSnapshot } from "./simulationEngine";
+} from "./engine/simulationWorkerClient";
+import type { SimulationSnapshot } from "./engine/simulationEngine";
 import type { SimulationController } from "./useSimulationController";
 import { useRunScene } from "./useRunScene";
 

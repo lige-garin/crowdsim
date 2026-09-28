@@ -1,6 +1,6 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { createMallCrowdDecisionBackend } from "../mallCrowdDecisionBackend";
-import { createSimulationEngineFromScene } from "../simulationEngine";
+import { createMallCrowdDecisionBackend } from "../engine/mallCrowdDecisionBackend";
+import { createSimulationEngineFromScene } from "../engine/simulationEngine";
 import { routingGapMeters, type RimeaTestResult } from "./shared";
 import { corridorTest } from "./test01Corridor";
 

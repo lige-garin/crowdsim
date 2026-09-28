@@ -1,6 +1,9 @@
 import { boundedNelderMead } from "../boundedNelderMead";
-import { socialForceParameters } from "../crowdMovement";
-import { fitBounds, type FittedParameterName } from "../fundamentalDiagramFit";
+import { socialForceParameters } from "../engine/crowdMovement";
+import {
+  fitBounds,
+  type FittedParameterName,
+} from "../analytics/fundamentalDiagramFit";
 
 /**
  * Calibrating `crowdMovement.ts`'s social-force parameters directly against

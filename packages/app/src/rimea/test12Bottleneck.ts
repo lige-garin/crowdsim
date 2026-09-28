@@ -1,5 +1,5 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { createSimulationEngineFromScene } from "../simulationEngine";
+import { createSimulationEngineFromScene } from "../engine/simulationEngine";
 import type { RimeaTestResult } from "./shared";
 import { corridorTest } from "./test01Corridor";
 

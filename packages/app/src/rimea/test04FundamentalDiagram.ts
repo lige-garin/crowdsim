@@ -1,8 +1,8 @@
-import { measureCorridorSpeed } from "../fundamentalDiagramHarness";
+import { measureCorridorSpeed } from "../analytics/fundamentalDiagramHarness";
 import {
   weidmannFundamentalDiagram,
   weidmannSpeedAtDensity,
-} from "../pedestrianFundamentalDiagram";
+} from "../analytics/pedestrianFundamentalDiagram";
 import type { RimeaTestResult } from "./shared";
 
 /**

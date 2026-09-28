@@ -1,0 +1,153 @@
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { useEffect, useRef, useState } from "react";
+import type { DashboardSample } from "./dashboardStats";
+import { resolveDisplayPosition } from "../engine/floorTransferDisplay";
+import type { HeatmapSample } from "./heatmap";
+import { createRunAnalytics, type RunAnalytics, type StayKind } from "./runAnalytics";
+import type { SimulationSnapshot } from "../engine/simulationEngine";
+import type { SimulationRuntimeArtifact } from "../engine/simulationRuntimeArtifact";
+import {
+  appendTrajectoryFrame,
+  createTrajectoryRecording,
+} from "./trajectoryRecording";
+
+/** Charts keep the last two minutes; the analytics and the recording keep the run. */
+const chartSeconds = 120;
+
+/**
+ * Everything sampled from the running crowd once a simulated second: the
+ * dashboard and heatmap series, the measured results (runAnalytics) and the
+ * trajectory recording that replay plays back.
+ *
+ * Polled a few times a wall-clock second and deduplicated by simulated second,
+ * so fast-forward still samples most seconds instead of one in eight.
+ */
+export function useRunSeries({
+  runtime,
+  scene,
+  snapshot,
+}: {
+  runtime: SimulationRuntimeArtifact;
+  scene: CrowdSimScene;
+  snapshot: SimulationSnapshot;
+}) {
+  const latest = useRef({ runtime, scene, snapshot });
+  useEffect(() => {
+    latest.current = { runtime, scene, snapshot };
+  }, [runtime, scene, snapshot]);
+
+  const analyticsRef = useRef(createRunAnalytics());
+  const lastSecondRef = useRef(-1);
+  const [runSummary, setRunSummary] = useState(() => createRunAnalytics().summary());
+  const [dashboardSamples, setDashboardSamples] = useState<DashboardSample[]>([
+    {
+      agentCount: snapshot.agentCount,
+      elapsedSeconds: snapshot.elapsedSeconds,
+      exitedCount: snapshot.exitedCount,
+    },
+  ]);
+  const [heatmapSamples, setHeatmapSamples] = useState<HeatmapSample[]>([]);
+  const [trajectoryRecording, setTrajectoryRecording] = useState(() =>
+    newRecording(scene, runtime),
+  );
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      const { runtime, scene, snapshot } = latest.current;
+      const second = Math.floor(snapshot.elapsedSeconds);
+      if (snapshot.status !== "running" || second === lastSecondRef.current) return;
+      lastSecondRef.current = second;
+
+      analyticsRef.current.record(scene, snapshot);
+      setRunSummary(analyticsRef.current.summary());
+      setHeatmapSamples((samples) =>
+        [
+          ...samples,
+          {
+            // A rider's own floorId/x/y are the flight's own synthetic id
+            // and lane-local coordinates (ADR-0010 stage 5/6); `display`,
+            // when set, is where a stair/escalator/lift rider actually
+            // belongs for a density read — same resolution the crowd
+            // renderer (`agentInstanceField.selectCrowdAgents`) and
+            // `runAnalytics` both do off the same snapshot field.
+            agents: snapshot.agents.map((agent) => ({
+              id: agent.id,
+              ...resolveDisplayPosition(agent),
+            })),
+            elapsedSeconds: snapshot.elapsedSeconds,
+          },
+        ].slice(-chartSeconds),
+      );
+      setDashboardSamples((samples) =>
+        [
+          ...samples,
+          {
+            agentCount: snapshot.agentCount,
+            elapsedSeconds: snapshot.elapsedSeconds,
+            exitedCount: snapshot.exitedCount,
+          },
+        ].slice(-chartSeconds),
+      );
+      setTrajectoryRecording((recording) =>
+        appendTrajectoryFrame(
+          sameRuntime(recording.runtime, runtime)
+            ? recording
+            : newRecording(scene, runtime),
+          snapshot,
+        ),
+      );
+    }, 250);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  /** Start every series over: they describe a new run. */
+  function clear(forScene: CrowdSimScene) {
+    analyticsRef.current = createRunAnalytics();
+    lastSecondRef.current = -1;
+    setRunSummary(analyticsRef.current.summary());
+    setDashboardSamples([{ agentCount: 0, elapsedSeconds: 0, exitedCount: 0 }]);
+    setHeatmapSamples([]);
+    setTrajectoryRecording(newRecording(forScene, latest.current.runtime));
+  }
+
+  return {
+    clear,
+    dashboardSamples,
+    exportAnalyticsCsv: (kind: keyof RunAnalytics["csv"]) =>
+      analyticsRef.current.csv[kind](),
+    heatmapSamples,
+    journeyDurations: () => analyticsRef.current.journeyDurations(),
+    minuteFlows: () => analyticsRef.current.minuteFlows(),
+    // Windowed to the same `chartSeconds` every other chart in this file
+    // uses -- a self-review found the unwindowed version scanning the
+    // whole run's history on every render, for every queue-kind place
+    // shown (see placeOccupancyOverTime's own comment).
+    placeOccupancyOverTime: (kind: StayKind, placeId: string) =>
+      analyticsRef.current.placeOccupancyOverTime(kind, placeId, chartSeconds),
+    runSummary,
+    trajectoryRecording,
+  };
+}
+
+function newRecording(scene: CrowdSimScene, runtime: SimulationRuntimeArtifact) {
+  return createTrajectoryRecording({
+    id: "live-recording",
+    runtime,
+    sceneId: scene.id,
+    seed: scene.seed,
+  });
+}
+
+function sameRuntime(
+  left: SimulationRuntimeArtifact,
+  right: SimulationRuntimeArtifact,
+) {
+  return (
+    left.decisionBackend === right.decisionBackend &&
+    left.decisionHz === right.decisionHz &&
+    left.movementBackend === right.movementBackend &&
+    left.movementHz === right.movementHz &&
+    left.sharedMemory === right.sharedMemory &&
+    left.thread === right.thread
+  );
+}

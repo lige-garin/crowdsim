@@ -1,14 +1,18 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { RetailAnalyticsPanel } from "./RetailAnalyticsPanel";
-import type { DashboardSample } from "./dashboardStats";
-import { RealObservationsPanel } from "./RealObservationsPanel";
-import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
-import type { MinuteFlow, RunAnalyticsSummary, StayKind } from "./runAnalytics";
+import { RetailAnalyticsPanel } from "./panels/RetailAnalyticsPanel";
+import type { DashboardSample } from "./analytics/dashboardStats";
+import { RealObservationsPanel } from "./panels/RealObservationsPanel";
+import { RunAnalyticsPanel, type RunAnalyticsExport } from "./panels/RunAnalyticsPanel";
+import type {
+  MinuteFlow,
+  RunAnalyticsSummary,
+  StayKind,
+} from "./analytics/runAnalytics";
 import type { EvacuationState, SystemSignal } from "./AppTypes";
-import type { HeatmapCell } from "./heatmap";
+import type { HeatmapCell } from "./analytics/heatmap";
 import { formatSceneName, useI18n } from "./i18n";
-import type { SimulationCredibilityReport } from "./simulationCredibility";
-import type { TrajectoryRecording } from "./trajectoryRecording";
+import type { SimulationCredibilityReport } from "./engine/simulationCredibility";
+import type { TrajectoryRecording } from "./analytics/trajectoryRecording";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
 type AppInspectorProps = {

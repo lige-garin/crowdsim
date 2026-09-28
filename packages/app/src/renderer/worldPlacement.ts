@@ -1,17 +1,17 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { Plane, Raycaster, Vector2, Vector3, type Camera } from "three";
-import { screenToNdc } from "../agentPicking";
-import { overlaps, rectOf, type Rect } from "../cityLayout";
-import { pointInPolygon } from "../routeCostMap";
-import { distanceToSegment } from "../sceneEditorGeometry";
-import { addCountLineBetween } from "../sceneEditorAdders";
+import { screenToNdc } from "../viewport/agentPicking";
+import { overlaps, rectOf, type Rect } from "../viewport/cityLayout";
+import { pointInPolygon } from "../engine/routeCostMap";
+import { distanceToSegment } from "../editor/sceneEditorGeometry";
+import { addCountLineBetween } from "../editor/sceneEditorAdders";
 import {
   createEditorDocumentFromScene,
   createSceneFromEditorDocument,
   placeEditorTool,
   snapPoint,
   type EditorTool,
-} from "../sceneEditorState";
+} from "../editor/sceneEditorState";
 
 /** Same grid the 2D editor snaps to, so both views land things identically. */
 export const PLACEMENT_GRID_METERS = 2;

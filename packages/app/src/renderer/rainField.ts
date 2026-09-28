@@ -7,7 +7,7 @@ import {
   Quaternion,
   Vector3,
 } from "three";
-import { mulberry32 } from "../simulationEngineRandom";
+import { mulberry32 } from "../engine/simulationEngineRandom";
 
 /**
  * Rain that falls.

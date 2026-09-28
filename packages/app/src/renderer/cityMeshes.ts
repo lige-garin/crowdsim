@@ -19,7 +19,7 @@ import {
   type CityBuildingStyle,
   type CityLayout,
   type Rect,
-} from "../cityLayout";
+} from "../viewport/cityLayout";
 import { BoxBatch } from "./boxBatch";
 import { cityTextures, TILE_BAYS, TILE_FLOORS } from "./cityTextures";
 import { createDistrictObjects, sceneRectToRender } from "./districtMeshes";

@@ -1,6 +1,6 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { connectorSpeeds, flightFloorId } from "../floorRouting";
-import { createSimulationEngineFromScene } from "../simulationEngine";
+import { connectorSpeeds, flightFloorId } from "../engine/floorRouting";
+import { createSimulationEngineFromScene } from "../engine/simulationEngine";
 import type { RimeaTestResult } from "./shared";
 import { corridorTest } from "./test01Corridor";
 

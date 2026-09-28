@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
-import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
+import type { SimulationDecisionBackend } from "./engine/simulationDecisionBackend";
 import { useSimulationController } from "./useSimulationController";
 
 const fastScene = parseScene({

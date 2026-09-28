@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { socialForceParameters } from "../crowdMovement";
-import { speedRmse } from "../fundamentalDiagramFit";
-import { weidmannSpeedAtDensity } from "../pedestrianFundamentalDiagram";
+import { socialForceParameters } from "../engine/crowdMovement";
+import { speedRmse } from "../analytics/fundamentalDiagramFit";
+import { weidmannSpeedAtDensity } from "../analytics/pedestrianFundamentalDiagram";
 import {
   buildCalibrationSamples,
   fitSocialForceToTrajectories,

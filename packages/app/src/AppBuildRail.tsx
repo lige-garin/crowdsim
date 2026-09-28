@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { buildCategories } from "./hudCatalog";
 import { HudIcon } from "./hudIcons";
 import type { Language } from "./i18n";
-import type { EditorTool } from "./sceneEditorState";
+import type { EditorTool } from "./editor/sceneEditorState";
 
 type AppBuildRailProps = {
   canUndo: boolean;

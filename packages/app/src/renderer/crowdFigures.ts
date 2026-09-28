@@ -21,12 +21,12 @@ import {
   figureLook,
   type FigureArchetype,
   type FigureLook,
-} from "../crowdDemographics";
+} from "../engine/crowdDemographics";
 import {
   agentStateColor,
   agentStateKey,
   type AgentStateKey,
-} from "../agentStateColors";
+} from "../viewport/agentStateColors";
 import { createContactShadows } from "./contactShadows";
 
 /**

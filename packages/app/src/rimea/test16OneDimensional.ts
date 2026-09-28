@@ -1,5 +1,5 @@
-import { bodyRadiusRangeMeters } from "../behaviorDistributions";
-import { measureCorridorSpeed } from "../fundamentalDiagramHarness";
+import { bodyRadiusRangeMeters } from "../engine/behaviorDistributions";
+import { measureCorridorSpeed } from "../analytics/fundamentalDiagramHarness";
 import type { RimeaTestResult } from "./shared";
 import {
   fundamentalDiagramMeasureSeconds,

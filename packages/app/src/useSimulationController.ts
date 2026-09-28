@@ -3,8 +3,8 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import {
   createSimulationEngineFromScene,
   type SimulationSnapshot,
-} from "./simulationEngine";
-import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
+} from "./engine/simulationEngine";
+import type { SimulationDecisionBackend } from "./engine/simulationDecisionBackend";
 import { useRunScene } from "./useRunScene";
 
 export type SimulationController = {

@@ -1,20 +1,20 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
 import { lazy, Suspense, useState } from "react";
-import { ContactNetworkView } from "./ContactNetworkView";
-import { buildCrowdContactNetwork } from "./crowdContactNetwork";
+import { ContactNetworkView } from "./panels/ContactNetworkView";
+import { buildCrowdContactNetwork } from "./engine/crowdContactNetwork";
 import { formatSimulationClock } from "./appUi";
-import type { HeatmapCell } from "./heatmap";
+import type { HeatmapCell } from "./analytics/heatmap";
 import type { Language, TranslationKey } from "./i18n";
-import { SceneEditor } from "./SceneEditor";
+import { SceneEditor } from "./editor/SceneEditor";
 import type { StageTab, StageViewMode } from "./AppTypes";
-import { useLiveCrowd, type LiveCrowd } from "./liveCrowd";
-import { FloorSwitcher, type SwitchableFloor } from "./FloorSwitcher";
-import type { ViewedFloor } from "./agentInstanceField";
-import type { EditorTool } from "./sceneEditorState";
-import type { ViewportLayers } from "./viewportLayers";
+import { useLiveCrowd, type LiveCrowd } from "./engine/liveCrowd";
+import { FloorSwitcher, type SwitchableFloor } from "./editor/FloorSwitcher";
+import type { ViewedFloor } from "./viewport/agentInstanceField";
+import type { EditorTool } from "./editor/sceneEditorState";
+import type { ViewportLayers } from "./viewport/viewportLayers";
 
 const SimulationViewport = lazy(() =>
-  import("./SimulationViewport").then((module) => ({
+  import("./viewport/SimulationViewport").then((module) => ({
     default: module.SimulationViewport,
   })),
 );

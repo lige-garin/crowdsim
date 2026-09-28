@@ -10,7 +10,7 @@ import {
   type Camera,
   type Object3D,
 } from "three";
-import type { EditorTool } from "../sceneEditorState";
+import type { EditorTool } from "../editor/sceneEditorState";
 import {
   placementConflict,
   placementFootprint,

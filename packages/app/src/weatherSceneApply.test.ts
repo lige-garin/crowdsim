@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "./defaultDemoScene";
+import { defaultDemoScene } from "./scenes/defaultDemoScene";
 import { applyWeatherFactorsToScene } from "./weatherSceneApply";
 import type { WeatherEnvironmentFactorInput } from "./weatherMcpClient";
 

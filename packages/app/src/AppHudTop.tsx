@@ -1,6 +1,6 @@
 import { HudIcon, type HudIconName } from "./hudIcons";
 import type { Language, TranslationKey } from "./i18n";
-import type { SimulationStatus } from "./simulationEngine";
+import type { SimulationStatus } from "./engine/simulationEngine";
 import type { StageTab, StageViewMode } from "./AppTypes";
 
 import type { HudReadout } from "./appTopbarMetrics";

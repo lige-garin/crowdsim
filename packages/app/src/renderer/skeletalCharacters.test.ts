@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { weidmannFundamentalDiagram } from "../pedestrianFundamentalDiagram";
+import { weidmannFundamentalDiagram } from "../analytics/pedestrianFundamentalDiagram";
 import {
   DEFAULT_SKELETAL_CHARACTER_CAPACITY,
   SKELETAL_MOVEMENT_THRESHOLD_METERS_PER_SECOND,

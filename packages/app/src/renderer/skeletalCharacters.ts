@@ -1,6 +1,6 @@
 import { AnimationMixer, Group, Mesh, Object3D, type AnimationAction } from "three";
 import { clamp } from "../numberUtils";
-import { weidmannFundamentalDiagram } from "../pedestrianFundamentalDiagram";
+import { weidmannFundamentalDiagram } from "../analytics/pedestrianFundamentalDiagram";
 
 /**
  * A small, bounded set of real skinned, rigged, walking humanoid characters

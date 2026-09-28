@@ -6,7 +6,7 @@ import {
   measurePassingDistance,
   runOrcaComparison,
 } from "./orcaComparison";
-import { measureCorridorSpeed } from "../fundamentalDiagramHarness";
+import { measureCorridorSpeed } from "../analytics/fundamentalDiagramHarness";
 
 describe("measureCorridorSpeedMoussaid", () => {
   it("gives a finite, positive speed at a modest density, slowing as density rises", () => {

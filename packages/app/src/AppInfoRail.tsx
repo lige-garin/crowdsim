@@ -1,8 +1,8 @@
 import { infoLayers, infoWindows, type InfoWindowId } from "./hudCatalog";
 import { HudIcon } from "./hudIcons";
 import type { Language } from "./i18n";
-import { viewportLayerText, type ViewportLayerId } from "./viewportLayers";
-import type { ViewportLayers } from "./viewportLayers";
+import { viewportLayerText, type ViewportLayerId } from "./viewport/viewportLayers";
+import type { ViewportLayers } from "./viewport/viewportLayers";
 
 type AppInfoRailProps = {
   language: Language;

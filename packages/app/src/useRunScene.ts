@@ -1,7 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { useCallback, useState } from "react";
-import { hotUpdateBlocker } from "./simulationEngine";
-import type { SimulationDecisionBackend } from "./simulationDecisionBackend";
+import { hotUpdateBlocker } from "./engine/simulationEngine";
+import type { SimulationDecisionBackend } from "./engine/simulationDecisionBackend";
 
 /**
  * The scene a simulation run was *built* from (ADR-0007).

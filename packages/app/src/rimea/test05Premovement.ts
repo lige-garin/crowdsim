@@ -1,7 +1,7 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
-import { sampleUniformReactionSeconds } from "../behaviorDistributions";
-import { createMallCrowdDecisionBackend } from "../mallCrowdDecisionBackend";
-import { createSimulationEngineFromScene } from "../simulationEngine";
+import { sampleUniformReactionSeconds } from "../engine/behaviorDistributions";
+import { createMallCrowdDecisionBackend } from "../engine/mallCrowdDecisionBackend";
+import { createSimulationEngineFromScene } from "../engine/simulationEngine";
 import type { RimeaTestResult } from "./shared";
 import { corridorTest } from "./test01Corridor";
 

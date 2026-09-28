@@ -1,12 +1,12 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { createAgentMindset } from "./agentPersona";
-import { calibrateBrandAttraction } from "./brandCalibration";
+import { createAgentMindset } from "./engine/agentPersona";
+import { calibrateBrandAttraction } from "./engine/brandCalibration";
 import {
   chooseBrandStore,
   createBrandStoresFromScene,
   rankBrandStores,
-} from "./brandAttraction";
-import { createCustomerTwin, updateCustomerTwin } from "./customerDigitalTwin";
+} from "./engine/brandAttraction";
+import { createCustomerTwin, updateCustomerTwin } from "./engine/customerDigitalTwin";
 
 export type BrandDecisionInsight = {
   calibration: {

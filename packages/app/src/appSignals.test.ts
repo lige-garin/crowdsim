@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseScene } from "@crowdsim/scene-schema";
 import { floorSignals } from "./appSignals";
-import { demoScene } from "./demoScene";
+import { demoScene } from "./scenes/demoScene";
 import { messages } from "./i18nMessages";
 
 const t = (key: keyof typeof messages) => messages[key].en;

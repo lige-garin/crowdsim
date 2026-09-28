@@ -1,7 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { Language } from "./i18n";
 import { CityHeroScene } from "./renderer/CityHeroScene";
-import { TemplateGallery } from "./TemplateGallery";
+import { TemplateGallery } from "./panels/TemplateGallery";
 import type { UiMode } from "./uiMode";
 
 type AppHomeProps = {

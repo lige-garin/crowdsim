@@ -1,4 +1,4 @@
-import { bootstrapMeanInterval } from "../experimentSweep";
+import { bootstrapMeanInterval } from "../analytics/experimentSweep";
 import type { RimeaTestResult } from "./shared";
 import { corridorTest, walkCorridorOnce } from "./test01Corridor";
 

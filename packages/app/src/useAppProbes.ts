@@ -5,7 +5,7 @@ import {
   runDiscreteEventWasmProbe,
   runQueueSystemWasmProbe,
   runShopDecisionWasmProbe,
-} from "./behaviorWasm";
+} from "./engine/behaviorWasm";
 import type {
   AgentStateProbeState,
   DiscreteEventProbeState,

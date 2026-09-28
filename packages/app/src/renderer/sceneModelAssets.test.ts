@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
-import { defaultDemoScene } from "../defaultDemoScene";
+import { defaultDemoScene } from "../scenes/defaultDemoScene";
 import {
   createSceneAssetLoadPlans,
   createSceneAssetWorldTransform,
   prepareSceneVisualAssetObject,
   summarizeSceneAssetLoading,
 } from "./sceneModelAssets";
-import { createSceneRenderPlan } from "../sceneRenderPlan";
+import { createSceneRenderPlan } from "../viewport/sceneRenderPlan";
 
 describe("sceneModelAssets", () => {
   it("plans GLB and GLTF assets for GLTFLoader with placeholder fallback", () => {

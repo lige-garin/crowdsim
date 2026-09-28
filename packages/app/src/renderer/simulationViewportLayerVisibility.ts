@@ -1,5 +1,8 @@
 ﻿import type { Group, Object3D } from "three";
-import { viewportLayerOfObjectName, type ViewportLayers } from "../viewportLayers";
+import {
+  viewportLayerOfObjectName,
+  type ViewportLayers,
+} from "../viewport/viewportLayers";
 
 export function applyViewportLayers(
   dynamicGroup: Group | null,

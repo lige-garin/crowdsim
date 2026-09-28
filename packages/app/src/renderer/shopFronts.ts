@@ -11,7 +11,7 @@ import {
 } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { BoxBatch } from "./boxBatch";
-import type { Rect } from "../cityLayout";
+import type { Rect } from "../viewport/cityLayout";
 
 /**
  * Shops you can recognise as shops.

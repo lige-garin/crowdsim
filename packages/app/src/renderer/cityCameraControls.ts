@@ -1,5 +1,5 @@
 import type { PerspectiveCamera } from "three";
-import { isClick } from "../agentPicking";
+import { isClick } from "../viewport/agentPicking";
 import { clamp } from "../numberUtils";
 import {
   orbitByDrag,
@@ -11,7 +11,7 @@ import {
   zoomByWheel,
   type GroundPoint,
   type OrbitState,
-} from "../orbitCamera";
+} from "../viewport/orbitCamera";
 
 type Limit = { maxX: number; maxY: number; minX: number; minY: number };
 

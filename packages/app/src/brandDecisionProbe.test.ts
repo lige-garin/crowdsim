@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createBrandDecisionInsight } from "./brandDecisionProbe";
-import { demoScene } from "./demoScene";
+import { demoScene } from "./scenes/demoScene";
 
 describe("brand decision probe", () => {
   it("summarizes persona, chosen brand, top stores and twin calibration", () => {

@@ -1,6 +1,6 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { Language } from "./i18n";
-import type { SimulationSnapshot } from "./simulationEngine";
+import type { SimulationSnapshot } from "./engine/simulationEngine";
 import { formatSimulationClock } from "./appUi";
 import { formatSceneWeather } from "./weatherLabel";
 

@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppInspector } from "./AppInspector";
 import { I18nProvider, translate } from "./i18n";
-import { createRunAnalytics } from "./runAnalytics";
-import { createTrajectoryRecording } from "./trajectoryRecording";
+import { createRunAnalytics } from "./analytics/runAnalytics";
+import { createTrajectoryRecording } from "./analytics/trajectoryRecording";
 import type { SystemSignal } from "./AppTypes";
 
 // The component resolves its own label via `t("movementBackend")`, and the

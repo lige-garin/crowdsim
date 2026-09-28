@@ -1,8 +1,8 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { demoScene } from "./demoScene";
-import { createSimulationWorkerClient } from "./simulationWorkerClient";
+import { demoScene } from "./scenes/demoScene";
+import { createSimulationWorkerClient } from "./engine/simulationWorkerClient";
 import { useRunScene } from "./useRunScene";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 

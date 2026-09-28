@@ -1,7 +1,10 @@
 import { PerspectiveCamera } from "three";
 import { describe, expect, it } from "vitest";
-import { defaultDemoScene } from "../defaultDemoScene";
-import { placeEditorTool, createEditorDocumentFromScene } from "../sceneEditorState";
+import { defaultDemoScene } from "../scenes/defaultDemoScene";
+import {
+  placeEditorTool,
+  createEditorDocumentFromScene,
+} from "../editor/sceneEditorState";
 import {
   placeCountLineBetween,
   placeInScene,

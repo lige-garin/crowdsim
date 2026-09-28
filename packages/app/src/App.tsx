@@ -5,34 +5,37 @@ import { AppWorkbench } from "./AppWorkbench";
 import type { EvacuationState, StageTab, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
 import { createHudReadouts } from "./appTopbarMetrics";
-import { createDashboardStats } from "./dashboardStats";
-import { defaultDemoScene as initialScene } from "./defaultDemoScene";
-import { createEvacuationFlowPlan } from "./evacuationPlan";
-import { createHeatmapCellsFromSamples, heatmapSamplesOnFloor } from "./heatmap";
+import { createDashboardStats } from "./analytics/dashboardStats";
+import { defaultDemoScene as initialScene } from "./scenes/defaultDemoScene";
+import { createEvacuationFlowPlan } from "./engine/evacuationPlan";
+import {
+  createHeatmapCellsFromSamples,
+  heatmapSamplesOnFloor,
+} from "./analytics/heatmap";
 import { formatSceneName, I18nProvider, useI18n } from "./i18n";
 import { UiModeProvider, useUiMode } from "./uiMode";
-import { createSimulationCredibilityReport } from "./simulationCredibility";
-import { createLiveSimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
+import { createSimulationCredibilityReport } from "./engine/simulationCredibility";
+import { createLiveSimulationRuntimeArtifact } from "./engine/simulationRuntimeArtifact";
 import { useAppProbes } from "./useAppProbes";
 import { useSimulationController } from "./useSimulationController";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
-import { usesWorkerSimulationPath } from "./simulationThread";
-import { useWasmDecisionRuntime } from "./wasmDecisionRuntime";
-import type { EditorTool } from "./sceneEditorState";
+import { usesWorkerSimulationPath } from "./engine/simulationThread";
+import { useWasmDecisionRuntime } from "./engine/wasmDecisionRuntime";
+import type { EditorTool } from "./editor/sceneEditorState";
 import { placesInWorld } from "./renderer/worldPlacement";
-import { useWorldBuilding } from "./useWorldBuilding";
-import { hotUpdateBlocker } from "./simulationEngine";
-import { createLiveCrowd } from "./liveCrowd";
-import { downloadCsv } from "./runAnalytics";
-import { useRunSeries } from "./useRunSeries";
-import { trajectoryCsv } from "./trajectoryRecording";
+import { useWorldBuilding } from "./editor/useWorldBuilding";
+import { hotUpdateBlocker } from "./engine/simulationEngine";
+import { createLiveCrowd } from "./engine/liveCrowd";
+import { downloadCsv } from "./analytics/runAnalytics";
+import { useRunSeries } from "./analytics/useRunSeries";
+import { trajectoryCsv } from "./analytics/trajectoryRecording";
 import { toggleUrlFlag } from "./urlFlagToggle";
-import type { RunAnalyticsExport } from "./RunAnalyticsPanel";
+import type { RunAnalyticsExport } from "./panels/RunAnalyticsPanel";
 import {
   defaultViewportLayers,
   toggleViewportLayer,
   type ViewportLayerId,
-} from "./viewportLayers";
+} from "./viewport/viewportLayers";
 export function App() {
   return (
     <I18nProvider>

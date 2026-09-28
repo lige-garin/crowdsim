@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
-vi.mock("./behaviorWasm", () => ({
+vi.mock("./engine/behaviorWasm", () => ({
   addWithBehaviorWasm: vi.fn().mockResolvedValue(42),
   createWasmSimulationDecisionBackend: vi.fn().mockResolvedValue({
     decisionHz: 10,

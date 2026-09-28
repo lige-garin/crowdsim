@@ -9,15 +9,19 @@
   type Object3D,
 } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { facadeWindows } from "../buildingFacade";
+import { facadeWindows } from "../viewport/buildingFacade";
 import { groundTextures, groundTileMeters, repeatFor } from "./groundTextures";
-import { streetDressingPlacements } from "../streetDressing";
+import { streetDressingPlacements } from "../viewport/streetDressing";
 import type {
   SceneRenderAssetPlacement,
   SceneRenderPrimitive,
-} from "../sceneRenderPlan";
-import type { ViewMode } from "../simulationViewportTypes";
-import { primitiveBounds, toRenderX, toRenderY } from "../simulationViewportGeometry";
+} from "../viewport/sceneRenderPlan";
+import type { ViewMode } from "../viewport/simulationViewportTypes";
+import {
+  primitiveBounds,
+  toRenderX,
+  toRenderY,
+} from "../viewport/simulationViewportGeometry";
 import { sceneHeadingToRenderRotationZ } from "./sceneHeading";
 
 export function createRenderPrimitiveMesh(

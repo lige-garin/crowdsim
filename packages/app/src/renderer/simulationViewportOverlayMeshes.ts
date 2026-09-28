@@ -1,15 +1,15 @@
 ﻿import { CylinderGeometry, Mesh, MeshBasicMaterial, PlaneGeometry } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import type { SceneRenderPlan, SceneWeatherLine } from "../sceneRenderPlan";
+import type { SceneRenderPlan, SceneWeatherLine } from "../viewport/sceneRenderPlan";
 import type {
   ViewportFlowOverlay,
   ViewportHeatmapOverlay,
   ViewportOverlayPlan,
   ViewportRiskOverlay,
-} from "../viewportOverlayPlan";
-import { viewportLayerObjectPrefix } from "../viewportLayers";
-import type { ViewMode } from "../simulationViewportTypes";
-import { toRenderX, toRenderY } from "../simulationViewportGeometry";
+} from "../viewport/viewportOverlayPlan";
+import { viewportLayerObjectPrefix } from "../viewport/viewportLayers";
+import type { ViewMode } from "../viewport/simulationViewportTypes";
+import { toRenderX, toRenderY } from "../viewport/simulationViewportGeometry";
 import { createLineLikeMesh } from "./simulationViewportPrimitiveMeshes";
 import { createRainField } from "./rainField";
 

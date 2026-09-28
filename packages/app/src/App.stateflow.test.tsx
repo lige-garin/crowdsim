@@ -11,8 +11,8 @@ import { App } from "./App";
 
 // The evacuation mode lives in the WASM behaviour runtime, which does not load
 // in jsdom; give it the same answers the real module gives.
-vi.mock("./behaviorWasm", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./behaviorWasm")>()),
+vi.mock("./engine/behaviorWasm", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./engine/behaviorWasm")>()),
   initBehaviorWasm: vi.fn().mockResolvedValue(undefined),
   resetBehaviorModeWasm: vi.fn().mockResolvedValue({ active: false, label: "Normal" }),
   triggerEvacuationWithBehaviorWasm: vi

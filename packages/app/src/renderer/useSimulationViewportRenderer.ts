@@ -17,17 +17,17 @@ import {
 import type { WebGLRenderer } from "three";
 import type { WebGPURenderer } from "three/webgpu";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import { viewportAgentCapacity } from "../renderBenchmark";
+import { viewportAgentCapacity } from "../viewport/renderBenchmark";
 import {
   agentWorldPosition,
   selectCrowdAgents,
   type ViewedFloor,
   visibleAgentCount,
-} from "../agentInstanceField";
-import { crowdBudget } from "../crowdBudget";
+} from "../viewport/agentInstanceField";
+import { crowdBudget } from "../engine/crowdBudget";
 import { createCrowdFigures, type CrowdFigureAgent } from "./crowdFigures";
 import { createSkeletalCharacters } from "./skeletalCharacters";
-import { screenToNdc } from "../agentPicking";
+import { screenToNdc } from "../viewport/agentPicking";
 import { sceneHeadingToRenderRotationZ } from "./sceneHeading";
 import {
   attachCityCameraControls,
@@ -35,22 +35,22 @@ import {
   type CityCameraRig,
 } from "./cityCameraControls";
 import { createCityObjects, type CityObjects } from "./cityMeshes";
-import { CITY_CAMERA_FOV_DEGREES } from "../orbitCamera";
-import { toRenderX, toRenderY } from "../simulationViewportGeometry";
+import { CITY_CAMERA_FOV_DEGREES } from "../viewport/orbitCamera";
+import { toRenderX, toRenderY } from "../viewport/simulationViewportGeometry";
 import { attachPlacementGhost } from "./placementGhost";
 import { attachCountLineDraft } from "./countLineDragTool";
 import { scenePointAtScreen } from "./worldPlacement";
-import type { EditorTool } from "../sceneEditorState";
-import type { SimulationSnapshot } from "../simulationEngine";
-import type { ViewportAgentOverlayFrame } from "../simulationViewportOverlay";
-import { createSceneRenderPlan } from "../sceneRenderPlan";
-import { createViewportOverlayPlan } from "../viewportOverlayPlan";
+import type { EditorTool } from "../editor/sceneEditorState";
+import type { SimulationSnapshot } from "../engine/simulationEngine";
+import type { ViewportAgentOverlayFrame } from "../viewport/simulationViewportOverlay";
+import { createSceneRenderPlan } from "../viewport/sceneRenderPlan";
+import { createViewportOverlayPlan } from "../viewport/viewportOverlayPlan";
 import { loadSceneVisualAssetObject } from "./sceneModelAssets";
-import type { ViewportLayers } from "../viewportLayers";
-import type { HeatmapCell } from "../heatmap";
-import type { RenderStatus, ViewMode } from "../simulationViewportTypes";
-import type { ViewportRenderMode } from "../viewportRenderMode";
-import { localizedStatus, rawStatus } from "../simulationViewportStatus";
+import type { ViewportLayers } from "../viewport/viewportLayers";
+import type { HeatmapCell } from "../analytics/heatmap";
+import type { RenderStatus, ViewMode } from "../viewport/simulationViewportTypes";
+import type { ViewportRenderMode } from "../viewport/viewportRenderMode";
+import { localizedStatus, rawStatus } from "../viewport/simulationViewportStatus";
 import { applyViewportLayers } from "./simulationViewportLayerVisibility";
 import {
   applySceneAtmosphere,

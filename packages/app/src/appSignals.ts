@@ -22,12 +22,15 @@ import { formatSimulationClock, formatStageViewMode } from "./appUi";
 import type { FlowFieldProbeResult } from "./flowFieldProbe";
 import type { GpuGridProbeResult } from "./gpuGridProbe";
 import type { HeatmapProbeResult } from "./heatmapProbe";
-import type { MovementBackendId } from "./movementBackend";
-import { simulationRuntimeProfile, type SimulationSnapshot } from "./simulationEngine";
+import type { MovementBackendId } from "./engine/movementBackend";
+import {
+  simulationRuntimeProfile,
+  type SimulationSnapshot,
+} from "./engine/simulationEngine";
 import { createSharedArrayBufferSummary } from "./sharedArrayBufferProbe";
 import type { SocialForceProbeResult } from "./socialForceProbe";
 import type { SimulationWorkerControllerState } from "./useSimulationWorkerController";
-import { createDecisionBackendValue } from "./wasmDecisionRuntime";
+import { createDecisionBackendValue } from "./engine/wasmDecisionRuntime";
 import type { WebGpuProbeResult } from "./webgpuProbe";
 
 type SystemSignalOptions = {

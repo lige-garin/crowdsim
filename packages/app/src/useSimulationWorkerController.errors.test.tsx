@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { demoScene } from "./demoScene";
-import type { SimulationSnapshot } from "./simulationEngine";
+import { demoScene } from "./scenes/demoScene";
+import type { SimulationSnapshot } from "./engine/simulationEngine";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 
 const mocks = vi.hoisted(() => ({
@@ -22,8 +22,8 @@ function snap(status: SimulationSnapshot["status"]): SimulationSnapshot {
   };
 }
 
-vi.mock("./simulationWorkerClient", async (importActual) => {
-  const actual = await importActual<typeof import("./simulationWorkerClient")>();
+vi.mock("./engine/simulationWorkerClient", async (importActual) => {
+  const actual = await importActual<typeof import("./engine/simulationWorkerClient")>();
   return {
     ...actual,
     createSimulationWorkerClient: vi.fn(() => ({

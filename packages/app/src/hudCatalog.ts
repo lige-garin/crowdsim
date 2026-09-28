@@ -1,6 +1,6 @@
 import type { HudIconName } from "./hudIcons";
-import type { EditorTool } from "./sceneEditorState";
-import type { ViewportLayerId } from "./viewportLayers";
+import type { EditorTool } from "./editor/sceneEditorState";
+import type { ViewportLayerId } from "./viewport/viewportLayers";
 
 export type LocalizedLabel = { en: string; zh: string };
 

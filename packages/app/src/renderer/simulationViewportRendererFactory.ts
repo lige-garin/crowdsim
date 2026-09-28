@@ -6,7 +6,7 @@ import {
 } from "three";
 import { WebGPURenderer } from "three/webgpu";
 
-import { performanceBenchmarkFrames } from "../renderBenchmark";
+import { performanceBenchmarkFrames } from "../viewport/renderBenchmark";
 
 export function createGpuViewportRenderer(
   canvas: HTMLCanvasElement,

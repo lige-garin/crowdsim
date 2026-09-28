@@ -4,7 +4,7 @@ import {
   createMovementBackendProbeFixture,
   createMovementBackendReadinessSummary,
   createWebGpuMovementBackend,
-} from "./movementBackend";
+} from "./engine/movementBackend";
 
 export type MovementBackendProbeResult = {
   activeBackend: "cpu-compat";

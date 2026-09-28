@@ -5,8 +5,8 @@ import {
   stepCrowdMoussaid,
   visibleDistance,
 } from "./moussaidHeuristic";
-import { createWallIndex } from "../wallIndex";
-import type { SimulationAgent } from "../simulationEngine";
+import { createWallIndex } from "../engine/wallIndex";
+import type { SimulationAgent } from "../engine/simulationEngine";
 
 function agent(overrides: Partial<SimulationAgent> = {}): SimulationAgent {
   return {

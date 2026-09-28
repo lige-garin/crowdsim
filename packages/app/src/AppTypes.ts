@@ -3,12 +3,12 @@ import type {
   DiscreteEventProbeResult,
   QueueSystemProbeResult,
   ShopDecisionProbeResult,
-} from "./behaviorWasm";
-import type { EvacuationFlowPlan } from "./evacuationPlan";
+} from "./engine/behaviorWasm";
+import type { EvacuationFlowPlan } from "./engine/evacuationPlan";
 import type { MovementBackendProbeResult } from "./movementBackendProbe";
 import type { SharedArrayBufferProbeResult } from "./sharedArrayBufferProbe";
-import type { ViewMode } from "./SimulationViewport";
-import type { WasmDecisionRuntimeState } from "./wasmDecisionRuntime";
+import type { ViewMode } from "./viewport/SimulationViewport";
+import type { WasmDecisionRuntimeState } from "./engine/wasmDecisionRuntime";
 
 export type EvacuationCurvePoint = {
   elapsedSeconds: number;

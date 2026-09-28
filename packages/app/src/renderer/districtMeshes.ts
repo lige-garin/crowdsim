@@ -1,6 +1,6 @@
 import { Color, DoubleSide, MeshStandardMaterial, type Object3D } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import { contains, districtKeepOut, rectOf, type Rect } from "../cityLayout";
+import { contains, districtKeepOut, rectOf, type Rect } from "../viewport/cityLayout";
 import { BoxBatch } from "./boxBatch";
 import { createShopFronts } from "./shopFronts";
 

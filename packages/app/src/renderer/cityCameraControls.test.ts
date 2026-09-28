@@ -1,6 +1,6 @@
 import { PerspectiveCamera } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RADIUS_MIN, RADIUS_MAX } from "../orbitCamera";
+import { RADIUS_MIN, RADIUS_MAX } from "../viewport/orbitCamera";
 import {
   attachCityCameraControls,
   initialCityCameraRig,

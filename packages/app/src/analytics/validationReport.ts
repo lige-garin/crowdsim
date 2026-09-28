@@ -1,0 +1,367 @@
+import {
+  createFundamentalDiagramPoints,
+  type FundamentalDiagramPoint,
+} from "./fundamentalDiagram";
+import { escapeHtml } from "../htmlEscape";
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import {
+  createCommercialValidationBundle,
+  renderCommercialValidationHtml,
+  type CommercialValidationBundle,
+} from "./commercialValidation";
+import {
+  createPedestrianPresetSummary,
+  getPedestrianPreset,
+  pedestrianPresets,
+  type PedestrianPresetId,
+} from "../engine/pedestrianPresets";
+import { populationFor } from "../engine/populationSampling";
+import { rimeaCoreScenarios } from "./benchmarkScenarios";
+import { runBenchmarkSuite } from "./benchmarkRunner";
+import type { BenchmarkRunResult, BenchmarkScenario } from "./benchmarkTypes";
+import {
+  createResidualProjectionValidationReport,
+  type ResidualProjectionValidationReport,
+} from "./socialForceCalibration";
+import {
+  demoTrajectoryCsv,
+  deriveTrajectoryCalibrationTarget,
+  parseTrajectoryDatasetCsv,
+} from "./trajectoryDataset";
+
+export type ValidationReportLanguage = "en" | "zh";
+
+export type ValidationReport = {
+  benchmarkResults: BenchmarkRunResult[];
+  benchmarkSummary: {
+    failCount: number;
+    passCount: number;
+    totalCount: number;
+  };
+  generatedAtIso: string;
+  commercialValidation?: CommercialValidationBundle;
+  residualProjectionValidation: ResidualProjectionValidationReport;
+  /** The user's scene the commercial section describes, when one was given. */
+  sceneName?: string;
+  notes: string[];
+  pedestrianPresetSummaries: ReturnType<typeof createPedestrianPresetSummary>[];
+  /** What the profiles above mean for this run (ADR-0011). */
+  populationNote: string;
+  referenceLinks: {
+    label: string;
+    url: string;
+  }[];
+  speedDensityPoints: FundamentalDiagramPoint[];
+  title: string;
+};
+
+export type ValidationReportOptions = {
+  commercialScene?: CrowdSimScene;
+  generatedAtIso?: string;
+  scenarios?: readonly BenchmarkScenario[];
+};
+
+const weidmannReference = {
+  label: "Weidmann 1993 pedestrian speed-density reference curve",
+  url: "https://doi.org/10.3929/ethz-a-000687810",
+};
+
+/**
+ * The walking profiles the report should show: the ones this scene's crowd is
+ * drawn from, or all of them when the scene declares no population — in which
+ * case they are reference material, not a description of the run, and
+ * `populationNote` says so.
+ */
+function reportedPresets(scene?: CrowdSimScene) {
+  const mix = scene ? populationFor(scene) : undefined;
+
+  if (!mix) {
+    return pedestrianPresets;
+  }
+
+  return mix
+    .map((entry) => getPedestrianPreset(entry.profileId as PedestrianPresetId))
+    .filter((preset): preset is (typeof pedestrianPresets)[number] => Boolean(preset));
+}
+
+/** What the table above means for this run, in one honest sentence. */
+function populationNote(scene?: CrowdSimScene): string {
+  const mix = scene ? populationFor(scene) : undefined;
+
+  if (!mix) {
+    return "This scene declares no population: everyone walks at the engine's own speed distribution, and the profiles below are reference values the run did not use.";
+  }
+
+  const shares = mix
+    .map((entry) => `${entry.profileId} ${Math.round(entry.share * 100)}%`)
+    .join(", ");
+
+  return `This run drew its crowd from: ${shares}. Speeds come from the published ranges below; the distribution inside each range is uniform, which is this project's choice and not the source's.`;
+}
+
+export function createValidationReport(
+  options: ValidationReportOptions = {},
+): ValidationReport {
+  const benchmarkResults = runBenchmarkSuite(options.scenarios ?? rimeaCoreScenarios);
+  return createValidationReportFromBenchmarkResults(benchmarkResults, options);
+}
+
+/**
+ * Everything `createValidationReport` does except actually running the
+ * benchmark suite -- split out so a caller that can't afford to block (the
+ * benchmark suite steps four ~90-100s scenarios, thousands of physics
+ * steps, synchronously) can run `runBenchmarkSuite` in a worker first
+ * (`validationBenchmarkWorkerClient.ts`) and hand the results here, which
+ * is fast: scene-specific checks and formatting only.
+ */
+export function createValidationReportFromBenchmarkResults(
+  benchmarkResults: BenchmarkRunResult[],
+  options: ValidationReportOptions = {},
+): ValidationReport {
+  const generatedAtIso = options.generatedAtIso ?? new Date().toISOString();
+  const passCount = benchmarkResults.filter((result) => result.pass).length;
+  const failCount = benchmarkResults.length - passCount;
+
+  return {
+    benchmarkResults,
+    benchmarkSummary: {
+      failCount,
+      passCount,
+      totalCount: benchmarkResults.length,
+    },
+    generatedAtIso,
+    commercialValidation: options.commercialScene
+      ? createCommercialValidationBundle(options.commercialScene)
+      : undefined,
+    residualProjectionValidation: createReportResidualProjectionValidation(
+      benchmarkResults[0],
+    ),
+    sceneName: options.commercialScene
+      ? (options.commercialScene.name ?? options.commercialScene.id)
+      : undefined,
+    notes: [
+      ...(options.commercialScene
+        ? [
+            "Benchmark scenarios are engine regression fixtures and do not describe this scene; the commercial section does.",
+          ]
+        : []),
+      "Current M5 fixtures are deterministic regression baselines for the browser engine.",
+      "Wall-aware routing and empirical calibration should be tightened before these results are treated as certified RiMEA validation.",
+      "The residual projection is fitted to the same trajectory target it is scored against, so its improvement is an in-sample fit, not held-out validation.",
+      "Every figure here is one run at one seed. None of them carries a confidence interval, because none was repeated: for a range, run the sweep panel, which repeats each variant and reports a bootstrap interval.",
+    ],
+    pedestrianPresetSummaries: reportedPresets(options.commercialScene).map(
+      createPedestrianPresetSummary,
+    ),
+    populationNote: populationNote(options.commercialScene),
+    referenceLinks: [
+      weidmannReference,
+      {
+        label: pedestrianPresets[0].source.label,
+        url: pedestrianPresets[0].source.url,
+      },
+    ],
+    speedDensityPoints: createFundamentalDiagramPoints(
+      benchmarkResults.map((result) => ({
+        densityPeoplePerSquareMeter: result.densityPeak,
+        observedSpeedMetersPerSecond: result.meanSpeedMetersPerSecond,
+      })),
+    ),
+    title: "CrowdSim V2 calibration report",
+  };
+}
+
+export function renderValidationReportHtml(
+  report: ValidationReport,
+  language: ValidationReportLanguage,
+) {
+  const labels =
+    language === "zh"
+      ? {
+          benchmark: "基准场景",
+          density: "峰值密度",
+          generated: "生成时间",
+          notes: "说明",
+          residualProjection: "残差投影验证",
+          pass: "通过",
+          presets: "人群参数",
+          references: "参考来源",
+          scene: "场景",
+          speed: "平均速度",
+          speedDensity: "密度-速度对比",
+          status: "状态",
+          throughput: "吞吐量",
+          title: "CrowdSim V2 校准报告",
+        }
+      : {
+          benchmark: "Benchmark scenarios",
+          density: "Peak density",
+          generated: "Generated",
+          notes: "Notes",
+          residualProjection: "Residual projection validation",
+          pass: "Pass",
+          presets: "Pedestrian presets",
+          references: "References",
+          scene: "Scene",
+          speed: "Mean speed",
+          speedDensity: "Density-speed comparison",
+          status: "Status",
+          throughput: "Throughput",
+          title: report.title,
+        };
+
+  return `<!doctype html>
+<html lang="${language === "zh" ? "zh-CN" : "en"}">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(labels.title)}</title>
+  <style>
+    body { color: #151515; font: 14px/1.5 Arial, sans-serif; margin: 32px; }
+    h1 { font-size: 28px; margin: 0 0 4px; }
+    h2 { border-bottom: 1px solid #d8d8d8; font-size: 18px; margin-top: 28px; padding-bottom: 6px; }
+    table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+    th, td { border-bottom: 1px solid #e5e5e5; padding: 8px 6px; text-align: left; }
+    th { background: #f5f5f2; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+    .summary { display: flex; gap: 18px; margin: 18px 0; }
+    .summary strong { display: block; font-size: 24px; }
+    .ok { color: #11613a; font-weight: 700; }
+    .fail { color: #9f1d1d; font-weight: 700; }
+    @media print { body { margin: 18mm; } }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(labels.title)}</h1>
+  ${report.sceneName ? `<p>${escapeHtml(labels.scene)}: ${escapeHtml(report.sceneName)}</p>` : ""}
+  <p>${escapeHtml(labels.generated)}: ${escapeHtml(report.generatedAtIso)}</p>
+  <div class="summary">
+    <span><strong>${report.benchmarkSummary.passCount}</strong>${escapeHtml(labels.pass)}</span>
+    <span><strong>${report.benchmarkSummary.totalCount}</strong>Total</span>
+    <span><strong>${report.benchmarkSummary.failCount}</strong>Fail</span>
+  </div>
+  <h2>${escapeHtml(labels.benchmark)}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>${escapeHtml(labels.status)}</th>
+        <th>Scenario</th>
+        <th>${escapeHtml(labels.density)}</th>
+        <th>${escapeHtml(labels.speed)}</th>
+        <th>${escapeHtml(labels.throughput)}</th>
+        <th>Hash</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${report.benchmarkResults
+        .map(
+          (result) => `<tr>
+        <td class="${result.pass ? "ok" : "fail"}">${result.pass ? "PASS" : "FAIL"}</td>
+        <td>${escapeHtml(result.scenarioName)}</td>
+        <td>${result.densityPeak.toFixed(4)}</td>
+        <td>${result.meanSpeedMetersPerSecond.toFixed(3)} m/s</td>
+        <td>${result.throughputPerMinute.toFixed(2)} / min</td>
+        <td>${escapeHtml(result.reproducibilityHash)}</td>
+      </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>
+  <h2>${escapeHtml(labels.speedDensity)}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>${escapeHtml(labels.density)}</th>
+        <th>${escapeHtml(labels.speed)}</th>
+        <th>Weidmann</th>
+        <th>Delta</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${report.speedDensityPoints
+        .map(
+          (point) => `<tr>
+        <td>${point.densityPeoplePerSquareMeter.toFixed(4)}</td>
+        <td>${point.observedSpeedMetersPerSecond.toFixed(4)}</td>
+        <td>${point.referenceSpeedMetersPerSecond.toFixed(4)}</td>
+        <td>${point.speedDeltaMetersPerSecond.toFixed(4)}</td>
+      </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>
+  <h2>${escapeHtml(labels.residualProjection)}</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Target speed</th>
+        <th>Target throughput</th>
+        <th>Pure physics error</th>
+        <th>Physics + residual error</th>
+        <th>Improvement</th>
+        <th>Model</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${report.residualProjectionValidation.targetMeanSpeedMetersPerSecond.toFixed(3)} m/s</td>
+        <td>${report.residualProjectionValidation.targetThroughputPerMinute.toFixed(2)} / min</td>
+        <td>${report.residualProjectionValidation.baselineMeanError.toFixed(4)}</td>
+        <td>${report.residualProjectionValidation.correctedMeanError.toFixed(4)}</td>
+        <td>${(report.residualProjectionValidation.improvementRatio * 100).toFixed(1)}%</td>
+        <td>${escapeHtml(report.residualProjectionValidation.modelSource)}</td>
+      </tr>
+    </tbody>
+  </table>
+  <h2>${escapeHtml(labels.presets)}</h2>
+  <p>${escapeHtml(report.populationNote)}</p>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Label</th>
+        <th>Flat</th>
+        <th>Stair up</th>
+        <th>Stair down</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${report.pedestrianPresetSummaries
+        .map(
+          (preset) => `<tr>
+        <td>${escapeHtml(preset.id)}</td>
+        <td>${escapeHtml(preset.label)}</td>
+        <td>${preset.flatTerrainMeanMetersPerSecond.toFixed(3)}</td>
+        <td>${preset.stairUpMeanMetersPerSecond.toFixed(3)}</td>
+        <td>${preset.stairDownMeanMetersPerSecond.toFixed(3)}</td>
+      </tr>`,
+        )
+        .join("")}
+    </tbody>
+  </table>
+  ${report.commercialValidation ? renderCommercialValidationHtml(report.commercialValidation) : ""}
+  <h2>${escapeHtml(labels.notes)}</h2>
+  <ul>${report.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>
+  <h2>${escapeHtml(labels.references)}</h2>
+  <ul>${report.referenceLinks
+    .map(
+      (link) =>
+        `<li><a href="${escapeAttribute(link.url)}">${escapeHtml(link.label)}</a></li>`,
+    )
+    .join("")}</ul>
+</body>
+</html>`;
+}
+
+function createReportResidualProjectionValidation(result: BenchmarkRunResult) {
+  const dataset = parseTrajectoryDatasetCsv(demoTrajectoryCsv, {
+    id: "report-bottleneck",
+    name: "Report bottleneck trajectory",
+    source: "unified-csv-adapter",
+  });
+  const target = deriveTrajectoryCalibrationTarget(dataset);
+
+  return createResidualProjectionValidationReport(result, target);
+}
+
+function escapeAttribute(value: string) {
+  return escapeHtml(value).replaceAll("`", "&#096;");
+}

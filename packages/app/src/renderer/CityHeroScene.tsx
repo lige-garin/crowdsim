@@ -1,11 +1,11 @@
 import { useEffect, useRef } from "react";
 import { Color, PerspectiveCamera, Scene, Vector3 } from "three";
-import { defaultDemoScene } from "../defaultDemoScene";
+import { defaultDemoScene } from "../scenes/defaultDemoScene";
 import {
   CITY_CAMERA_FOV_DEGREES,
   orbitToPosition,
   type OrbitState,
-} from "../orbitCamera";
+} from "../viewport/orbitCamera";
 import { createCityObjects } from "./cityMeshes";
 import { createFallbackViewportRenderer } from "./simulationViewportRendererFactory";
 import {

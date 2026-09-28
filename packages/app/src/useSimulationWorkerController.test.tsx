@@ -1,13 +1,13 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { demoScene } from "./demoScene";
+import { demoScene } from "./scenes/demoScene";
 import { useSimulationWorkerController } from "./useSimulationWorkerController";
 
 const wasmMocks = vi.hoisted(() => ({
   createWasmSimulationDecisionBackend: vi.fn(),
 }));
 
-vi.mock("./behaviorWasm", () => ({
+vi.mock("./engine/behaviorWasm", () => ({
   createWasmSimulationDecisionBackend: wasmMocks.createWasmSimulationDecisionBackend,
 }));
 

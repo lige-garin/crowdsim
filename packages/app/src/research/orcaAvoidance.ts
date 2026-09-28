@@ -1,8 +1,8 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
 import { agentsWithinDistance, splitExitedAgents } from "./crowdStepUtils";
-import { constrainMovement, type SceneWorldBounds } from "../sceneGeometry";
-import type { SimulationAgent } from "../simulationEngine";
-import type { WallIndex } from "../wallIndex";
+import { constrainMovement, type SceneWorldBounds } from "../engine/sceneGeometry";
+import type { SimulationAgent } from "../engine/simulationEngine";
+import type { WallIndex } from "../engine/wallIndex";
 
 /**
  * ORCA (Optimal Reciprocal Collision Avoidance): van den Berg, Guy, Lin &

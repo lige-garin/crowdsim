@@ -1,16 +1,16 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
-import { sampleBodyRadius, sampleSpeedFactor } from "../behaviorDistributions";
-import { stepCrowd } from "../crowdMovement";
+import { sampleBodyRadius, sampleSpeedFactor } from "../engine/behaviorDistributions";
+import { stepCrowd } from "../engine/crowdMovement";
 import {
   measureCorridorSpeed,
   runPeriodicCorridor,
   type CorridorOptions,
-} from "../fundamentalDiagramHarness";
+} from "../analytics/fundamentalDiagramHarness";
 import { stepCrowdMoussaid } from "./moussaidHeuristic";
 import { stepCrowdOrca } from "./orcaAvoidance";
-import { weidmannFundamentalDiagram } from "../pedestrianFundamentalDiagram";
-import type { SimulationAgent } from "../simulationEngine";
-import { createWallIndex, type WallIndex } from "../wallIndex";
+import { weidmannFundamentalDiagram } from "../analytics/pedestrianFundamentalDiagram";
+import type { SimulationAgent } from "../engine/simulationEngine";
+import { createWallIndex, type WallIndex } from "../engine/wallIndex";
 
 /**
  * Social force vs ORCA vs Moussaïd's heuristic, on this project's own
