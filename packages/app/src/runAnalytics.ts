@@ -105,6 +105,17 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
   const journeys: { agentId: number; entered: number; left: number }[] = [];
   const stays: Stay[] = [];
   const peakConcurrent = new Map<string, number>();
+  /**
+   * The per-tick `concurrent` count computed below used to be folded
+   * straight into `peakConcurrent` (the running max) and discarded --
+   * `places[]` could say "the longest this queue ever got was 6" but never
+   * "how long it stayed near 6". Kept as its own series, same growth
+   * shape as `losSeries` right below (one entry per `record()` call, for
+   * the life of the run) so a queue's length over time can be read back
+   * per place via `placeOccupancyOverTime` -- this is what stage 4.2's
+   * "排队长度时间带" plan item actually needed and never had the data for.
+   */
+  const occupancySeries: { t: number; concurrent: Map<string, number> }[] = [];
 
   const cells = new Map<
     string,
@@ -214,6 +225,12 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
     for (const [key, count] of concurrent) {
       peakConcurrent.set(key, Math.max(peakConcurrent.get(key) ?? 0, count));
     }
+    // `concurrent` itself, not just its running max -- see occupancySeries's
+    // own comment. `concurrent` is a fresh `Map` local to this call (line
+    // ~146), so aliasing it directly would be safe today, but copying it
+    // costs one small Map clone and makes that safety independent of this
+    // function's future internals never mutating it again after this point.
+    occupancySeries.push({ t, concurrent: new Map(concurrent) });
 
     const levelCounts = fruinLevels.map(() => 0);
     for (const [cellKey, count] of counts) {
@@ -317,6 +334,52 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
     return journeys.map((journey) => journey.left - journey.entered);
   }
 
+  /**
+   * How many people were at `kind`/`placeId` at each recorded second of the
+   * run -- e.g. a specific store's `shopQueue`, over time, not just its
+   * `summary().places[]` peak. `kind`+`placeId` (not a pre-joined key)
+   * matches how a caller already has both fields from a `places[]` row,
+   * without needing to know this module's own internal `"kind:placeId"`
+   * key format.
+   *
+   * `windowSamples`, when given, returns only the most recent
+   * `windowSamples` entries via `Array.prototype.slice(-windowSamples)` --
+   * O(windowSamples), not O(run length so far), unlike mapping the whole
+   * `occupancySeries`. This matters because a caller like
+   * `RunAnalyticsPanel.tsx` calls this once per queue-kind place on every
+   * render while the run is live: without a window, per-render cost grows
+   * with elapsed run time (self-reviewed, found by a ponytail-review pass
+   * that traced this all the way to "O(elapsed seconds squared) over a
+   * run", not just "unbounded array"). One record() call is one sample
+   * (this project's own "采样分辨率1仿真秒" convention, same assumption
+   * `useRunSeries.ts`'s `chartSeconds` already makes for its own windowed
+   * series), so a sample count doubles as an approximate second count.
+   *
+   * `windowSamples: 0` means "no history", not "unwindowed" -- `slice(-0)`
+   * is `slice(0)` (the whole array) because `-0 === 0`, so 0 needs its own
+   * branch rather than falling through to the slice (ponytail-review caught
+   * this as a currently-unreachable latent bug: the sole real caller always
+   * passes a positive constant, but the function's own contract should not
+   * depend on that).
+   */
+  function placeOccupancyOverTime(
+    kind: StayKind,
+    placeId: string,
+    windowSamples?: number,
+  ): { t: number; count: number }[] {
+    const key = `${kind}:${placeId}`;
+    const source =
+      windowSamples === undefined
+        ? occupancySeries
+        : windowSamples <= 0
+          ? []
+          : occupancySeries.slice(-windowSamples);
+    return source.map((sample) => ({
+      count: sample.concurrent.get(key) ?? 0,
+      t: sample.t,
+    }));
+  }
+
   const csv = {
     flows: () =>
       toCsv(
@@ -379,7 +442,14 @@ export function createRunAnalytics(options: { cellSizeMeters?: number } = {}) {
       ),
   };
 
-  return { csv, journeyDurations, minuteFlows, record, summary };
+  return {
+    csv,
+    journeyDurations,
+    minuteFlows,
+    placeOccupancyOverTime,
+    record,
+    summary,
+  };
 }
 
 export type RunAnalytics = ReturnType<typeof createRunAnalytics>;

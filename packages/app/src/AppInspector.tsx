@@ -3,7 +3,7 @@ import { RetailAnalyticsPanel } from "./RetailAnalyticsPanel";
 import type { DashboardSample } from "./dashboardStats";
 import { RealObservationsPanel } from "./RealObservationsPanel";
 import { RunAnalyticsPanel, type RunAnalyticsExport } from "./RunAnalyticsPanel";
-import type { MinuteFlow, RunAnalyticsSummary } from "./runAnalytics";
+import type { MinuteFlow, RunAnalyticsSummary, StayKind } from "./runAnalytics";
 import type { EvacuationState, SystemSignal } from "./AppTypes";
 import type { HeatmapCell } from "./heatmap";
 import { formatSceneName, useI18n } from "./i18n";
@@ -30,6 +30,10 @@ type AppInspectorProps = {
   journeyDurations: () => number[];
   minuteFlows: () => MinuteFlow[];
   onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
+  placeOccupancyOverTime: (
+    kind: StayKind,
+    placeId: string,
+  ) => { t: number; count: number }[];
   /** Flips the flag above and reloads -- see `urlFlagToggle.ts`. */
   onToggleGpuMovement: () => void;
   runSummary: RunAnalyticsSummary;
@@ -51,6 +55,7 @@ export function AppInspector({
   minuteFlows,
   onExportRunAnalytics,
   onToggleGpuMovement,
+  placeOccupancyOverTime,
   runSummary,
   scene,
   signals,
@@ -95,6 +100,7 @@ export function AppInspector({
         language={language}
         minuteFlows={minuteFlows}
         onExport={onExportRunAnalytics}
+        placeOccupancyOverTime={placeOccupancyOverTime}
         scene={scene}
         summary={runSummary}
       />

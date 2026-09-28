@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DashboardSample } from "./dashboardStats";
 import { resolveDisplayPosition } from "./floorTransferDisplay";
 import type { HeatmapSample } from "./heatmap";
-import { createRunAnalytics, type RunAnalytics } from "./runAnalytics";
+import { createRunAnalytics, type RunAnalytics, type StayKind } from "./runAnalytics";
 import type { SimulationSnapshot } from "./simulationEngine";
 import type { SimulationRuntimeArtifact } from "./simulationRuntimeArtifact";
 import {
@@ -118,6 +118,12 @@ export function useRunSeries({
     heatmapSamples,
     journeyDurations: () => analyticsRef.current.journeyDurations(),
     minuteFlows: () => analyticsRef.current.minuteFlows(),
+    // Windowed to the same `chartSeconds` every other chart in this file
+    // uses -- a self-review found the unwindowed version scanning the
+    // whole run's history on every render, for every queue-kind place
+    // shown (see placeOccupancyOverTime's own comment).
+    placeOccupancyOverTime: (kind: StayKind, placeId: string) =>
+      analyticsRef.current.placeOccupancyOverTime(kind, placeId, chartSeconds),
     runSummary,
     trajectoryRecording,
   };

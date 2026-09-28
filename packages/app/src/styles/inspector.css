@@ -397,6 +397,22 @@
   grid-column: 1 / -1;
 }
 
+/* Same third-row-spans-both-columns shape as .run-analytics-lines above,
+   for a queue row's optional sparkline (only shopQueue/counterQueue rows
+   get one -- a row without one keeps the plain two-row height). */
+.run-analytics-places div {
+  grid-template-rows: auto auto auto;
+  height: auto;
+  padding-bottom: 8px;
+}
+
+.run-analytics-places .queue-length-sparkline {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 24px;
+  color: var(--lab-blue);
+}
+
 .compact-list span {
   font-family: var(--lab-mono);
   font-weight: 820;

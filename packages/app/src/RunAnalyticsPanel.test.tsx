@@ -47,6 +47,7 @@ describe("RunAnalyticsPanel", () => {
         language="en"
         minuteFlows={() => []}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={createRunAnalytics().summary()}
       />,
@@ -67,6 +68,7 @@ describe("RunAnalyticsPanel", () => {
         language="zh"
         minuteFlows={analytics.minuteFlows}
         onExport={onExport}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={analytics.summary()}
       />,
@@ -88,6 +90,7 @@ describe("RunAnalyticsPanel", () => {
         language="en"
         minuteFlows={analytics.minuteFlows}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={analytics.summary()}
       />,
@@ -126,6 +129,7 @@ describe("RunAnalyticsPanel", () => {
         language="en"
         minuteFlows={analytics.minuteFlows}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={summary}
       />,
@@ -145,6 +149,7 @@ describe("RunAnalyticsPanel", () => {
         language="en"
         minuteFlows={() => []}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={{
           ...summary,
@@ -179,6 +184,7 @@ describe("RunAnalyticsPanel", () => {
         language="en"
         minuteFlows={() => []}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={createRunAnalytics().summary()}
       />,
@@ -206,6 +212,7 @@ describe("Fruin LOS gauge", () => {
         language="zh"
         minuteFlows={analytics.minuteFlows}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={summary}
       />,
@@ -248,6 +255,7 @@ describe("Fruin LOS gauge", () => {
         language="zh"
         minuteFlows={sparse.minuteFlows}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={sparse.summary()}
       />,
@@ -263,6 +271,7 @@ describe("Fruin LOS gauge", () => {
         language="zh"
         minuteFlows={dense.minuteFlows}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={dense.summary()}
       />,
@@ -277,6 +286,63 @@ describe("Fruin LOS gauge", () => {
   });
 });
 
+describe("queue length sparkline", () => {
+  it("draws a sparkline for a queue-kind place, fed the real occupancy series, and not for a non-queue place", () => {
+    const baseSummary = createRunAnalytics().summary();
+    const summary = {
+      ...baseSummary,
+      places: [
+        {
+          kind: "shopQueue" as const,
+          p50Seconds: 12,
+          p90Seconds: 18,
+          peakConcurrent: 3,
+          placeId: "cafe",
+          visits: 5,
+        },
+        {
+          kind: "browse" as const,
+          p50Seconds: 20,
+          p90Seconds: 30,
+          peakConcurrent: 2,
+          placeId: "cafe",
+          visits: 10,
+        },
+      ],
+      samples: 1,
+    };
+    const series = [
+      { count: 0, t: 0 },
+      { count: 3, t: 1 },
+    ];
+    const placeOccupancyOverTime = vi.fn((kind: string, placeId: string) =>
+      kind === "shopQueue" && placeId === "cafe" ? series : [],
+    );
+
+    render(
+      <RunAnalyticsPanel
+        dashboardSamples={[]}
+        journeyDurations={() => []}
+        language="zh"
+        minuteFlows={() => []}
+        onExport={vi.fn()}
+        placeOccupancyOverTime={placeOccupancyOverTime}
+        scene={scene}
+        summary={summary}
+      />,
+    );
+
+    // Called with the real (kind, placeId) from the queue row, not a
+    // pre-joined key or a guess.
+    expect(placeOccupancyOverTime).toHaveBeenCalledWith("shopQueue", "cafe");
+    const sparklines = document.querySelectorAll(".queue-length-sparkline");
+    // Exactly one: the shopQueue row gets a sparkline, the browse row (same
+    // placeId "cafe", different kind) does not.
+    expect(sparklines).toHaveLength(1);
+    expect(sparklines[0].getAttribute("aria-label")).toBe("peak 3");
+  });
+});
+
 describe("what the measured numbers are", () => {
   it("says they come from one run and carry no interval", () => {
     render(
@@ -286,6 +352,7 @@ describe("what the measured numbers are", () => {
         language="zh"
         minuteFlows={() => []}
         onExport={vi.fn()}
+        placeOccupancyOverTime={() => []}
         scene={scene}
         summary={createRunAnalytics().summary()}
       />,

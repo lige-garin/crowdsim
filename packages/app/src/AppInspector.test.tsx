@@ -69,6 +69,7 @@ function renderInspector(
         journeyDurations={() => []}
         minuteFlows={() => []}
         onExportRunAnalytics={() => undefined}
+        placeOccupancyOverTime={() => []}
         onToggleGpuMovement={overrides.onToggleGpuMovement ?? (() => undefined)}
         runSummary={createRunAnalytics().summary()}
         scene={scene}

@@ -6,6 +6,7 @@ import { fruinColours, fruinLevels } from "./fruinLevelOfService";
 import type { Language } from "./i18n";
 import { JourneyTimeHistogram } from "./JourneyTimeHistogram";
 import { PlacesRankingChart } from "./PlacesRankingChart";
+import { QueueLengthSparkline } from "./QueueLengthSparkline";
 import { RealtimeStrip } from "./RealtimeStrip";
 import type {
   MinuteFlow,
@@ -102,6 +103,7 @@ export function RunAnalyticsPanel({
   language,
   minuteFlows,
   onExport,
+  placeOccupancyOverTime,
   scene,
   summary,
 }: {
@@ -110,6 +112,10 @@ export function RunAnalyticsPanel({
   language: Language;
   minuteFlows: () => MinuteFlow[];
   onExport: (kind: RunAnalyticsExport) => void;
+  placeOccupancyOverTime: (
+    kind: StayKind,
+    placeId: string,
+  ) => { t: number; count: number }[];
   scene: CrowdSimScene;
   summary: RunAnalyticsSummary;
 }) {
@@ -233,18 +239,27 @@ export function RunAnalyticsPanel({
                   visits: place.visits,
                 }))}
               />
-              <div className="status-list">
-                {places.map((place) => (
-                  <div key={`${place.kind}:${place.placeId}`}>
-                    <span>
-                      {text.kinds[place.kind]} · {placeName(place.placeId)}
-                    </span>
-                    <strong>
-                      {place.visits} {text.visits} · P50 {seconds(place.p50Seconds)} ·
-                      P90 {seconds(place.p90Seconds)} · max {place.peakConcurrent}
-                    </strong>
-                  </div>
-                ))}
+              <div className="status-list run-analytics-places">
+                {places.map((place) => {
+                  const isQueue =
+                    place.kind === "shopQueue" || place.kind === "counterQueue";
+                  return (
+                    <div key={`${place.kind}:${place.placeId}`}>
+                      <span>
+                        {text.kinds[place.kind]} · {placeName(place.placeId)}
+                      </span>
+                      <strong>
+                        {place.visits} {text.visits} · P50 {seconds(place.p50Seconds)} ·
+                        P90 {seconds(place.p90Seconds)} · max {place.peakConcurrent}
+                      </strong>
+                      {isQueue ? (
+                        <QueueLengthSparkline
+                          series={placeOccupancyOverTime(place.kind, place.placeId)}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             </>
           ) : null}

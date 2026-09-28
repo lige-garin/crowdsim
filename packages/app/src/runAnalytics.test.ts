@@ -135,6 +135,50 @@ describe("createRunAnalytics", () => {
     );
   });
 
+  it("tracks a queue's length over time, not just its peak", () => {
+    // Same fixture as "measures journeys and stays, and the longest line at
+    // a shop" above -- agent 2 is in shopQueue at "cafe" only at t=10, browse
+    // at t=40 (queue count back to 0), gone by t=60.
+    const analytics = createRunAnalytics();
+    analytics.record(scene, at(0, [person({ id: 1 }), person({ id: 2 })]));
+    analytics.record(
+      scene,
+      at(10, [
+        person({ id: 1, lifecycleState: "browse", selectedStoreId: "cafe" }),
+        person({ id: 2, lifecycleState: "queue", selectedStoreId: "cafe" }),
+      ]),
+    );
+    analytics.record(
+      scene,
+      at(40, [
+        person({ id: 1, lifecycleState: "leave" }),
+        person({ id: 2, lifecycleState: "browse", selectedStoreId: "cafe" }),
+      ]),
+    );
+    analytics.record(scene, at(60, [person({ id: 2, lifecycleState: "leave" })]));
+
+    const series = analytics.placeOccupancyOverTime("shopQueue", "cafe");
+    expect(series).toEqual([
+      { count: 0, t: 0 },
+      { count: 1, t: 10 },
+      { count: 0, t: 40 },
+      { count: 0, t: 60 },
+    ]);
+    // A place/kind combination that never actually occurred (nobody ever
+    // queued at "counter-that-never-existed") reads as a real all-zero
+    // series, not undefined/throwing -- the same "counted, not missing"
+    // distinction this project's real-observations import already insists
+    // on for count lines.
+    const neverHappened = analytics.placeOccupancyOverTime("shopQueue", "nope");
+    expect(neverHappened.every((sample) => sample.count === 0)).toBe(true);
+    expect(neverHappened).toHaveLength(4);
+
+    // windowSamples: 0 means "no history", not "unwindowed" -- `slice(-0)`
+    // is `slice(0)` (the whole array) because `-0 === 0`, a latent bug a
+    // ponytail-review pass caught even though no real caller passes 0 today.
+    expect(analytics.placeOccupancyOverTime("shopQueue", "cafe", 0)).toEqual([]);
+  });
+
   it("exposes each completed journey's raw duration, matching the summary's percentiles", () => {
     // Same record sequence as "measures journeys and stays" above: agent 1's
     // last-seen sample is t=40 (gone by t=60, duration 40s), agent 2's is

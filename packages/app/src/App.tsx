@@ -132,6 +132,7 @@ function AppContent() {
     heatmapSamples,
     journeyDurations,
     minuteFlows,
+    placeOccupancyOverTime,
     runSummary,
     trajectoryRecording,
   } = runSeries;
@@ -509,6 +510,7 @@ function AppContent() {
             gpuMovementRequested: requestGpuMovement,
             journeyDurations,
             minuteFlows,
+            placeOccupancyOverTime,
             onExportRunAnalytics: (kind: RunAnalyticsExport) =>
               downloadCsv(
                 `${scene.id}-${kind}-${Math.floor(simulation.snapshot.elapsedSeconds)}s.csv`,
