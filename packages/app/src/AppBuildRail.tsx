@@ -52,7 +52,13 @@ export function AppBuildRail({
                 className="hud-card"
                 data-testid={`palette-${entry.id}`}
                 aria-pressed={editorTool === entry.tool}
-                onClick={() => onEditorToolChange(entry.tool)}
+                onClick={() => {
+                  onEditorToolChange(entry.tool);
+                  // The tray sits over the middle of the plan on a 720px-high
+                  // window; leaving it open after a pick hides the very thing
+                  // you are about to click.
+                  setOpenCategory(null);
+                }}
               >
                 <span className="hud-card-art">
                   <HudIcon name={entry.icon} size={30} />

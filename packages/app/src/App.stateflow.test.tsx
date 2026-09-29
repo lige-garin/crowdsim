@@ -62,11 +62,11 @@ describe("view, tab and tool stay consistent", () => {
     renderWorkbench();
     fireEvent.click(screen.getByTestId("build-category-structure"));
     fireEvent.click(screen.getByTestId("palette-building"));
-    expect(pressed("palette-building")).toBe("true");
+    // The tray closes on a pick; the category tile shows the held tool.
+    expect(pressed("build-category-structure")).toBe("true");
 
     fireEvent.click(screen.getByTestId("view-mode-2d"));
 
-    expect(pressed("palette-building")).toBe("false");
     expect(pressed("palette-select")).toBe("true");
     expect(pressed("build-category-structure")).toBe("false");
   });
@@ -78,7 +78,7 @@ describe("view, tab and tool stay consistent", () => {
 
     fireEvent.click(screen.getByTestId("view-mode-3d"));
 
-    expect(pressed("palette-building")).toBe("true");
+    expect(pressed("build-category-structure")).toBe("true");
   });
 
   it("drops the wall tool on the way back to 3D, where walls cannot be drawn", () => {
@@ -89,7 +89,6 @@ describe("view, tab and tool stay consistent", () => {
 
     fireEvent.click(screen.getByTestId("view-mode-3d"));
 
-    expect(pressed("palette-wall")).toBe("false");
     expect(pressed("build-category-structure")).toBe("false");
   });
 

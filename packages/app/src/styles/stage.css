@@ -574,7 +574,7 @@
   min-height: 0;
   /* file bar, tools, status, floor bar, plan, parameters. The plan is the row
      that takes what is left; every other row is its own content's height. */
-  grid-template-rows: auto auto auto auto minmax(120px, 1fr) auto;
+  grid-template-rows: auto auto auto auto minmax(240px, 1fr) auto;
 }
 
 /* The editor canvas keeps the scene's aspect ratio, so a short wide box
@@ -582,9 +582,9 @@
  * clicks near the edges then land outside the world. Give it real height and
  * let the stage scroll rather than squashing it. */
 .workspace .stage-tab-edit .editor-canvas-wrap {
-  /* Small enough that every editor row still fits at 1280×720 with the build
-     tray open; the viewBox scales the plan down rather than cropping it. */
-  min-height: 120px;
+  /* At 1280×720 the editor's own rows leave ~120px, which letterboxes the
+     plan into a ~200px-wide strip. Hold 240px and let the stage scroll. */
+  min-height: 240px;
   height: 100%;
 }
 

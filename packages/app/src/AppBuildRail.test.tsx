@@ -35,6 +35,11 @@ describe("build rail is wired to real state", () => {
     fireEvent.click(screen.getByTestId("build-category-commerce"));
     fireEvent.click(screen.getByTestId("palette-shop"));
 
+    // Picking a tool closes the tray so it is not sitting on the plan; the
+    // held tool shows again when the category is reopened.
+    expect(screen.queryByTestId("palette-shop")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("build-category-commerce"));
+
     // The city is where you build: the run view stays, the tool is held.
     expect(screen.getByTestId("palette-shop")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("stage-tab-edit")).toHaveAttribute(
@@ -70,6 +75,7 @@ describe("build rail is wired to real state", () => {
 
     fireEvent.click(screen.getByTestId("build-category-structure"));
     fireEvent.click(screen.getByTestId("palette-road"));
+    fireEvent.click(screen.getByTestId("build-category-structure"));
     expect(screen.getByTestId("palette-road")).toHaveAttribute("aria-pressed", "true");
 
     // Driven from the editor's own toolbar, not the palette.
