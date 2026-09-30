@@ -129,6 +129,7 @@ export const messages = {
   },
   ifcInvalid: { zh: "IFC 无效", en: "IFC invalid" },
   editorStatus: { zh: "编辑器状态", en: "Editor status" },
+  objectCounts: { zh: "对象", en: "Objects" },
   editorTools: { zh: "编辑工具", en: "Editor tools" },
   engine: { zh: "引擎", en: "Engine" },
   entrances: { zh: "出入口", en: "Entrances" },

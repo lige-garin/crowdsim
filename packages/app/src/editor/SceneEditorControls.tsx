@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { ChangeEvent, RefObject } from "react";
 import {
@@ -134,6 +135,11 @@ export function SceneEditorControls({
   tools,
   viewMode,
 }: SceneEditorControlsProps) {
+  const [countsOpen, setCountsOpen] = useState(false);
+  const totalObjects = Object.values(documentCounts).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
   return (
     <>
       <div className="editor-filebar" aria-label={t("sceneFileControls")}>
@@ -325,48 +331,60 @@ export function SceneEditorControls({
         <span>
           {t("selected")} {selectedLabel}
         </span>
-        <span>
-          {t("roads")} {documentCounts.roads}
-        </span>
-        <span>
-          {t("buildings")} {documentCounts.buildings}
-        </span>
-        <span>
-          {t("walls")} {documentCounts.walls}
-        </span>
-        <span>
-          {t("zones")} {documentCounts.zones}
-        </span>
-        <span>
-          {t("entrances")} {documentCounts.entrances}
-        </span>
-        <span>
-          {t("targets")} {documentCounts.targets}
-        </span>
-        <span>
-          {t("shops")} {documentCounts.shops}
-        </span>
-        <span>
-          {t("service")} {documentCounts.servicePoints}
-        </span>
-        <span>
-          {t("transitStops")} {documentCounts.transitStops}
-        </span>
-        <span>
-          {t("crosswalks")} {documentCounts.crosswalks}
-        </span>
-        <span>
-          {t("trafficSignals")} {documentCounts.trafficSignals}
-        </span>
-        <span>
-          {t("obstacles")} {documentCounts.obstacles}
-        </span>
-        <span>
-          {t("hazards")} {documentCounts.hazards}
-        </span>
-        <span>
-          {t("countLines")} {documentCounts.countLines}
-        </span>
+        <button
+          type="button"
+          className="editor-counts-toggle"
+          aria-expanded={countsOpen}
+          onClick={() => setCountsOpen((open) => !open)}
+        >
+          {t("objectCounts")} {totalObjects} {countsOpen ? "▾" : "▸"}
+        </button>
+        {countsOpen ? (
+          <>
+            <span>
+              {t("roads")} {documentCounts.roads}
+            </span>
+            <span>
+              {t("buildings")} {documentCounts.buildings}
+            </span>
+            <span>
+              {t("walls")} {documentCounts.walls}
+            </span>
+            <span>
+              {t("zones")} {documentCounts.zones}
+            </span>
+            <span>
+              {t("entrances")} {documentCounts.entrances}
+            </span>
+            <span>
+              {t("targets")} {documentCounts.targets}
+            </span>
+            <span>
+              {t("shops")} {documentCounts.shops}
+            </span>
+            <span>
+              {t("service")} {documentCounts.servicePoints}
+            </span>
+            <span>
+              {t("transitStops")} {documentCounts.transitStops}
+            </span>
+            <span>
+              {t("crosswalks")} {documentCounts.crosswalks}
+            </span>
+            <span>
+              {t("trafficSignals")} {documentCounts.trafficSignals}
+            </span>
+            <span>
+              {t("obstacles")} {documentCounts.obstacles}
+            </span>
+            <span>
+              {t("hazards")} {documentCounts.hazards}
+            </span>
+            <span>
+              {t("countLines")} {documentCounts.countLines}
+            </span>
+          </>
+        ) : null}
       </div>
     </>
   );

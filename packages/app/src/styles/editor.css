@@ -830,7 +830,8 @@
 /* These object-count chips were left behind by the light skin: a white pill
  * with `--lab-ink` text, which under the dark palette is near-white on white.
  * That row of blank white bars under the toolbar was this rule. */
-.editor-status span {
+.editor-status span,
+.editor-status .editor-counts-toggle {
   padding: 2px 7px;
   border: 1px solid var(--lab-line);
   border-radius: 5px;
@@ -1264,4 +1265,11 @@
   background: rgba(10, 18, 28, 0.72);
   color: #dcefff;
   backdrop-filter: blur(6px);
+}
+
+/* The per-type object counts are reference, not something you steer by: the
+ * tool and selection stay on the row, the counts fold behind one chip. */
+.editor-status .editor-counts-toggle {
+  font: inherit;
+  cursor: pointer;
 }

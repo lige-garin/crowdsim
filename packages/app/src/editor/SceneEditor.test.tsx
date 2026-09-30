@@ -124,6 +124,9 @@ describe("SceneEditor template scene draft", () => {
     expect(
       screen.getByRole("option", { name: "Hospital Template Draft" }),
     ).toBeInTheDocument();
+    // The per-type counts sit behind the "对象" chip until it is opened.
+    expect(screen.queryByText(/服务 2/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^对象 \d+/ }));
     expect(screen.getByText(/服务 2/)).toBeInTheDocument();
   });
 
