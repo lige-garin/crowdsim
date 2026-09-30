@@ -5,6 +5,7 @@ import {
   type AgentSpawn,
   type GpuSimCoreSocialForceParams,
 } from "../src/index";
+import { runUpdateWallsScenario } from "./updateWallsScenario";
 import { enqueueCopyToReadbackBuffer, readFloat32Array } from "../src/gpuUtils";
 
 // Self-skips without a real WebGPU adapter (see test-webgpu/README.md).
@@ -330,6 +331,26 @@ describe("createGpuSimCore (real WebGPU)", () => {
       expect(result.velocities[3]).toBeCloseTo(-0.3, 6);
 
       core.destroy();
+      device!.destroy();
+    },
+  );
+
+  gpuTest(
+    "updateWalls writes walls in place: agents move exactly as in a core built with them, and a set beyond the headroom is declined",
+    async () => {
+      const adapter = await maybeNavigator?.gpu?.requestAdapter();
+      const device = await adapter?.requestDevice({
+        requiredLimits: { maxStorageBuffersPerShaderStage: 16 },
+      });
+      const result = await runUpdateWallsScenario(device!);
+
+      expect(result.accepted).toBe(true);
+      // 64 is the minimum headroom, so 65 walls do not fit.
+      expect(result.declined).toBe(false);
+      // Same walls, whether given at construction or afterwards: identical.
+      expect(result.updatedVsWithWall).toBeLessThan(1e-6);
+      // The wall genuinely acts on these agents, so "identical" is not vacuous.
+      expect(result.noWallVsWithWall).toBeGreaterThan(0.01);
       device!.destroy();
     },
   );

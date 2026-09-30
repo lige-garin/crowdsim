@@ -101,6 +101,15 @@ export type GpuSimCore = {
    */
   uploadSpeeds(speed: Float32Array): void;
   setCount(count: number): void;
+  /**
+   * Replace the wall set in place. Walls are only ever buffer data here —
+   * never compiled into the shader — so a scene edit that changes a floor's
+   * walls (same world size) needs a buffer write, not a new core: no
+   * pipeline compiles, and every agent's GPU-resident position and velocity
+   * survive. Returns `false` and changes nothing when the new set is larger
+   * than the headroom allocated at construction; the caller then rebuilds.
+   */
+  updateWalls(walls: WallSegment[]): boolean;
   step(dt: number): void;
   positionsBuffer(): GPUBuffer;
   readAggregates(): Promise<{ cellCounts: Uint32Array; maxCount: number }>;
@@ -130,7 +139,10 @@ export function createGpuSimCore(
   }
   const cellCount = layout.cellCount;
   const blocks = Math.max(1, Math.ceil(cellCount / SCAN_WORKGROUP));
-  const wallCount = walls.length;
+  let wallCount = walls.length;
+  // Headroom so a scene edit that adds a few walls can be written in place
+  // (`updateWalls`) instead of rebuilding the core and its five pipelines.
+  const wallCapacity = Math.max(64, wallCount * 2);
   const posBuffers = [0, 1].map((i) =>
     createStorageBuffer(
       device,
@@ -212,7 +224,7 @@ export function createGpuSimCore(
   const wallsBuffer = createStorageBuffer(
     device,
     "core-walls",
-    Math.max(1, wallCount) * 4 * F32,
+    wallCapacity * 4 * F32,
     GPUBufferUsage.COPY_DST,
   );
   const gridParamsBuffer = device.createBuffer({
@@ -497,6 +509,15 @@ export function createGpuSimCore(
       const cellCounts = await readUint32Array(readback, cellCount);
       readback.destroy();
       return { cellCounts, maxCount: maxUint32(cellCounts) };
+    },
+    updateWalls(newWalls) {
+      if (newWalls.length > wallCapacity) return false;
+      wallCount = newWalls.length;
+      if (wallCount > 0) {
+        device.queue.writeBuffer(wallsBuffer, 0, createWallsBufferData(newWalls));
+      }
+      syncParams();
+      return true;
     },
     async readback() {
       if (count === 0) {

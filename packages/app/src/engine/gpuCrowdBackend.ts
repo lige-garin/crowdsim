@@ -36,7 +36,13 @@ export type GpuCrowdPlane = {
   /** The `rawWalls`/`world` this plane's `core` was actually built from —
    * see `planeFingerprint`'s own comment for why `forPlane` needs it. */
   fingerprint: string;
+  /** Width x height the grid layout was built for; a change needs a new core. */
+  worldKey: string;
 };
+
+function worldKey(world: SceneWorldBounds): string {
+  return `${world.width}x${world.height}`;
+}
 
 /**
  * A cheap content key for "would `createGpuSimCore` need to be called
@@ -142,6 +148,19 @@ export function createGpuCrowdPlanePool(
       lastInputs.set(planeId, { rawWalls, world });
       const fingerprint = planeFingerprint(rawWalls, world);
       if (existing && existing.fingerprint === fingerprint) return existing;
+      // Same world size, different walls: the walls are only buffer data in
+      // the core, so write them in place. That keeps the core, its compiled
+      // pipelines, the allocator, and every agent's GPU-resident state. It
+      // declines (returns false) only when the new set outgrows the buffer
+      // headroom, and a world-size change always needs a new grid.
+      if (
+        existing &&
+        existing.worldKey === worldKey(world) &&
+        existing.core.updateWalls([...rawWalls])
+      ) {
+        existing.fingerprint = fingerprint;
+        return existing;
+      }
       if (existing) existing.core.destroy();
       const layout = createSpatialHashGridLayout({
         width: world.width,
@@ -157,6 +176,7 @@ export function createGpuCrowdPlanePool(
         }),
         allocator: createGpuSlotAllocator(),
         fingerprint,
+        worldKey: worldKey(world),
       };
       planes.set(planeId, plane);
       return plane;
