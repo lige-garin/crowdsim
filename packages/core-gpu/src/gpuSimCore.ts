@@ -515,16 +515,25 @@ export function createGpuSimCore(
         bytes,
       );
       device.queue.submit([encoder.finish()]);
-      await device.queue.onSubmittedWorkDone();
-      const internalError = await device.popErrorScope();
-      const validationError = await device.popErrorScope();
+      // Every await here is a round trip to the GPU process, and they used to
+      // run one after another (submitted-work, two error scopes, then each
+      // buffer's map). Issue the maps and both scope pops together and wait
+      // once: mapAsync already waits for the copy that feeds it, and the
+      // scopes still catch a failed copy, which is the silent-stale-data bug
+      // they were added for.
+      const [positions, velocities, internalError, validationError] = await Promise.all(
+        [
+          readFloat32Array(positionsReadbackBuffer, count * 2),
+          readFloat32Array(velocitiesReadbackBuffer, count * 2),
+          device.popErrorScope(),
+          device.popErrorScope(),
+        ],
+      );
       if (internalError || validationError) {
         throw new Error(
           internalError?.message ?? validationError?.message ?? "GPU readback failed",
         );
       }
-      const positions = await readFloat32Array(positionsReadbackBuffer, count * 2);
-      const velocities = await readFloat32Array(velocitiesReadbackBuffer, count * 2);
       return { positions, velocities };
     },
     destroy() {

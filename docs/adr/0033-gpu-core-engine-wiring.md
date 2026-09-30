@@ -462,6 +462,53 @@
   determinism trade-off), ADR-0006 (WebGPU compute / labelled WebGL-CPU
   fallback, "no silent degradation")
 
+- **Stage 4 addendum — per-step measurement corrects the "GPU is slower at
+  every count" reading (2026-09-30)**: the 2026-09-26 numbers were per
+  `tick()` call, and under the starved-`requestAnimationFrame` automation a
+  call catches up roughly 250 ms of simulated time — about nine fixed
+  steps. That multiplied both backends' per-step cost, and it only ever saw
+  crowds under ~600. Re-measured **per fixed step** (`stepAsync(1)`,
+  dt = 1/60, real engine, Stadium Concourse with the entrances raised to
+  4000/min so the crowd fills to the 2000 cap, no decision backend — its
+  cost is identical for both, so excluded; NVIDIA Lovelace, real Chrome):
+
+  | agents    | CPU mean (p95) ms | GPU mean (p95) ms |
+  | --------- | ----------------- | ----------------- |
+  | 0–249     | 0.55 (1.28)       | 3.27 (4.67)       |
+  | 250–499   | 1.67 (3.14)       | 3.99 (5.21)       |
+  | 500–749   | 3.19 (5.43)       | 4.77 (5.94)       |
+  | 750–999   | 4.84 (8.63)       | 5.31 (6.55)       |
+  | 1000–1249 | 9.27 (19.97)      | 5.65 (7.09)       |
+  | 1250–1499 | 10.88 (25.69)     | 6.14 (7.88)       |
+  | 1500–1749 | 18.47 (31.46)     | 5.79 (7.63)       |
+  | 1750–1999 | not reached       | 5.57 (6.75)       |
+
+  So the crossover is at roughly **750–1000 agents**: below it the CPU path
+  is faster, above it the GPU path is, and by 1500 the CPU's mean is past
+  the 16.6 ms frame budget while the GPU's stays near 6 ms up to the
+  2000-agent cap. **The earlier conclusion holds only below ~900 agents.**
+  - **Where the GPU floor comes from**: at core level (`step` + `readback`,
+    no engine) the cost is ~3.4 ms and does not change between 100, 600 and
+    2000 agents — it is one `mapAsync` round trip to the GPU process. The
+    readback used to wait five things in series (submitted work, two error
+    scopes, then each buffer's map); issuing them together and waiting once
+    took it to ~2.9 ms. That is the whole gain (~0.5 ms); the round trip
+    itself cannot be shortened from here. Behaviour is unchanged: the same
+    400-step CPU-vs-GPU comparison gives an identical maximum difference
+    (0.7726 m) before and after.
+  - **What follows from the floor**: every fixed step pays it. At 1× that is
+    one step per frame, ~3 ms of a 16.6 ms budget. Fast-forward runs several
+    steps per frame, so at 4× and above the GPU path cannot beat the CPU
+    below the crossover, and 8× at any count costs eight round trips. Not
+    measured; stated from the floor.
+  - **Not investigated**: 23 agents after 400 steps differ between the two
+    backends by up to 0.77 m, while the 6-agent, 30-tick parity test agrees
+    to 1e-5. ADR-0002 accepts tolerance-level rather than bitwise agreement,
+    but how that difference grows with step count has not been quantified.
+  - **Limits**: one machine, one scene, movement and arrivals only, single
+    steps. CPU stays the default (ADR-0006); this changes the reason to
+    opt in from "never" to "above roughly 900 agents", not the default.
+
 ## Context
 
 ADR-0015 ported `crowdMovement.ts`'s full force model — exponential
