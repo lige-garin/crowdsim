@@ -30,6 +30,7 @@ export function SceneEditorFloorBar({
       className="editor-floorbar"
       aria-label={t("floors")}
       data-testid="editor-floors"
+      title={t("floorsNote")}
     >
       <span className="editor-floorbar-label">{t("floors")}</span>
       <FloorSwitcher
@@ -45,7 +46,6 @@ export function SceneEditorFloorBar({
       >
         {t("floorAdd")}
       </button>
-      <span className="editor-floorbar-note">{t("floorsNote")}</span>
     </div>
   );
 }

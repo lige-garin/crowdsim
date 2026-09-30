@@ -231,12 +231,14 @@ describe("App", () => {
     // The scene-draft button used to double as the image-tracing trigger, which
     // put fixture geometry on screen for a scene nobody had traced. Tracing
     // geometry now has its own labelled entry.
-    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "模板草稿" }));
 
     expect(screen.queryByLabelText("描图图层（示例）")).not.toBeInTheDocument();
     expect(screen.getByText("请先输入模板提示词")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "描图示例" }));
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "描图示例" }));
 
     expect(screen.getByLabelText("描图图层（示例）")).toBeInTheDocument();
     expect(screen.getAllByText(/复核/).length).toBeGreaterThan(0);

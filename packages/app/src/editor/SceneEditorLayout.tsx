@@ -351,13 +351,14 @@ export function SceneEditorLayout({
         tool={tool}
         tools={tools}
         viewMode={viewMode}
-      />
-
-      <SceneEditorFloorBar
-        document={document}
-        onAddFloor={onAddFloor}
-        onSelectFloor={onSelectFloor}
-        t={t}
+        statusTrailing={
+          <SceneEditorFloorBar
+            document={document}
+            onAddFloor={onAddFloor}
+            onSelectFloor={onSelectFloor}
+            t={t}
+          />
+        }
       />
 
       <SceneEditorCanvas

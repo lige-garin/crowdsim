@@ -971,7 +971,7 @@
   color: var(--lab-muted);
   box-shadow: none;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 2px;
   padding-bottom: 9px;
   border-bottom: 1px solid var(--lab-line);
 }
@@ -1080,9 +1080,9 @@
 }
 
 .workspace .editor-tool {
-  min-width: 44px;
+  min-width: 40px;
   min-height: 42px;
-  padding: 4px 6px;
+  padding: 4px 3px;
 }
 
 .workspace .editor-tool-glyph {
@@ -1108,7 +1108,7 @@
   color: var(--lab-blue-strong);
 }
 
-.workspace .editor-tool-apply {
+.workspace .editor-filebar .editor-apply {
   border-color: rgba(220, 193, 139, 0.4);
   background: rgba(200, 169, 107, 0.1);
   color: var(--lab-blue-strong);
@@ -1119,10 +1119,6 @@
 }
 
 .workspace .editor-tool[aria-pressed="true"] .editor-tool-glyph {
-  color: var(--lab-blue-strong);
-}
-
-.workspace .editor-tool-apply .editor-tool-text {
   color: var(--lab-blue-strong);
 }
 
@@ -1272,4 +1268,50 @@
 .editor-status .editor-counts-toggle {
   font: inherit;
   cursor: pointer;
+}
+
+/* Everything in the file bar except the scene picker and Save is a one-off:
+ * load, export, import from four formats, a basemap, a template draft. They
+ * fold into one menu so the bar is a single row. */
+.editor-file-menu-wrap {
+  position: relative;
+}
+
+.editor-file-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  display: grid;
+  min-width: 220px;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--lab-line-strong, var(--lab-line));
+  border-radius: 8px;
+  background: #101a24;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.editor-file-menu button {
+  text-align: left;
+}
+
+.editor-file-menu-template {
+  display: grid;
+  gap: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--lab-line);
+}
+
+/* The floor chooser rides on the status row instead of taking its own. Its
+ * own label and buttons are not count chips, so opt out of the chip skin. */
+.editor-status .editor-floorbar {
+  margin-left: auto;
+  padding: 0;
+}
+
+.editor-status .editor-floorbar span {
+  padding: 0;
+  border: 0;
+  background: none;
 }

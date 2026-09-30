@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
-import type { ChangeEvent, RefObject } from "react";
+import type { ChangeEvent, ReactNode, RefObject } from "react";
 import {
   formatEditorTool,
   formatSceneName,
@@ -49,6 +49,7 @@ type DocumentCounts = {
 };
 
 type SceneEditorControlsProps = {
+  statusTrailing?: ReactNode;
   templatePrompt: string;
   baseSceneId: string;
   basemapInputRef: RefObject<HTMLInputElement | null>;
@@ -134,8 +135,23 @@ export function SceneEditorControls({
   tool,
   tools,
   viewMode,
+  statusTrailing,
 }: SceneEditorControlsProps) {
   const [countsOpen, setCountsOpen] = useState(false);
+  const [fileMenuOpen, setFileMenuOpen] = useState(false);
+  const fileMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!fileMenuOpen) return;
+    const close = (event: MouseEvent) => {
+      if (!fileMenuRef.current?.contains(event.target as Node)) setFileMenuOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [fileMenuOpen]);
+  const pick = (action: () => void) => () => {
+    setFileMenuOpen(false);
+    action();
+  };
   const totalObjects = Object.values(documentCounts).reduce(
     (sum, count) => sum + count,
     0,
@@ -160,43 +176,115 @@ export function SceneEditorControls({
         <button type="button" onClick={onSaveScene}>
           {t("save")}
         </button>
-        <button type="button" onClick={onLoadSavedScene} disabled={!canLoadSavedScene}>
-          {t("loadSaved")}
+        <button
+          type="button"
+          className="editor-apply"
+          data-testid="editor-apply-scene"
+          onClick={onApplyScene}
+        >
+          {t("applyToSimulation")}
         </button>
-        <button type="button" onClick={onExportScene}>
-          {t("export")}
-        </button>
-        <button type="button" onClick={() => fileInputRef.current?.click()}>
-          {t("import")}
-        </button>
-        <button type="button" onClick={() => geoJsonInputRef.current?.click()}>
-          {t("geoJsonImport")}
-        </button>
-        <button type="button" onClick={() => dxfInputRef.current?.click()}>
-          {t("dxfImport")}
-        </button>
-        <button type="button" onClick={() => ifcInputRef.current?.click()}>
-          {t("ifcImport")}
-        </button>
-        <button type="button" onClick={() => basemapInputRef.current?.click()}>
-          {t("basemap")}
-        </button>
-        <button type="button" onClick={onShowTracingFixture}>
-          {t("imageTracingDemo")}
-        </button>
-        <label>
-          <span className="visually-hidden">{t("templatePrompt")}</span>
-          <input
-            aria-label={t("templatePrompt")}
-            type="text"
-            value={templatePrompt}
-            placeholder={t("templatePromptPlaceholder")}
-            onChange={(event) => onTemplatePromptChange(event.target.value)}
-          />
-        </label>
-        <button type="button" onClick={onTemplateDraft}>
-          {t("templateDraft")}
-        </button>
+        <div className="editor-file-menu-wrap" ref={fileMenuRef}>
+          <button
+            type="button"
+            aria-expanded={fileMenuOpen}
+            aria-haspopup="menu"
+            onClick={() => setFileMenuOpen((open) => !open)}
+          >
+            {t("fileMenu")} {fileMenuOpen ? "▾" : "▸"}
+          </button>
+          {fileMenuOpen ? (
+            <div
+              className="editor-file-menu"
+              role="menu"
+              aria-label={t("fileMenu")}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setFileMenuOpen(false);
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={pick(onLoadSavedScene)}
+                disabled={!canLoadSavedScene}
+              >
+                {t("loadSaved")}
+              </button>
+              <button type="button" role="menuitem" onClick={pick(onExportScene)}>
+                {t("export")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  fileInputRef.current?.click();
+                }}
+              >
+                {t("import")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  geoJsonInputRef.current?.click();
+                }}
+              >
+                {t("geoJsonImport")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  dxfInputRef.current?.click();
+                }}
+              >
+                {t("dxfImport")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  ifcInputRef.current?.click();
+                }}
+              >
+                {t("ifcImport")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  basemapInputRef.current?.click();
+                }}
+              >
+                {t("basemap")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={pick(onShowTracingFixture)}
+              >
+                {t("imageTracingDemo")}
+              </button>
+              <div className="editor-file-menu-template">
+                <input
+                  aria-label={t("templatePrompt")}
+                  type="text"
+                  value={templatePrompt}
+                  placeholder={t("templatePromptPlaceholder")}
+                  onChange={(event) => onTemplatePromptChange(event.target.value)}
+                />
+                <button type="button" role="menuitem" onClick={pick(onTemplateDraft)}>
+                  {t("templateDraft")}
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </div>
         <input
           ref={fileInputRef}
           className="visually-hidden"
@@ -311,18 +399,6 @@ export function SceneEditorControls({
           </span>
           <span className="editor-tool-text">{t("delete")}</span>
         </button>
-        <span className="editor-toolbar-divider" aria-hidden="true" />
-        <button
-          type="button"
-          className="editor-tool editor-tool-apply"
-          data-testid="editor-apply-scene"
-          onClick={onApplyScene}
-        >
-          <span className="editor-tool-glyph" aria-hidden="true">
-            AP
-          </span>
-          <span className="editor-tool-text">{t("applyToSimulation")}</span>
-        </button>
       </div>
       <div className="editor-status" aria-label={t("editorStatus")}>
         <span>
@@ -385,6 +461,7 @@ export function SceneEditorControls({
             </span>
           </>
         ) : null}
+        {statusTrailing}
       </div>
     </>
   );

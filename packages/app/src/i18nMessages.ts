@@ -129,6 +129,7 @@ export const messages = {
   },
   ifcInvalid: { zh: "IFC 无效", en: "IFC invalid" },
   editorStatus: { zh: "编辑器状态", en: "Editor status" },
+  fileMenu: { zh: "文件", en: "File" },
   objectCounts: { zh: "对象", en: "Objects" },
   editorTools: { zh: "编辑工具", en: "Editor tools" },
   engine: { zh: "引擎", en: "Engine" },
@@ -158,8 +159,8 @@ export const messages = {
     en: "floors, all simulated",
   },
   floorsNote: {
-    zh: "用楼梯/扶梯连通；电梯未建模",
-    en: "Joined by stairs and escalators; lifts not modelled",
+    zh: "用楼梯、扶梯或电梯连通",
+    en: "Joined by stairs, escalators or lifts",
   },
   flow: { zh: "流量", en: "Flow" },
   flowField: { zh: "流场", en: "Flow field" },

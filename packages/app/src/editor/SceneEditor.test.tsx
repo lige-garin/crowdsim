@@ -82,7 +82,8 @@ describe("SceneEditor image geometry overlay", () => {
 
     expect(container.querySelector(".ai-image-line")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "描图示例" }));
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "描图示例" }));
 
     await waitFor(() =>
       expect(container.querySelector(".ai-image-line")).toBeInTheDocument(),
@@ -97,7 +98,8 @@ describe("SceneEditor image geometry overlay", () => {
     uploadBasemap(container, "my-floor-plan.png");
     await screen.findByText("此图未运行几何识别");
 
-    fireEvent.click(screen.getByRole("button", { name: "描图示例" }));
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "描图示例" }));
 
     expect(screen.queryByText("此图未运行几何识别")).toBeNull();
   });
@@ -107,7 +109,8 @@ describe("SceneEditor template scene draft", () => {
   it("refuses to draft anything until the user has typed a prompt", () => {
     renderEditor();
 
-    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "模板草稿" }));
 
     expect(screen.getByText("请先输入模板提示词")).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: /Template Draft/ })).toBeNull();
@@ -116,10 +119,11 @@ describe("SceneEditor template scene draft", () => {
   it("drafts a hospital scene when the prompt asks for a hospital", () => {
     renderEditor();
 
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
     fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "hospital outpatient hall" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "模板草稿" }));
 
     expect(
       screen.getByRole("option", { name: "Hospital Template Draft" }),
@@ -133,10 +137,11 @@ describe("SceneEditor template scene draft", () => {
   it("drafts a station scene when the prompt asks for a station", () => {
     renderEditor();
 
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
     fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "train station concourse" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "模板草稿" }));
 
     expect(
       screen.getByRole("option", { name: "Station Template Draft" }),
@@ -146,10 +151,11 @@ describe("SceneEditor template scene draft", () => {
   it("drafts a mall scene when the prompt asks for a mall", () => {
     renderEditor();
 
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
     fireEvent.change(screen.getByLabelText("模板提示词"), {
       target: { value: "mall circulation" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "模板草稿" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "模板草稿" }));
 
     expect(screen.getByRole("option", { name: "商场模板草稿" })).toBeInTheDocument();
   });
@@ -226,7 +232,8 @@ describe("SceneEditor DXF import wiring", () => {
     const { container } = renderEditor();
 
     // The control is there and routes through a hidden, typed file input.
-    expect(screen.getByRole("button", { name: "导入 DXF" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    expect(screen.getByRole("menuitem", { name: "导入 DXF" })).toBeInTheDocument();
 
     const input = container.querySelector<HTMLInputElement>('input[accept*=".dxf"]');
     expect(input).not.toBeNull();
@@ -405,12 +412,13 @@ describe("floors in the 2D editor", () => {
     expect(countLines()).toBe(1);
   });
 
-  it("says what joins the floors, and what is not modelled", () => {
+  it("says what joins the floors, and no longer claims lifts are not modelled", () => {
     renderEditor();
 
-    // The bar's own note, not the toolbar button of the same name.
-    expect(document.querySelector(".editor-floorbar-note")?.textContent).toMatch(
-      /lifts not modelled|电梯未建模/,
-    );
+    // Elevators have been modelled since ADR-0010 stage 6; the note used to
+    // say they were not. It is the bar's tooltip now, to keep the bar to one row.
+    const note = screen.getByTestId("editor-floors").getAttribute("title") ?? "";
+    expect(note).toMatch(/lifts|电梯/);
+    expect(note).not.toMatch(/not modelled|未建模/);
   });
 });
