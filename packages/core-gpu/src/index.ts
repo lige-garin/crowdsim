@@ -28,6 +28,7 @@ export type { AgentSpawn, GpuSimCore, GpuSimCoreOptions } from "./gpuSimCore";
 export { createGpuSlotAllocator } from "./gpuSlotAllocator";
 export type { GpuSlotAllocator } from "./gpuSlotAllocator";
 export {
+  noFormationSlot,
   stepGpuSimCoreSocialForceCpu,
   stepGpuSimCoreSocialForceNeighborhoodCpu,
 } from "./gpuSimCoreSocialForce";

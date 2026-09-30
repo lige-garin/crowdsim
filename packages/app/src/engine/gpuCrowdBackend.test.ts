@@ -1,5 +1,5 @@
 import type { AgentSpawn, GpuSimCore } from "@crowdsim/core-gpu";
-import { createGpuSlotAllocator } from "@crowdsim/core-gpu";
+import { createGpuSlotAllocator, noFormationSlot } from "@crowdsim/core-gpu";
 import { describe, expect, it } from "vitest";
 import { socialForceParameters, stepCrowd } from "./crowdMovement";
 import { createRouter } from "./crowdNavigation";
@@ -12,6 +12,7 @@ import {
   type GpuCrowdPlane,
 } from "./gpuCrowdBackend";
 import type { SimulationAgent } from "./simulationEngine";
+import { runCpuVsGpuScenarios } from "./gpuParityScenarios";
 import { createWallIndex } from "./wallIndex";
 
 // Self-skips without a real WebGPU adapter -- same precedent as core-gpu's
@@ -138,15 +139,13 @@ describe("buildGpuCrowdUploadArrays", () => {
     expect(arrays.formationSlots[0] !== 0 || arrays.formationSlots[1] !== 0).toBe(true);
   });
 
-  it("decisive: a defined groupId with NO formation slot (a solo group member) must upload groupId -1, not its real id", () => {
-    // crowdMovement.ts's own formation force is gated on
-    // groupFormation(agents).slots.has(agent.id) (excludes a solo member --
-    // groupFormation itself skips any group with fewer than 2 movers), but
-    // the GPU kernel's gate is only groupIds[i] >= 0. Uploading this
-    // agent's real groupId would let the kernel apply a formation pull
-    // toward (0, 0) (formationSlots' zero-initialized default) that CPU
-    // never would for this same agent -- a real, silent behavioural
-    // divergence if not corrected here.
+  it("a group member with NO formation slot keeps its real groupId and gets the no-slot sentinel", () => {
+    // crowdMovement.ts uses groupId for two things: groupmates do not repel
+    // each other (needs only the id), and the formation pull (needs a slot,
+    // which groupFormation withholds from a solo mover or a browsing
+    // companion). Uploading -1 for the slotless member stopped the pull but
+    // also made it repel its own group on the GPU -- and not on the CPU --
+    // which is what pulled a browsing companion's whole group apart.
     const solo = agent({ id: 1, x: 5, y: 5, targetX: 15, targetY: 5, groupId: 7 });
     const arrays = buildGpuCrowdUploadArrays(
       [solo],
@@ -156,7 +155,28 @@ describe("buildGpuCrowdUploadArrays", () => {
       straightLineRouter,
       1,
     );
-    expect(arrays.groupIds[0]).toBe(-1);
+    expect(arrays.groupIds[0]).toBe(7);
+    expect(arrays.formationSlots[0]).toBe(Math.fround(noFormationSlot));
+    expect(arrays.formationSlots[1]).toBe(Math.fround(noFormationSlot));
+  });
+
+  it("a member that does have a slot uploads it, and an ungrouped agent uploads neither", () => {
+    const a = agent({ id: 1, x: 5, y: 5, targetX: 15, targetY: 5, groupId: 3 });
+    const b = agent({ id: 2, x: 5, y: 6, targetX: 15, targetY: 6, groupId: 3 });
+    const loner = agent({ id: 3, x: 5, y: 9, targetX: 15, targetY: 9 });
+    const arrays = buildGpuCrowdUploadArrays(
+      [a, b, loner],
+      new Int32Array([0, 1, 2]),
+      3,
+      1.34,
+      straightLineRouter,
+      1,
+    );
+    expect(arrays.groupIds[0]).toBe(3);
+    expect(arrays.groupIds[1]).toBe(3);
+    expect(arrays.groupIds[2]).toBe(-1);
+    expect(arrays.formationSlots[0]).not.toBe(Math.fround(noFormationSlot));
+    expect(arrays.formationSlots[2 * 2]).toBe(Math.fround(noFormationSlot));
   });
 
   it("resolves radius/speedFactor via the same fallback stepCrowd uses when absent, and preserves them when already set", () => {
@@ -530,6 +550,21 @@ describe("advanceAgentsGpu vs stepCrowd (real WebGPU, same scenario)", () => {
       }
 
       pool.destroyAll();
+      device!.destroy();
+    },
+  );
+});
+
+describe("advanceAgentsGpu vs stepCrowd, wall and browsing-companion cases (real WebGPU)", () => {
+  gpuTest(
+    "an agent beside a wall, and a browsing groupmate, both track the CPU backend",
+    async () => {
+      const device = await acquireGpuTestDevice();
+      const result = await runCpuVsGpuScenarios(device!);
+
+      // Both used to differ by roughly 0.05-0.15 m and grow; now float noise.
+      expect(result.wallHugger).toBeLessThan(0.001);
+      expect(result.browsingCompanion).toBeLessThan(0.001);
       device!.destroy();
     },
   );

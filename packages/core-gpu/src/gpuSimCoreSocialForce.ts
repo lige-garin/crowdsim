@@ -175,23 +175,29 @@ function agentInteractionForce(
 function wallForce(
   px: number,
   py: number,
+  radius: number,
   walls: WallSegment[],
   params: GpuSimCoreSocialForceParams,
 ): { x: number; y: number } {
+  // crowdMovement.ts's own wall push, not the linear stage-1 stand-in this
+  // used to be: exponential in the gap between the wall and the agent's body,
+  // plus contact stiffness once the body touches, and only for walls within a
+  // metre (it skips the rest). `wallRepulsionRange` is the CPU's
+  // `wallRangeMeters` here -- an exponential decay length, not a cutoff.
   let forceX = 0;
   let forceY = 0;
   for (const wall of walls) {
     const closest = closestPointOnSegment(px, py, wall);
     const dx = px - closest.x;
     const dy = py - closest.y;
-    const distance = Math.max(Math.hypot(dx, dy), 0.0001);
-    if (distance < params.wallRepulsionRange) {
-      const strength =
-        params.wallRepulsionStrength *
-        ((params.wallRepulsionRange - distance) / params.wallRepulsionRange);
-      forceX += (dx / distance) * strength;
-      forceY += (dy / distance) * strength;
-    }
+    const gap = Math.hypot(dx, dy);
+    if (gap < 1e-9 || gap > 1) continue;
+    let push =
+      params.wallRepulsionStrength *
+      Math.exp((radius - gap) / params.wallRepulsionRange);
+    if (gap < radius) push += params.contactStiffness * (radius - gap);
+    forceX += (dx / gap) * push;
+    forceY += (dy / gap) * push;
   }
   return { x: forceX, y: forceY };
 }
@@ -201,10 +207,9 @@ function wallForce(
  * own `wallClose` flag, which gates the formation force off near a wall so
  * it never fights the (much stronger) wall push. A second, small loop over
  * `walls` rather than folding into `wallForce()` above: the CPU original
- * gates wallClose on a *different* radius (`formationRoomMeters`, 1m) than
- * the wall push itself (`wallRepulsionRange`, ~0.2m) — two different
- * questions ("is a wall nearby at all" vs. "close enough to push against"),
- * kept as two small functions rather than one doing both.
+ * decides wallClose against `formationRoomMeters` and the push against its own
+ * one-metre reach: two separate questions ("is a wall nearby at all" vs. "how
+ * hard does it push"), that happen to share a distance today, kept as two small functions rather than one doing both.
  */
 function isNearAnyWall(px: number, py: number, walls: WallSegment[]): boolean {
   for (const wall of walls) {
@@ -228,6 +233,16 @@ function isNearAnyWall(px: number, py: number, walls: WallSegment[]): boolean {
  * the "not in a group" sentinel (mirrors WGSL's `i32`, which has no
  * `undefined`).
  */
+/**
+ * `formationSlots` value meaning "this agent is in a group but has no
+ * formation slot this tick" (a companion who is browsing, or a group with only
+ * one member still walking). A group id alone cannot say that, and the two
+ * facts are separate on the CPU: `crowdMovement.ts` uses `groupId` to stop
+ * groupmates repelling each other whether or not there is a slot, and uses the
+ * slot only for the formation pull. Mirrored as a literal in the WGSL kernel.
+ */
+export const noFormationSlot = -1e30;
+
 function formationForce(
   index: number,
   px: number,
@@ -241,6 +256,9 @@ function formationForce(
     return { x: 0, y: 0 };
   }
   if (wallClose || strangersClose >= 2) {
+    return { x: 0, y: 0 };
+  }
+  if (formationSlots[index * 2] <= noFormationSlot / 2) {
     return { x: 0, y: 0 };
   }
   return {
@@ -515,7 +533,7 @@ export function stepGpuSimCoreSocialForceCpu(
       ay += anticipation.y;
     }
 
-    const wall = wallForce(px, py, walls, params);
+    const wall = wallForce(px, py, agents.radius[index], walls, params);
     ax += wall.x;
     ay += wall.y;
 
@@ -728,7 +746,7 @@ export function stepGpuSimCoreSocialForceNeighborhoodCpu(
       ay += anticipation.y;
     }
 
-    const wall = wallForce(px, py, walls, params);
+    const wall = wallForce(px, py, agents.radius[index], walls, params);
     ax += wall.x;
     ay += wall.y;
 

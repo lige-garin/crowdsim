@@ -9,6 +9,7 @@ import {
   createGpuSimCore,
   createGpuSlotAllocator,
   createSpatialHashGridLayout,
+  noFormationSlot,
 } from "@crowdsim/core-gpu";
 import {
   deriveFreeSpeed,
@@ -223,17 +224,15 @@ export type GpuCrowdUploadArrays = {
  * as `stepCrowd`'s own `next.push({...agent, radius, speedFactor, ...})`
  * already does for the CPU path.
  *
- * One real, disclosed discrepancy this function has to correct for rather
- * than reproduce naively: `crowdMovement.ts`'s formation force is gated on
- * `groupFormation(agents).slots.has(agent.id)` (which excludes a holding
- * companion, or any grouped-but-not-currently-moving agent, per
- * `groupFormation`'s own `isMoving` check) — but the GPU kernel's own gate
- * is only `groupIds[i] >= 0`. Uploading an agent's real, defined `groupId`
- * whenever it lacks a formation slot would let the kernel apply a
- * formation pull CPU never would for that same agent. So `groupIds` here
- * is `-1` unless the agent BOTH has a `groupId` AND has an entry in
- * `groupFormation`'s own slot map — matching CPU's actual gate, not just
- * its most obvious-looking condition.
+ * `crowdMovement.ts` uses `groupId` for two separate things, and the upload
+ * keeps them separate: groupmates do not repel each other (needs only the id),
+ * and the formation pull (needs a slot from `groupFormation`, which leaves out
+ * a companion who is browsing or a group with one member still walking). So
+ * `groupIds` is the agent's real id whenever it has one, and
+ * `formationSlots` holds the slot, or `noFormationSlot` when there is none.
+ * An earlier version uploaded `-1` for a slotless member to stop a pull toward
+ * the origin; that also switched off the no-repulsion rule, so a browsing
+ * companion pushed its own group apart on the GPU and not on the CPU.
  */
 export function buildGpuCrowdUploadArrays(
   walkingAgents: readonly SimulationAgent[],
@@ -246,7 +245,7 @@ export function buildGpuCrowdUploadArrays(
   const targets = new Float32Array(count * 2);
   const speed = new Float32Array(count);
   const groupIds = new Int32Array(count).fill(-1);
-  const formationSlots = new Float32Array(count * 2);
+  const formationSlots = new Float32Array(count * 2).fill(noFormationSlot);
   const hazardAvoidance = new Float32Array(count * 2);
   const holding = new Uint32Array(count);
   const routedHeading = new Float32Array(count * 2);
@@ -283,8 +282,8 @@ export function buildGpuCrowdUploadArrays(
     }
 
     const formationSlot = formation.slots.get(agent.id);
+    if (agent.groupId !== undefined) groupIds[slot] = agent.groupId;
     if (agent.groupId !== undefined && formationSlot) {
-      groupIds[slot] = agent.groupId;
       formationSlots[slot * 2] = formationSlot.x;
       formationSlots[slot * 2 + 1] = formationSlot.y;
     }

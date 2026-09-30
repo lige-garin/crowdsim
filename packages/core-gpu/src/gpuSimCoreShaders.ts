@@ -378,25 +378,34 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
 
   // wall repulsion, and wallClose (formation force's other gate: the crowd
   // falls into single file near a wall instead of holding a side-by-side
-  // line) — a different, wider radius (formationRoomMeters) than the push
-  // itself (wallRepulsionRange), same as the CPU original.
+  // line). Both use the same one-metre reach as the CPU original;
+  // wallRepulsionRange here is only the push's decay length.
   var wallClose = false;
+  let myRadius = radii[i];
   for (var w = 0u; w < params.wallCount; w = w + 1u) {
     let closest = closestOnSegment(p, walls[w]);
     let d = p - closest;
-    let dist = max(length(d), 0.0001);
-    if (dist > 0.000001 && dist < formationRoomMeters) { wallClose = true; }
-    if (dist < params.wallRepulsionRange) {
-      let strength = params.wallRepulsionStrength *
-        ((params.wallRepulsionRange - dist) / params.wallRepulsionRange);
-      force = force + (d / dist) * strength;
+    let gap = length(d);
+    // crowdMovement.ts skips a wall that is degenerate or further than a
+    // metre, and otherwise pushes exponentially in the gap between the wall
+    // and the body, plus contact stiffness once they touch.
+    if (gap < 0.000000001 || gap > 1.0) { continue; }
+    if (gap < formationRoomMeters) { wallClose = true; }
+    var wallPush = params.wallRepulsionStrength *
+      exp((myRadius - gap) / params.wallRepulsionRange);
+    if (gap < myRadius) {
+      wallPush = wallPush + params.contactStiffness * (myRadius - gap);
     }
+    force = force + (d / gap) * wallPush;
   }
 
   // in-formation spring: pull toward the precomputed slot unless a wall is
   // close or two-plus strangers are. formationSlots is meaningless (never
   // read) for agents with no group.
-  if (myGroup >= 0 && !wallClose && strangersClose < 2u) {
+  // -1.0e30 is noFormationSlot in gpuSimCoreSocialForce.ts: in a group, but
+  // no slot this tick, so no pull (the group id still stops groupmates
+  // repelling each other above).
+  if (myGroup >= 0 && formationSlots[i].x > -5.0e29 && !wallClose && strangersClose < 2u) {
     force = force + formationGain * (formationSlots[i] - p);
   }
 

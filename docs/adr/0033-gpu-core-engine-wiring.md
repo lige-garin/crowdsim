@@ -501,10 +501,29 @@
     steps per frame, so at 4× and above the GPU path cannot beat the CPU
     below the crossover, and 8× at any count costs eight round trips. Not
     measured; stated from the floor.
-  - **Not investigated**: 23 agents after 400 steps differ between the two
-    backends by up to 0.77 m, while the 6-agent, 30-tick parity test agrees
-    to 1e-5. ADR-0002 accepts tolerance-level rather than bitwise agreement,
-    but how that difference grows with step count has not been quantified.
+  - **The CPU-vs-GPU difference, investigated (2026-09-30)**: 23 agents
+    after 400 steps differed by up to 0.77 m, and the gap grew with time. Two
+    real defects, found by a single-agent reproduction and a per-agent trace:
+    (1) **the kernel's wall force was still the stage-1 linear stand-in**
+    (reach about 0.2 m), while `crowdMovement.ts` pushes exponentially out to
+    a metre and adds contact stiffness once bodies touch; every parity test
+    used a scene with no walls, so it was never exercised. (2) **`groupId`
+    was uploaded as -1 for any member without a formation slot**, to stop a
+    pull toward the origin; but the CPU also uses `groupId` to stop groupmates
+    repelling each other, slot or not, so a browsing companion pushed its own
+    group apart on the GPU only. Both are fixed (the wall force ported into
+    the kernel and its CPU oracle; the group id always uploaded, with
+    `noFormationSlot` marking "no slot"). On real hardware, a wall-hugging
+    agent went from 0.136 m to 6e-6 m against the CPU over 120 steps, and a
+    browsing companion from 0.318 m to 3e-5 m. In the engine (Stadium
+    Concourse, sparse crowd) the mean difference at 900 steps went from 0.48 m
+    to 0.04 m.
+  - **What remains is expected**: the CPU replans anticipation every third
+    step and the GPU every step (a disclosed difference), and in a dense crowd
+    the model is itself sensitive: two CPU engines whose relaxation time
+    differs by one part in a million end up 0.89 m apart on average, 5.9 m at
+    the worst, after 1200 steps, against 1.19 m and 5.9 m for CPU against GPU.
+    Agreement is therefore statistical, not per-agent, in a dense crowd.
   - **Limits**: one machine, one scene, movement and arrivals only, single
     steps. CPU stays the default (ADR-0006); this changes the reason to
     opt in from "never" to "above roughly 900 agents", not the default.
