@@ -309,3 +309,42 @@ body {
     transition-duration: 0.01ms;
   }
 }
+
+.app-error-boundary {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  padding: 32px;
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.app-error-boundary h1 {
+  font-size: var(--fs-title, 1.4rem);
+}
+
+.app-error-boundary details summary {
+  cursor: pointer;
+  color: var(--lab-muted, #8aa2b8);
+}
+
+.app-error-boundary pre {
+  overflow: auto;
+  max-height: 200px;
+  padding: 10px;
+  border: 1px solid var(--lab-line, rgba(148, 163, 184, 0.24));
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.app-error-boundary button {
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: rgba(11, 99, 229, 0.9);
+  color: #f4f8ff;
+  font-weight: 700;
+}

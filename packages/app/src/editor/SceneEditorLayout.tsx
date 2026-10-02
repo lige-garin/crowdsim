@@ -1,5 +1,10 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import type { ChangeEvent, PointerEvent as ReactPointerEvent, RefObject } from "react";
+import type {
+  ChangeEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from "react";
 import type { HeatmapCell } from "../analytics/heatmap";
 import type { Language, LocalizedText, TranslationKey } from "../i18n";
 import { SceneEditorCanvas } from "./SceneEditorCanvas";
@@ -36,6 +41,10 @@ type SceneEditorLayoutProps = {
   hidden?: boolean;
   /** Set when the live scene changed underneath unapplied edits. */
   onReloadLiveScene?: () => void;
+  /** Timestamp of a recoverable autosave, or null when there is none. */
+  recoverableAutosaveMs: number | null;
+  onRecoverAutosave: () => void;
+  onDiscardAutosave: () => void;
   aiImageOverlay: SceneImageOverlay | null;
   templatePrompt: string;
   baseScene: CrowdSimScene;
@@ -79,6 +88,7 @@ type SceneEditorLayoutProps = {
   onEntranceProfileChange: (text: string) => void;
   onEntranceProfileIntervalChange: (minutes: number) => void;
   onEntranceNumberChange: (field: EntranceNumberField, value: number) => void;
+  onCanvasKeyDown: (event: ReactKeyboardEvent<SVGSVGElement>) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onCountLineEndpointPointerDown: (
     event: ReactPointerEvent<SVGElement>,
@@ -170,6 +180,9 @@ type SceneEditorLayoutProps = {
 export function SceneEditorLayout({
   hidden = false,
   onReloadLiveScene,
+  recoverableAutosaveMs,
+  onRecoverAutosave,
+  onDiscardAutosave,
   aiImageOverlay,
   templatePrompt,
   baseScene,
@@ -212,6 +225,7 @@ export function SceneEditorLayout({
   onEntranceProfileChange,
   onEntranceProfileIntervalChange,
   onEntranceNumberChange,
+  onCanvasKeyDown,
   onCanvasPointerDown,
   onCountLineEndpointPointerDown,
   onDeleteSelected,
@@ -309,6 +323,32 @@ export function SceneEditorLayout({
           </button>
         </div>
       ) : null}
+      {recoverableAutosaveMs !== null ? (
+        <div
+          className="editor-autosave-banner"
+          role="alert"
+          data-testid="editor-autosave-banner"
+        >
+          <span>
+            {t("autosaveBannerTitle")} ·{" "}
+            {new Date(recoverableAutosaveMs).toLocaleString()}
+          </span>
+          <button
+            type="button"
+            data-testid="editor-autosave-recover"
+            onClick={onRecoverAutosave}
+          >
+            {t("autosaveRecover")}
+          </button>
+          <button
+            type="button"
+            data-testid="editor-autosave-discard"
+            onClick={onDiscardAutosave}
+          >
+            {t("autosaveDiscard")}
+          </button>
+        </div>
+      ) : null}
       <SceneEditorControls
         baseSceneId={baseScene.id}
         basemapInputRef={basemapInputRef}
@@ -370,6 +410,7 @@ export function SceneEditorLayout({
         draftCountLine={draftCountLine}
         gridSize={gridSize}
         crowd={showsSimulatedFloor ? crowd : undefined}
+        onCanvasKeyDown={onCanvasKeyDown}
         onCanvasPointerDown={onCanvasPointerDown}
         onCountLineEndpointPointerDown={onCountLineEndpointPointerDown}
         onEntityPointerDown={onEntityPointerDown}

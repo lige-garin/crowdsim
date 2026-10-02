@@ -1,8 +1,10 @@
 ﻿import {
+  useEffect,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type SetStateAction,
 } from "react";
@@ -54,6 +56,55 @@ type DragState = {
 };
 const gridSize = 2;
 const storageKey = "crowdsim.scene.v1";
+// Autosave writes the working document (debounced) to its own slot, so a
+// crash or an accidental tab close never costs more than the debounce
+// window. It never touches the manual `storageKey` slot: overwriting what a
+// user deliberately saved, with whatever they happen to have open, would be
+// a data loss of its own making.
+const autosaveKey = "crowdsim.autosave.v1";
+const autosaveDebounceMs = 2_000;
+type RecoverableAutosave = { savedAtMs: number; json: string };
+
+/**
+ * Mount-time read of the autosave slot: an autosave that differs from both
+ * the initial scene and the manual slot means work that was never
+ * deliberately saved — offer it for recovery exactly once, with a discard
+ * that is just as easy. Anything corrupt or redundant is dropped on the spot.
+ * Called from a useState initializer, so it must stay read-then-maybe-remove
+ * (idempotent under StrictMode's double render).
+ */
+function readRecoverableAutosave(scene: CrowdSimScene): RecoverableAutosave | null {
+  const stored = localStorage.getItem(autosaveKey);
+  if (!stored) {
+    return null;
+  }
+  let parsed: { savedAtMs?: unknown; scene?: unknown };
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    localStorage.removeItem(autosaveKey);
+    return null;
+  }
+  if (typeof parsed.scene !== "object" || parsed.scene === null) {
+    localStorage.removeItem(autosaveKey);
+    return null;
+  }
+  const autosavedJson = JSON.stringify(parsed.scene);
+  if (
+    autosavedJson === localStorage.getItem(storageKey) ||
+    autosavedJson === JSON.stringify(scene)
+  ) {
+    // Already deliberately saved, or nothing actually changed: not worth a
+    // recovery prompt.
+    localStorage.removeItem(autosaveKey);
+    return null;
+  }
+  return {
+    savedAtMs: typeof parsed.savedAtMs === "number" ? parsed.savedAtMs : Date.now(),
+    json: autosavedJson,
+  };
+}
+
 export function SceneEditor({
   heatmapCells = [],
   hidden = false,
@@ -143,6 +194,8 @@ export function SceneEditor({
       ? false
       : localStorage.getItem(storageKey) !== null,
   );
+  const [recoverableAutosave, setRecoverableAutosave] =
+    useState<RecoverableAutosave | null>(() => readRecoverableAutosave(scene));
   if (scene !== seenScene) {
     setSeenScene(scene);
     if (scene === appliedScene) {
@@ -319,6 +372,31 @@ export function SceneEditor({
     commit(removeEntity(document, selectedId));
     setSelectedId(null);
   }
+  /**
+   * Keyboard shortcuts for the 2D canvas (P2 from the 2026-10-02 review:
+   * delete and undo had buttons but no keys; undo's key existed only in the
+   * 3D build view). Attached to the SVG itself, so they fire only when the
+   * canvas has focus — typing in a parameter input never lands here, and
+   * Ctrl+Z keeps its browser meaning everywhere else.
+   */
+  function handleCanvasKeyDown(event: ReactKeyboardEvent<SVGSVGElement>) {
+    if (event.key === "Delete" || event.key === "Backspace") {
+      if (selectedId) {
+        event.preventDefault();
+        deleteSelected();
+      }
+      return;
+    }
+    const key = event.key.toLowerCase();
+    const withModifier = event.ctrlKey || event.metaKey;
+    if (withModifier && key === "z" && !event.shiftKey) {
+      event.preventDefault();
+      undo();
+    } else if (withModifier && (key === "y" || (key === "z" && event.shiftKey))) {
+      event.preventDefault();
+      redo();
+    }
+  }
   function pointFromEvent(event: ReactPointerEvent<SVGElement>) {
     const svg = svgRef.current;
     if (!svg) {
@@ -474,10 +552,70 @@ export function SceneEditor({
       replaceScene(nextScene, makeStatus("loadedScene", sceneNameValues(nextScene)));
     }
   }
+  /*
+   * Autosave: the working document, debounced, into its own slot. Best-effort
+   * by design — if the slot is unwritable the loud path is the manual save's
+   * quota fallback (export to file), not a second banner.
+   */
+  const currentSceneRef = useRef(currentScene);
+  useEffect(() => {
+    currentSceneRef.current = currentScene;
+  }, [currentScene]);
+  const didAutosaveSkipMountRef = useRef(false);
+  useEffect(() => {
+    // The effect also runs on mount, where writing the untouched initial
+    // document would clobber a recoverable autosave before the user decides —
+    // two seconds after load, refresh-recovery would be gone forever. Skip
+    // the mount run: only actual edits autosave.
+    if (!didAutosaveSkipMountRef.current) {
+      didAutosaveSkipMountRef.current = true;
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      try {
+        localStorage.setItem(
+          autosaveKey,
+          JSON.stringify({ savedAtMs: Date.now(), scene: currentSceneRef.current }),
+        );
+      } catch {
+        // See the comment above: best-effort by design.
+      }
+    }, autosaveDebounceMs);
+    return () => window.clearTimeout(handle);
+  }, [document]);
+  function recoverAutosave() {
+    if (!recoverableAutosave) {
+      return;
+    }
+    try {
+      replaceScene(
+        parseScene(JSON.parse(recoverableAutosave.json)),
+        makeStatus("loadedAutosave"),
+      );
+    } catch {
+      setStorageStatus(makeStatus("savedSceneInvalid"));
+    }
+    localStorage.removeItem(autosaveKey);
+    setRecoverableAutosave(null);
+  }
+  function discardAutosave() {
+    localStorage.removeItem(autosaveKey);
+    setRecoverableAutosave(null);
+  }
   function saveScene() {
-    localStorage.setItem(storageKey, JSON.stringify(currentScene, null, 2));
-    setHasSavedScene(true);
-    setStorageStatus(makeStatus("savedLocally"));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(currentScene, null, 2));
+      setHasSavedScene(true);
+      setStorageStatus(makeStatus("savedLocally"));
+    } catch {
+      // Quota exceeded (a large base64 basemap embedded in the scene is the
+      // usual culprit) or storage disabled. Before this, the exception was
+      // uncaught and took the whole tree down with a white screen. The work
+      // is too valuable to lose quietly, so fall back to the durable path —
+      // a .csim.json file export — and say exactly what happened.
+      downloadSceneJson(currentScene);
+      setStorageStatus(makeStatus("saveFailedExported"));
+    }
   }
   function loadSavedScene() {
     const stored = localStorage.getItem(storageKey);
@@ -668,6 +806,9 @@ export function SceneEditor({
     <SceneEditorLayout
       hidden={hidden}
       onReloadLiveScene={liveSceneChanged ? reloadLiveScene : undefined}
+      recoverableAutosaveMs={recoverableAutosave?.savedAtMs ?? null}
+      onRecoverAutosave={recoverAutosave}
+      onDiscardAutosave={discardAutosave}
       aiImageOverlay={aiImageOverlay}
       templatePrompt={templatePrompt}
       basemap={activeBasemap}
@@ -706,6 +847,7 @@ export function SceneEditor({
       onTrafficSignalNumberChange={paramActions.updateTrafficSignalNumber}
       onTrafficSignalRoadIdChange={paramActions.updateTrafficSignalRoadId}
       onCanvasPointerDown={handleCanvasPointerDown}
+      onCanvasKeyDown={handleCanvasKeyDown}
       onCountLineEndpointPointerDown={handleCountLineEndpointPointerDown}
       onDeleteSelected={deleteSelected}
       onEntityPointerDown={handleEntityPointerDown}

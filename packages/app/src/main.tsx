@@ -19,9 +19,12 @@ import "./styles/panels.css";
  * reuses inside floating windows. */
 import "./styles/hud.css";
 import { App } from "./App";
+import { AppErrorBoundary } from "./ErrorBoundary";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );

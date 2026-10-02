@@ -12,6 +12,12 @@ export const messages = {
   alighting: { zh: "Alighting", en: "Alighting" },
   appName: { zh: "CrowdSim Web", en: "CrowdSim Web" },
   applyToSimulation: { zh: "应用到仿真", en: "Apply to simulation" },
+  autosaveBannerTitle: {
+    zh: "检测到未恢复的自动保存草稿",
+    en: "An unrecovered autosaved draft was found",
+  },
+  autosaveDiscard: { zh: "丢弃", en: "Discard" },
+  autosaveRecover: { zh: "恢复", en: "Recover" },
   arrivalInterval: { zh: "Arrival interval", en: "Arrival interval" },
   arrivalRate: { zh: "到达率 (人/分)", en: "Arrival rate (per min)" },
   arrivalProfile: {
@@ -208,6 +214,7 @@ export const messages = {
   initializing: { zh: "初始化中", en: "Initializing" },
   language: { zh: "语言", en: "Language" },
   liveAnalytics: { zh: "实时分析", en: "Live Analytics" },
+  loadedAutosave: { zh: "已恢复自动保存的草稿", en: "Recovered the autosaved draft" },
   loadedSavedScene: { zh: "已加载存档场景", en: "Loaded saved scene" },
   loadedScene: { zh: "已加载 {name}", en: "Loaded {name}" },
   loading: { zh: "加载中", en: "Loading" },
@@ -282,6 +289,10 @@ export const messages = {
   save: { zh: "保存", en: "Save" },
   savedLocally: { zh: "已本地保存", en: "Saved locally" },
   savedSceneInvalid: { zh: "Saved scene invalid", en: "Saved scene invalid" },
+  saveFailedExported: {
+    zh: "本地保存失败（存储配额不足），已改为导出场景文件",
+    en: "Local save failed (storage quota); exported a scene file instead",
+  },
   scaffold: { zh: "Scaffold", en: "Scaffold" },
   scene: { zh: "场景", en: "Scene" },
   sceneApplied: { zh: "已应用到仿真", en: "Applied to simulation" },

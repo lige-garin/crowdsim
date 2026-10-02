@@ -1,6 +1,10 @@
 ﻿import { crowdOverlaySelection } from "../engine/crowdBudget";
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  RefObject,
+} from "react";
 import type { HeatmapCell } from "../analytics/heatmap";
 import type { TranslationKey } from "../i18n";
 import { AiImageOverlay } from "./AiImageOverlay";
@@ -23,6 +27,7 @@ type SceneEditorCanvasProps = {
   gridSize: number;
   /** The live crowd drawn over the plan, if any (liveCrowd). */
   crowd?: LiveCrowd;
+  onCanvasKeyDown: (event: ReactKeyboardEvent<SVGSVGElement>) => void;
   onCanvasPointerDown: (event: ReactPointerEvent<SVGSVGElement>) => void;
   onCountLineEndpointPointerDown: (
     event: ReactPointerEvent<SVGElement>,
@@ -48,6 +53,7 @@ export function SceneEditorCanvas({
   draftCountLine,
   gridSize,
   crowd,
+  onCanvasKeyDown,
   onCanvasPointerDown,
   onCountLineEndpointPointerDown,
   onEntityPointerDown,
@@ -65,9 +71,12 @@ export function SceneEditorCanvas({
         ref={svgRef}
         className="editor-canvas"
         data-testid="editor-canvas"
-        role="img"
+        role="application"
         aria-label={t("editableSceneCanvas")}
+        aria-keyshortcuts="Delete Ctrl+Z Ctrl+Shift+Z"
+        tabIndex={0}
         viewBox={`0 0 ${baseScene.world.width} ${baseScene.world.height}`}
+        onKeyDown={onCanvasKeyDown}
         onPointerDown={onCanvasPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

@@ -1315,3 +1315,21 @@
   border: 0;
   background: none;
 }
+
+.editor-autosave-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(126, 176, 215, 0.5);
+  border-radius: 8px;
+  background: rgba(126, 176, 215, 0.14);
+  color: #dcefff;
+  font-size: var(--fs-body);
+}
+
+.editor-autosave-banner button {
+  min-height: 28px;
+  padding: 0 12px;
+}
