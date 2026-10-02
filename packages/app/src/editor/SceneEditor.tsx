@@ -256,10 +256,17 @@ export function SceneEditor({
   const activeBasemap = getActiveBasemap(currentScene);
   const selectableScenes = useMemo(() => {
     const scenes = [scene, ...templateScenes];
-    if (scenes.some((candidate) => candidate.id === baseScene.id)) {
-      return scenes;
-    }
-    return [baseScene, ...scenes];
+    const withBase = scenes.some((candidate) => candidate.id === baseScene.id)
+      ? scenes
+      : [baseScene, ...scenes];
+    // Picking a template makes `scene` that very template's scene, which is
+    // also in `templateScenes` — without the dedupe the 示例场景 dropdown
+    // renders the same scene (and the same React key) twice. Caught by the
+    // customer-journey e2e's zero-console-errors assertion.
+    return withBase.filter(
+      (candidate, index, all) =>
+        all.findIndex((other) => other.id === candidate.id) === index,
+    );
   }, [baseScene, scene]);
   const visibleHeatmapCells = baseScene.id === scene.id ? heatmapCells : [];
   const visibleCrowd = baseScene.id === scene.id ? crowd : undefined;
