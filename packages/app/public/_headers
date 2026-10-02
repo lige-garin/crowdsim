@@ -1,0 +1,6 @@
+# Cross-origin isolation is a hard launch constraint — see docs/DEPLOYMENT.md.
+# Without both headers the page is not cross-origin-isolated and the
+# SharedArrayBuffer agent overlay falls back to the slower copy path.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
