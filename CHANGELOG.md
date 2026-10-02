@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- CI e2e suite was red: `reducedMotion: "reduce"` sat directly in Playwright's
+  `use`, but the 1.61 runner only models colorScheme / viewport / userAgent /
+  … as direct `use` keys — a bare `use.reducedMotion` is silently dropped, so
+  the homepage hero animated at 30 fps under software WebGL on the 2-core CI
+  runner, saturated the renderer's main thread, and starved every click until
+  tests timed out. Moved under `use.contextOptions` (verified in the created
+  context's trace: `reducedMotion: "reduce"`), restoring the intended single
+  static hero frame.
+
 ## [0.1.0] — 2026-10-02
 
 First tagged release: the open-source baseline, after the 2026-10-02 review's

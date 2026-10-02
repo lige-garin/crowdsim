@@ -18,7 +18,15 @@ export default defineConfig({
         // WebGL saturates the main thread — tolerable on a local GPU, but it
         // starved every click on the 2-core CI runner until tests timed out.
         // This also keeps local runs testing the same code path as CI.
-        reducedMotion: "reduce",
+        //
+        // It must live under `contextOptions`: Playwright 1.61's runner only
+        // models colorScheme/deviceScaleFactor/viewport/... as direct `use`
+        // keys. A bare `use.reducedMotion` is silently dropped on the floor
+        // (verified against playwright/lib/index.js's fixture table and a
+        // real trace: `"reducedMotion": "undefined"` in the created context).
+        contextOptions: {
+          reducedMotion: "reduce",
+        },
       },
     },
   ],
