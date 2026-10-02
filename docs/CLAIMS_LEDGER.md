@@ -3074,3 +3074,29 @@ embedded CJK font (multi-MB, plus subsetting complexity) or a library pull
 produces losslessly from the same HTML via print-to-PDF. Deferred, not hidden:
 when a paying customer needs a one-click server-grade PDF (fire-approval
 submissions), revisit with a print pipeline, not a bundled font blob.
+
+## 2026-10-02 (sixtieth entry): two P2 assessments — sweep parameterisation and cross-browser reproducibility
+
+From the 2026-10-02 review's P2 list. Both are **documented assessments, deliberately not built** — what a deferral must state, per this ledger's own rules.
+
+**Parameter sweep UI parameterisation.** The engine side already sweeps
+three parameter kinds (`experimentSweep.ts`: `entrance-width`, `max-agents`,
+`speed`); the panel hard-codes one (`entrance-width` 2→4 m, step 1, five runs
+per variant). What parameterisation costs: a kind selector plus
+start/end/step inputs and an entrance picker in `ExperimentSweepPanel` — UI
+wiring only, no engine work. Deferred because the fixed sweep is honest and
+labelled; a half-thought-out parameter surface (say, sweeping a parameter the
+loaded scene has no instance of) would be worse than none. First customer who
+needs a second knob is the trigger to build it.
+
+**Cross-browser reproducibility CI (T5.5).** Not done, and no claim is made
+anywhere that it works. Facts on the record: e2e runs Chromium only
+(Chrome channel locally, chromium in CI); the engine is seeded
+(`mulberry32`) and same-build reproducibility is contract-hashed
+(`benchmarkReproducibility.ts`), but that contract compares a build against
+**itself** — cross-browser numeric equality is untested, floating-point and
+WebGPU behaviour differ by vendor, and Firefox/WebKit lack a stable WebGPU
+path. What it would take: a CI matrix (firefox + webkit projects), per-browser
+baseline contracts, and a decision on which divergences are bugs vs
+platform reality. Estimated 1–2 weeks including triage. Deferred until a
+paying workflow depends on it.

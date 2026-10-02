@@ -23,11 +23,11 @@ dist without it: the decision-runtime WASM ends up in the bundle as
 
 Measured sizes of what ships (2026-10-02, this repository):
 
-| What | Size | Notes |
-| --- | --- | --- |
-| Main bundle | ~2.4 MB | loads on first paint |
-| web-ifc chunk | ~3.4 MB | lazy — fetched only on an IFC import |
-| Character models | ~23 MB | `assets/characters/quaternius/`, CC0, license file included |
+| What             | Size    | Notes                                                       |
+| ---------------- | ------- | ----------------------------------------------------------- |
+| Main bundle      | ~2.4 MB | loads on first paint                                        |
+| web-ifc chunk    | ~3.4 MB | lazy — fetched only on an IFC import                        |
+| Character models | ~23 MB  | `assets/characters/quaternius/`, CC0, license file included |
 
 ## The one hard constraint: COOP/COEP (SharedArrayBuffer)
 
@@ -68,8 +68,25 @@ Vite's config does not affect your production host.
 ### Cloudflare Pages
 
 `packages/app/public/_headers` ships in this repository and Vite copies it
-into `dist/`, so Pages applies the two headers with **zero host-side
-configuration**. Two ways to deploy:
+into `dist/`, so Pages applies the two isolation headers **plus the
+Content-Security-Policy below** with zero host-side configuration. The CSP
+directives are derived from code, not guesswork, and were verified against a
+real Chrome over the built `dist` with these exact headers (2026-10-02:
+worker path boots, engine runs, `crossOriginIsolated === true`, zero CSP
+violations):
+
+```
+default-src 'self'; script-src 'self' 'wasm-unsafe-eval';
+style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;
+font-src 'self' data:; connect-src 'self' https://api.open-meteo.com;
+worker-src 'self'; object-src 'none'; base-uri 'self'
+```
+
+(`'wasm-unsafe-eval'` is the wasm-bindgen decision layer; `data:` images are
+embedded basemaps; `api.open-meteo.com` is the weather panel — the app's only
+cross-origin call.)
+
+Two ways to deploy:
 
 1. **From CI / local build (recommended).** Build with the steps above, then:
 
@@ -98,6 +115,8 @@ server {
     # that is why the isolation pair repeats inside /assets/.
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    # Same CSP as public/_headers — keep the two in lockstep.
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; worker-src 'self'; object-src 'none'; base-uri 'self'" always;
 
     location /assets/ {
         # Hashed filenames: safe to cache forever.
