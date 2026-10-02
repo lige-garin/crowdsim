@@ -37,10 +37,12 @@ describe("ValidationReportPanel", () => {
     await waitFor(() => expect(screen.getByText(/4\/4\s+通过/)).toBeInTheDocument(), {
       timeout: 30_000,
     });
-    expect(screen.getByText(/PDF-ready yes/)).toBeInTheDocument();
+    expect(screen.getByText(/print-optimized yes/)).toBeInTheDocument();
     expect(screen.getByText(/physics error/)).toBeInTheDocument();
     expect(screen.getByText(/校准摘要/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打印 / 导出 PDF" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "打印 / 另存为 PDF" }),
+    ).toBeInTheDocument();
   }, 30_000);
 
   it("opens a printable HTML report bundle", async () => {
@@ -58,14 +60,18 @@ describe("ValidationReportPanel", () => {
 
     const printButton = await screen.findByRole(
       "button",
-      { name: "打印 / 导出 PDF" },
+      { name: "打印 / 另存为 PDF" },
       { timeout: 30_000 },
     );
     fireEvent.click(printButton);
 
     expect(createObjectUrl).toHaveBeenCalledWith(expect.any(Blob));
     expect(open).toHaveBeenCalledWith("blob:report", "_blank", "noopener,noreferrer");
-    expect(screen.getByText("已打开报告")).toBeInTheDocument();
+    // The honest tell: the hint says the PDF comes from the browser's print
+    // dialog, not from this app writing a PDF file.
+    expect(screen.getByTestId("report-opened-hint").textContent).toContain(
+      "另存为 PDF",
+    );
   }, 30_000);
 });
 

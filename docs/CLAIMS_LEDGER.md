@@ -3051,3 +3051,26 @@ Default path (no `?gpumove`): the "工程状态" (engineering signals) dock now 
 ### What remains
 
 Stage 4 (full-pipeline measurement — GPU movement, CPU decision layer, readback, and three.js rendering all in the loop, the first point at which any end-to-end "N agents at 60fps" claim becomes honest) is entirely unstarted. A disclosed, unresolved limitation carried over from stage 2: editing a floor's walls mid-run still requires destroying and rebuilding that floor's `GpuSimCore` (walls are fixed at construction) — left for a future hot-update pass, since neither stage 2's nor stage 3's own verification plans edit a scene mid-run.
+
+## 2026-10-02 (fifty-ninth entry): the report export claimed to "导出 PDF" but never wrote one
+
+From the 2026-10-02 review (P1 #5 wording half). The validation report's
+export button said **打印 / 导出 PDF** while `openPrintableReport()` opened a
+`text/html` blob of print-styled HTML; the actual PDF, if any, was produced by
+the browser's print dialog, not by the app. The bundle field was named
+`pdfReady`, computed by checking the HTML for `@media print` and a `<table>` —
+a claim about print-optimisation wearing a PDF's name.
+
+**Fixed.** Button now reads 打印 / 另存为 PDF / "Print / save as PDF"; after the
+report opens, a hint says the PDF comes from choosing 另存为 PDF in the print
+dialog; `pdfReady` is renamed `printOptimized`. Tests pin both the label and
+the hint.
+
+**True in-browser PDF, assessed and deliberately not built (product
+decision, disclosed):** the report is bilingual, and a hand-rolled PDF using
+the standard 14 fonts cannot render CJK at all; a real writer needs an
+embedded CJK font (multi-MB, plus subsetting complexity) or a library pull
+(pdf-lib + fontkit, or jsPDF with a CJK font) — for output a browser already
+produces losslessly from the same HTML via print-to-PDF. Deferred, not hidden:
+when a paying customer needs a one-click server-grade PDF (fire-approval
+submissions), revisit with a print pipeline, not a bundled font blob.

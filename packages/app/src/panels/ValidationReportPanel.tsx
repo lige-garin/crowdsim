@@ -139,7 +139,14 @@ function ValidationReportReady({
   );
   const passLabel = language === "zh" ? "通过" : "passed";
   const failLabel = language === "zh" ? "失败" : "failed";
-  const printLabel = language === "zh" ? "打印 / 导出 PDF" : "Print / export PDF";
+  const printLabel = language === "zh" ? "打印 / 另存为 PDF" : "Print / save as PDF";
+  // The export opens print-optimized HTML, not a PDF file — the PDF arrives
+  // through the browser's print dialog. The label and this hint say exactly
+  // that (REVIEW-2026-10-02 P1 #5 wording half).
+  const printHint =
+    language === "zh"
+      ? "报告已在新标签页打开；在打印对话框中选择「另存为 PDF」即可得到 PDF 文件。"
+      : 'The report opened in a new tab; choose "Save as PDF" in the print dialog to get a PDF file.';
   const note =
     language === "zh"
       ? `场景「${sceneName}」的商业参数校验；另附引擎回归基准（RiMEA 命名的自拟场景，与本场景无关）、Weidmann 密度-速度对比和 IMO 人群参数来源。`
@@ -163,7 +170,8 @@ function ValidationReportReady({
         {passLabel} | {report.benchmarkSummary.failCount} {failLabel}
       </code>
       <code>
-        PDF-ready {exportBundle.pdfReady ? "yes" : "no"} | {exportBundle.filename}
+        print-optimized {exportBundle.printOptimized ? "yes" : "no"} |{" "}
+        {exportBundle.filename}
       </code>
       <code>
         physics error {report.residualProjectionValidation.baselineMeanError} |
@@ -176,9 +184,7 @@ function ValidationReportReady({
       <button type="button" onClick={openPrintableReport}>
         {printLabel}
       </button>
-      {opened ? (
-        <span>{language === "zh" ? "已打开报告" : "Report opened"}</span>
-      ) : null}
+      {opened ? <span data-testid="report-opened-hint">{printHint}</span> : null}
     </section>
   );
 }

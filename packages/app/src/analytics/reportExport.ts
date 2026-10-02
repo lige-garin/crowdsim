@@ -28,7 +28,12 @@ export type ValidationReportExportBundle = {
   filename: string;
   html: string;
   mimeType: "text/html";
-  pdfReady: boolean;
+  /**
+   * The bundle is print-optimized HTML, not a PDF file: the supported path to
+   * an actual PDF is the browser's print-to-PDF from the opened tab. The
+   * button used to claim "导出 PDF" straight to an HTML blob — honest now.
+   */
+  printOptimized: boolean;
   reproducibility: BenchmarkReproducibilityContract;
   reproducibilityComparison: ReproducibilityComparison;
   contentDigest: string;
@@ -60,7 +65,7 @@ export function createValidationReportExportBundle(
     filename: createReportFilename(report.generatedAtIso, language),
     html,
     mimeType: "text/html",
-    pdfReady: html.includes("@media print") && html.includes("<table"),
+    printOptimized: html.includes("@media print") && html.includes("<table"),
     reproducibility,
     reproducibilityComparison: compareAgainstBaseline(
       reproducibility,
