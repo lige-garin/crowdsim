@@ -40,6 +40,12 @@ export type SimulationWorkerController = SimulationController & {
    * the whole point of stage 3's "real switch".
    */
   movementBackend?: SimulationWorkerMovementBackendStatus;
+  /**
+   * Dispose the (possibly dead) worker and build a fresh one from the current
+   * scene. The user-level "retry" behind the simulation-fault card: a crashed
+   * worker used to leave no way back short of a page reload.
+   */
+  retry: () => void;
 };
 
 export function useSimulationWorkerController(
@@ -73,6 +79,19 @@ export function useSimulationWorkerController(
   const [movementBackend, setMovementBackend] = useState<
     SimulationWorkerMovementBackendStatus | undefined
   >(undefined);
+  // Bumped by `retry` below; a change re-runs the init effect, which disposes
+  // the old client and builds a fresh worker from the current scene.
+  const [retryToken, setRetryToken] = useState(0);
+  const retry = useCallback(() => {
+    // Flip to "checking" up front so the fault card steps aside for the
+    // re-init instead of sitting on "error" until the new worker answers.
+    setWorker((current) => ({
+      ...current,
+      message: "Reinitializing simulation worker",
+      status: "checking",
+    }));
+    setRetryToken((token) => token + 1);
+  }, []);
   const publish = useCallback((nextSnapshot: SimulationSnapshot) => {
     setSnapshot(nextSnapshot);
     setWorker((current) => ({
@@ -191,7 +210,7 @@ export function useSimulationWorkerController(
 
       currentClient.dispose();
     };
-  }, [requestGpuMovement, runScene]);
+  }, [requestGpuMovement, retryToken, runScene]);
 
   // Hot scene update (ADR-0007). Declared after the init effect: on a re-init
   // that effect has already recorded the new scene, so this one does nothing.
@@ -323,6 +342,7 @@ export function useSimulationWorkerController(
     movementBackend,
     pause,
     reset,
+    retry,
     setEvacuation,
     setTimeScale,
     snapshot,

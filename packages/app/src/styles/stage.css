@@ -243,6 +243,12 @@
   border-radius: 14px;
 }
 
+/* The simulation-fault card's retry: visually the card's one action, so it
+   gets a touch more presence than the muted text around it. */
+.simulation-fault-retry {
+  margin: 6px 0 10px;
+}
+
 /*
   Not a corner: all four are already taken by AppHudTop (name plate,
   view controls, agent/exit counts, transport), which sits in a separate

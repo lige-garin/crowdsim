@@ -98,4 +98,31 @@ describe("useSimulationWorkerController failure reporting", () => {
     unmount();
     vi.restoreAllMocks();
   });
+
+  it("recovers from a failure through retry (REVIEW-2026-10-02 P1 #7)", async () => {
+    mocks.start.mockRejectedValue(new Error("worker exploded"));
+
+    const { result, unmount } = renderHook(() =>
+      useSimulationWorkerController(demoScene),
+    );
+
+    await waitFor(() => expect(result.current.worker.status).toBe("ready"));
+
+    act(() => {
+      result.current.start();
+    });
+
+    await waitFor(() => expect(result.current.worker.status).toBe("error"));
+
+    // Retry steps aside immediately, then the fresh init flips it back to
+    // ready — only the re-run init effect can do that.
+    act(() => {
+      result.current.retry();
+    });
+    expect(result.current.worker.status).toBe("checking");
+
+    await waitFor(() => expect(result.current.worker.status).toBe("ready"));
+
+    unmount();
+  });
 });

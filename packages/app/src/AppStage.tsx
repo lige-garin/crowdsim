@@ -44,6 +44,13 @@ type AppStageProps = {
   /** The live crowd, read by subscription rather than passed down (liveCrowd). */
   crowd: LiveCrowd;
   scene: CrowdSimScene;
+  /**
+   * The user-level fault surface (REVIEW-2026-10-02 P1 #7): a dead simulation
+   * worker used to surface as one English engineering-log line in the signal
+   * dock. This card says what stopped, what survived, and how to restart.
+   * Null while the worker path is unused or healthy.
+   */
+  simulationFault: { message: string; onRetry: () => void } | null;
   stageTab: StageTab;
   t: (key: TranslationKey) => string;
   viewMode: StageViewMode;
@@ -64,6 +71,7 @@ export function AppStage({
   onPlaceInWorld,
   onPlaceLineInWorld,
   scene,
+  simulationFault,
   stageTab,
   t,
   viewMode,
@@ -182,6 +190,37 @@ export function AppStage({
           </>
         )}
       </div>
+      {simulationFault ? (
+        /*
+          Reuses the viewport-unsupported card's look on purpose: one blocking
+          overlay language for "the stage cannot do its job right now". The
+          raw message stays reachable under the details toggle for bug
+          reports (task #18's diagnostics channel will feed off it too).
+        */
+        <div
+          className="render-unsupported simulation-fault"
+          data-testid="simulation-fault"
+          role="alert"
+        >
+          <div className="render-unsupported-card">
+            <p className="render-unsupported-eyebrow">{t("simulationFaultEyebrow")}</p>
+            <h3>{t("simulationFaultTitle")}</h3>
+            <p>{t("simulationFaultBody")}</p>
+            <button
+              type="button"
+              className="simulation-fault-retry"
+              data-testid="simulation-fault-retry"
+              onClick={simulationFault.onRetry}
+            >
+              {t("retrySimulation")}
+            </button>
+            <details>
+              <summary>{t("technicalDetail")}</summary>
+              <code>{simulationFault.message}</code>
+            </details>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

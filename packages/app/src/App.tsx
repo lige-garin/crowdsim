@@ -560,6 +560,16 @@ function AppContent() {
             viewScene,
             scene: scene,
             crowd: liveCrowd,
+            // Only the ACTIVE simulation path's failures are user-level news:
+            // under ?mainsim the worker controller still runs but nothing
+            // depends on it, and a fault card from it would be a lie.
+            simulationFault:
+              usesWorkerSimulation && workerSimulation.worker.status === "error"
+                ? {
+                    message: workerSimulation.worker.message,
+                    onRetry: workerSimulation.retry,
+                  }
+                : null,
             stageTab,
             t,
             viewMode,
