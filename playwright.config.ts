@@ -13,6 +13,12 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         ...(isCi ? {} : { channel: "chrome" }),
+        // The homepage's three.js hero renders exactly one static frame under
+        // reduced motion (see CityHeroScene.tsx). Without this, continuous
+        // WebGL saturates the main thread — tolerable on a local GPU, but it
+        // starved every click on the 2-core CI runner until tests timed out.
+        // This also keeps local runs testing the same code path as CI.
+        reducedMotion: "reduce",
       },
     },
   ],

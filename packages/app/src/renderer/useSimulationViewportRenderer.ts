@@ -76,6 +76,13 @@ import { createViewportPostProcessing } from "./viewportPostProcessing";
  * arrival rates, not its agent budget. Tens, not thousands; see ADR-0020.
  */
 const vehicleViewportCapacity = 64;
+/**
+ * Compat-mode (software WebGL) frame cap, ADR-0006's "scale-limited
+ * compatibility mode": rendering at the display's full rate on a software
+ * renderer measurably saturates the main thread and starves pointer
+ * handling. ~24 fps keeps the preview live while leaving the thread usable.
+ */
+const COMPAT_FRAME_INTERVAL_MS = 1_000 / 24;
 type RendererArgs = {
   crowdScene?: CrowdSimScene;
   /** The floor being watched; its crowd is the only one drawn (ADR-0010). */
@@ -178,6 +185,10 @@ export function useSimulationViewportRenderer({
     let gpuDevice: GPUDevice | undefined;
     let postProcessing: ReturnType<typeof createViewportPostProcessing> | undefined;
     let renderHalted = false;
+    // 0 = render every animation frame (the full-GPU path); the compat
+    // branches raise this to cap software-WebGL rendering at ~24 fps.
+    let frameIntervalMs = 0;
+    let lastRenderAtMs = 0;
     const scene = new Scene();
     const camera =
       viewMode === "3d"
@@ -475,6 +486,14 @@ export function useSimulationViewportRenderer({
         return;
       }
       const frameTime = Number.isFinite(time) ? time : performance.now();
+      // Compat-mode frame cap (ADR-0006's "scale-limited compatibility mode"):
+      // software WebGL rendering at the display's full rate measurably
+      // saturates a main thread and starves pointer handling — the same
+      // failure the home hero had. Full-GPU mode keeps every frame.
+      if (frameIntervalMs > 0 && frameTime - lastRenderAtMs < frameIntervalMs) {
+        return;
+      }
+      lastRenderAtMs = frameTime;
       try {
         // Per-frame animation for dynamic objects that want it (falling
         // rain, skeletal character walk cycles) — computed before
@@ -550,6 +569,7 @@ export function useSimulationViewportRenderer({
             return;
           }
           setRenderMode("compat");
+          frameIntervalMs = COMPAT_FRAME_INTERVAL_MS;
           renderer = createFallbackViewportRenderer(canvasElement);
           observeResize();
           seedAgents();
@@ -562,8 +582,26 @@ export function useSimulationViewportRenderer({
           powerPreference: "high-performance",
         });
         if (!adapter) {
-          setRenderMode("unsupported");
-          setStatus(localizedStatus("noWebGpuAdapter"));
+          // ADR-0006: "WebGL/CPU is a labeled, scale-limited compatibility
+          // mode with no silent degradation." A browser can expose
+          // `navigator.gpu` yet yield no adapter (headless chromium, driver
+          // blocklists, Linux without Vulkan) — that machine still gets the
+          // compatibility mode, not the blocking card. The card is reserved
+          // for when even WebGL cannot render. This closes the gap flagged
+          // in docs/REVIEW-2026-09-19.md §7.
+          try {
+            renderer = createFallbackViewportRenderer(canvasElement);
+          } catch {
+            setRenderMode("unsupported");
+            setStatus(localizedStatus("rendererFailed"));
+            return;
+          }
+          setRenderMode("compat");
+          frameIntervalMs = COMPAT_FRAME_INTERVAL_MS;
+          observeResize();
+          seedAgents();
+          seedVehicles();
+          startRenderLoop();
           return;
         }
         const device = await adapter.requestDevice();

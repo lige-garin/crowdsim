@@ -30,6 +30,15 @@ import {
 const ELAPSED_SECONDS_FOR_LOOK = 750;
 // A full turn in about 12 minutes — slow enough to read as "still", not "spinning".
 const ORBIT_RADIANS_PER_SECOND = (2 * Math.PI) / (12 * 60);
+// 30 fps is plenty for a backdrop that reads as "still"; rendering at the
+// display's full rate measurably saturates a main thread (a 2 s window on a
+// desktop GPU showed >2.2 s of long tasks) and starves pointer handling on
+// slower machines — the CI e2e failure that motivated this.
+const FRAME_INTERVAL_MS = 1_000 / 30;
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 export function CityHeroScene() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,6 +84,7 @@ export function CityHeroScene() {
 
     let animationFrameId = 0;
     let lastTime = performance.now();
+    let lastRenderTime = 0;
 
     function resize() {
       const parent = canvas!.parentElement;
@@ -87,29 +97,58 @@ export function CityHeroScene() {
       renderer.setSize(safeWidth, safeHeight, false);
     }
 
+    function renderFrame(azimuth: number) {
+      const position = orbitToPosition(
+        { azimuth, polar: orbit.polar, radius: orbit.radius },
+        {
+          x: target.x,
+          y: target.y,
+          z: target.z,
+        },
+      );
+      camera.position.set(position.x, position.y, position.z);
+      camera.lookAt(target);
+      renderer.render(scene, camera);
+    }
+
+    const reducedMotion = prefersReducedMotion();
+
     // No `disposed` guard needed: this loop is fully synchronous (no awaited
     // gaps a stale callback could fire into, unlike useSimulationViewportRenderer.ts's
     // loop, which really does have async GPU-adapter gaps) -- cancelling the
     // queued frame in cleanup is already enough to stop it for good.
+    // `prefers-reduced-motion` skips the loop entirely and renders exactly
+    // one static frame (re-rendered on resize) — matching the global CSS
+    // reduced-motion rule in base.css, and keeping the homepage usable on
+    // machines where continuous WebGL saturates the main thread.
     function animate(time: number) {
       const deltaSeconds = Math.min(0.1, (time - lastTime) / 1000);
       lastTime = time;
-      orbit.azimuth += deltaSeconds * ORBIT_RADIANS_PER_SECOND;
-      const position = orbitToPosition(orbit, {
-        x: target.x,
-        y: target.y,
-        z: target.z,
-      });
-      camera.position.set(position.x, position.y, position.z);
-      camera.lookAt(target);
-      renderer.render(scene, camera);
+      if (time - lastRenderTime >= FRAME_INTERVAL_MS) {
+        lastRenderTime = time;
+        orbit.azimuth += deltaSeconds * ORBIT_RADIANS_PER_SECOND;
+        renderFrame(orbit.azimuth);
+      }
       animationFrameId = requestAnimationFrame(animate);
     }
 
-    resize();
-    const resizeObserver = new ResizeObserver(resize);
+    function start() {
+      resize();
+      if (reducedMotion) {
+        renderFrame(orbit.azimuth);
+      } else {
+        animationFrameId = requestAnimationFrame(animate);
+      }
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      resize();
+      if (reducedMotion) {
+        renderFrame(orbit.azimuth);
+      }
+    });
     resizeObserver.observe(canvas.parentElement ?? canvas);
-    animationFrameId = requestAnimationFrame(animate);
+    start();
 
     return () => {
       cancelAnimationFrame(animationFrameId);

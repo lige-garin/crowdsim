@@ -29,6 +29,17 @@ jobs:
       - run: pnpm test:rust
       - run: pnpm typecheck
       - run: pnpm test
+      # The app is bilingual, Chinese-first; without CJK fonts the runner's
+      # chromium renders tofu boxes with different metrics than any real
+      # user sees, so layout assertions there are noise.
+      - run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
       - run: pnpm build
+      - name: Upload e2e failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: test-results/
+          retention-days: 7

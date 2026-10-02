@@ -120,6 +120,10 @@ async function enterWorkbench(page: Page) {
 test("workbench boots into a running simulation and renders a crowd", async ({
   page,
 }) => {
+  // Inner waits already total up to ~75 s (engine start, canvas content,
+  // live agents) — an outer budget of 30 s could never fit them on a slow
+  // machine, and software-WebGL compat mode (the no-GPU condition) is slow.
+  test.setTimeout(90_000);
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
@@ -277,6 +281,11 @@ test("editor places an entity, undoes it, and keeps the document consistent", as
 test("panel dock opens panels without runtime errors or long freezes", async ({
   page,
 }) => {
+  // This walks every dock panel in sequence while the 3D viewport keeps
+  // rendering; under software WebGL (the no-GPU CI/local condition, where the
+  // compat mode honestly renders at a capped frame rate) that combination
+  // legitimately takes longer than the default budget.
+  test.setTimeout(90_000);
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
@@ -653,6 +662,11 @@ test("the parameter sweep runs in a worker and reports an interval", async ({
 test("live analytics draws real charts for the running crowd, not just numbers", async ({
   page,
 }) => {
+  // The chart poll below already allows 60 s for shop visits and completed
+  // journeys to accumulate at 4x speed — an inner budget that could never be
+  // used under the default 30 s test timeout, and software-WebGL compat mode
+  // (the no-GPU condition) stretches every step further.
+  test.setTimeout(120_000);
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
@@ -689,10 +703,23 @@ test("live analytics draws real charts for the running crowd, not just numbers",
     .toBeGreaterThan(0);
 
   // The heatmap legend only draws once that layer is switched on -- it
-  // should not appear before the toggle, and must appear after.
-  await expect(page.locator(".render-heatmap-legend")).toHaveCount(0);
-  await page.getByTestId("palette-layer-heatmap").click();
-  await expect(page.locator(".render-heatmap-legend")).toBeVisible();
+  // should not appear before the toggle, and must appear after. The viewport
+  // overlays require a working 3D renderer: when even WebGL is unavailable
+  // (headless chromium without software GL), ADR-0006 replaces the viewport
+  // with the readable blocking card and no legend can exist there — so that
+  // branch asserts the card instead of the legend. Both branches stay real
+  // assertions; neither silently skips.
+  const webglAvailable = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+  });
+  if (webglAvailable) {
+    await expect(page.locator(".render-heatmap-legend")).toHaveCount(0);
+    await page.getByTestId("palette-layer-heatmap").click();
+    await expect(page.locator(".render-heatmap-legend")).toBeVisible();
+  } else {
+    await expect(page.getByTestId("viewport-unsupported")).toBeVisible();
+  }
 
   // The report: a live, scored check against the actual running scene, not
   // a fixture -- the last step of the plan's four-step normal-user path

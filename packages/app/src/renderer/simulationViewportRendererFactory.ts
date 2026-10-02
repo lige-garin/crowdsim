@@ -31,6 +31,13 @@ export function createFallbackViewportRenderer(canvas: HTMLCanvasElement) {
     antialias: true,
     canvas,
     powerPreference: "high-performance",
+    // The compatibility mode is the path a screenshot/export (or a test's
+    // readback) takes on machines without WebGPU, and without this flag the
+    // drawing buffer is cleared after present — those readbacks see a blank
+    // canvas even while frames are visibly rendering. The modest cost is
+    // exactly what ADR-0006's "scale-limited compatibility mode" exists to
+    // absorb; the full-GPU path keeps the default.
+    preserveDrawingBuffer: true,
     stencil: false,
   });
   configureViewportRenderer(renderer);
