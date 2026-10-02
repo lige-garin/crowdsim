@@ -1,8 +1,10 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import { useState } from "react";
 import { RetailAnalyticsPanel } from "./panels/RetailAnalyticsPanel";
 import type { DashboardSample } from "./analytics/dashboardStats";
 import { RealObservationsPanel } from "./panels/RealObservationsPanel";
 import { RunAnalyticsPanel, type RunAnalyticsExport } from "./panels/RunAnalyticsPanel";
+import { formatDiagnostics } from "./errorDiagnostics";
 import type {
   MinuteFlow,
   RunAnalyticsSummary,
@@ -183,6 +185,7 @@ export function AppInspector({
             }
           />
         </div>
+        <DiagnosticsExportButton language={language} />
       </section>
 
       <section
@@ -263,6 +266,37 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
+  );
+}
+
+/**
+ * The healthy-app half of the local diagnostics channel: one button, one
+ * clipboard payload, no network (errorDiagnostics.ts). The crash-path half is
+ * the copy button on the ErrorBoundary's own fallback card.
+ */
+function DiagnosticsExportButton({ language }: { language: "en" | "zh" }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      className="diagnostics-export"
+      data-testid="diagnostics-export"
+      onClick={() => {
+        void navigator.clipboard
+          .writeText(formatDiagnostics())
+          .then(() => setCopied(true))
+          .catch(() => setCopied(false));
+      }}
+    >
+      {copied
+        ? language === "zh"
+          ? "已复制诊断信息"
+          : "Diagnostics copied"
+        : language === "zh"
+          ? "复制诊断信息"
+          : "Copy diagnostics"}
+    </button>
   );
 }
 

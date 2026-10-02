@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppErrorBoundary } from "./ErrorBoundary";
 
@@ -42,6 +42,29 @@ describe("AppErrorBoundary", () => {
       );
 
       expect(consoleError).toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("records the caught error into the local diagnostics channel", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    try {
+      render(
+        <AppErrorBoundary>
+          <Kaboom />
+        </AppErrorBoundary>,
+      );
+
+      fireEvent.click(
+        screen.getByRole("button", { name: /复制诊断信息 · Copy diagnostics/ }),
+      );
+
+      // The clipboard payload carries the recorded crash, not an empty buffer.
+      expect(writeText).toHaveBeenCalledTimes(1);
+      expect(String(writeText.mock.calls[0][0])).toContain("kaboom");
     } finally {
       consoleError.mockRestore();
     }

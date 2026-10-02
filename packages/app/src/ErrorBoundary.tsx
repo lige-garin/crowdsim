@@ -1,10 +1,12 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { formatDiagnostics, recordDiagnostic } from "./errorDiagnostics";
 
 type AppErrorBoundaryProps = {
   children: ReactNode;
 };
 
 type AppErrorBoundaryState = {
+  copiedDiagnostics: boolean;
   error: Error | null;
 };
 
@@ -22,14 +24,28 @@ export class AppErrorBoundary extends Component<
   AppErrorBoundaryProps,
   AppErrorBoundaryState
 > {
-  state: AppErrorBoundaryState = { error: null };
+  state: AppErrorBoundaryState = { copiedDiagnostics: false, error: null };
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
-    return { error };
+    return { copiedDiagnostics: false, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
+    // The local diagnostics channel (errorDiagnostics.ts): what the boundary
+    // catches never reaches window.onerror, so record it here or the trail
+    // misses every caught render error.
+    recordDiagnostic("ui", `${String(error)} ${info.componentStack ?? ""}`);
     console.error("Unhandled UI error:", error, info.componentStack);
+  }
+
+  async copyDiagnostics() {
+    try {
+      await navigator.clipboard.writeText(formatDiagnostics());
+      this.setState({ copiedDiagnostics: true });
+    } catch {
+      // Clipboard needs a secure context and permission; the details blocks
+      // below still carry the information for a manual copy.
+    }
   }
 
   render() {
@@ -55,6 +71,11 @@ export class AppErrorBoundary extends Component<
         </details>
         <button type="button" onClick={() => window.location.reload()}>
           刷新页面 · Reload
+        </button>
+        <button type="button" onClick={() => void this.copyDiagnostics()}>
+          {this.state.copiedDiagnostics
+            ? "已复制 · Copied"
+            : "复制诊断信息 · Copy diagnostics"}
         </button>
       </div>
     );

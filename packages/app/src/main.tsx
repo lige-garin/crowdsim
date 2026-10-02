@@ -20,6 +20,11 @@ import "./styles/panels.css";
 import "./styles/hud.css";
 import { App } from "./App";
 import { AppErrorBoundary } from "./ErrorBoundary";
+import { installGlobalErrorDiagnostics } from "./errorDiagnostics";
+
+// Before anything can throw: the diagnostics ring buffer wants the whole
+// session's trail, not just what survived after mount.
+installGlobalErrorDiagnostics();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
