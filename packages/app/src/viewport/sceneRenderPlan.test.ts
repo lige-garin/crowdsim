@@ -16,6 +16,68 @@ describe("sceneRenderPlan", () => {
       heightMeters: 18,
       kind: "building",
     });
+    // The default demo scene is fully procedural (no visualAssets), so the
+    // asset-mapping half of the plan is exercised on an inline fixture in
+    // the dedicated test below and in sceneModelAssets.test.ts.
+    expect(plan.assets).toEqual([]);
+  });
+
+  it("maps scene.visualAssets into render-plan assets", () => {
+    const scene = parseScene({
+      ...defaultDemoScene,
+      visualAssets: [
+        {
+          id: "test-streetscape",
+          name: "Test Streetscape",
+          kind: "gltf-scene",
+          sourceUrl: "/assets/test-scene/streetscape.glb",
+          lodSources: {
+            high: "/assets/test-scene/streetscape.high.glb",
+            low: "/assets/test-scene/streetscape.low.glb",
+            medium: "/assets/test-scene/streetscape.glb",
+          },
+          originalSourceFormat: "sketchup",
+          anchor: { x: 80, y: 48, z: 0 },
+          calibration: {
+            accuracyMeters: 0.5,
+            simulationProxy: {
+              entityId: "downtown-walkable",
+              kind: "area",
+            },
+            unitScaleMeters: 1,
+            upAxis: "y-up",
+            verified: true,
+          },
+          rotationDegrees: 0,
+          scale: 1,
+        },
+        {
+          id: "test-shelter",
+          name: "Test Shelter",
+          kind: "gltf-prop",
+          sourceUrl: "/assets/test-scene/shelter.glb",
+          lodSources: {
+            low: "/assets/test-scene/shelter.low.glb",
+          },
+          originalSourceFormat: "glb",
+          anchor: { x: 122, y: 72, z: 0 },
+          calibration: {
+            accuracyMeters: 0.2,
+            simulationProxy: {
+              entityId: "rain-market-bus-stop",
+              kind: "transitStop",
+            },
+            unitScaleMeters: 1,
+            upAxis: "y-up",
+            verified: true,
+          },
+          scale: 0.9,
+        },
+      ],
+    });
+
+    const plan = createSceneRenderPlan(scene, 0);
+
     expect(plan.assets).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -27,16 +89,16 @@ describe("sceneRenderPlan", () => {
             unitScaleMeters: 1,
             verified: true,
           }),
-          id: "asset-rain-market-streetscape",
+          id: "asset-test-streetscape",
           kind: "gltf-scene",
           lod: "medium",
           lodSources: expect.objectContaining({
-            low: "/assets/demo-scene/rain-market-streetscape.low.glb",
+            low: "/assets/test-scene/streetscape.low.glb",
           }),
-          sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
+          sourceUrl: "/assets/test-scene/streetscape.glb",
         }),
         expect.objectContaining({
-          id: "asset-bus-stop-shelter",
+          id: "asset-test-shelter",
           kind: "gltf-prop",
         }),
       ]),

@@ -59,11 +59,12 @@ pnpm test:rust       # cargo test
 
 ## Where things are
 
-`CLAUDE.md` at the repo root is the fullest single account of the project's
-direction, architecture, and history — read it before large changes.
+`docs/ARCHITECTURE.md` describes the actual package and data-flow layout.
 Architectural decisions are recorded as ADRs in `docs/adr/`; if your change
 shifts a boundary the ADRs describe, open a new ADR rather than silently
-diverging from it.
+diverging from it. `docs/CLAIMS_LEDGER.md` is the dated audit trail of what
+this project has claimed and what it corrected — reading its recent entries
+is the fastest way to understand the house rules.
 
 ## Code of Conduct
 

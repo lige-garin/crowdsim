@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from "three";
+import { parseScene } from "@crowdsim/scene-schema";
 import { defaultDemoScene } from "../scenes/defaultDemoScene";
 import {
   createSceneAssetLoadPlans,
@@ -9,35 +10,92 @@ import {
 } from "./sceneModelAssets";
 import { createSceneRenderPlan } from "../viewport/sceneRenderPlan";
 
+// The default demo scene is fully procedural (its third-party streetscape
+// GLB was removed at open-sourcing — see docs/CLAIMS_LEDGER.md, 2026-10-02
+// note), so these loader-planning tests run against an inline visual-asset
+// fixture instead.
+const sceneWithAssets = parseScene({
+  ...defaultDemoScene,
+  visualAssets: [
+    {
+      id: "test-streetscape",
+      name: "Test Streetscape",
+      kind: "gltf-scene",
+      sourceUrl: "/assets/test-scene/streetscape.glb",
+      lodSources: {
+        high: "/assets/test-scene/streetscape.high.glb",
+        low: "/assets/test-scene/streetscape.low.glb",
+        medium: "/assets/test-scene/streetscape.glb",
+      },
+      originalSourceFormat: "sketchup",
+      anchor: { x: 80, y: 48, z: 0 },
+      calibration: {
+        accuracyMeters: 0.5,
+        simulationProxy: {
+          entityId: "downtown-walkable",
+          kind: "area",
+        },
+        unitScaleMeters: 1,
+        upAxis: "y-up",
+        verified: true,
+      },
+      rotationDegrees: 0,
+      scale: 1,
+    },
+    {
+      id: "test-shelter",
+      name: "Test Shelter",
+      kind: "gltf-prop",
+      sourceUrl: "/assets/test-scene/shelter.glb",
+      lodSources: {
+        low: "/assets/test-scene/shelter.low.glb",
+      },
+      originalSourceFormat: "glb",
+      anchor: { x: 122, y: 72, z: 0 },
+      calibration: {
+        accuracyMeters: 0.2,
+        simulationProxy: {
+          entityId: "rain-market-bus-stop",
+          kind: "transitStop",
+        },
+        unitScaleMeters: 1,
+        upAxis: "y-up",
+        verified: true,
+      },
+      scale: 0.9,
+    },
+  ],
+});
+
 describe("sceneModelAssets", () => {
   it("plans GLB and GLTF assets for GLTFLoader with placeholder fallback", () => {
-    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const renderPlan = createSceneRenderPlan(sceneWithAssets, 0);
     const loadPlans = createSceneAssetLoadPlans(renderPlan.assets);
 
     expect(loadPlans).toEqual([
       {
         estimatedTriangles: 120000,
         fallback: "placeholder",
-        id: "asset-rain-market-streetscape",
+        id: "asset-test-streetscape",
         loader: "gltf-loader",
         requestedLod: "medium",
         selectedLod: "medium",
-        sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
+        sourceUrl: "/assets/test-scene/streetscape.glb",
       },
       {
         estimatedTriangles: 7500,
         fallback: "placeholder",
-        id: "asset-bus-stop-shelter",
+        id: "asset-test-shelter",
         loader: "gltf-loader",
         requestedLod: "medium",
         selectedLod: "medium",
-        sourceUrl: "/assets/demo-scene/bus-stop-shelter.glb",
+        sourceUrl: "/assets/test-scene/shelter.glb",
       },
     ]);
   });
 
   it("selects quality-specific LOD sources without exceeding asset LOD", () => {
-    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const renderPlan = createSceneRenderPlan(sceneWithAssets, 0);
     const lowPlans = createSceneAssetLoadPlans(renderPlan.assets, {
       quality: "low",
     });
@@ -47,23 +105,23 @@ describe("sceneModelAssets", () => {
 
     expect(lowPlans[0]).toMatchObject({
       selectedLod: "low",
-      sourceUrl: "/assets/demo-scene/rain-market-streetscape.low.glb",
+      sourceUrl: "/assets/test-scene/streetscape.low.glb",
     });
     expect(lowPlans[1]).toMatchObject({
       selectedLod: "low",
-      sourceUrl: "/assets/demo-scene/bus-stop-shelter.low.glb",
+      sourceUrl: "/assets/test-scene/shelter.low.glb",
     });
     expect(highPlans[0]).toMatchObject({
       requestedLod: "high",
       selectedLod: "medium",
-      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
+      sourceUrl: "/assets/test-scene/streetscape.glb",
     });
   });
 
   it("keeps 3D tiles on the tileset renderer path", () => {
     const renderPlan = createSceneRenderPlan(
-      {
-        ...defaultDemoScene,
+      parseScene({
+        ...sceneWithAssets,
         visualAssets: [
           {
             anchor: { x: 80, y: 48, z: 0 },
@@ -80,12 +138,12 @@ describe("sceneModelAssets", () => {
             lodSources: {},
             rotationDegrees: 0,
             scale: 1,
-            sourceUrl: "/assets/demo-scene/tileset.json",
+            sourceUrl: "/assets/test-scene/tileset.json",
             visible: true,
             customParameters: {},
           },
         ],
-      },
+      }),
       0,
     );
 
@@ -98,16 +156,16 @@ describe("sceneModelAssets", () => {
 
   it("summarizes loader readiness and source URL de-duplication", () => {
     const renderPlan = createSceneRenderPlan(
-      {
-        ...defaultDemoScene,
+      parseScene({
+        ...sceneWithAssets,
         visualAssets: [
-          ...defaultDemoScene.visualAssets,
+          ...sceneWithAssets.visualAssets,
           {
-            ...defaultDemoScene.visualAssets[1],
-            id: "bus-stop-shelter-copy",
+            ...sceneWithAssets.visualAssets[1],
+            id: "test-shelter-copy",
           },
         ],
-      },
+      }),
       0,
     );
 
@@ -128,7 +186,7 @@ describe("sceneModelAssets", () => {
   });
 
   it("reports deferred assets when the unique source budget is exceeded", () => {
-    const renderPlan = createSceneRenderPlan(defaultDemoScene, 0);
+    const renderPlan = createSceneRenderPlan(sceneWithAssets, 0);
     const plans = createSceneAssetLoadPlans(renderPlan.assets, {
       maxUniqueSources: 1,
     });
@@ -145,25 +203,25 @@ describe("sceneModelAssets", () => {
 
   it("applies visual asset calibration to world transforms", () => {
     const renderPlan = createSceneRenderPlan(
-      {
-        ...defaultDemoScene,
+      parseScene({
+        ...sceneWithAssets,
         visualAssets: [
           {
-            ...defaultDemoScene.visualAssets[0],
+            ...sceneWithAssets.visualAssets[0],
             calibration: {
-              ...defaultDemoScene.visualAssets[0].calibration,
+              ...sceneWithAssets.visualAssets[0].calibration,
               unitScaleMeters: 0.5,
               upAxis: "z-up",
             },
             scale: 2,
           },
         ],
-      },
+      }),
       0,
     );
 
     expect(
-      createSceneAssetWorldTransform(renderPlan.assets[0], defaultDemoScene),
+      createSceneAssetWorldTransform(renderPlan.assets[0], sceneWithAssets),
     ).toEqual({
       position: { x: 0, y: 0, z: 0 },
       rotation: { x: 0, y: 0, z: 0 },

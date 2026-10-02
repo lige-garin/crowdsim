@@ -7,6 +7,9 @@ export type IndustryTemplate = {
     zh: string;
   };
   id: string;
+  // `maxAgents` is what the card advertises; the engine hard-caps the crowd
+  // at `crowdBudget.maxAgents` (2,000 today). Advertising more would be a
+  // silent truncation — industryTemplates.test.ts enforces the bound.
   recommended: {
     arrivalRatePerMinute: number;
     maxAgents: number;
@@ -24,7 +27,7 @@ export const industryTemplates: readonly IndustryTemplate[] = [
     id: "metro-station-hall",
     recommended: {
       arrivalRatePerMinute: 180,
-      maxAgents: 2_500,
+      maxAgents: 2_000,
       speedMetersPerSecond: 1.28,
     },
     scene: exampleScenes[0],
@@ -50,7 +53,7 @@ export const industryTemplates: readonly IndustryTemplate[] = [
     id: "performance-venue",
     recommended: {
       arrivalRatePerMinute: 240,
-      maxAgents: 3_200,
+      maxAgents: 2_000,
       speedMetersPerSecond: 1.22,
     },
     scene: exampleScenes[2],
@@ -63,7 +66,7 @@ export const industryTemplates: readonly IndustryTemplate[] = [
     id: "airport-security",
     recommended: {
       arrivalRatePerMinute: 210,
-      maxAgents: 2_800,
+      maxAgents: 2_000,
       speedMetersPerSecond: 1.12,
     },
     scene: parseScene({
@@ -250,7 +253,7 @@ export const industryTemplates: readonly IndustryTemplate[] = [
     id: "stadium-concourse",
     recommended: {
       arrivalRatePerMinute: 320,
-      maxAgents: 4_500,
+      maxAgents: 2_000,
       speedMetersPerSecond: 1.24,
     },
     scene: parseScene({

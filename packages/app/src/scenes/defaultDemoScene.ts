@@ -17,56 +17,6 @@ export const defaultDemoScene = parseScene({
       severity: 0.8,
     },
   ],
-  visualAssets: [
-    {
-      id: "rain-market-streetscape",
-      name: "Rain Market Streetscape",
-      kind: "gltf-scene",
-      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
-      lodSources: {
-        high: "/assets/demo-scene/rain-market-streetscape.high.glb",
-        low: "/assets/demo-scene/rain-market-streetscape.low.glb",
-        medium: "/assets/demo-scene/rain-market-streetscape.glb",
-      },
-      originalSourceFormat: "sketchup",
-      anchor: { x: 80, y: 48, z: 0 },
-      calibration: {
-        accuracyMeters: 0.5,
-        simulationProxy: {
-          entityId: "downtown-walkable",
-          kind: "area",
-        },
-        unitScaleMeters: 1,
-        upAxis: "y-up",
-        verified: true,
-      },
-      rotationDegrees: 0,
-      scale: 1,
-      attribution: "SketchUp massing model converted to GLB for visual context",
-    },
-    {
-      id: "bus-stop-shelter",
-      name: "Bus Stop Shelter",
-      kind: "gltf-prop",
-      sourceUrl: "/assets/demo-scene/bus-stop-shelter.glb",
-      lodSources: {
-        low: "/assets/demo-scene/bus-stop-shelter.low.glb",
-      },
-      originalSourceFormat: "glb",
-      anchor: { x: 122, y: 72, z: 0 },
-      calibration: {
-        accuracyMeters: 0.2,
-        simulationProxy: {
-          entityId: "rain-market-bus-stop",
-          kind: "transitStop",
-        },
-        unitScaleMeters: 1,
-        upAxis: "y-up",
-        verified: true,
-      },
-      scale: 0.9,
-    },
-  ],
   areas: [
     {
       id: "downtown-walkable",

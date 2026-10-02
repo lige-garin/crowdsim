@@ -7,9 +7,8 @@ side, no server required to run or save your work.
 
 This README states plainly what is real and what is not. The project has a
 documented habit of catching and correcting its own overstated claims — see
-[`docs/CLAIMS_LEDGER.md`](docs/CLAIMS_LEDGER.md) for the full history, and
-[`CLAUDE.md`](CLAUDE.md) for the complete, dated account of what was built
-and why.
+[`docs/CLAIMS_LEDGER.md`](docs/CLAIMS_LEDGER.md) for the full history and
+[`docs/adr/`](docs/adr/) for the architecture decisions.
 
 ## Status, honestly
 
@@ -26,13 +25,19 @@ and why.
   failures (not bugs papered over — see `docs/adr/` and the ledger), and 1
   cannot be built because the guideline's own figure for it has no usable
   dimensions.
-- **"100,000 agents on WebGPU" is a real, benchmarked number for the
-  movement kernel alone (0.45 ms/step), and it is not wired into the app.**
-  The shipping app runs up to 2,000 agents on the CPU path
-  (`movementBackend: "cpu-compat"`); `packages/core-gpu`'s `gpuSimCore` has
-  zero importers from `packages/app`. See `docs/adr/0015-scale-up-path-comparison.md`.
-  Do not read "100k" anywhere else in this project as a claim about the
-  running application.
+- **The GPU movement kernel is wired into the app — behind an experimental,
+  default-off toggle — and at today's scale it is a wash, not a win.**
+  `packages/core-gpu`'s `gpuSimCore` (benchmarked at 0.45 ms/step for
+  100,000 agents in isolation) is connected to the live engine (ADR-0033):
+  a labelled "GPU movement (experimental)" toggle / `?gpumove` URL flag,
+  worker-side device lifecycle with CPU fallback on device loss, and
+  fail-loud async APIs. Measured on real hardware, the crossover is at
+  roughly **750–1000 agents** — below it the CPU path is faster, above it the
+  GPU path is, and at the shipping 2,000-agent cap the GPU path stays near
+  6 ms/step while the CPU path exceeds the frame budget. The shipping
+  default remains the CPU path (`movementBackend: "cpu-compat"`), so "100k"
+  is still a kernel-only benchmark number, not a claim about the running
+  application. See `docs/adr/0033-gpu-core-engine-wiring.md`.
 - **Pedestrians nearest the camera can be real skinned, animated 3D
   characters (CC0 assets, ADR-0032), not a claim about the whole crowd.**
   Only the closest 12 agents within 20 m of the camera get one; everyone
@@ -56,7 +61,9 @@ and why.
   not decorative.
 - **There is no account system, and none is required.** The app persists
   your work to `localStorage` and to files you export/import
-  (`.csim.json`). It makes no network requests in a default build. An
+  (`.csim.json`). A default build makes no network requests of its own —
+  the only outbound call in the app is the live-weather panel, which fetches
+  from the Open-Meteo API when (and only when) you click its button. An
   earlier optional backend for projects/versions/share links existed at
   one point but was never deployable as shipped and was never reachable
   from the client — it was removed rather than kept around unmaintained;

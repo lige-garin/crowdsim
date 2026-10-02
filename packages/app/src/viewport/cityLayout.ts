@@ -43,7 +43,8 @@ export type CityLayout = {
  * A city around the simulated district, generated so it never touches it.
  *
  * The viewport used to fill the world with a uniform grid of identical boxes
- * (baked into `rain-market-streetscape.glb`) — it read as a warehouse yard, and
+ * (in the demo scene's former streetscape GLB, since removed) — it read as a
+ * warehouse yard, and
  * because it filled the same ground the crowd walks on, depth-sorting fought
  * the agents. Here the scene's world rectangle is the district: only the
  * scene's own geometry is drawn inside it, plus plaza trees that stay clear of

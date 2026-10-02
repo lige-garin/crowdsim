@@ -14,32 +14,10 @@ describe("defaultDemoScene", () => {
       "glass-arcade",
       "food-hall-south",
     ]);
-    expect(roundTripped.visualAssets.map((asset) => asset.id)).toEqual([
-      "rain-market-streetscape",
-      "bus-stop-shelter",
-    ]);
-    expect(roundTripped.visualAssets[0]).toMatchObject({
-      calibration: {
-        accuracyMeters: 0.5,
-        origin: "scene-anchor",
-        simulationProxy: {
-          entityId: "downtown-walkable",
-          kind: "area",
-          role: "alignment-only",
-        },
-        unitScaleMeters: 1,
-        upAxis: "y-up",
-        verified: true,
-      },
-      collisionMode: "none",
-      lodSources: {
-        high: "/assets/demo-scene/rain-market-streetscape.high.glb",
-        low: "/assets/demo-scene/rain-market-streetscape.low.glb",
-        medium: "/assets/demo-scene/rain-market-streetscape.glb",
-      },
-      originalSourceFormat: "sketchup",
-      sourceUrl: "/assets/demo-scene/rain-market-streetscape.glb",
-    });
+    // The scene is fully procedural: no visualAssets (the third-party
+    // streetscape GLB was removed at open-sourcing — see
+    // docs/CLAIMS_LEDGER.md, 2026-10-02 note).
+    expect(roundTripped.visualAssets).toEqual([]);
     expect(roundTripped.transitStops[0]).toMatchObject({
       id: "rain-market-bus-stop",
       roadId: "bus-loop",
