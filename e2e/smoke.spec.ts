@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
+// The 2-core software-WebGL CI runner needs 3-5x the local time per
+// operation. The per-test budgets below stay tuned for local runs; on CI
+// they take this floor so they cannot cap the config's 240 s default down.
+const ciBudgetFloor = process.env.CI ? 240_000 : 0;
+
 /**
  * These specs guard real user journeys, not copy. They deliberately anchor on
  * `data-testid` and ARIA roles rather than on visible strings: the previous
@@ -123,7 +128,7 @@ test("workbench boots into a running simulation and renders a crowd", async ({
   // Inner waits already total up to ~75 s (engine start, canvas content,
   // live agents) — an outer budget of 30 s could never fit them on a slow
   // machine, and software-WebGL compat mode (the no-GPU condition) is slow.
-  test.setTimeout(90_000);
+  test.setTimeout(Math.max(90_000, ciBudgetFloor));
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
@@ -285,7 +290,7 @@ test("panel dock opens panels without runtime errors or long freezes", async ({
   // rendering; under software WebGL (the no-GPU CI/local condition, where the
   // compat mode honestly renders at a capped frame rate) that combination
   // legitimately takes longer than the default budget.
-  test.setTimeout(90_000);
+  test.setTimeout(Math.max(90_000, ciBudgetFloor));
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");
@@ -666,7 +671,7 @@ test("live analytics draws real charts for the running crowd, not just numbers",
   // journeys to accumulate at 4x speed — an inner budget that could never be
   // used under the default 30 s test timeout, and software-WebGL compat mode
   // (the no-GPU condition) stretches every step further.
-  test.setTimeout(120_000);
+  test.setTimeout(Math.max(120_000, ciBudgetFloor));
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");

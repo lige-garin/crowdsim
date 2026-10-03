@@ -28,8 +28,9 @@ function captureRuntimeErrors(page: Page): ErrorSink {
 test("template → edit → simulate → CSV + report, end to end", async ({ page }) => {
   // Inner polls (engine start, samples, applied scene, report) already sum
   // past the 30 s default on a slow machine; software-WebGL compat mode
-  // stretches every step further.
-  test.setTimeout(150_000);
+  // stretches every step further. On CI the 2-core software-WebGL runner
+  // gets a 240 s floor (see smoke.spec.ts's ciBudgetFloor).
+  test.setTimeout(Math.max(150_000, process.env.CI ? 240_000 : 0));
   const errors = captureRuntimeErrors(page);
 
   await page.goto("/");

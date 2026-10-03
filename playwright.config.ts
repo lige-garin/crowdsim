@@ -32,7 +32,13 @@ export default defineConfig({
   ],
   reporter: isCi ? [["list"], ["html", { open: "never" }]] : "list",
   testDir: "./e2e",
-  timeout: 30_000,
+  // The 2-core CI runner renders through software WebGL: every operation
+  // completes, just 3-5x slower than a local GPU run assumes (measured:
+  // a test that finishes everything but its last click inside 90 s; the
+  // 150 s-budget journey test passes end-to-end). CI gets 4 minutes per
+  // test; the per-test setTimeout() calls in the specs take a CI floor so
+  // they cannot cap it back down.
+  timeout: isCi ? 240_000 : 30_000,
   use: {
     baseURL: "http://127.0.0.1:5173",
     trace: "retain-on-failure",
