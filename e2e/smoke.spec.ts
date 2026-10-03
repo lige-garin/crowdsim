@@ -1,9 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // The 2-core software-WebGL CI runner needs 3-5x the local time per
-// operation. The per-test budgets below stay tuned for local runs; on CI
-// they take this floor so they cannot cap the config's 240 s default down.
-const ciBudgetFloor = process.env.CI ? 240_000 : 0;
+// operation, and rate-dependent waits (recording seconds, chart samples)
+// accumulate at simulation speed — a fraction of wall-clock there. The
+// per-test budgets and rate waits below take this floor on CI (measured:
+// the panel-dock walk alone needs >240 s; it stays tuned for local runs).
+const ciBudgetFloor = process.env.CI ? 480_000 : 0;
 
 /**
  * These specs guard real user journeys, not copy. They deliberately anchor on
@@ -443,7 +445,11 @@ test("replay pauses the run, scrubs the recording, and hands back to live", asyn
 
   const simToggle = page.getByTestId("sim-toggle");
   const replayToggle = page.getByTestId("replay-toggle");
-  await expect(replayToggle).toBeEnabled({ timeout: 20_000 });
+  // The button enables once the recorder holds enough simulated seconds —
+  // on the slow CI runner those accumulate at a fraction of wall-clock.
+  await expect(replayToggle).toBeEnabled({
+    timeout: Math.max(20_000, ciBudgetFloor),
+  });
   await page.waitForTimeout(4_000);
 
   await replayToggle.click();
@@ -702,9 +708,13 @@ test("live analytics draws real charts for the running crowd, not just numbers",
   // The slower half: at least one of the count-line, journey-time, or
   // places-ranking charts (all built on the same EChart wrapper, all
   // .echart-container) must actually render once there is real data behind
-  // it -- not stay permanently gated behind "nothing measured yet".
+  // it -- not stay permanently gated behind "nothing measured yet". The
+  // data accumulates at simulation speed, a fraction of wall-clock on the
+  // slow CI runner.
   await expect
-    .poll(() => page.locator(".echart-container").count(), { timeout: 60_000 })
+    .poll(() => page.locator(".echart-container").count(), {
+      timeout: Math.max(60_000, ciBudgetFloor),
+    })
     .toBeGreaterThan(0);
 
   // The heatmap legend only draws once that layer is switched on -- it
