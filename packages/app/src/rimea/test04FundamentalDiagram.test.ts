@@ -30,7 +30,10 @@ describe("test 4: the fundamental diagram", () => {
     const result = runFundamentalDiagramTest(cheap);
 
     expect(result.number).toBe(4);
-    expect(["pass", "fail"]).toContain(result.status);
+    // Only that a verdict was reached, not which one: this config walks the
+    // code path, it is not the guideline's sweep, so "pass" here would say
+    // more about the model than this run can carry.
+    expect(result.status).not.toBe("needs-scenario");
     expect(result.measured).toMatch(/worst deviation/u);
     expect(result.criterion).toContain("RiMEA 4.1.1 A 2 test 4");
     // The tolerance is this project's, and the corridor is not the

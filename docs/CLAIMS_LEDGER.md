@@ -3100,3 +3100,38 @@ path. What it would take: a CI matrix (firefox + webkit projects), per-browser
 baseline contracts, and a decision on which divergences are bugs vs
 platform reality. Estimated 1–2 weeks including triage. Deferred until a
 paying workflow depends on it.
+
+## 2026-10-04 (sixty-first entry): the movement step's NaN hazard — investigated, not found, and one hang that is real but unreachable
+
+From the 2026-10-04 full-repo review, which flagged two things in
+`crowdMovement.ts`: the anticipation push divides by `sqrt(discriminant)` and
+by `tau²`, and every clamp in the model is a plain `>` comparison, which a NaN
+passes straight through. Both are true as written. What the investigation
+found:
+
+- **No non-finite output is reachable.** 200 000 randomised two- and
+  three-agent configurations, plus a sweep putting every
+  `SocialForceParameters` field at 0 / ±fitted / ×1e-9 / ×1e9, produced zero
+  non-finite positions or velocities. The reason it cannot overflow: `a` is
+  floored at `1e-6`, `tau = c / (b + root)` after rationalising, and `c` is a
+  difference of two doubles of order 0.01 — so `c` cannot be smaller than
+  about `1e-19` in practice, which bounds the force near `1e76`, far under
+  `1.8e308`. `Infinity` (which the clamp would turn into NaN via
+  `max / Infinity === 0`) is therefore unreachable too.
+- **One hang is real but unreachable from shipped code.** `forEachNearby`
+  computes `Math.ceil(reachMeters / buckets.size)`; with
+  `interactionRangeMeters` at 0 or ×1e-9 that is `Infinity` or ~1e9, and the
+  cell loop never terminates (measured: a single-parameter sweep hangs there).
+  Nothing shipped can set it: no scene field carries it, the sensitivity
+  panel sweeps six _other_ parameters over ±50% of their fitted values, and
+  the calibration fit excludes it. Left unguarded on purpose — a guard here
+  would be defending against an input no user can produce, and this project
+  does not add guards to look careful.
+
+What was added instead: a regression test in `crowdMovement.test.ts` pinning
+the invariant that matters — every walker stays finite across the whole
+screened parameter range — verified by injecting a NaN into `anticipation()`
+and watching the test fail, then reverting. The GPU path
+(`gpuSimCoreShaders.ts`) repeats the same formula in f32 with the same
+NaN-transparent clamp; **not verified there**, because this machine has no
+WebGPU device and the f32 headroom argument does not transfer.

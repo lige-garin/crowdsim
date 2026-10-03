@@ -18,6 +18,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   context's trace: `reducedMotion: "reduce"`), restoring the intended single
   static hero frame.
 
+- Typing a fractional shop capacity (e.g. `12.5`) in the editor's parameter
+  panel took the whole workbench down to the error boundary: `capacity` is
+  `z.number().int()` in the shop schema, and the value reaches
+  `parseScene` inside a render-time `useMemo`. The mutation now rounds the
+  head count (attraction and dwell stay fractional). Building and transit-stop
+  numbers already rounded; the shop was the one that had been missed.
+- Closing the trajectory replay by its own close button left the run stopped
+  for good: only the play button cleared the pause, so the auto-start latch
+  stayed set and the city sat frozen. Exiting the replay now resumes a run
+  that was live when it opened, and leaves a run the user had already paused
+  alone.
+- A refused hot scene update in the simulation worker adopted the new scene's
+  floors before the engine rejected it, so shared-memory snapshots wrote the
+  wrong floor list until the re-init landed. The floors are now read only
+  after the engine has accepted the scene.
+
+### Changed
+
+- Two RiMEA tests asserted `expect(["pass", "fail"]).toContain(status)`,
+  which reads as "the test passes" but only ever excluded `needs-scenario`, a
+  status neither test can return. Both now say plainly that only a reached
+  verdict is asserted, and why the verdict itself is left open.
+
 ## [0.1.0] — 2026-10-02
 
 First tagged release: the open-source baseline, after the 2026-10-02 review's

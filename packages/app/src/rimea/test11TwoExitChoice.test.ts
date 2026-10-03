@@ -13,7 +13,10 @@ describe("test 11: choice of escape route", () => {
     const result = runTwoExitChoiceTest({ people: 60 });
 
     expect(result.number).toBe(11);
-    expect(["pass", "fail"]).toContain(result.status);
+    // Deliberately not `toBe("pass")`: the penalty overshoot above is a
+    // disclosed finding, so the verdict is left open here while the split
+    // itself is asserted below.
+    expect(result.status).not.toBe("needs-scenario");
     expect(result.measured).toMatch(
       /exit 1 \(nearer\) took \d+, exit 2 \(further\) took \d+/u,
     );

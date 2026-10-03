@@ -275,6 +275,8 @@ function AppContent() {
   // different questions and were previously answered by the same flag.
   const autoStartedRef = useRef(false);
   const userPausedRef = useRef(false);
+  /** Whether opening the replay was what stopped a live run — see `exitReplay`. */
+  const resumeAfterReplayRef = useRef(false);
   const startSimulation = simulation.start;
   const simulationStatus = simulation.snapshot.status;
   useEffect(() => {
@@ -296,6 +298,26 @@ function AppContent() {
     userPausedRef.current = false;
     setReplaying(false);
     simulation.start();
+  }
+  /**
+   * Opening the replay stops the run so the scrubbed frames are not fighting
+   * live ones. Closing it used to leave the run stopped for good: `onClose`
+   * only dropped the replay bar, so `userPausedRef` stayed set and the
+   * auto-start effect above refused to bring the city back — the same dead
+   * end this latch exists to prevent, reached by a second door. Exiting now
+   * puts back what entering took: a run that was live resumes, one the user
+   * had already paused stays paused.
+   */
+  function enterReplay() {
+    resumeAfterReplayRef.current = simulationStatus === "running";
+    pauseSimulation();
+    setReplaying(true);
+  }
+  function exitReplay() {
+    setReplaying(false);
+    if (!resumeAfterReplayRef.current) return;
+    resumeAfterReplayRef.current = false;
+    startSimulationFromControls();
   }
   useEffect(() => {
     if (!evacuation.active) {
@@ -489,10 +511,7 @@ function AppContent() {
             onPause: pauseSimulation,
             onReplay:
               trajectoryRecording.frames.length > 1
-                ? () => {
-                    pauseSimulation();
-                    setReplaying(!replaying);
-                  }
+                ? () => (replaying ? exitReplay() : enterReplay())
                 : undefined,
             onReset: resetSimulation,
             replaying,
@@ -582,7 +601,7 @@ function AppContent() {
               ? {
                   crowd: liveCrowd,
                   language,
-                  onClose: () => setReplaying(false),
+                  onClose: exitReplay,
                   onExport: () =>
                     downloadCsv(
                       `${scene.id}-trajectories.csv`,

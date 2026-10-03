@@ -1,9 +1,10 @@
 import type { WallSegment } from "@crowdsim/core-gpu";
 import { describe, expect, it } from "vitest";
 import { createRouter } from "./crowdNavigation";
-import { stepCrowd } from "./crowdMovement";
 import type { SimulationAgent } from "./simulationEngine";
+import { stepCrowd, type SocialForceParameters } from "./crowdMovement";
 import { createWallIndex } from "./wallIndex";
+import { defaultSocialForceScreeningParameters } from "../analytics/sensitivityAnalysis";
 
 const world = { width: 40, height: 20 };
 
@@ -34,6 +35,7 @@ function run(
    * time, and this is where that trade gets tested rather than assumed.
    */
   replanEvery = 1,
+  parameters?: Partial<SocialForceParameters>,
 ) {
   const router = createRouter(world, walls);
   const index = createWallIndex(walls);
@@ -45,6 +47,7 @@ function run(
       exitRadius: () => 0,
       isExitBound: () => false,
       meanSpeedMetersPerSecond: 1.34,
+      parameters,
       replanAnticipation: replanEvery === 1 ? true : step % replanEvery === 0,
       router,
       seed: 1,
@@ -194,5 +197,42 @@ describe("stepCrowd", () => {
     });
 
     expect(crossed).toBe(0);
+  });
+
+  // One NaN anywhere in a step poisons every agent it touches and then the
+  // whole run, and the model's clamps are all plain `>` comparisons, which a
+  // NaN passes straight through — so the failure would be silent and total.
+  // The bounds below are the ones the sensitivity panel actually sweeps
+  // (`defaultSocialForceScreeningParameters`), i.e. the range a user can
+  // really reach, not an invented worst case.
+  it("keeps every walker finite across the whole screened parameter range", () => {
+    const crowd = Array.from({ length: 30 }, (_, index) =>
+      walker({
+        id: index + 1,
+        x: 8 + (index % 6) * 0.7,
+        y: 6 + Math.floor(index / 6) * 0.7,
+        targetX: 32,
+        targetY: 10,
+        vx: 1.2,
+      }),
+    );
+
+    // A NaN never heals — it propagates into every later step — so the final
+    // state is enough to catch one anywhere in the run.
+    for (const parameter of defaultSocialForceScreeningParameters) {
+      for (const bound of [parameter.min, parameter.max]) {
+        const end = run(crowd, 5, [], undefined, 1, {
+          [parameter.id]: bound,
+        } as Partial<SocialForceParameters>);
+        const poisoned = end.find(
+          (agent) =>
+            !Number.isFinite(agent.x) ||
+            !Number.isFinite(agent.y) ||
+            !Number.isFinite(agent.vx) ||
+            !Number.isFinite(agent.vy),
+        );
+        expect(poisoned, `${parameter.id}=${bound}`).toBeUndefined();
+      }
+    }
   });
 });

@@ -338,11 +338,16 @@ export function updateDocumentShopNumber(
   field: ShopNumberField,
   value: number,
 ) {
+  // `capacity` is a head count, integer in the shop schema; a `step={1}` number
+  // input still accepts "12.5" typed by hand, and a fraction there used to fail
+  // the render-time `parseScene` and blank the editor. Attraction and dwell are
+  // genuinely fractional and keep the typed value.
+  const nextValue = field === "capacity" ? Math.round(value) : value;
   return {
     ...document,
     shops: document.shops.map((shop) =>
       shop.id === shopId
-        ? { ...shop, [field]: Math.max(field === "attraction" ? 0 : 1, value) }
+        ? { ...shop, [field]: Math.max(field === "attraction" ? 0 : 1, nextValue) }
         : shop,
     ),
   };

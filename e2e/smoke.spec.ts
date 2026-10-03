@@ -472,6 +472,16 @@ test("replay pauses the run, scrubs the recording, and hands back to live", asyn
   await simToggle.click();
   await expect(replay).toBeHidden();
   await expect(simToggle).toHaveAttribute("aria-label", /Pause|暂停/);
+
+  // Closing the replay bar by its own close button (rather than pressing play)
+  // has to hand the run back as well: it used to drop the bar and leave the
+  // run stopped for good, because only the play button cleared the pause.
+  await replayToggle.click();
+  await expect(replay).toBeVisible();
+  await expect(simToggle).toHaveAttribute("aria-label", /Start|开始/);
+  await replay.getByRole("button", { name: /Back to live|回到实时/ }).click();
+  await expect(replay).toBeHidden();
+  await expect(simToggle).toHaveAttribute("aria-label", /Pause|暂停/);
   expect(errors.messages).toEqual([]);
 });
 

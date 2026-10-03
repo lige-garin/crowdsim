@@ -46,6 +46,7 @@ import {
   updateDocumentObstacleNumber,
   updateDocumentRoadDirection,
   updateDocumentRoadNumber,
+  updateDocumentShopNumber,
   updateDocumentTransitStopKind,
   updateDocumentTransitStopNumber,
   updateDocumentZoneCategory,
@@ -792,5 +793,36 @@ describe("editor round-trip of ADR-0008 fields", () => {
 
     const applied = createSceneFromEditorDocument(scene, document);
     expect(applied.servicePoints[0].outageWindows).toEqual([]);
+  });
+});
+
+describe("editor number fields the scene schema declares integer", () => {
+  // `capacity` is `z.number().int()` in the shop schema. A `step={1}` number
+  // input still accepts "12.5" typed by hand, and the value reaches the scene
+  // through a render-time `parseScene`, so a fraction used to throw inside
+  // `SceneEditor`'s `useMemo` and take the editor down to the error boundary.
+  it("rounds a fractional shop capacity so the scene still parses", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addShop(document, { x: 12, y: 12 });
+    const shopId = document.shops.at(-1)!.id;
+
+    document = updateDocumentShopNumber(document, shopId, "capacity", 12.5);
+
+    expect(document.shops.at(-1)!.capacity).toBe(13);
+    expect(() => createSceneFromEditorDocument(demoScene, document)).not.toThrow();
+  });
+
+  it("leaves genuinely fractional shop numbers alone", () => {
+    let document = createEditorDocumentFromScene(demoScene);
+    document = addShop(document, { x: 12, y: 12 });
+    const shopId = document.shops.at(-1)!.id;
+
+    document = updateDocumentShopNumber(document, shopId, "attraction", 1.25);
+    document = updateDocumentShopNumber(document, shopId, "dwellMeanSeconds", 90.5);
+
+    expect(document.shops.at(-1)).toMatchObject({
+      attraction: 1.25,
+      dwellMeanSeconds: 90.5,
+    });
   });
 });

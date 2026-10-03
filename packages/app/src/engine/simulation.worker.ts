@@ -158,7 +158,16 @@ async function handleMessage(message: SimulationWorkerRequest) {
     }
 
     if (message.type === "update-scene") {
+      // `updateScene` throws when the change cannot be hot-swapped
+      // (`hotUpdateBlocker`), so the floors are read only once the engine has
+      // accepted the scene: they describe what the engine is actually running,
+      // and every snapshot writes them into shared memory. Reading them before
+      // the call left a refused update with the NEW scene's floors and the OLD
+      // scene's geometry until the re-init landed.
+      const snapshot = engine.updateScene(message.scene);
       floorIds = sceneFloors(message.scene).map((floor) => floor.id);
+      postSnapshot(message.id, snapshot);
+      return;
     }
 
     if (message.type === "start") {
@@ -183,11 +192,6 @@ async function handleMessage(message: SimulationWorkerRequest) {
 
     if (message.type === "set-evacuation") {
       postSnapshot(message.id, engine.setEvacuation(message.active));
-      return;
-    }
-
-    if (message.type === "update-scene") {
-      postSnapshot(message.id, engine.updateScene(message.scene));
       return;
     }
 
