@@ -34,6 +34,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wrong floor list until the re-init landed. The floors are now read only
   after the engine has accepted the scene.
 
+- The contact-network view rebuilt its whole graph inside `AppStage`'s JSX, so
+  it paid O(N²) over the entire crowd — two thousand people is two million
+  pairs — on every snapshot, i.e. sixty times a second. The graph is now
+  sampled from the crowd store twice a second instead.
+- Every ECharts panel rebuilt its chart from scratch on every render: each
+  panel builds its option inline in JSX, so the option is always a new object,
+  and `setOption(option, true)` discards and re-creates every component. It now
+  skips an option that says the same thing as the last one (functions compared
+  by source, so a changed formatter still lands) and replaces only the series
+  list, which is the one part whose length changes.
+- The heatmap grid was recomputed at the rate samples arrive, four times a
+  second: measured at 17.6 ms per call for 2 000 people over the default 30 s
+  window, and once per floor again for the peak-density KPI. It is now
+  re-gridded once a second. The samples themselves are untouched — the
+  credibility report still reads every one of them.
+- `disposeRenderObject` freed a mesh's geometry and material but not the
+  textures that material maps: ground tiles are cloned per city and shop fronts
+  paint their own canvas, so every rebuild of the viewport orphaned a set of
+  GPU textures.
+
 ### Changed
 
 - Two RiMEA tests asserted `expect(["pass", "fail"]).toContain(status)`,

@@ -1,5 +1,5 @@
 import type { CrowdSimScene, ScenePoint } from "@crowdsim/scene-schema";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { ContactNetworkView } from "./panels/ContactNetworkView";
 import { buildCrowdContactNetwork } from "./engine/crowdContactNetwork";
 import { formatSimulationClock } from "./appUi";
@@ -7,6 +7,7 @@ import type { HeatmapCell } from "./analytics/heatmap";
 import type { Language, TranslationKey } from "./i18n";
 import { SceneEditor } from "./editor/SceneEditor";
 import type { StageTab, StageViewMode } from "./AppTypes";
+import type { SimulationAgent } from "./engine/simulationEngine";
 import { useLiveCrowd, type LiveCrowd } from "./engine/liveCrowd";
 import { FloorSwitcher, type SwitchableFloor } from "./editor/FloorSwitcher";
 import type { ViewedFloor } from "./viewport/agentInstanceField";
@@ -20,6 +21,15 @@ const SimulationViewport = lazy(() =>
 );
 
 const noHeatmapCells: readonly HeatmapCell[] = [];
+
+/**
+ * How often the contact-network view re-derives its graph. The build is O(N²)
+ * over the whole crowd — two thousand people is two million pairs — and it
+ * used to run inside the JSX on every snapshot, i.e. sixty times a second,
+ * which was by far the most expensive thing this view did. Twice a second is
+ * as fast as a graph of twelve nodes can be read anyway.
+ */
+const contactNetworkSampleMs = 500;
 
 type AppStageProps = {
   /** The floors of the scene, lowest first; empty when it has none. */
@@ -87,6 +97,27 @@ export function AppStage({
   );
 
   const editing = stageTab === "edit";
+  // Sampled from the store on a timer rather than derived from `snapshot` on
+  // every render: a snapshot lands sixty times a second, and the graph below
+  // costs O(N²) to build (see `contactNetworkSampleMs`).
+  const [networkAgents, setNetworkAgents] = useState<readonly SimulationAgent[]>(
+    () => crowd.get().snapshot?.agents ?? [],
+  );
+  useEffect(() => {
+    if (viewMode !== "network") return;
+    const sample = () => setNetworkAgents(crowd.get().snapshot?.agents ?? []);
+    sample();
+    const intervalId = window.setInterval(sample, contactNetworkSampleMs);
+    return () => window.clearInterval(intervalId);
+  }, [crowd, viewMode]);
+  const contactNetwork = useMemo(
+    () =>
+      buildCrowdContactNetwork(networkAgents, {
+        worldHeight: scene.world.height,
+        worldWidth: scene.world.width,
+      }),
+    [networkAgents, scene.world.height, scene.world.width],
+  );
   // Mounted on first use and then kept, hidden, while another view shows: it
   // holds unapplied work (drafted walls, its undo history, parameter edits)
   // that unmounting threw away the moment the user glanced at the city.
@@ -115,12 +146,7 @@ export function AppStage({
           />
         ) : null}
         {editing ? null : viewMode === "network" ? (
-          <ContactNetworkView
-            network={buildCrowdContactNetwork(snapshot?.agents ?? [], {
-              worldWidth: scene.world.width,
-              worldHeight: scene.world.height,
-            })}
-          />
+          <ContactNetworkView network={contactNetwork} />
         ) : (
           <>
             <Suspense

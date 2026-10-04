@@ -140,6 +140,27 @@ function AppContent() {
     trajectoryRecording,
   } = runSeries;
   const [heatmapWindowSeconds, setHeatmapWindowSeconds] = useState(30);
+  /**
+   * Gridding the heatmap costs O(samples × agents) over the whole rolling
+   * window — measured at 17.6 ms for 2 000 people and the default 30 s window,
+   * i.e. most of a core at the four-times-a-second rate `heatmapSamples` grows
+   * at, and once per floor again for the peak below. A 30-second aggregate does
+   * not need redrawing four times a second, so the samples the grid reads are
+   * held back to one a second. The samples themselves are untouched: the
+   * credibility report reads every one of them.
+   */
+  const heatmapSamplesRef = useRef(heatmapSamples);
+  const [griddedHeatmapSamples, setGriddedHeatmapSamples] = useState(heatmapSamples);
+  useEffect(() => {
+    heatmapSamplesRef.current = heatmapSamples;
+  }, [heatmapSamples]);
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setGriddedHeatmapSamples(heatmapSamplesRef.current),
+      1000,
+    );
+    return () => window.clearInterval(intervalId);
+  }, []);
   const [editorTool, setEditorTool] = useState<EditorTool>("select");
   const [stageTab, setStageTab] = useState<StageTab>("run");
   const [layers, setLayers] = useState(defaultViewportLayers);
@@ -190,8 +211,8 @@ function AppContent() {
     [scene, viewFloorId],
   );
   const floorHeatmapSamples = useMemo(
-    () => heatmapSamplesOnFloor(heatmapSamples, viewFloorId),
-    [heatmapSamples, viewFloorId],
+    () => heatmapSamplesOnFloor(griddedHeatmapSamples, viewFloorId),
+    [griddedHeatmapSamples, viewFloorId],
   );
   const heatmapCells = useMemo(
     () =>
@@ -222,13 +243,13 @@ function AppContent() {
     return floors.reduce((peak, floor) => {
       const cells = createHeatmapCellsFromSamples(
         sceneOnFloor(scene, floor.id) ?? scene,
-        heatmapSamplesOnFloor(heatmapSamples, floor.id),
+        heatmapSamplesOnFloor(griddedHeatmapSamples, floor.id),
         { cellSize: 2, windowSeconds: heatmapWindowSeconds },
       );
 
       return cells.reduce((best, cell) => Math.max(best, cell.count), peak);
     }, 0);
-  }, [floors, heatmapCells, heatmapSamples, heatmapWindowSeconds, scene]);
+  }, [floors, griddedHeatmapSamples, heatmapCells, heatmapWindowSeconds, scene]);
   const dashboardStats = useMemo(
     () =>
       createDashboardStats({

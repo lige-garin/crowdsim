@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { sameChartOption } from "./chartOptionEqual";
 import { echarts, type EChartsOption } from "./echartsCore";
 
 /**
@@ -56,8 +57,20 @@ export function EChart({
     };
   }, []);
 
+  const lastOptionRef = useRef<EChartsOption | null>(null);
+
   useEffect(() => {
-    chartRef.current?.setOption(option, true);
+    const chart = chartRef.current;
+    if (!chart) return;
+    if (lastOptionRef.current && sameChartOption(lastOptionRef.current, option)) {
+      return;
+    }
+    lastOptionRef.current = option;
+    // `replaceMerge`, not a bare merge and not `notMerge`: a ranking chart's
+    // series list shrinks as places drop out, and a plain merge would leave the
+    // departed ones on the chart, while `notMerge` throws away every other
+    // component (axes, tooltip, animation state) to rebuild them all.
+    chart.setOption(option, { replaceMerge: ["series"] });
   }, [option]);
 
   return (

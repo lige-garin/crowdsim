@@ -15,6 +15,7 @@
   Object3D,
   PlaneGeometry,
   type Scene,
+  Texture,
 } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import {
@@ -272,6 +273,18 @@ export function disposeRenderObject(object: Object3D) {
     child.geometry.dispose();
     const materials = Array.isArray(child.material) ? child.material : [child.material];
 
-    materials.forEach((material) => material.dispose());
+    materials.forEach((material) => {
+      // A material does not free the textures it maps: the ground tiles are
+      // cloned per city (`repeatFor` gives each one its own repeat) and shop
+      // fronts paint their own canvas, so every rebuild of the viewport
+      // orphaned those on the GPU. Disposing a texture three.js is still using
+      // costs one re-upload, so catching every map is safe.
+      for (const value of Object.values(material)) {
+        if (value instanceof Texture) {
+          value.dispose();
+        }
+      }
+      material.dispose();
+    });
   });
 }
