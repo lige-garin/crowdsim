@@ -1,5 +1,7 @@
 node_modules/
 dist/
+# `tsc --build` drops an incremental-build log next to each tsconfig.
+*.tsbuildinfo
 coverage/
 playwright-report/
 test-results/

@@ -95,6 +95,11 @@ export type EditorShop = {
   brand?: EditorShopBrand;
   name?: string;
   position: ScenePoint;
+  /** Door and queue tail — the only shop fields with a position of their own,
+   * so they travel with the shop when it is dragged (as a building's
+   * `entrancePosition` already does) instead of being left behind. */
+  entrancePosition?: ScenePoint;
+  queueAnchor?: ScenePoint;
   size: {
     width: number;
     height: number;

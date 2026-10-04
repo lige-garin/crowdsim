@@ -102,6 +102,12 @@ export function moveEntity(
         ? {
             ...shop,
             position: translatePoint(shop.position, delta),
+            entrancePosition: shop.entrancePosition
+              ? translatePoint(shop.entrancePosition, delta)
+              : undefined,
+            queueAnchor: shop.queueAnchor
+              ? translatePoint(shop.queueAnchor, delta)
+              : undefined,
           }
         : shop,
     ),

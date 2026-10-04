@@ -187,6 +187,10 @@ export function createEditorDocumentFromScene(scene: CrowdSimScene): EditorDocum
       brand: copyBrand(shop.brand),
       name: shop.name,
       position: { ...shop.position },
+      entrancePosition: shop.entrancePosition
+        ? { ...shop.entrancePosition }
+        : undefined,
+      queueAnchor: shop.queueAnchor ? { ...shop.queueAnchor } : undefined,
       size: { ...shop.size },
       attraction: shop.attraction,
       capacity: shop.capacity,
@@ -244,6 +248,7 @@ export function createSceneFromEditorDocument(
       elevationMeters: floor.elevationMeters,
     })),
     roads: document.roads.map((road) => ({
+      ...baseScene.roads.find((existing) => existing.id === road.id),
       id: road.id,
       floorId: road.floorId,
       name: road.name,
@@ -262,15 +267,16 @@ export function createSceneFromEditorDocument(
       vehicleSpeedLimitMetersPerSecond: road.vehicleSpeedLimitMetersPerSecond,
     })),
     walls: document.walls.map((wall) => ({
+      ...baseScene.walls.find((existing) => existing.id === wall.id),
       id: wall.id,
       floorId: wall.floorId,
       geometry: {
         type: "polyline",
         points: wall.points.map((point) => ({ ...point })),
       },
-      thickness: 0.2,
     })),
     entrances: document.entrances.map((entrance) => ({
+      ...baseScene.entrances.find((existing) => existing.id === entrance.id),
       id: entrance.id,
       floorId: entrance.floorId,
       kind: entrance.kind,
@@ -290,12 +296,14 @@ export function createSceneFromEditorDocument(
         : undefined,
     })),
     targets: document.targets.map((target) => ({
+      ...baseScene.targets.find((existing) => existing.id === target.id),
       id: target.id,
       floorId: target.floorId,
       position: { ...target.position },
       radius: target.radius,
     })),
     zones: document.zones.map((zone) => ({
+      ...baseScene.zones.find((existing) => existing.id === zone.id),
       id: zone.id,
       floorId: zone.floorId,
       attraction: zone.attraction,
@@ -309,6 +317,7 @@ export function createSceneFromEditorDocument(
       walkable: zone.walkable,
     })),
     buildings: document.buildings.map((building) => ({
+      ...baseScene.buildings.find((existing) => existing.id === building.id),
       id: building.id,
       floorId: building.floorId,
       name: building.name,
@@ -327,17 +336,23 @@ export function createSceneFromEditorDocument(
       visitorCapacity: building.visitorCapacity,
     })),
     shops: document.shops.map((shop) => ({
+      ...baseScene.shops.find((existing) => existing.id === shop.id),
       id: shop.id,
       floorId: shop.floorId,
       brand: copyBrand(shop.brand),
       name: shop.name,
       position: { ...shop.position },
+      entrancePosition: shop.entrancePosition
+        ? { ...shop.entrancePosition }
+        : undefined,
+      queueAnchor: shop.queueAnchor ? { ...shop.queueAnchor } : undefined,
       size: { ...shop.size },
       attraction: shop.attraction,
       capacity: shop.capacity,
       dwellMeanSeconds: shop.dwellMeanSeconds,
     })),
     servicePoints: document.servicePoints.map((servicePoint) => ({
+      ...baseScene.servicePoints.find((existing) => existing.id === servicePoint.id),
       id: servicePoint.id,
       floorId: servicePoint.floorId,
       name: servicePoint.name,
@@ -351,6 +366,7 @@ export function createSceneFromEditorDocument(
       outageWindows: servicePoint.outageWindows.map((window) => ({ ...window })),
     })),
     transitStops: document.transitStops.map((stop) => ({
+      ...baseScene.transitStops.find((existing) => existing.id === stop.id),
       id: stop.id,
       floorId: stop.floorId,
       name: stop.name,
@@ -365,6 +381,7 @@ export function createSceneFromEditorDocument(
       active: stop.active,
     })),
     obstacles: document.obstacles.map((obstacle) => ({
+      ...baseScene.obstacles.find((existing) => existing.id === obstacle.id),
       id: obstacle.id,
       floorId: obstacle.floorId,
       name: obstacle.name,
@@ -377,6 +394,7 @@ export function createSceneFromEditorDocument(
       routeCostMultiplier: obstacle.routeCostMultiplier,
     })),
     hazards: document.hazards.map((hazard) => ({
+      ...baseScene.hazards.find((existing) => existing.id === hazard.id),
       id: hazard.id,
       floorId: hazard.floorId,
       name: hazard.name,
@@ -395,6 +413,7 @@ export function createSceneFromEditorDocument(
       riskScore: hazard.riskScore,
     })),
     connectors: document.connectors.map((connector) => ({
+      ...baseScene.connectors.find((existing) => existing.id === connector.id),
       id: connector.id,
       name: connector.name,
       kind: connector.kind,
@@ -407,6 +426,7 @@ export function createSceneFromEditorDocument(
       doorSeconds: connector.doorSeconds,
     })),
     countLines: document.countLines.map((line) => ({
+      ...baseScene.countLines.find((existing) => existing.id === line.id),
       id: line.id,
       floorId: line.floorId,
       name: line.name,
@@ -416,6 +436,7 @@ export function createSceneFromEditorDocument(
       },
     })),
     crosswalks: document.crosswalks.map((crosswalk) => ({
+      ...baseScene.crosswalks.find((existing) => existing.id === crosswalk.id),
       id: crosswalk.id,
       floorId: crosswalk.floorId,
       name: crosswalk.name,
@@ -424,6 +445,7 @@ export function createSceneFromEditorDocument(
       widthMeters: crosswalk.widthMeters,
     })),
     trafficSignals: document.trafficSignals.map((signal) => ({
+      ...baseScene.trafficSignals.find((existing) => existing.id === signal.id),
       id: signal.id,
       floorId: signal.floorId,
       name: signal.name,

@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   textures that material maps: ground tiles are cloned per city and shop fronts
   paint their own canvas, so every rebuild of the viewport orphaned a set of
   GPU textures.
+- Editing anything in the scene editor and applying it silently deleted every
+  field the editor has no control for — a shop's `zoneId`, `storeLotId`,
+  `conversionRate`, `serviceMeanSeconds`, `openingHours`, `visual`,
+  `customParameters` and door; a zone's `personaAffinity`; a connector's
+  `speedMetersPerSecond`; a wall's `name`; and more — because
+  `createSceneFromEditorDocument` rebuilt each entity from the editor document
+  alone. Each entity now starts from the matching entity in the scene it is
+  replacing, the way the floor list already did, so anything the editor does
+  not model is carried through instead of reset to the schema default. A
+  wall's thickness was also pinned to 0.2 on the way out; it now keeps the
+  value the scene author set.
 
 ### Changed
 
