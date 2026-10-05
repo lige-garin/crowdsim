@@ -8,7 +8,7 @@ export type SceneRenderPrimitive =
       color: string;
       end: ScenePoint;
       id: string;
-      kind: "road" | "obstacle";
+      kind: "road" | "obstacle" | "line";
       start: ScenePoint;
       widthMeters: number;
     }
@@ -60,6 +60,21 @@ export type SceneRenderPrimitive =
       kind: "trafficSignal";
       position: ScenePoint;
       radiusMeters: number;
+    }
+  | {
+      color: string;
+      id: string;
+      /** A point placed in the 3D world that the scene otherwise draws
+       * nothing for: entrances, targets, service points, connectors. */
+      kind: "marker";
+      position: ScenePoint;
+      radiusMeters: number;
+    }
+  | {
+      color: string;
+      id: string;
+      kind: "zone";
+      points: ScenePoint[];
     };
 
 export type SceneWeatherVisualState = {
@@ -192,6 +207,53 @@ export function createSceneRenderPlan(
       position: copyPoint(hazard.position),
       radiusMeters: hazard.radiusMeters,
     })),
+    // Everything below is placeable in the 3D world and was previously drawn
+    // nowhere in it: placing an exit succeeded and changed nothing on screen,
+    // which reads as "the click did nothing" (see worldPlacement.placeInScene).
+    ...scene.entrances.map((entrance) => ({
+      color: entrance.kind === "source" ? "#22c55e" : "#f59e0b",
+      id: `entrance-${entrance.id}`,
+      kind: "marker" as const,
+      position: copyPoint(entrance.position),
+      radiusMeters: Math.max(1.2, entrance.width / 2),
+    })),
+    ...scene.targets.map((target) => ({
+      color: "#0ea5e9",
+      id: `target-${target.id}`,
+      kind: "marker" as const,
+      position: copyPoint(target.position),
+      radiusMeters: Math.max(1.2, target.radius),
+    })),
+    ...scene.servicePoints.map((point) => ({
+      color: "#8b5cf6",
+      id: `service-${point.id}`,
+      kind: "marker" as const,
+      position: copyPoint(point.position),
+      radiusMeters: Math.max(1.2, point.width / 2),
+    })),
+    ...scene.connectors.map((connector) => ({
+      color: "#6366f1",
+      id: `connector-${connector.id}`,
+      kind: "marker" as const,
+      position: copyPoint(connector.from.point),
+      radiusMeters: Math.max(1.2, connector.width / 2),
+    })),
+    ...scene.zones.map((zone) => ({
+      color: "#2dd4bf",
+      id: `zone-${zone.id}`,
+      kind: "zone" as const,
+      points: zone.geometry.points.map(copyPoint),
+    })),
+    ...scene.countLines.flatMap((line) =>
+      line.geometry.points.slice(1).map((point, index) => ({
+        color: "#facc15",
+        end: copyPoint(point),
+        id: `count-line-${line.id}-${index}`,
+        kind: "line" as const,
+        start: copyPoint(line.geometry.points[index]),
+        widthMeters: 0.7,
+      })),
+    ),
   ];
 
   return {

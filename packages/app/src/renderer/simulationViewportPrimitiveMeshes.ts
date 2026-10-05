@@ -6,7 +6,10 @@
   MeshBasicMaterial,
   MeshPhysicalMaterial,
   MeshStandardMaterial,
+  Shape,
+  ShapeGeometry,
   type Object3D,
+  Vector2,
 } from "three";
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import { facadeWindows } from "../viewport/buildingFacade";
@@ -196,6 +199,63 @@ export function createRenderPrimitiveMesh(
     );
 
     return group;
+  }
+
+  if (primitive.kind === "marker") {
+    const is3d = viewMode === "3d";
+    const group = new Group();
+    const disc = new Mesh(
+      new CylinderGeometry(primitive.radiusMeters, primitive.radiusMeters, 0.06, 24),
+      new MeshBasicMaterial({
+        color: primitive.color,
+        opacity: is3d ? 0.45 : 0.3,
+        transparent: true,
+      }),
+    );
+    // Cylinders are Y-axis by default; rotate to lie flat in the z-up scene.
+    disc.rotation.x = Math.PI / 2;
+    group.add(disc);
+
+    if (is3d) {
+      // A post as well: a disc flat on the ground is invisible from anywhere
+      // but directly above, and these markers are what tells you a click in
+      // the 3D world actually placed something.
+      const post = new Mesh(
+        new CylinderGeometry(0.18, 0.18, 2.4, 8),
+        new MeshBasicMaterial({ color: primitive.color }),
+      );
+      post.rotation.x = Math.PI / 2;
+      post.position.set(0, 0, 1.2);
+      group.add(post);
+    }
+
+    group.position.set(
+      toRenderX(primitive.position.x, scene),
+      toRenderY(primitive.position.y, scene),
+      0.05,
+    );
+
+    return group;
+  }
+
+  if (primitive.kind === "zone") {
+    const shape = new Shape(
+      primitive.points.map(
+        (point) => new Vector2(toRenderX(point.x, scene), toRenderY(point.y, scene)),
+      ),
+    );
+    const mesh = new Mesh(
+      new ShapeGeometry(shape),
+      new MeshBasicMaterial({
+        color: primitive.color,
+        opacity: viewMode === "3d" ? 0.16 : 0.28,
+        transparent: true,
+      }),
+    );
+
+    mesh.position.set(0, 0, 0.03);
+
+    return mesh;
   }
 
   if (primitive.kind === "hazard") {

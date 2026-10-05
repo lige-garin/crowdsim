@@ -22,6 +22,62 @@ describe("sceneRenderPlan", () => {
     expect(plan.assets).toEqual([]);
   });
 
+  it("draws what a click in the 3D world can place", () => {
+    const plan = createSceneRenderPlan(defaultDemoScene, 0);
+
+    // An exit placed in the 3D world used to change nothing on screen: the
+    // placement succeeded and reached the running simulation, but the render
+    // plan had no primitive for it, so the click looked like it did nothing.
+    const exits = defaultDemoScene.entrances.filter(
+      (entrance) => entrance.kind !== "source",
+    );
+    expect(exits.length).toBeGreaterThan(0);
+    for (const exit of exits) {
+      expect(plan.primitives.some((p) => p.id === `entrance-${exit.id}`)).toBe(true);
+    }
+
+    expect(plan.primitives.some((primitive) => primitive.kind === "marker")).toBe(true);
+
+    // The default demo scene carries no zone or count line, so those two ride
+    // on a fixture: both are placeable in the 3D world too.
+    const planWithMore = createSceneRenderPlan(
+      parseScene({
+        ...defaultDemoScene,
+        zones: [
+          {
+            id: "z-1",
+            category: "atrium",
+            geometry: {
+              type: "polygon",
+              points: [
+                { x: 10, y: 10 },
+                { x: 30, y: 10 },
+                { x: 30, y: 30 },
+              ],
+            },
+          },
+        ],
+        countLines: [
+          {
+            id: "cl-1",
+            geometry: {
+              type: "polyline",
+              points: [
+                { x: 5, y: 5 },
+                { x: 25, y: 5 },
+              ],
+            },
+          },
+        ],
+      }),
+      0,
+    );
+
+    expect(planWithMore.primitives.map((primitive) => primitive.kind)).toEqual(
+      expect.arrayContaining(["zone", "line"]),
+    );
+  });
+
   it("maps scene.visualAssets into render-plan assets", () => {
     const scene = parseScene({
       ...defaultDemoScene,

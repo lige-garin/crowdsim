@@ -65,6 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   wall's thickness was also pinned to 0.2 on the way out; it now keeps the
   value the scene author set.
 
+- Placing an exit in the 3D world did nothing you could see. The placement
+  landed — the entity reached the scene and the running simulation — but the
+  render plan has no primitive for entrances, targets, service points,
+  connectors, zones or count lines, so the click read as "it did not build",
+  while a shop appeared at once because shop fronts are drawn separately. Point
+  placements now draw as a disc on the ground with a post in 3D (a disc alone
+  is invisible from any angle but straight down), zones as a translucent
+  polygon, count lines as a line.
+
 ### Changed
 
 - Two RiMEA tests asserted `expect(["pass", "fail"]).toContain(status)`,
