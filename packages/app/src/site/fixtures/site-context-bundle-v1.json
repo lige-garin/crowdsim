@@ -1,0 +1,96 @@
+{
+  "contractVersion": 1,
+  "generatedAt": "2026-10-05T15:04:05Z",
+  "provider": "amap+overpass",
+  "site": {
+    "address": "沈阳市沈河区中街路 1 号",
+    "coordinateSystem": "GCJ-02",
+    "origin": { "lat": 41.8, "lng": 123.46 },
+    "catchmentRadiusMeters": 3000,
+    "siteRadiusMeters": 300
+  },
+  "catchment": {
+    "layers": {
+      "residential": { "count": 42, "weightedCount": 18.4, "ringCounts": [7, 14, 21] },
+      "school": { "count": 6 },
+      "office": { "count": 11 },
+      "bus": { "count": 23 },
+      "subway": { "count": 2 },
+      "mall": { "count": 3 },
+      "competitor": { "count": 17 }
+    },
+    "estimates": {
+      "estimatedResidents": 38700,
+      "estimatedDaytimeWorkers": 10800,
+      "estimatedDailyFlow": 41000,
+      "competitionLevel": "高",
+      "rentEstimate": "100-200元/㎡/月"
+    },
+    "inference": {
+      "coefficientsAreCalibrated": false,
+      "source": "caidian analysisService, 2026-06-05"
+    }
+  },
+  "siteGeometry": {
+    "coordinateSystem": "local-meters",
+    "buildings": [
+      {
+        "id": "b1",
+        "name": "北侧商住楼",
+        "footprint": [
+          [-40, -20],
+          [-30, -20],
+          [-30, -10],
+          [-40, -10]
+        ],
+        "heightMeters": 18,
+        "heightSource": "building:levels"
+      },
+      {
+        "id": "b2",
+        "name": "东侧裙楼",
+        "footprint": [
+          [20, -15],
+          [35, -15],
+          [35, 5],
+          [20, 5]
+        ],
+        "heightMeters": 12,
+        "heightSource": "tags.height"
+      },
+      {
+        "id": "b3",
+        "name": "南侧无高度数据楼",
+        "footprint": [
+          [-10, 25],
+          [10, 25],
+          [10, 40],
+          [-10, 40]
+        ]
+      }
+    ],
+    "roads": [
+      {
+        "id": "r1",
+        "path": [
+          [-120, 0],
+          [120, 0]
+        ],
+        "kind": "primary",
+        "widthMeters": 14
+      }
+    ],
+    "entrances": [
+      { "id": "d1", "name": "西门", "position": [-60, 2], "kind": "bidirectional", "widthMeters": 4 },
+      { "id": "d2", "name": "东门", "position": [60, 2], "kind": "bidirectional", "widthMeters": 4 }
+    ]
+  },
+  "shop": {
+    "name": "老四季中餐厅",
+    "category": "restaurant",
+    "areaSquareMeters": 320,
+    "averageTicketYuan": 85,
+    "tables": { "twoSeat": 6, "fourSeat": 10, "sixSeat": 4, "privateRoom10": 2 },
+    "customParameters": { "note": "示例数据，非真实门店" }
+  }
+}

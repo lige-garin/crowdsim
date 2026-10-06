@@ -3135,3 +3135,82 @@ and watching the test fail, then reverting. The GPU path
 (`gpuSimCoreShaders.ts`) repeats the same formula in f32 with the same
 NaN-transparent clamp; **not verified there**, because this machine has no
 WebGPU device and the f32 headroom argument does not transfer.
+
+---
+
+## 2026-10-06: site context bundle — the inferred demand chain, written down
+
+Status of every number below: **PARTIAL at best, and honestly
+self-chosen-uncalibrated.** None of them is fitted to a measurement. They are
+recorded here because ADR-0034 D5 requires it in the same change that ships
+the code, not in a later pass.
+
+### The chain, and where each step comes from
+
+`src/site/demandInference.ts` turns catchment POI counts into an arrival
+profile. Four steps, none measured:
+
+| Step                             | What it does                     | Coefficient                     | Status                                                                                           |
+| -------------------------------- | -------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| POI → people                     | one residential POI → residents  | `peoplePerResidentialPoi: 2100` | **self-chosen, uncalibrated**                                                                    |
+| POI → people                     | one office POI → daytime workers | `workersPerOfficePoi: 560`      | **self-chosen, uncalibrated**                                                                    |
+| POI → people                     | one school POI → people          | `peoplePerSchoolPoi: 780`       | **self-chosen, uncalibrated**                                                                    |
+| people → visits a day            | catchment population → visits    | `captureRate: 0.01`             | **self-chosen, uncalibrated** — nothing in either codebase estimates it; the weakest number here |
+| visits a day → arrivals per slot | a day's shape                    | `defaultDayShape()`             | **self-chosen, uncalibrated** — no time-of-day data exists anywhere in the pipeline              |
+| competitors → demand lost        | one competitor keeps 94%         | `competitorRetention: 0.94`     | **self-chosen, uncalibrated** — no quantitative rule exists                                      |
+
+The 560 / 780 figures are the same order as the ones in the exporting tool
+(caidian `analysisService.ts`, 2026-06-05) so a bundle round-trips to a sane
+run; they are copied for compatibility, **not** because that tool calibrated
+them. caidian ships `coefficientsAreCalibrated: false` and this contract
+requires that field rather than defaulting it, so omitting it cannot be read
+as calibrated (`siteContextBundle.ts`).
+
+### What this permits and what it does not
+
+- **Permitted:** "a scenario shaped by real POI counts." The counts are real;
+  the counts-to-people arithmetic on top of them is not.
+- **Not permitted:** any statement of the form "you will get N customers" or
+  "footfall will be N". `describeDemandInference()` returns the caveat as its
+  first line, and `describeComparison()` leads with the same point, so a
+  caller cannot show the number without the caveat.
+- **Sound:** comparing two sites or two layouts through the same
+  coefficients. The coefficients cancel; the difference between the runs is
+  in the geometry. This is the product's actual claim.
+
+### Also recorded
+
+- `importSiteBundle` writes a default building height of **10 m** where OSM
+  gave no height tag, the same fallback the reference implementation
+  (cartesiancs/map3d) uses. Every building whose height is a fallback or a
+  `building:levels` conversion is listed in `SiteImport.inferredHeightIds`
+  and named in the import report. A defaulted height is not a surveyed one.
+- A site bundle with no `entrances` produces a scene with **no doors at all**,
+  and the report says so. Street-entrance positions are a floor-plan decision;
+  inventing them would put fake geometry behind a scene sold on real
+  footprints.
+- The table-to-seats arithmetic (`2n₂ + 4n₄ + 6n₆ + 10n₁₀`) is arithmetic, not
+  inference — it is the one number in this chain that is exact.
+
+### 2026-10-06，当天补记：审查发现并修掉的 7 个问题
+
+同一天对本轮改动做了一轮 BUG 审查，7 条全部修复并逐条做了退回验证
+（先断言红、再修绿、再复验）。记录在此，因为其中 3 条是**诚实性**问题，
+不只是代码问题：
+
+| #   | 问题                                                                     | 性质                                                                                                                                                                                                              |
+| --- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `importSiteBundle` 不把 `site_geometry` 平移到世界内                     | **产出不可用**：17 个点里 10 个负坐标，落在世界 (0,0)–(260,80) 之外。已改为整体平移（translation，保距），现 17/17 在世界内                                                                                       |
+| 2   | `coveredMinutes` 把「到最后一槽为止」当成「有数的分钟」                  | **虚报**：计数器第 80 分钟才开，报告说覆盖 90 分钟，实际只有 15 分钟有数，前 75 分钟生成 0 人。已拆成 `coveredMinutes`（实际有数）+ `startsAtMinutes`（从哪分钟开始），报告里明说空槽是「没数据」不是「客流为 0」 |
+| 3   | `applyArrivalCalibration` 注释称「不会把门写成 0」，代码会               | **不实注释**：slot 0 为空时确实写 0。已改为取第一个实测非零速率                                                                                                                                                   |
+| 4   | `compareScenarioMeasures` 只校验 seed，不校验跑批时长                    | 240 秒跑批与 120 秒跑批会被「比较」，而时长带来的增长会被当成设计差异。已拒绝                                                                                                                                     |
+| 5   | 系数 `0.05` 硬编码在表达式里，不在 `demandCoefficients` 表里             | **逃出台账**：台账登记 6 个系数，实际有 7 个。已收进表并命名 `populationVisitRate`，补测                                                                                                                          |
+| 6   | `impliedVisitsPerDay` 的注释说是「capture 前的全部需求」，实际不含人口项 | 字段口径与文档不符。已改口径说明，并新增 `populationVisitsPerDay` 单独暴露人口项                                                                                                                                  |
+| 7   | `describeDelta` 把 −0.4% 显示成「0%（…更差）」                           | 既说 0 又给方向，读起来像没变。已改为「基本持平」并给出绝对变化量                                                                                                                                                 |
+
+**第 2、3、5、6 条属于同一类错误：数字在骗人。** 这四条都不会崩溃、
+不会报错，只会让报告看起来比实际更有依据——在一个把「不吹牛」当卖点的
+项目里，这比崩溃更该修。
+
+第 5 条补记：`populationVisitRate: 0.05`，**self-chosen, uncalibrated**，
+与其他六个系数同级，无引用来源。

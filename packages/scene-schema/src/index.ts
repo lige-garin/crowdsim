@@ -200,6 +200,12 @@ export function safeParseScene(input: unknown) {
 }
 
 export {
+  parseSiteContextBundle,
+  siteContextBundleSchema,
+  type SiteContextBundle,
+} from "./siteContextBundle";
+
+export {
   baseFloorId,
   resolveFloorId,
   sceneFloors,

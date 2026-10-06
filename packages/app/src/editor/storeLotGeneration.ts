@@ -89,6 +89,10 @@ function createStoreFromZone(
     brand: { ...brandProfile, profileId: brandProfile.id },
     capacity: Math.max(4, Math.round((lotWidth * bounds.height) / 6)),
     dwellMeanSeconds: dwellForCategory(category, zone.dwellMeanSeconds),
+    // Without this the shop resolves to the base floor, so every store in a
+    // multi-floor mall would silently belong to the ground floor no matter
+    // which floor its zone is on.
+    floorId: zone.floorId,
     entrancePosition,
     name: brandProfile.name,
     position: center,
@@ -99,6 +103,7 @@ function createStoreFromZone(
   };
   const storeLot = {
     id: `lot-${suffix}`,
+    floorId: zone.floorId,
     generated: true,
     geometry: {
       type: "polygon" as const,

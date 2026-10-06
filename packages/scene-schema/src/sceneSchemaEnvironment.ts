@@ -140,6 +140,7 @@ export const obstacleSchema = z.object({
     "constructionBarrier",
     "debris",
     "fence",
+    "furniture",
     "landscape",
     "securityLine",
     "water",

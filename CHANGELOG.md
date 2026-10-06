@@ -7,7 +7,111 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `createMallSkeleton` (`packages/app/src/scenes/mallSkeleton.ts`) builds a
+  shopping centre from a floor-and-zone description: floors with elevations,
+  a walled perimeter per floor, zones cut into store lots and shops, an
+  escalator pair plus a lift between each adjacent floor pair, and doors on
+  the ground floor. This is the first scene the project's multi-floor and
+  connector schema has actually been exercised by — every example scene until
+  now was single-level.
+
+- `planShopLayout` / `applyShopLayoutToLot` (`packages/app/src/scenes/shopLayout.ts`)
+  lays a shop's tables out inside its lot and writes them into a scene: table
+  counts become a seat capacity, the door and queue land on the side asked
+  for, private rooms become three-sided walls, and furniture becomes
+  obstacles people have to walk around. It throws when the tables do not fit,
+  which is arithmetic rather than inference. **The furniture dimensions and
+  the aisle clearances it uses are self-chosen and uncalibrated** — they are
+  there so two layouts can be compared against each other, not so an absolute
+  number can be quoted.
+
+- `obstacleSchema.kind` gained `"furniture"`, because tables and booths are
+  neither construction barriers, debris, fences, planting, security lines nor
+  water, and the previous six made no honest place to put them.
+
+- `measureScenario` / `compareScenarioMeasures` / `describeComparison`
+  (`packages/app/src/analytics/layoutComparison.ts`) run two layouts and
+  report the difference between them: peak queue, visits, dwell, peak
+  density, congestion share, throughput and journey length, each as a delta
+  with a ratio. `compareScenarioMeasures` refuses to compare runs whose seeds
+  differ, because a difference that is partly the random stream is not a
+  difference in the layout. Visits are counted on entry rather than on
+  completion, so a run shorter than the dwell still reports them.
+
+- `calibrateArrivals` / `applyArrivalCalibration`
+  (`packages/app/src/analytics/arrivalCalibration.ts`) turn a mall's own gate
+  counts into the arrival profile a run spawns from. A door with no counter
+  is left on its existing rate and reported as unmeasured — it is never
+  filled in from the doors that were measured, because this is the one input
+  here that can be measured rather than inferred.
+
+- `siteContextBundle` (`packages/scene-schema`) and `importSiteBundle` /
+  `catchmentToArrivalProfile` (`packages/app/src/site/`): the site context
+  bundle contract of ADR-0034, an importer that turns one into a runnable
+  scene, and the catchment → arrival-profile inference behind it. Everything
+  the bundle does not say is left out rather than invented: no entrances means
+  a scene with no doors, and a building with no height tag is listed as
+  inferred. **Every coefficient in `demandInference.ts` is self-chosen and
+  uncalibrated**, registered in `docs/CLAIMS_LEDGER.md` in the same change.
+
+- `packages/app/src/geo/projection.ts`: WGS-84 ↔ GCJ-02 and a local
+  tangent-plane projection to metres, with inverses. AMap and OSM points for
+  the same place differ by hundreds of metres (measured: 569 m at Shenyang),
+  so a bundle mixing them would have been off by more than a block.
+
+### Changed
+
+- **GeoJSON import now reads degrees as degrees.** `createSceneFromGeoJson`
+  used to copy longitude and latitude straight into `x`/`y`, so a GeoJSON
+  import of Shenyang (≈123.4, 41.8) produced a ~123 m × 42 m scene. RFC 7946
+  says GeoJSON coordinates are WGS-84 unless the file says otherwise, so they
+  are now projected onto a local plane in metres, and shifted so nothing lands
+  off the world. **This changes the geometry of every GeoJSON scene imported
+  before it**; a caller with metre-based coordinates passes
+  `{ coordinateSystem: "meters" }` and gets the old behaviour back. A file
+  carrying values no longitude can hold is refused rather than projected into
+  something that looks plausible.
+
+- `compareScenarioMeasures` now also refuses to compare runs of different
+  lengths, not just different seeds. Every absolute measure it reports grows
+  with the run, so a longer run would have shown up as a better layout.
+
+- `ArrivalCalibration.coverageMinutes` is the length of the profile; how much
+  of it was actually measured is `DoorCalibration.coveredMinutes` plus the new
+  `startsAtMinutes`. They used to be one number that overstated coverage
+  whenever a counter started late.
+
 ### Fixed
+
+- `importSiteBundle` copied `site_geometry` coordinates straight into the
+  scene. Those are metres **relative to the site origin**, so they are
+  negative on two sides; on the checked-in fixture 10 of 17 points landed
+  outside the world the importer had just computed — buildings drawn and
+  simulated nowhere, with the shop alone in an empty middle. The whole site is
+  now translated onto the world by one offset, which preserves every distance
+  in it.
+
+- `applyArrivalCalibration` claimed a door is never left at a flat rate of 0,
+  and then wrote 0 whenever the door's first slot held no counts — which is
+  exactly what happens to a counter switched on after opening. It now falls
+  back to the first rate that was actually measured.
+
+- A coefficient in `catchmentToArrivalProfile` was hard-coded in the
+  expression rather than in `demandCoefficients`, so it was missing from the
+  claims ledger's list of uncalibrated coefficients. It is now
+  `populationVisitRate`, in the table, with a test that fails if it is taken
+  back out.
+
+- `describeDelta` printed `-0.4%` as `0%` while still labelling the change
+  "更差", which reads as if nothing had moved. A change that rounds to 0% now
+  says 基本持平 and gives the absolute change instead.
+
+- Generated store lots and shops carried no `floorId`, so a zone on an upper
+  floor produced shops that `resolveFloorId` silently placed on the base
+  floor: a multi-level mall's upper floors had no stores on them. Both now
+  take the floor of the zone they were cut from.
 
 - CI e2e suite was red: `reducedMotion: "reduce"` sat directly in Playwright's
   `use`, but the 1.61 runner only models colorScheme / viewport / userAgent /
