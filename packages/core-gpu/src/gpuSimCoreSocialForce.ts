@@ -324,10 +324,20 @@ function anticipationPairForce(
   const k = params.anticipationStrength;
   const t0 = params.anticipationHorizonSeconds;
   const scale = (-k * Math.exp(-tau / t0) * (2 / tau + 1 / t0)) / (a * tau * tau);
-  return {
-    x: scale * (rvx - (b * rvx - a * wx) / root),
-    y: scale * (rvy - (b * rvy - a * wy) / root),
-  };
+  const pushX = scale * (rvx - (b * rvx - a * wx) / root);
+  const pushY = scale * (rvy - (b * rvy - a * wy) / root);
+
+  // Same reason as `crowdMovement.ts`: every guard above is a comparison, and a
+  // comparison against NaN is always false, so a non-finite position, velocity
+  // or horizon walks through all of them. The CPU engine checks the same thing
+  // here, and it has to: this file is the reference the WGSL kernel in
+  // `gpuSimCoreShaders.ts` is validated against, so a guard on one side and not
+  // the other would be a parity gap dressed up as an optimisation.
+  if (!Number.isFinite(pushX) || !Number.isFinite(pushY)) {
+    return { x: 0, y: 0 };
+  }
+
+  return { x: pushX, y: pushY };
 }
 
 /** Clamps the summed anticipation push to `anticipationMaxAcceleration` —
@@ -338,9 +348,20 @@ function clampAnticipation(
   fy: number,
   params: GpuSimCoreSocialForceParams,
 ): { x: number; y: number } {
+  const cap = params.anticipationMaxAcceleration;
+
+  // The cap is checked, not the sum — see the same fix in `crowdMovement.ts`.
+  // Guarding `fx`/`fy` here does nothing for a NaN cap: the sum is finite and
+  // it is the limit that is unusable, so `magnitude > cap` is false and the
+  // whole unclamped force goes through.
+  if (!Number.isFinite(cap) || cap < 0) {
+    return { x: 0, y: 0 };
+  }
+
   const magnitude = Math.hypot(fx, fy);
-  if (magnitude > params.anticipationMaxAcceleration) {
-    const scale = params.anticipationMaxAcceleration / magnitude;
+
+  if (magnitude > cap) {
+    const scale = cap / magnitude;
     return { x: fx * scale, y: fy * scale };
   }
   return { x: fx, y: fy };

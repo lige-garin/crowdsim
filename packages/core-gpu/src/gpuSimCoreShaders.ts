@@ -352,14 +352,33 @@ fn fused_move(@builtin(global_invocation_id) id: vec3<u32>) {
         if (tau <= 0.0) { continue; }
         let scale2 = (-params.anticipationStrength * exp(-tau / params.anticipationHorizonSeconds) *
           (2.0 / tau + 1.0 / params.anticipationHorizonSeconds)) / (a2 * tau * tau);
-        antX = antX + scale2 * (rv.x - (b2 * rv.x - a2 * w2.x) / root2);
-        antY = antY + scale2 * (rv.y - (b2 * rv.y - a2 * w2.y) / root2);
+        let pushX2 = scale2 * (rv.x - (b2 * rv.x - a2 * w2.x) / root2);
+        let pushY2 = scale2 * (rv.y - (b2 * rv.y - a2 * w2.y) / root2);
+        // Same guard as crowdMovement.ts and gpuSimCoreSocialForce.ts, and for
+        // the same reason: every test above is a comparison, and IEEE says a
+        // comparison against NaN is false, so a non-finite position, velocity
+        // or horizon falls through all of them and the NaN enters antX/antY.
+        // WGSL has no isNan, and a value compared against itself being unequal
+        // is the IEEE-defined NaN test — NaN compares unequal to everything.
+        if (pushX2 != pushX2 || pushY2 != pushY2) { continue; }
+        antX = antX + pushX2;
+        antY = antY + pushY2;
       }
     }
   }
+  // The cap is checked, not the sum — same fix as crowdMovement.ts and
+  // gpuSimCoreSocialForce.ts, for the same reason: the sum is finite and it is
+  // the limit that can be unusable, in which case the length comparison is
+  // false and the whole unclamped force goes through. A negative cap is also
+  // false against NaN, so the finite test is the one that catches it.
+  let antCap = params.anticipationMaxAcceleration;
+  if (antCap != antCap || !(antCap >= 0.0)) {
+    antX = 0.0;
+    antY = 0.0;
+  }
   let antLen = length(vec2<f32>(antX, antY));
-  if (antLen > params.anticipationMaxAcceleration && antLen > 0.0001) {
-    let antScale = params.anticipationMaxAcceleration / antLen;
+  if (antLen > antCap && antLen > 0.0001) {
+    let antScale = antCap / antLen;
     antX = antX * antScale;
     antY = antY * antScale;
   }

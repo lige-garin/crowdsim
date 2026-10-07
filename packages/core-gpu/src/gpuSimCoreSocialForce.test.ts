@@ -732,6 +732,89 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     expect(magnitude).toBeGreaterThan(params.anticipationMaxAcceleration * 0.9);
   });
 
+  // The same three guards `crowdMovement.ts` got in the same pass, asserted
+  // here because this file is the reference the WGSL kernel is validated
+  // against: a guard on one side and not the other would be a parity gap
+  // dressed up as an optimisation.
+  describe("with a parameter the formula cannot use", () => {
+    /** The near-miss pair the clamp test above uses: 3 m apart at 6 m/s
+     * closing, so the raw push is far past the cap. */
+    function nearMiss() {
+      const agents = createAgentSoA(2);
+      setAgentPosition(agents, 0, 0, 0);
+      setAgentVelocity(agents, 0, 3, 0.01);
+      setAgentRadius(agents, 0, 0.22);
+      setAgentPosition(agents, 1, 3, 0);
+      setAgentVelocity(agents, 1, -3, -0.01);
+      setAgentRadius(agents, 1, 0.22);
+
+      return agents;
+    }
+
+    const isolated = (overrides: Partial<typeof params>) =>
+      stepGpuSimCoreSocialForceCpu(nearMiss(), new Float32Array([1000, 0, -1000, 0]), [], {
+        ...params,
+        anticipationRangeMeters: 5,
+        relaxationTime: 1e9,
+        maxSpeedRatio: 1000,
+        ...overrides,
+      });
+
+    it.each([
+      ["zero", 0],
+      ["not a number", Number.NaN],
+    ])("keeps both agents finite when the horizon is %s", (_label, horizon) => {
+      // The horizon divides twice (`exp(-tau/t0)` and `1/t0`), so 0 makes the
+      // scale Infinity and 0·Infinity NaN — which lands in a position with
+      // nothing thrown and nothing logged.
+      const result = isolated({ anticipationHorizonSeconds: horizon });
+
+      for (const array of [result.positions, result.velocities]) {
+        for (const value of array) {
+          expect(Number.isFinite(value)).toBe(true);
+        }
+      }
+    });
+
+    it("applies no push at all when the cap is not a number", () => {
+      // The cap is the thing that has to be checked. `magnitude > NaN` is
+      // false, so an unclamped 40-plus m/s² goes straight through and reverses
+      // the pair inside one step.
+      const forceOf = (result: { velocities: Float32Array }) =>
+        (result.velocities[0] - 3) / params.dt;
+
+      expect(Math.abs(forceOf(isolated({ anticipationMaxAcceleration: Number.NaN })))).toBe(0);
+      // Not vacuous: the same pair with a usable cap is pushed, so a zero here
+      // is the guard refusing rather than the geometry contributing nothing.
+      expect(
+        Math.abs(forceOf(isolated({ anticipationMaxAcceleration: 5 }))),
+      ).toBeGreaterThan(0.9 * 5);
+    });
+
+    it("does not spread a NaN velocity arriving from one neighbour", () => {
+      const agents = createAgentSoA(2);
+      setAgentPosition(agents, 0, 0, 0);
+      setAgentVelocity(agents, 0, 1.34, 0);
+      setAgentRadius(agents, 0, 0.22);
+      setAgentPosition(agents, 1, 1.5, 0);
+      setAgentVelocity(agents, 1, Number.NaN, 0);
+      setAgentRadius(agents, 1, 0.22);
+
+      const result = stepGpuSimCoreSocialForceCpu(
+        agents,
+        new Float32Array([10, 0, -10, 0]),
+        [],
+        params,
+      );
+
+      // Agent 0 is healthy and stays healthy. Every guard in the anticipation
+      // pair force is a comparison, and IEEE makes a comparison against NaN
+      // false, so without the check the NaN is subtracted straight into it.
+      expect(Number.isFinite(result.velocities[0])).toBe(true);
+      expect(Number.isFinite(result.positions[0])).toBe(true);
+    });
+  });
+
   it("stays lossless under the 3x3 neighbourhood restriction with anticipation's own (wider) range", () => {
     const N = 30;
     const agents = createAgentSoA(N);

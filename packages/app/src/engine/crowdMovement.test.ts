@@ -235,4 +235,166 @@ describe("stepCrowd", () => {
       }
     }
   });
+
+  // The screen above cannot reach the anticipation parameters, because
+  // `defaultSocialForceScreeningParameters` does not include them. That leaves
+  // a real gap rather than a theoretical one: `movementParameters` is an
+  // unvalidated `Partial<SocialForceParameters>` all the way from a worker
+  // message, a sensitivity point and a Sobol point to the arithmetic below, and
+  // the two values here are the ones that reach a NaN with nothing thrown.
+  // Both divide by `anticipationHorizonSeconds` (`exp(-tau/t0)` and `1/t0`),
+  // so a horizon of 0 makes the scale Infinity and 0·Infinity NaN.
+  describe("anticipation with a horizon the formula cannot use", () => {
+    // 2.5 m apart, walking at each other at 1.3 m/s. The distance matters:
+    // `anticipationRangeMeters` is 3, so a pair further apart than that returns
+    // at the first guard and never reaches the division these tests are about.
+    // An earlier version of this used a 20 m pair — comfortably outside the
+    // range — and so passed with the guards removed, which is the whole reason
+    // the "still gives way" case below re-checks that a usable horizon is
+    // actually doing something.
+    const inRange = () => [
+      walker({ id: 1, x: 5, y: 10, vx: 1.3, targetX: 35, targetY: 10 }),
+      walker({ id: 2, x: 7.5, y: 10, vx: -1.3, targetX: -5, targetY: 10 }),
+    ];
+
+    const oneStep = (parameters?: Partial<SocialForceParameters>) =>
+      stepCrowd({
+        agents: inRange(),
+        dtSeconds: 1 / 60,
+        exitRadius: () => 0,
+        isExitBound: () => false,
+        meanSpeedMetersPerSecond: 1.34,
+        parameters,
+        replanAnticipation: true,
+        router: createRouter(world, []),
+        seed: 1,
+        walls: createWallIndex([]),
+        world,
+      }).agents;
+
+    it.each([
+      ["zero", 0],
+      ["not a number", Number.NaN],
+    ])("leaves both walkers finite after one step when the horizon is %s", (_label, horizon) => {
+      for (const agent of oneStep({ anticipationHorizonSeconds: horizon })) {
+        expect(Number.isFinite(agent.x), `agent ${agent.id} x`).toBe(true);
+        expect(Number.isFinite(agent.y), `agent ${agent.id} y`).toBe(true);
+        expect(Number.isFinite(agent.vx), `agent ${agent.id} vx`).toBe(true);
+        expect(Number.isFinite(agent.vy), `agent ${agent.id} vy`).toBe(true);
+      }
+    });
+
+    // A negative horizon is deliberately absent from the list above. It is not
+    // a NaN path: `exp(-tau/-3)` and `1/-3` are both finite, so the force comes
+    // out a large-but-usable value and the step stays finite. An earlier
+    // version of this test listed it and passed for the wrong reason — the
+    // arithmetic never produced anything to refuse.
+
+    it("changes the step at all with a usable horizon, so the cases above are not vacuous", () => {
+      // A usable horizon has to actually move these two agents somewhere
+      // different from a refused one. If the guard were simply disabling
+      // anticipation for every horizon, this would compare equal and the two
+      // tests above would pass for the wrong reason.
+      //
+      // The push is along x, not sideways: this pair is exactly head-on, so
+      // `wy` and both `vy` are 0 and the y component is `-0` either way. An
+      // earlier version asserted on `|vy|` and so read 0 for a healthy step and
+      // for a NaN one alike — it passed against an implementation with the
+      // guards deleted.
+      const speedAfter = (parameters?: Partial<SocialForceParameters>) =>
+        oneStep(parameters).map((agent) => agent.vx);
+
+      const usable = speedAfter();
+      const off = speedAfter({ anticipationStrength: 0 });
+
+      expect(usable).not.toEqual(off);
+      // A refused horizon leaves the pair on the pure-repulsion course, which
+      // is what "the force did not apply" looks like from out here.
+      expect(speedAfter({ anticipationHorizonSeconds: 0 })).toEqual(off);
+    });
+
+    it("refuses a non-finite anticipation cap instead of passing the force through", () => {
+      // The pair has to be close enough that the push genuinely exceeds the
+      // default cap of 5, or the clamp never runs and the guard is never
+      // reached. An earlier version used 2.9 m, whose push is 1.18 — the clamp
+      // was never applied, so the test passed against a deleted guard.
+      //
+      // At 1.2 m and 2.6 m/s closing the push is 47.7. Capped, it moves vx by
+      // 0.083 in one step; uncapped, by 0.795 — an order of magnitude apart,
+      // so "refused" cannot be confused with "clamped to something else".
+      const fast = () => [
+        walker({ id: 1, x: 5, y: 10, vx: 1.3, targetX: 35, targetY: 10 }),
+        walker({ id: 2, x: 6.2, y: 10, vx: -1.3, targetX: -5, targetY: 10 }),
+      ];
+      const stepped = (parameters?: Partial<SocialForceParameters>) =>
+        stepCrowd({
+          agents: fast(),
+          dtSeconds: 1 / 60,
+          exitRadius: () => 0,
+          isExitBound: () => false,
+          meanSpeedMetersPerSecond: 1.34,
+          parameters,
+          replanAnticipation: true,
+          router: createRouter(world, []),
+          seed: 1,
+          walls: createWallIndex([]),
+          world,
+        }).agents;
+
+      const capped = stepped();
+      const refused = stepped({ anticipationMaxAcceleration: Number.NaN });
+
+      for (const agent of refused) {
+        expect(Number.isFinite(agent.x), `agent ${agent.id} x`).toBe(true);
+        expect(Number.isFinite(agent.vx), `agent ${agent.id} vx`).toBe(true);
+      }
+
+      // The brake pulls the two apart along x, so a *lower* vx is the capped
+      // pair: the default cap of 5 holds the push to 5 m/s² and it ends the
+      // step at 0.52. A NaN cap makes the guard zero the sum instead, so no
+      // brake applies and the pair keeps almost all of its 1.3.
+      //
+      // Without the guard the refused pair would be driven apart at the full
+      // 47.7 m/s² — 9.5× the cap, enough to reverse it inside one step. That is
+      // the failure being prevented, and it is why this asserts the refused
+      // pair is the *faster* one rather than spelling out a number.
+      expect(capped[0].vx).toBeLessThan(refused[0].vx);
+    });
+
+    // A neighbour carrying a NaN velocity, which is the case the horizon gate
+    // cannot see: this agent's own parameters are perfectly usable, and the NaN
+    // is in the other body. Every guard in `anticipation` is a comparison, and
+    // IEEE makes a comparison against NaN false, so the pair walks through all
+    // of them and the NaN lands in the sum — from there into this agent's
+    // position, and on the next step into everybody it stands next to.
+    //
+    // A NaN *position* cannot reach this loop at all: the neighbour buckets are
+    // keyed on position, and `bucketKey(NaN)` names no cell, so such an agent
+    // is never visited. That is why this uses a velocity and not a position —
+    // the position version of this test passed against a deleted guard, because
+    // the guard was never reached.
+    it("does not spread a NaN velocity arriving from one neighbour", () => {
+      const stepped = stepCrowd({
+        agents: [
+          walker({ id: 1, x: 5, y: 10, vx: 1.3, targetX: 35, targetY: 10 }),
+          walker({ id: 2, x: 7.5, y: 10, vx: Number.NaN, targetX: -5, targetY: 10 }),
+        ],
+        dtSeconds: 1 / 60,
+        exitRadius: () => 0,
+        isExitBound: () => false,
+        meanSpeedMetersPerSecond: 1.34,
+        parameters: undefined,
+        replanAnticipation: true,
+        router: createRouter(world, []),
+        seed: 1,
+        walls: createWallIndex([]),
+        world,
+      }).agents;
+
+      // The healthy agent stays healthy. Without the guard it takes the
+      // neighbour's NaN into its own velocity and from there into its position.
+      expect(Number.isFinite(stepped[0].vx)).toBe(true);
+      expect(Number.isFinite(stepped[0].x)).toBe(true);
+    });
+  });
 });

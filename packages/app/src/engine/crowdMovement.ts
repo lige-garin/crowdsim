@@ -197,7 +197,22 @@ export function stepCrowd(input: CrowdStepInput): {
   const agents = input.agents;
   const grid = bucketAgents(agents, p.interactionRangeMeters);
   const formation = groupFormation(agents);
-  const anticipating = p.anticipationStrength > 0;
+  // The gate covers the horizon, not just the strength. `anticipation()` divides
+  // by `anticipationHorizonSeconds` twice (`exp(-tau/t0)` and `1/t0`), so a
+  // horizon of 0 returns Infinity and 0·Infinity is NaN — and a NaN force lands
+  // in an agent's position with nothing thrown and nothing logged, from there
+  // on poisoning every neighbour it is compared against. `movementParameters`
+  // reaches this line as an unvalidated `Partial<SocialForceParameters>` from
+  // worker messages, the sensitivity screen and the Sobol sweep, so "0" and
+  // "NaN" are reachable, not theoretical. A horizon that is not a positive
+  // finite number turns anticipation off, exactly as a strength of 0 does:
+  // the model is undefined there, and doing nothing is the honest reading of
+  // it. `Number.isFinite` rather than `> 0` because NaN fails every comparison
+  // and would otherwise pass the gate.
+  const anticipating =
+    p.anticipationStrength > 0 &&
+    Number.isFinite(p.anticipationHorizonSeconds) &&
+    p.anticipationHorizonSeconds > 0;
   const next: SimulationAgent[] = [];
   let exitedCount = 0;
 
@@ -486,14 +501,37 @@ function anticipation(
     const tau = (b - root) / a;
     if (tau <= 0) return;
     const scale = (-k * Math.exp(-tau / t0) * (2 / tau + 1 / t0)) / (a * tau * tau);
-    fx += scale * (vx - (b * vx - a * wx) / root);
-    fy += scale * (vy - (b * vy - a * wy) / root);
+    const px = scale * (vx - (b * vx - a * wx) / root);
+    const py = scale * (vy - (b * vy - a * wy) / root);
+    // Every guard above is a comparison, and a comparison against NaN is
+    // always false — so a neighbour whose position or velocity is already NaN
+    // walks through all of them and the NaN lands in `fx`/`fy` unchecked. It
+    // would then spread to that agent's own neighbours on the next step, and
+    // from there through the whole crowd, with nothing thrown and nothing
+    // logged. One check on the result catches every path the guards miss,
+    // including a non-finite `t0`, at the cost of two comparisons per
+    // neighbour against a per-step cost of hundreds.
+    if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+    fx += px;
+    fy += py;
   };
   forEachNearby(buckets, agent.x, agent.y, visit, p.anticipationRangeMeters);
+
+  // The cap is checked, not the sum. An earlier version of this guarded `fx`/`fy`
+  // here, which does nothing for the case it was written for: the sum is finite
+  // (47.68 in the test that caught it) and it is the *cap* that is NaN, so
+  // `magnitude > cap` is false and the whole unclamped force goes through —
+  // 9.5x the limit, enough to reverse two people walking head-on inside one
+  // step. A cap that is not a positive number cannot express a limit, so the
+  // push is dropped rather than applied unbounded.
+  const cap = p.anticipationMaxAcceleration;
+
+  if (!Number.isFinite(cap) || cap < 0) return [0, 0];
+
   const magnitude = Math.sqrt(fx * fx + fy * fy);
-  if (magnitude > p.anticipationMaxAcceleration) {
-    fx *= p.anticipationMaxAcceleration / magnitude;
-    fy *= p.anticipationMaxAcceleration / magnitude;
+  if (magnitude > cap) {
+    fx *= cap / magnitude;
+    fy *= cap / magnitude;
   }
   return [fx, fy];
 }
