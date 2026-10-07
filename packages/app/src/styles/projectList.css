@@ -79,6 +79,14 @@
   font-size: 13px;
 }
 
+/* The good-news counterpart of `.storage-error`: a key that was stored. Kept
+ * visually quiet so the red still means one thing on this screen. */
+.key-notice {
+  margin: 0;
+  font-size: 12px;
+  color: #9ba3b4;
+}
+
 .project-list > p[data-testid="project-list-empty"] {
   margin: 0;
   padding: 24px 18px;
@@ -324,4 +332,133 @@
   .map-canvas {
     height: 240px;
   }
+}
+
+/*
+ * The catchment panel. Same glass language as the wizard panels it sits in;
+ * the table is a table rather than cards because it is seven rows of one kind
+ * of fact, and reading a column beats reading seven boxes.
+ */
+.catchment-counts {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: var(--product-radius-sm);
+  background: rgba(6, 14, 24, 0.6);
+  color: #dcefff;
+}
+
+.catchment-counts-intro {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cfe6fb;
+}
+
+.catchment-key {
+  display: grid;
+  gap: 8px;
+}
+
+.catchment-key-form {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.catchment-key-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: #cfe6fb;
+}
+
+.catchment-key-form input {
+  padding: 7px 10px;
+  border: 1px solid rgba(126, 176, 215, 0.3);
+  border-radius: var(--product-radius-sm);
+  background: rgba(6, 14, 24, 0.9);
+  color: #eaf4ff;
+  font-size: 14px;
+}
+
+.catchment-key-warning {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #9ba3b4;
+}
+
+.catchment-key-state {
+  margin: 0;
+  font-size: 13px;
+  color: #cfe6fb;
+}
+
+.catchment-key-state small,
+.catchment-counts-radius {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #9ba3b4;
+}
+
+.catchment-counts-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.catchment-counts-idle,
+.catchment-counts-footnote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #9ba3b4;
+}
+
+.catchment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.catchment-table caption {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #9ba3b4;
+  text-align: left;
+}
+
+.catchment-table th,
+.catchment-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid rgba(126, 176, 215, 0.14);
+  text-align: left;
+}
+
+.catchment-table th {
+  font-weight: 500;
+  color: #cfe6fb;
+}
+
+.catchment-table td {
+  color: #eaf4ff;
+  font-family: var(--lab-mono);
+}
+
+.catchment-table td small {
+  margin-left: 6px;
+  font-family: var(--product-sans, inherit);
+  font-size: 12px;
+  color: #9ba3b4;
+}
+
+.catchment-row-failed,
+.catchment-row-failed small {
+  color: #ffc9c8;
 }

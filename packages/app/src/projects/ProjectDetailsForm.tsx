@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useI18n } from "../i18n";
+import { CatchmentCounts } from "./CatchmentCounts";
 import {
   businessCategories,
   categoryLabels,
@@ -267,6 +268,12 @@ export function ProjectDetailsForm({
                 : "A drawn plan replaces it with real shops."
             }`}
       </p>
+
+      <CatchmentCounts
+        lat={place.lat}
+        lng={place.lng}
+        radiusMeters={place.radiusMeters}
+      />
 
       {saveError ? (
         <p className="storage-error" data-testid="details-save-error">

@@ -372,9 +372,13 @@ describe("the new-project wizard, through the real App", () => {
     fireEvent.click(screen.getByTestId("map-next"));
 
     expect(screen.getByTestId("details-name")).toBeInTheDocument();
-    // The point chosen a step earlier survived the step change.
-    expect(screen.getByText(/41\.12345/)).toBeInTheDocument();
-    expect(screen.getByText(/1500 m/)).toBeInTheDocument();
+    // The point chosen a step earlier survived the step change. Asserted on the
+    // form's own location line rather than the text: the catchment panel below
+    // also names the radius, and a bare `getByText("1500 m")` finds both.
+    const where = document.querySelector(".project-details-where");
+
+    expect(where?.textContent).toMatch(/41\.12345/);
+    expect(where?.textContent).toMatch(/1500 m/);
 
     fireEvent.change(screen.getByTestId("details-name"), {
       target: { value: "中街商场" },
@@ -458,11 +462,18 @@ describe("creating a project when the browser refuses to save", () => {
     });
     fireEvent.click(screen.getByTestId("details-submit"));
 
-    // The name is still on screen, so the work is not lost and can be retyped.
-    expect(screen.getByTestId("details-name")).toBeInTheDocument();
+    // The name is still on screen, so the work is not lost and can be retyped,
+    // and the refusal is stated rather than swallowed into a silent success.
+    expect(screen.getByTestId("details-save-error")).toBeInTheDocument();
+    expect(screen.getByTestId("details-save-error").textContent).toMatch(/没有存下来/);
     expect((screen.getByTestId("details-name") as HTMLInputElement).value).toBe(
       "中街商场",
     );
+
+    // And nothing claims the project now exists: not the workbench, and not an
+    // entry in the store.
+    expect(screen.queryByTestId("hud-report-trigger")).toBeNull();
+    expect(localStorage.getItem("crowdsim.projects.v1")).toBeNull();
 
     setItem.mockRestore();
   });
