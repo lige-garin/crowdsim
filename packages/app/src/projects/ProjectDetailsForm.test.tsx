@@ -99,4 +99,24 @@ describe("ProjectDetailsForm", () => {
     // that nobody has drawn anything.
     expect(document.body.textContent).toMatch(/楼层数不是平面图/);
   });
+
+  it("shows no markdown asterisks, because nothing here renders markdown", () => {
+    renderForm();
+
+    // These strings were written with `**emphasis**` and the asterisks went
+    // straight onto the screen. The limit on a route is the most important
+    // thing on this page, and it has to be readable to count.
+    expect(document.body.textContent).not.toContain("*");
+  });
+
+  it("emphasises the limit on each route as an element, not as punctuation", () => {
+    renderForm();
+
+    // The bolded phrase is the whole difference between the route and a
+    // promise, so it has to be marked up as emphasis rather than sitting in
+    // the run of text where it can be missed.
+    for (const phrase of ["门洞认不出来", "扶梯位置是猜的", "不产生墙体"]) {
+      expect(screen.getByText(phrase).tagName).toBe("B");
+    }
+  });
 });

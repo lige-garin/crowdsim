@@ -25,10 +25,19 @@ import {
  * one would be indistinguishable from a measured one once it is on screen.
  */
 
+/**
+ * What each plan route produces, and the limit on it.
+ *
+ * `warn` is a phrase rather than markup: an earlier version wrote `**like
+ * this**` into the string and shipped the asterisks to the screen, because
+ * nothing here renders markdown. The emphasis is now an element, which is
+ * also the honest way to say it — these two words are the whole difference
+ * between the route and a promise.
+ */
 const planChoices: {
   source: PlanSource;
-  zh: { label: string; produces: string };
-  en: { label: string; produces: string };
+  zh: { label: string; produces: string; warn?: string };
+  en: { label: string; produces: string; warn?: string };
 }[] = [
   {
     source: "drawn",
@@ -46,36 +55,42 @@ const planChoices: {
     source: "dxf",
     zh: {
       label: "上传 DXF / IFC",
-      produces: "抽出墙体和轮廓。**门洞认不出来**，门要在导入后自己补。",
+      produces: "抽出墙体和轮廓，门要在导入后自己补。",
+      warn: "门洞认不出来",
     },
     en: {
       label: "Upload DXF / IFC",
       produces:
-        "Extracts walls and outlines. **Openings are not recognised** — doors have to be added afterwards.",
+        "Extracts walls and outlines; doors have to be added afterwards.",
+      warn: "Openings are not recognised",
     },
   },
   {
     source: "skeleton",
     zh: {
       label: "按楼层生成",
-      produces: "填每层用途，自动生成墙、店铺、扶梯和首层的门。扶梯位置是猜的。",
+      produces: "填每层用途，自动生成墙、店铺、扶梯和首层的门。",
+      warn: "扶梯位置是猜的",
     },
     en: {
       label: "Generate from floors",
       produces:
-        "Say what each floor is for; walls, shops, escalators and ground-floor doors appear. Escalator positions are guesses.",
+        "Say what each floor is for; walls, shops, escalators and ground-floor doors appear.",
+      warn: "Escalator positions are guesses",
     },
   },
   {
     source: "glb",
     zh: {
       label: "导入 GLB 模型",
-      produces: "只有外观，**不产生墙体**。人可以在模型里走动，但仿真不知道墙在哪。",
+      produces: "只有外观。人可以在模型里走动，但仿真不知道墙在哪。",
+      warn: "不产生墙体",
     },
     en: {
       label: "Import a GLB model",
       produces:
-        "Appearance only, **no walls**. People can walk through the model and the simulation would not know where the walls are.",
+        "Appearance only. People can walk through the model and the simulation would not know where the walls are.",
+      warn: "No walls",
     },
   },
 ];
@@ -204,7 +219,17 @@ export function ProjectDetailsForm({
                 {/* The disclosure is the reason this is a radio with a paragraph
                     and not a select: what each route produces is a limit, and a
                     limit nobody reads becomes a promise nobody checked. */}
-                <small>{copy.produces}</small>
+                <small>
+                  {copy.warn ? (
+                    <>
+                      <b>{copy.warn}</b>
+                      {zh ? "，" : " — "}
+                      {copy.produces}
+                    </>
+                  ) : (
+                    copy.produces
+                  )}
+                </small>
               </span>
             </label>
           );

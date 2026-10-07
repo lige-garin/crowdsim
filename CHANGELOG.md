@@ -162,6 +162,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The new-project wizard closed one step early, so step 3 was unreachable.**
+  `creatingProject` decides whether the wizard or the project list is on
+  screen, and `onProjectPlace` set it to `false` after the map step — dropping
+  the user back to the list instead of showing the form. Every unit test passed
+  because each one supplied `creatingProject` and `pendingLocation` as fixed
+  props, so none of them could see the transition between steps; the pair is
+  now covered through the real `App`.
+
+- **`MapCanvas` leaked a map instance on every trip through the wizard.** Its
+  `map.destroy()` was returned from inside a `ready.then()` callback, which is
+  the promise's resolved value and never a React cleanup, so the map and its
+  listeners survived leaving the step.
+
+- The four plan routes rendered their limits as literal `**asterisks**` —
+  markdown that nothing on that screen parses, so the one sentence explaining
+  what a route cannot do arrived unreadable. The emphasised phrase is an
+  element now.
+
+- The three wizard panels had no background of their own, and the 3D city
+  renders behind them: step 3 was dark text over dark buildings. They carry the
+  same glass panel value `.template-card` already used, which is why the
+  template gallery was readable and these were not.
+
 - `ShopLayoutPanel` applied a shop with no tables, and the schema rejected it:
   `shopSchema.capacity` is positive and an empty table mix sums to zero, so
   importing a site bundle and clicking "apply to scene" — the shortest possible

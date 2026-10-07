@@ -62,12 +62,40 @@ documented habit of catching and correcting its own overstated claims — see
 - **There is no account system, and none is required.** The app persists
   your work to `localStorage` and to files you export/import
   (`.csim.json`). A default build makes no network requests of its own —
-  the only outbound call in the app is the live-weather panel, which fetches
-  from the Open-Meteo API when (and only when) you click its button. An
-  earlier optional backend for projects/versions/share links existed at
-  one point but was never deployable as shipped and was never reachable
-  from the client — it was removed rather than kept around unmaintained;
-  see `docs/CLAIMS_LEDGER.md` if you're looking for it.
+  the only outbound call in a default build is the live-weather panel,
+  which fetches from the Open-Meteo API when (and only when) you click
+  its button. An earlier optional backend for projects/versions/share
+  links existed at one point but was never deployable as shipped and was
+  never reachable from the client — it was removed rather than kept
+  around unmaintained; see `docs/CLAIMS_LEDGER.md` if you're looking for
+  it.
+- **A base map appears only if you configure an Amap key, and it is a
+  picking aid, not a dependency.** Step 2 of the new-project flow reads
+  `VITE_AMAP_KEY` at build time; with no key the app shows a labelled
+  pair of coordinate inputs and the flow completes identically, because
+  the coordinate and catchment radius are the parts a project actually
+  needs and the map only helps you choose them. With a key, the JS SDK
+  (~400 KB) and its stylesheet are fetched from `webapi.amap.com` when
+  you open that step. This is the one place a build can be given a
+  network dependency by configuration, so it is called out here rather
+  than left for someone to discover from the network tab. The key is
+  embedded in the built JavaScript, so a public deployment needs a key
+  type that restricts it by referer; a key without that restriction is
+  usable by anyone who loads the page. Coordinates are **GCJ-02**
+  throughout — the same system Amap serves, and what any future POI
+  query will return. It is not converted to WGS-84, which would move
+  every point ~570 m in Shenyang.
+- **The four plan routes are not variations on one thing, and the app says
+  what each one produced.** A DXF import yields walls with no door openings.
+  The generated skeleton yields walls, shop lots, escalators and doors at
+  positions its own layout logic chose — nobody surveyed them. A hand-drawn
+  plan has no source file. A GLB is a **render asset with no walls in it**:
+  it loads and looks right, and the simulation does not know where the walls
+  are. Only the skeleton route generates geometry; the other three open an
+  empty world sized to the footprint, because a scene whose walls were grown
+  from an area and a floor count would be indistinguishable on screen from a
+  measured one. Area and floor count are recorded and are **not** used to
+  draw anything.
 
 ## Quickstart
 

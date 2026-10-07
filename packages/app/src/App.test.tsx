@@ -351,3 +351,52 @@ describe("App", () => {
     });
   });
 });
+
+describe("the new-project wizard, through the real App", () => {
+  // These live here rather than in AppHome.uiMode.test.tsx because the bug they
+  // guard is in App's own state: `creatingProject` decides whether the wizard or
+  // the list is on screen, and `onProjectPlace` used to set it to false, closing
+  // the wizard one step early. A test that passes those two props as fixed
+  // values cannot see that, and a test that re-implements the state in its own
+  // harness tests the harness instead of the app.
+  it("walks list → map → details → stored project", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId("project-create"));
+    expect(screen.getByTestId("map-lat")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("map-lat"), {
+      target: { value: "41.12345" },
+    });
+    fireEvent.change(screen.getByTestId("map-radius"), { target: { value: "1500" } });
+    fireEvent.click(screen.getByTestId("map-next"));
+
+    expect(screen.getByTestId("details-name")).toBeInTheDocument();
+    // The point chosen a step earlier survived the step change.
+    expect(screen.getByText(/41\.12345/)).toBeInTheDocument();
+    expect(screen.getByText(/1500 m/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("details-name"), {
+      target: { value: "中街商场" },
+    });
+    fireEvent.click(screen.getByTestId("details-submit"));
+
+    // Submitting stores the project and opens its scene, so the workbench is
+    // what comes next rather than the list.
+    expect(screen.queryByTestId("details-name")).toBeNull();
+    expect(JSON.parse(localStorage.getItem("crowdsim.projects.v1") ?? "[]")).toHaveLength(1);
+  });
+
+  it("cancelling step 2 goes back to the list rather than stranding step 3", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId("project-create"));
+    fireEvent.click(screen.getByTestId("map-next"));
+    expect(screen.getByTestId("details-name")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("details-cancel"));
+
+    expect(screen.getByTestId("project-create")).toBeInTheDocument();
+    expect(screen.queryByTestId("details-name")).toBeNull();
+  });
+});

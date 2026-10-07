@@ -7,7 +7,23 @@
  * then whether a plan exists yet. That last one sits lowest because it is the
  * fact a card cannot otherwise show — area and floor count describe a building,
  * they are not a floor plan.
+ *
+ * The wizard panels carry a background of their own because the 3D city is
+ * rendering behind them. Without it the form is dark text over dark buildings:
+ * a screenshot of step 3 was unreadable, and the only reason it was not caught
+ * in a test is that no test looks at pixels. Same value as `.template-card`,
+ * which is why that one reads fine and these did not.
  */
+
+.project-list,
+.map-placement,
+.project-details {
+  padding: 18px 20px;
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: var(--product-radius-sm);
+  background: rgba(9, 22, 36, 0.88);
+  color: #dcefff;
+}
 
 .project-list {
   display: grid;
@@ -197,6 +213,12 @@
   gap: 4px;
   font-size: 13px;
   color: #cfe6fb;
+}
+
+.map-placement {
+  display: grid;
+  gap: 14px;
+  width: 100%;
 }
 
 .map-placement-fields {

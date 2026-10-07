@@ -518,8 +518,11 @@ function AppContent() {
           onProjectPlace={(point, radiusMeters) => {
             // Held here rather than in the map component, so step 3 reads it
             // from one place instead of it being threaded back through.
+            // `creatingProject` deliberately stays true: the wizard is not
+            // finished, it is on its last step. Clearing it here dropped the
+            // user back to the list, because `creatingProject` is what decides
+            // whether the wizard or the list is on screen.
             setPendingLocation({ ...point, radiusMeters });
-            setCreatingProject(false);
           }}
           onProjectSubmit={(details) => {
             const location = pendingLocation;
