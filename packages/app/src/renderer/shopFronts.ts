@@ -241,7 +241,17 @@ export function createShopFronts(scene: CrowdSimScene, render: Render): Object3D
   return objects;
 }
 
-/** One mesh of sign quads textured from a shared atlas; null without a 2D canvas. */
+/**
+ * One mesh of sign quads textured from a shared atlas; null without a 2D canvas.
+ *
+ * Every call allocates a canvas texture of its own, so the objects this hands
+ * back are GPU allocations, not just scene graph nodes. Nothing here releases
+ * them and nothing here should: the caller owns the lifetime, and
+ * `disposeRenderObject` in `simulationViewportSceneObjects.ts` frees a
+ * material's maps when the city is torn down. The two halves of that contract
+ * live in different files, which is why it is written down here rather than
+ * left for the reader to infer from `disposeRenderObject`'s own comment.
+ */
 function createSignMesh(signs: { name: string; colour: string; quad: number[] }[]) {
   if (signs.length === 0 || typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
