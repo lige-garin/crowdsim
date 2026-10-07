@@ -902,6 +902,17 @@
   border-color: rgba(126, 176, 215, 0.16);
 }
 
+.editor-site-report {
+  margin: 0 0 7px;
+  padding: 7px 10px 7px 26px;
+  border: 1px solid rgba(220, 193, 139, 0.28);
+  border-radius: 8px;
+  background: rgba(200, 169, 107, 0.07);
+  color: var(--lab-muted);
+  font-size: var(--fs-micro);
+  line-height: 1.55;
+}
+
 .editor-status {
   display: flex;
   flex-wrap: wrap;

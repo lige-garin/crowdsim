@@ -1,0 +1,67 @@
+{
+  "contractVersion": 1,
+  "generatedAt": "2026-10-07T09:04:09Z",
+  "provider": "amap+caidian",
+  "site": {
+    "coordinateSystem": "GCJ-02",
+    "origin": {
+      "lat": 41.8,
+      "lng": 123.46
+    },
+    "catchmentRadiusMeters": 1500,
+    "siteRadiusMeters": 300,
+    "address": "沈阳市沈河区中街路 1 号"
+  },
+  "catchment": {
+    "layers": {
+      "residential": {
+        "count": 42,
+        "ringCounts": [1, 1, 0]
+      },
+      "school": {
+        "count": 6
+      },
+      "office": {
+        "count": 11
+      },
+      "bus": {
+        "count": 23
+      },
+      "subway": {
+        "count": 2
+      },
+      "mall": {
+        "count": 3
+      },
+      "competitor": {
+        "count": 17
+      },
+      "hospital": {
+        "count": 3
+      },
+      "hotel": {
+        "count": 0
+      },
+      "bank": {
+        "count": 0
+      },
+      "market": {
+        "count": 0
+      },
+      "population": {
+        "count": 8
+      }
+    },
+    "estimates": {
+      "estimatedResidents": 38700,
+      "estimatedDaytimeWorkers": 10800,
+      "estimatedDailyFlow": 41000,
+      "competitionLevel": "高",
+      "rentEstimate": "100-200元/㎡/月"
+    },
+    "inference": {
+      "coefficientsAreCalibrated": false,
+      "source": "caidian analysisService 2026-10-07"
+    }
+  }
+}

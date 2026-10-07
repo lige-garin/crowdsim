@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { parseScene } from "@crowdsim/scene-schema";
 import { createMallSkeleton } from "./mallSkeleton";
 import {
   applyShopLayoutToLot,
+  applyShopLayoutToShop,
   planShopLayout,
   priceTierForAverageTicket,
+  sizeForArea,
 } from "./shopLayout";
 
 const restaurant = {
@@ -169,5 +172,79 @@ describe("applying a layout to a scene", () => {
     expect(twice.walls.filter((w) => w.id.startsWith(`${shopId}-room-`))).toHaveLength(
       1,
     );
+  });
+});
+
+describe("applying a layout to a shop with no lot", () => {
+  // A street site: the bundle gives it a shop with a position and a size and
+  // nothing else. There is no store lot to read a rectangle off, so the
+  // shop's own rectangle is all there is.
+  const street = parseScene({
+    schemaVersion: "1.0.0",
+    id: "street",
+    name: "Street site",
+    world: { width: 200, height: 120 },
+    shops: [
+      {
+        id: "site-shop",
+        name: "老四季",
+        position: { x: 100, y: 60 },
+        size: { width: 21.9, height: 14.6 },
+      },
+    ],
+  });
+
+  it("lays it out inside the shop's own rectangle, not at the origin", () => {
+    const fitted = applyShopLayoutToShop(street, "site-shop", {
+      lot: { x: 0, y: 0, width: 1, height: 1 },
+      tables: { fourSeat: 4 },
+    });
+
+    expect(fitted.shops[0]?.capacity).toBe(16);
+    expect(fitted.obstacles).toHaveLength(4);
+    // Every table has to land around the shop: furniture at the origin is the
+    // bug this path exists to avoid, and it is invisible in a test that only
+    // counts obstacles.
+    expect(
+      fitted.obstacles.every((obstacle) =>
+        obstacle.geometry.points.every((point) => point.x > 85 && point.y > 45),
+      ),
+    ).toBe(true);
+  });
+
+  it("changes the shop when the form asks for a different area", () => {
+    const fitted = applyShopLayoutToShop(
+      street,
+      "site-shop",
+      { lot: { x: 0, y: 0, width: 1, height: 1 }, tables: { fourSeat: 4 } },
+      { size: sizeForArea(320) },
+    );
+    const shop = fitted.shops[0];
+
+    expect((shop?.size.width ?? 0) * (shop?.size.height ?? 0)).toBeCloseTo(320, 0);
+  });
+
+  it("writes the ticket price and table mix back, so the form can be reopened", () => {
+    const fitted = applyShopLayoutToShop(
+      street,
+      "site-shop",
+      { lot: { x: 0, y: 0, width: 1, height: 1 }, tables: { fourSeat: 4 } },
+      { averageTicketYuan: 85 },
+    );
+    const stored = fitted.shops[0]?.customParameters ?? {};
+
+    expect(stored.averageTicketYuan).toBe(85);
+    expect(stored.tables).toEqual({ fourSeat: 4 });
+    // The schema keeps a 1-5 tier, not a yuan figure, so without this the
+    // form could not be reopened on the shop it had just produced.
+  });
+
+  it("refuses a shop the scene does not have", () => {
+    expect(() =>
+      applyShopLayoutToShop(street, "no-such-shop", {
+        lot: { x: 0, y: 0, width: 10, height: 10 },
+        tables: {},
+      }),
+    ).toThrow(/Unknown shop/);
   });
 });

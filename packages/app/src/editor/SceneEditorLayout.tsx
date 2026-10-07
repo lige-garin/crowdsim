@@ -61,6 +61,7 @@ type SceneEditorLayoutProps = {
   ifcInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
+  siteBundleInputRef: RefObject<HTMLInputElement | null>;
   gridSize: number;
   language: Language;
   crowd?: LiveCrowd;
@@ -102,6 +103,7 @@ type SceneEditorLayoutProps = {
   onExportScene: () => void;
   onFinishWall: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onSiteBundleImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
   onShowTracingFixture: () => void;
   onHazardKindChange: (kind: EditorDocument["hazards"][number]["kind"]) => void;
@@ -167,6 +169,8 @@ type SceneEditorLayoutProps = {
   selectedTransitStop: EditorDocument["transitStops"][number] | undefined;
   selectedZone: EditorDocument["zones"][number] | undefined;
   snapEnabled: boolean;
+  /** Caveats from the last site-bundle import, empty when there are none. */
+  siteReport: readonly string[];
   storageStatus: LocalizedText;
   svgRef: RefObject<SVGSVGElement | null>;
   t: (key: TranslationKey) => string;
@@ -198,6 +202,7 @@ export function SceneEditorLayout({
   ifcInputRef,
   fileInputRef,
   geoJsonInputRef,
+  siteBundleInputRef,
   gridSize,
   language,
   crowd,
@@ -235,6 +240,7 @@ export function SceneEditorLayout({
   onExportScene,
   onFinishWall,
   onGeoJsonImport,
+  onSiteBundleImport,
   onImportScene,
   onShowTracingFixture,
   onHazardKindChange,
@@ -290,6 +296,7 @@ export function SceneEditorLayout({
   selectedTransitStop,
   selectedZone,
   snapEnabled,
+  siteReport,
   storageStatus,
   svgRef,
   t,
@@ -361,6 +368,7 @@ export function SceneEditorLayout({
         ifcInputRef={ifcInputRef}
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
+        siteBundleInputRef={siteBundleInputRef}
         language={language}
         templatePrompt={templatePrompt}
         onTemplateDraft={onTemplateDraft}
@@ -372,6 +380,7 @@ export function SceneEditorLayout({
         onIfcImport={onIfcImport}
         onExportScene={onExportScene}
         onGeoJsonImport={onGeoJsonImport}
+        onSiteBundleImport={onSiteBundleImport}
         onImportScene={onImportScene}
         onShowTracingFixture={onShowTracingFixture}
         onLoadSavedScene={onLoadSavedScene}
@@ -385,6 +394,7 @@ export function SceneEditorLayout({
         selectableScenes={selectableScenes}
         selectedLabel={selectedLabel}
         snapEnabled={snapEnabled}
+        siteReport={siteReport}
         storageStatus={storageStatus}
         t={t}
         text={text}

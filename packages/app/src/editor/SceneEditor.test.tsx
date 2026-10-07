@@ -4,6 +4,7 @@ import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { demoScene } from "../scenes/demoScene";
 import { I18nProvider } from "../i18n";
 import { templateScenes } from "../scenes/industryTemplates";
+import bundleFixture from "../site/fixtures/site-context-bundle-v1.json";
 import { SceneEditor } from "./SceneEditor";
 
 /*
@@ -292,6 +293,47 @@ describe("SceneEditor DXF import wiring", () => {
     });
 
     expect(await screen.findByText("DXF 无效")).toBeInTheDocument();
+  });
+});
+
+describe("SceneEditor site bundle import wiring", () => {
+  function uploadBundle(container: HTMLElement, name: string, json: string) {
+    const input = container.querySelector<HTMLInputElement>(
+      'input[accept=".json,application/json"]',
+    );
+
+    if (!input) {
+      throw new Error("site bundle input not found");
+    }
+
+    fireEvent.change(input, {
+      target: { files: [new File([json], name, { type: "application/json" })] },
+    });
+  }
+
+  it("builds a scene from a site bundle and shows what the import had to guess", async () => {
+    const { container } = renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: /^文件/ }));
+    expect(screen.getByRole("menuitem", { name: "导入选址包" })).toBeInTheDocument();
+
+    uploadBundle(container, "site.json", JSON.stringify(bundleFixture));
+
+    expect(await screen.findByText(/已导入 site.json/)).toBeInTheDocument();
+    // 3 buildings and 1 road, moved onto a world that contains them all.
+    const report = screen.getByTestId("site-import-report").textContent ?? "";
+    expect(report).toContain("3 栋建筑");
+    // Two of the three heights are inferred: one from storeys, one from nothing.
+    expect(report).toMatch(/2 栋建筑高度是推断值/);
+  });
+
+  it("reports an invalid site bundle instead of silently importing nothing", async () => {
+    const { container } = renderEditor();
+
+    uploadBundle(container, "broken.json", JSON.stringify({ contractVersion: 1 }));
+
+    expect(await screen.findByText("选址包无效")).toBeInTheDocument();
+    expect(screen.queryByTestId("site-import-report")).toBeNull();
   });
 });
 

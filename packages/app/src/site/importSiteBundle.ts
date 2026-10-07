@@ -4,7 +4,7 @@ import {
   type ScenePoint,
   type SiteContextBundle,
 } from "@crowdsim/scene-schema";
-import { priceTierForAverageTicket } from "../scenes/shopLayout";
+import { priceTierForAverageTicket, sizeForArea } from "../scenes/shopLayout";
 import { catchmentToArrivalProfile } from "./demandInference";
 
 /**
@@ -153,6 +153,16 @@ export function importSiteBundle(bundle: SiteContextBundle): SiteImport {
         coefficientsAreCalibrated: bundle.catchment.inference.coefficientsAreCalibrated,
         demandSource:
           "catchmentToArrivalProfile, self-chosen uncalibrated coefficients",
+        // The arrival profile is carried even when there is no door to put it
+        // on. A site with no entrances would otherwise import as a scene with
+        // nobody arriving, and the one number the bundle was worth exporting
+        // would be gone — so it is kept here, and the report says where to
+        // put it.
+        arrival: {
+          slotMinutes: demand.slotMinutes,
+          ratesPerMinute: demand.ratesPerMinute,
+          ratePerMinute: firstMeasuredRate,
+        },
       },
     },
   });
@@ -171,6 +181,11 @@ export function importSiteBundle(bundle: SiteContextBundle): SiteImport {
   if (entrances.length === 0) {
     report.push(
       "场地平面未提供出入口位置，场景没有门：请在编辑器里放置，不要指望自动生成的门是真实位置。",
+    );
+    report.push(
+      `集客区推算的到店客流是 ${round(firstMeasuredRate)} 人/分钟（未标定系数，` +
+        `分时曲线 ${demand.ratesPerMinute.length} 段）：已记在场景参数 ` +
+        `siteInference.arrival 里，放到你自己加的门上。`,
     );
   }
 
@@ -284,13 +299,6 @@ function shopPosition(world: { width: number; height: number }): ScenePoint {
   return { x: world.width / 2, y: world.height / 2 };
 }
 
-/** An area in square metres as a rectangle, 2:3 — a shape, not a plan. */
-function sizeForArea(areaSquareMeters: number) {
-  const height = Math.sqrt(areaSquareMeters / 1.5);
-
-  return { width: Math.max(2, height * 1.5), height: Math.max(2, height) };
-}
-
 /** Stand-in height where OSM gave none. Same 10 m the reference tool uses. */
 const defaultBuildingHeightMeters = 10;
 
@@ -301,4 +309,8 @@ function slug(value: string) {
       .replace(/^-|-$/g, "")
       .toLowerCase() || "site"
   );
+}
+
+function round(value: number) {
+  return Math.round(value * 100) / 100;
 }

@@ -62,6 +62,7 @@ type SceneEditorControlsProps = {
   ifcInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
+  siteBundleInputRef: RefObject<HTMLInputElement | null>;
   language: Language;
   onTemplateDraft: () => void;
   onTemplatePromptChange: (value: string) => void;
@@ -72,6 +73,7 @@ type SceneEditorControlsProps = {
   onIfcImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onExportScene: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onSiteBundleImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
   onLoadSavedScene: () => void;
   onRedo: () => void;
@@ -85,6 +87,8 @@ type SceneEditorControlsProps = {
   selectableScenes: readonly CrowdSimScene[];
   selectedLabel: string;
   snapEnabled: boolean;
+  /** Caveats from the last site-bundle import, empty when there are none. */
+  siteReport: readonly string[];
   storageStatus: LocalizedText;
   t: (key: TranslationKey) => string;
   text: (value: LocalizedText) => string;
@@ -106,6 +110,7 @@ export function SceneEditorControls({
   ifcInputRef,
   fileInputRef,
   geoJsonInputRef,
+  siteBundleInputRef,
   language,
   onTemplateDraft,
   onTemplatePromptChange,
@@ -116,6 +121,7 @@ export function SceneEditorControls({
   onIfcImport,
   onExportScene,
   onGeoJsonImport,
+  onSiteBundleImport,
   onImportScene,
   onLoadSavedScene,
   onRedo,
@@ -129,6 +135,7 @@ export function SceneEditorControls({
   selectableScenes,
   selectedLabel,
   snapEnabled,
+  siteReport,
   storageStatus,
   t,
   text,
@@ -238,6 +245,16 @@ export function SceneEditorControls({
                 role="menuitem"
                 onClick={() => {
                   setFileMenuOpen(false);
+                  siteBundleInputRef.current?.click();
+                }}
+              >
+                {t("siteBundleImport")}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
                   dxfInputRef.current?.click();
                 }}
               >
@@ -300,6 +317,13 @@ export function SceneEditorControls({
           onChange={onGeoJsonImport}
         />
         <input
+          ref={siteBundleInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".json,application/json"
+          onChange={onSiteBundleImport}
+        />
+        <input
           ref={dxfInputRef}
           className="visually-hidden"
           type="file"
@@ -322,6 +346,13 @@ export function SceneEditorControls({
         />
         <span>{text(storageStatus)}</span>
       </div>
+      {siteReport.length > 0 ? (
+        <ul className="editor-site-report" data-testid="site-import-report">
+          {siteReport.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
       <div className="editor-toolbar" aria-label={t("editorTools")}>
         {tools.map((toolId) => (
           <button

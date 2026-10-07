@@ -10,6 +10,7 @@
 } from "react";
 import {
   parseScene,
+  parseSiteContextBundle,
   type CrowdSimScene,
   type ScenePoint,
 } from "@crowdsim/scene-schema";
@@ -24,6 +25,7 @@ import {
 import { createSceneFromGeoJson } from "./geojsonImport";
 import { createSceneFromDxfWithReport } from "./dxfImport";
 import { createSceneFromIfcWithReport } from "./ifcImport";
+import { importSiteBundle } from "../site/importSiteBundle";
 import type { HeatmapCell } from "../analytics/heatmap";
 import { useI18n, type LocalizedText } from "../i18n";
 import { SceneEditorLayout } from "./SceneEditorLayout";
@@ -138,6 +140,7 @@ export function SceneEditor({
   const basemapInputRef = useRef<HTMLInputElement | null>(null);
   const dxfInputRef = useRef<HTMLInputElement | null>(null);
   const ifcInputRef = useRef<HTMLInputElement | null>(null);
+  const siteBundleInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
   /** A count line being dragged out: where it started, and where it is now. */
   const [draftCountLine, setDraftCountLine] = useState<{
@@ -183,6 +186,12 @@ export function SceneEditor({
   const [storageStatus, setStorageStatus] = useState<LocalizedText>(() =>
     makeStatus("ready"),
   );
+  /*
+   * What the last site import had to say about the scene it produced —
+   * inferred heights, a site with no doors. Every scene swap clears it: a
+   * report about a scene that is no longer here would be a lie.
+   */
+  const [siteReport, setSiteReport] = useState<string[]>([]);
   const [uncontrolledTool, setUncontrolledTool] = useState<EditorTool>("select");
   // Controlled when the shell passes a tool, uncontrolled otherwise. Internal
   // resets (scene swap, delete) still route through setTool so the shell's
@@ -312,6 +321,7 @@ export function SceneEditor({
     setDraftWallPoints([]);
     setRedoStack([]);
     setSelectedId(null);
+    setSiteReport([]);
     setStorageStatus(status);
     setTool("select");
     setUndoStack([]);
@@ -672,6 +682,28 @@ export function SceneEditor({
       event.target.value = "";
     }
   }
+  async function importSiteBundleFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const imported = importSiteBundle(
+        parseSiteContextBundle(JSON.parse(await file.text())),
+      );
+      replaceScene(
+        imported.scene,
+        makeStatus("importedFile", fileNameValues(file.name)),
+      );
+      // Set after `replaceScene`, which clears the previous report: this one
+      // is about the scene that was just put in place.
+      setSiteReport(imported.report);
+    } catch {
+      setStorageStatus(makeStatus("siteBundleInvalid"));
+    } finally {
+      event.target.value = "";
+    }
+  }
   async function importDxf(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) {
@@ -831,6 +863,7 @@ export function SceneEditor({
       ifcInputRef={ifcInputRef}
       fileInputRef={fileInputRef}
       geoJsonInputRef={geoJsonInputRef}
+      siteBundleInputRef={siteBundleInputRef}
       gridSize={gridSize}
       language={language}
       crowd={visibleCrowd}
@@ -861,6 +894,7 @@ export function SceneEditor({
       onExportScene={exportScene}
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
+      onSiteBundleImport={importSiteBundleFile}
       onDxfImport={importDxf}
       onIfcImport={importIfc}
       onGenerateZoneStores={paramActions.generateStoresForSelectedZone}
@@ -925,6 +959,7 @@ export function SceneEditor({
       selectedTransitStop={selectedTransitStop}
       selectedZone={selectedZone}
       snapEnabled={snapEnabled}
+      siteReport={siteReport}
       storageStatus={storageStatus}
       svgRef={svgRef}
       t={t}

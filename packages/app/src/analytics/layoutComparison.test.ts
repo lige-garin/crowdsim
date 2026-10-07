@@ -226,8 +226,9 @@ describe("describeDelta", () => {
     );
     const lines = describeComparison(compareScenarioMeasures(sparse, [dense]));
 
-    expect(lines[0]).toContain("基线「sparse」");
-    expect(lines[1]).toContain("绝对数值不可用于预测");
+    // The caveat is the first line, not a footnote under the numbers.
+    expect(lines[0]).toContain("绝对数值不可用于预测");
+    expect(lines[1]).toContain("基线「sparse」");
     expect(lines.some((line) => line.includes("方案「dense」"))).toBe(true);
     expect(lines.filter((line) => line.startsWith("- "))).toHaveLength(7);
   }, 60_000);

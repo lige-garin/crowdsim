@@ -328,6 +328,8 @@ export const messages = {
   simulationControls: { zh: "仿真控制", en: "Simulation controls" },
   simulationSpeed: { zh: "仿真速度", en: "Simulation speed" },
   simulationViewport: { zh: "仿真视口", en: "Simulation viewport" },
+  siteBundleImport: { zh: "导入选址包", en: "Import site bundle" },
+  siteBundleInvalid: { zh: "选址包无效", en: "Site bundle invalid" },
   sink: { zh: "出口", en: "Exit" },
   sinkShort: { zh: "OUT", en: "OUT" },
   snap: { zh: "Snap", en: "Snap" },

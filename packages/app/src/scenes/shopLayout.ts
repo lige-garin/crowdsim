@@ -171,6 +171,68 @@ export function planShopLayout(spec: ShopLayoutSpec): ShopLayout {
 }
 
 /**
+ * Write a layout into a shop that has **no store lot** — a street site, where
+ * the shop's own rectangle is all the geometry there is.
+ *
+ * The furniture is still placed: an `obstacle` is a polygon on a floor like
+ * any other and needs no lot to hold it. What is missing here is the lot's
+ * frontage, so which side the door opens on is the form's choice rather than
+ * something read off a building. `size` resizes the shop as it lays out, so a
+ * form that asks for a different area gets a different shop rather than the
+ * same shop with a number changed next to it.
+ */
+export function applyShopLayoutToShop(
+  scene: CrowdSimScene,
+  shopId: string,
+  spec: ShopLayoutSpec,
+  options: LayoutOptions = {},
+): CrowdSimScene {
+  const shop = scene.shops.find((candidate) => candidate.id === shopId);
+
+  if (!shop) {
+    throw new Error(`Unknown shop: ${shopId}`);
+  }
+
+  const size = options.size ?? shop.size;
+  const layout = planShopLayout({
+    ...spec,
+    lot: {
+      x: shop.position.x - size.width / 2,
+      y: shop.position.y - size.height / 2,
+      width: size.width,
+      height: size.height,
+    },
+  });
+
+  return writeLayout(
+    scene,
+    {
+      floorId: shop.floorId,
+      id: shop.id,
+      label: shop.name ?? shop.id,
+      size,
+    },
+    layout,
+    spec,
+    options,
+  );
+}
+
+/**
+ * An area in square metres as a rectangle, 2:3.
+ *
+ * The ratio is a stand-in for a floor plan nobody has drawn yet, and it is
+ * the one arbitrary number here a reader could mistake for a rule. It is
+ * not: it exists so that an area produces *a* rectangle to lay tables out
+ * in, and the layout it produces is what is compared, never its shape.
+ */
+export function sizeForArea(areaSquareMeters: number) {
+  const height = Math.sqrt(areaSquareMeters / 1.5);
+
+  return { width: Math.max(2, height * 1.5), height: Math.max(2, height) };
+}
+
+/**
  * Price tier (1–5) from an average spend. **Self-chosen thresholds**, written
  * down because `brandProfileSchema.priceTier` is 1–5 and a yuan figure has to
  * land somewhere; they are a classification, not a measurement.
@@ -183,19 +245,107 @@ export function priceTierForAverageTicket(averageTicketYuan: number): number {
   return 5;
 }
 
+type LayoutOptions = {
+  averageTicketYuan?: number;
+  dwellMeanSeconds?: number;
+  name?: string;
+  /** Only the no-lot path can resize the shop; a lot's size is its geometry. */
+  size?: { width: number; height: number };
+};
+
 /**
- * Write a layout into the scene: the shop gains its capacity, door and queue,
- * and the furniture becomes obstacles that people have to walk around.
+ * Write a planned layout into the scene: the shop gains its capacity, door and
+ * queue, and the furniture becomes obstacles that people have to walk around.
+ *
+ * Every entry point ends up here, so the furniture, the private rooms and the
+ * shop's own fields are written exactly once. Writing them twice is how a fix
+ * to one path quietly fails to reach the other.
  *
  * Furniture that blocks movement is the point — a layout that crowds the
  * aisles shows up as congestion, which is exactly the difference between two
  * layouts that this feature exists to measure.
  */
+function writeLayout(
+  scene: CrowdSimScene,
+  target: {
+    floorId: string | undefined;
+    id: string;
+    label: string;
+    size: { width: number; height: number };
+  },
+  layout: ShopLayout,
+  spec: ShopLayoutSpec,
+  options: LayoutOptions,
+): CrowdSimScene {
+  return parseScene({
+    ...scene,
+    obstacles: [
+      ...scene.obstacles.filter(
+        (obstacle) => !obstacle.id.startsWith(`${target.id}-table-`),
+      ),
+      ...layout.tables.map((table, index) => ({
+        id: `${target.id}-table-${index + 1}`,
+        name: `${target.label} table ${index + 1}`,
+        floorId: target.floorId,
+        kind: "furniture" as const,
+        geometry: { type: "polygon" as const, points: table.points },
+      })),
+    ],
+    walls: [
+      ...scene.walls.filter((wall) => !wall.id.startsWith(`${target.id}-room-`)),
+      ...layout.rooms.map((room, index) => ({
+        id: `${target.id}-room-${index + 1}`,
+        name: `${target.label} private room ${index + 1}`,
+        floorId: target.floorId,
+        geometry: { type: "polyline" as const, points: room.points },
+      })),
+    ],
+    shops: scene.shops.map((candidate) =>
+      candidate.id === target.id
+        ? {
+            ...candidate,
+            name: options.name ?? candidate.name,
+            capacity: layout.capacity,
+            entrancePosition: layout.entrancePosition,
+            queueAnchor: layout.queueAnchor,
+            dwellMeanSeconds: options.dwellMeanSeconds ?? candidate.dwellMeanSeconds,
+            size: target.size,
+            brand:
+              options.averageTicketYuan === undefined || !candidate.brand
+                ? candidate.brand
+                : {
+                    ...candidate.brand,
+                    priceTier: priceTierForAverageTicket(options.averageTicketYuan),
+                  },
+            customParameters: {
+              ...candidate.customParameters,
+              // The form is the only place the ticket price exists — the
+              // schema keeps a 1-5 tier, not yuan — so it is written back
+              // next to the tables it came in with, or the form cannot be
+              // reopened on the shop it just produced.
+              ...(options.averageTicketYuan === undefined
+                ? {}
+                : { averageTicketYuan: options.averageTicketYuan }),
+              tableAreaSquareMeters: layout.tableAreaSquareMeters,
+              lotAreaSquareMeters: layout.lotAreaSquareMeters,
+              tables: spec.tables,
+              doorEdge: spec.doorEdge ?? "south",
+            },
+          }
+        : candidate,
+    ),
+  });
+}
+
 export function applyShopLayoutToLot(
   scene: CrowdSimScene,
   lotId: string,
   spec: ShopLayoutSpec,
-  options: { averageTicketYuan?: number; dwellMeanSeconds?: number } = {},
+  options: {
+    averageTicketYuan?: number;
+    dwellMeanSeconds?: number;
+    name?: string;
+  } = {},
 ): CrowdSimScene {
   const lot = scene.storeLots.find((candidate) => candidate.id === lotId);
 
@@ -212,54 +362,18 @@ export function applyShopLayoutToLot(
   const layout = planShopLayout(layoutSpecFor(lot.geometry.points, spec));
   const bounds = lotBounds(lot.geometry.points);
 
-  return parseScene({
-    ...scene,
-    obstacles: [
-      ...scene.obstacles.filter(
-        (obstacle) => !obstacle.id.startsWith(`${shop.id}-table-`),
-      ),
-      ...layout.tables.map((table, index) => ({
-        id: `${shop.id}-table-${index + 1}`,
-        name: `${shop.name ?? shop.id} table ${index + 1}`,
-        floorId: lot.floorId,
-        kind: "furniture" as const,
-        geometry: { type: "polygon" as const, points: table.points },
-      })),
-    ],
-    walls: [
-      ...scene.walls.filter((wall) => !wall.id.startsWith(`${shop.id}-room-`)),
-      ...layout.rooms.map((room, index) => ({
-        id: `${shop.id}-room-${index + 1}`,
-        name: `${shop.name ?? shop.id} private room ${index + 1}`,
-        floorId: lot.floorId,
-        geometry: { type: "polyline" as const, points: room.points },
-      })),
-    ],
-    shops: scene.shops.map((candidate) =>
-      candidate.id === shop.id
-        ? {
-            ...candidate,
-            capacity: layout.capacity,
-            entrancePosition: layout.entrancePosition,
-            queueAnchor: layout.queueAnchor,
-            dwellMeanSeconds: options.dwellMeanSeconds ?? candidate.dwellMeanSeconds,
-            size: { width: bounds.width, height: bounds.height },
-            brand:
-              options.averageTicketYuan === undefined || !candidate.brand
-                ? candidate.brand
-                : {
-                    ...candidate.brand,
-                    priceTier: priceTierForAverageTicket(options.averageTicketYuan),
-                  },
-            customParameters: {
-              ...candidate.customParameters,
-              tableAreaSquareMeters: layout.tableAreaSquareMeters,
-              lotAreaSquareMeters: layout.lotAreaSquareMeters,
-            },
-          }
-        : candidate,
-    ),
-  });
+  return writeLayout(
+    scene,
+    {
+      floorId: lot.floorId,
+      id: shop.id,
+      label: shop.name ?? shop.id,
+      size: { width: bounds.width, height: bounds.height },
+    },
+    layout,
+    spec,
+    options,
+  );
 }
 
 function inset(

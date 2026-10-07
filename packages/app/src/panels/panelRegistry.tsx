@@ -11,6 +11,8 @@ import { BrandIntelligencePanel } from "./BrandIntelligencePanel";
 import { TemplateLibraryPanel } from "./TemplateLibraryPanel";
 import { TrajectoryReplayPanel } from "./TrajectoryReplayPanel";
 import { WeatherPanel } from "./WeatherPanel";
+import { ShopLayoutPanel } from "./ShopLayoutPanel";
+import { LayoutComparePanel } from "./LayoutComparePanel";
 
 export type PanelDockContext = {
   /** The scene the app is running, for panels that report on the user's own project. */
@@ -102,6 +104,24 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelZh: "轨迹回放",
     labelEn: "Trajectory replay",
     render: (ctx) => <TrajectoryReplayPanel recording={ctx.trajectoryRecording} />,
+  },
+  {
+    dataSource: "live",
+    id: "shop-layout",
+    labelZh: "店铺布局",
+    labelEn: "Shop layout",
+    // Reads the open scene's shops and, when wired to onApplyScene, writes
+    // the planned furniture back into it.
+    render: (ctx) => (
+      <ShopLayoutPanel scene={ctx.scene} onApplyScene={ctx.onApplyScene} />
+    ),
+  },
+  {
+    dataSource: "live",
+    id: "layout-compare",
+    labelZh: "方案对比",
+    labelEn: "Layout comparison",
+    render: (ctx) => <LayoutComparePanel scene={ctx.scene} />,
   },
   {
     dataSource: "live",

@@ -61,6 +61,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same place differ by hundreds of metres (measured: 569 m at Shenyang),
   so a bundle mixing them would have been off by more than a block.
 
+- The 2D editor's file menu gained **导入选址包** ("Import site bundle"): pick
+  the JSON a site tool exported, and the editor swaps its working scene for
+  the one `importSiteBundle` builds from it. Everything the importer had to
+  assume is listed under the file bar — inferred building heights, a site with
+  no doors, a bundle with no shop — because a scene built from real footprints
+  still has to say which parts of it are not. The list describes the scene on
+  screen, so any later scene swap clears it. No network request is made: the
+  bundle is read from the picked file, so the app's no-network default holds.
+
+- Two live panels, both wired to the scene the app is actually running and
+  registered in the panel dock:
+
+  - **店铺布局** (`packages/app/src/panels/ShopLayoutPanel.tsx`): the shop
+    form — name, area, average spend, dwell, table mix, door side — with the
+    plan shown before anything is applied. It works on a **store lot** (the
+    area comes from the lot's geometry and is not editable) and on a
+    **standalone shop** (a street site from a site bundle, where the area is
+    an input and changing it resizes the shop). "These tables do not fit" is
+    shown as an answer and disables Apply; it is arithmetic, not inference.
+  - **方案对比** (`packages/app/src/panels/LayoutComparePanel.tsx`): saves the
+    open scene as scheme A or B, runs both, and prints `describeComparison` —
+    now with the caveat as its **first** line. Both runs are forced onto one
+    seed, because a difference that is partly the random stream is not a
+    difference in the layout. It runs on the main thread; the panel says so
+    rather than showing a spinner that cannot animate.
+
+- `applyShopLayoutToShop` (`packages/app/src/scenes/shopLayout.ts`) lays a
+  shop out inside its **own** rectangle, for shops that have no store lot. An
+  `obstacle` needs no lot to hold it, so the furniture is still placed; what
+  is missing is the lot's frontage, which is why the door side is the form's
+  choice rather than something read off a building.
+
+- `sizeForArea` is exported from `shopLayout.ts` instead of being a private
+  copy in `importSiteBundle.ts`: one 2:3 stand-in rectangle, not two that can
+  drift apart.
+
+- A site bundle with **no entrances** now carries the arrival profile it
+  inferred in `customParameters.siteInference.arrival`, and the report names
+  the figure and where to put it. Before, such a site imported as a scene with
+  nobody arriving — the one number the catchment was worth exporting had
+  nowhere to go.
+
+- `packages/app/src/site/fixtures/caidian-export-v1.json`: a bundle produced
+  by the exporter now added to the caidian repo
+  (`packages/frontend/src/utils/crowdSimExport.ts`), checked in here so the
+  cross-repo contract is pinned from both ends. It carries catchment POI
+  counts and **no geometry**: caidian has neither footprints nor door
+  positions, and neither is invented on the way out.
+
 ### Changed
 
 - **GeoJSON import now reads degrees as degrees.** `createSceneFromGeoJson`

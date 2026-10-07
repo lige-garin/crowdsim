@@ -375,9 +375,11 @@ export function describeDelta(delta: MeasureDelta): string {
  * reader who takes an absolute number out of here has been mis-sold.
  */
 export function describeComparison(comparison: ScenarioComparison): string[] {
+  // The caveat leads. A report that opens with a number invites the reader to
+  // take that number away, and the number is not what is being sold here.
   const lines = [
-    `基线「${comparison.baseline.id}」，随机种子 ${comparison.baseline.seed}，跑批 ${round(comparison.baseline.elapsedSeconds)} 秒。`,
     "以下只比较两个方案之间的差值；绝对数值不可用于预测客流。",
+    `基线「${comparison.baseline.id}」，随机种子 ${comparison.baseline.seed}，跑批 ${round(comparison.baseline.elapsedSeconds)} 秒。`,
   ];
 
   for (const variant of comparison.variants) {

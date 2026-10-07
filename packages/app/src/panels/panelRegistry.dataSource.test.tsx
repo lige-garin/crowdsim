@@ -67,6 +67,11 @@ describe("panel dock data-source labelling", () => {
 
     expect(live).toEqual([
       "brand-intelligence",
+      // Runs the two saved schemes off the open scene's own machinery; it
+      // reads no fixture.
+      "layout-compare",
+      // Reports on the open scene's shops and writes a layout back into it.
+      "shop-layout",
       "trajectory-replay",
       // Reports on the open scene since the report panel was given it.
       "validation-report",
