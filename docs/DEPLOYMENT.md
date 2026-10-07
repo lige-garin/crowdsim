@@ -76,15 +76,24 @@ worker path boots, engine runs, `crossOriginIsolated === true`, zero CSP
 violations):
 
 ```
-default-src 'self'; script-src 'self' 'wasm-unsafe-eval';
-style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;
-font-src 'self' data:; connect-src 'self' https://api.open-meteo.com;
+default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://webapi.amap.com;
+style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: blob:;
+font-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://restapi.amap.com;
 worker-src 'self'; object-src 'none'; base-uri 'self'
 ```
 
 (`'wasm-unsafe-eval'` is the wasm-bindgen decision layer; `data:` images are
-embedded basemaps; `api.open-meteo.com` is the weather panel — the app's only
-cross-origin call.)
+embedded basemaps; `api.open-meteo.com` is the weather panel and
+`restapi.amap.com` the POI lookup, both user-triggered and both needing a key
+the user supplies; `webapi.amap.com` is the optional map SDK.)
+
+> **The Amap tile hosts are not listed, because we have not seen them.** The two
+> Amap hosts above are the ones this codebase names in its own source. The SDK
+> also fetches map tiles at runtime from hosts that can only be observed with a
+> live key, so a deployment that enables the base map should load the map step
+> once with the console open and add whatever tile host the CSP violation names.
+> Missing it breaks the picture, not the flow: without a usable base map the
+> step still works from typed coordinates.
 
 Two ways to deploy:
 
@@ -116,7 +125,7 @@ server {
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
     # Same CSP as public/_headers — keep the two in lockstep.
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; worker-src 'self'; object-src 'none'; base-uri 'self'" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://webapi.amap.com; style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://restapi.amap.com; worker-src 'self'; object-src 'none'; base-uri 'self'" always;
 
     location /assets/ {
         # Hashed filenames: safe to cache forever.

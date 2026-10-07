@@ -9,7 +9,15 @@
 # - 'wasm-unsafe-eval' for the wasm-bindgen decision layer (instantiateStreaming)
 # - style 'unsafe-inline' for React's inline style attributes
 # - img data: for basemaps embedded as base64, blob: for report/object URLs
-# - connect api.open-meteo.com for the weather panel — the app's ONLY
-#   cross-origin call, disclosed in the README
-# - worker 'self' — every worker is a same-origin module-URL worker
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; worker-src 'self'; object-src 'none'; base-uri 'self'
+# - connect: api.open-meteo.com for the weather panel; restapi.amap.com for the
+#   POI lookup. Both are user-triggered and both need a key the user supplies.
+# - Amap is optional: webapi.amap.com is only contacted when a key is set, and
+#   without one the map step falls back to typed coordinates.
+#
+# - UNVERIFIED: the two hosts above are the ones this codebase names in its own
+#   source. The JS SDK also pulls map tiles at runtime, from hosts we have not
+#   enumerated because that needs a live key to observe. A deployment that
+#   enables the base map must check the console for CSP violations once and add
+#   whatever tile host appears; the map step degrades to coordinates either
+#   way, so a miss here breaks the picture and not the flow.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://webapi.amap.com; style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com https://restapi.amap.com; worker-src 'self'; object-src 'none'; base-uri 'self'
