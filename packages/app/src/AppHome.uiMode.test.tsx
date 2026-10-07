@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppHome } from "./AppHome";
+import { I18nProvider } from "./i18n";
 import { industryTemplates } from "./scenes/industryTemplates";
 
 afterEach(cleanup);
@@ -15,18 +16,31 @@ function renderHome(
   const onToggleUiMode = vi.fn();
 
   render(
-    <AppHome
-      language="en"
-      onEnterLab={onEnterLab}
-      onOpenNetwork={onOpenNetwork}
-      onSelectTemplate={onSelectTemplate}
-      onSetLanguage={vi.fn()}
-      onToggleUiMode={onToggleUiMode}
-      runState="running"
-      uiMode={uiMode}
-      webGpuStatus="ready"
-      {...extraProps}
-    />,
+    // Basic mode renders the project list, which reads language through
+    // `useI18n`. The provider is the app's own wiring, not a test convenience:
+    // without it this screen would throw in the app too if the provider were
+    // ever one layer higher.
+    <I18nProvider>
+      <AppHome
+        creatingProject={false}
+        language="en"
+        onCancelProjectCreate={vi.fn()}
+        onCreateProject={vi.fn()}
+        onEnterLab={onEnterLab}
+        onOpenNetwork={onOpenNetwork}
+        onOpenProject={vi.fn()}
+        onProjectSubmit={vi.fn()}
+        onProjectPlace={vi.fn()}
+        pendingLocation={null}
+        onSelectTemplate={onSelectTemplate}
+        onSetLanguage={vi.fn()}
+        onToggleUiMode={onToggleUiMode}
+        runState="running"
+        uiMode={uiMode}
+        webGpuStatus="ready"
+        {...extraProps}
+      />
+    </I18nProvider>,
   );
 
   return { onEnterLab, onOpenNetwork, onSelectTemplate, onToggleUiMode };

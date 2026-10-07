@@ -2,12 +2,26 @@ import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { Language } from "./i18n";
 import { CityHeroScene } from "./renderer/CityHeroScene";
 import { TemplateGallery } from "./panels/TemplateGallery";
+import { ProjectList } from "./projects/ProjectList";
+import { MapPlacement } from "./projects/MapPlacement";
+import { ProjectDetailsForm } from "./projects/ProjectDetailsForm";
+import type { Project } from "./projects/projectStore";
+import type { ProjectDetails } from "./projects/ProjectDetailsForm";
 import type { UiMode } from "./uiMode";
 
 type AppHomeProps = {
+  /** Step 2 of the new-project flow: pick the site on a map. */
+  creatingProject: boolean;
   language: Language;
+  onCancelProjectCreate: () => void;
+  onCreateProject: () => void;
   onEnterLab: () => void;
   onOpenNetwork: () => void;
+  onOpenProject: (project: Project) => void;
+  /** What step 2 produced, or null while the wizard is not on step 3. */
+  pendingLocation: { lat: number; lng: number; radiusMeters: number } | null;
+  onProjectPlace: (point: { lat: number; lng: number }, radiusMeters: number) => void;
+  onProjectSubmit: (details: ProjectDetails) => void;
   onSelectTemplate: (scene: CrowdSimScene) => void;
   onSetLanguage: (language: Language) => void;
   onToggleUiMode: () => void;
@@ -27,7 +41,7 @@ type HomeCopy = {
   pageLabel: string;
   primaryAction: string;
   statusLabel: string;
-  stepOneLabel: string;
+  templateStepLabel: string;
   subtitle: string;
   title: string;
 };
@@ -44,7 +58,7 @@ const homeCopy: Record<Language, HomeCopy> = {
     pageLabel: "CrowdSim 首页",
     primaryAction: "进入运营台",
     statusLabel: "运行摘要",
-    stepOneLabel: "第 1 步 · 选模板",
+    templateStepLabel: "或者，先拿一个模板看看",
     subtitle: "把客流仿真、品牌吸引、接触网络和验证报告放进一个可交付的商业运营台。",
     title: "CrowdSim Operations",
   },
@@ -60,7 +74,7 @@ const homeCopy: Record<Language, HomeCopy> = {
     pageLabel: "CrowdSim home",
     primaryAction: "Open console",
     statusLabel: "Run summary",
-    stepOneLabel: "Step 1 · Pick a template",
+    templateStepLabel: "Or start from a template",
     subtitle:
       "Simulation, brand pull, contact networks, and validation reports in one client-ready operating console.",
     title: "CrowdSim Operations",
@@ -68,9 +82,16 @@ const homeCopy: Record<Language, HomeCopy> = {
 };
 
 export function AppHome({
+  creatingProject,
   language,
+  onCancelProjectCreate,
+  onCreateProject,
   onEnterLab,
   onOpenNetwork,
+  onOpenProject,
+  onProjectPlace,
+  onProjectSubmit,
+  pendingLocation,
   onSelectTemplate,
   onSetLanguage,
   onToggleUiMode,
@@ -141,10 +162,40 @@ export function AppHome({
             <h1>{copy.title}</h1>
             <p>{copy.basicSubtitle}</p>
           </div>
-          <div className="home-template-step">
-            <p className="home-step-label">{copy.stepOneLabel}</p>
-            <TemplateGallery language={language} onSelect={onSelectTemplate} />
-          </div>
+          {creatingProject ? (
+            // Step 2 replaces the list rather than opening over it: the list's
+            // buttons are all "open something else", and leaving them under a
+            // half-finished wizard is how a coordinate ends up on the wrong
+            // project.
+            pendingLocation ? (
+              <ProjectDetailsForm
+                onCancel={onCancelProjectCreate}
+                onSubmit={onProjectSubmit}
+                place={pendingLocation}
+              />
+            ) : (
+              <MapPlacement onCancel={onCancelProjectCreate} onNext={onProjectPlace} />
+            )
+          ) : (
+            <>
+              {/*
+               * Projects first, templates second. Someone who has already made
+               * a project came back to work on it, and a wall of demo scenes
+               * above their own work is noise. Templates matter to whoever has
+               * nothing yet, and they keep their place below for that reason.
+               */}
+              <div className="home-project-step">
+                <p className="home-step-label">
+                  {language === "zh" ? "项目" : "Projects"}
+                </p>
+                <ProjectList onCreate={onCreateProject} onOpen={onOpenProject} />
+              </div>
+              <div className="home-template-step">
+                <p className="home-step-label">{copy.templateStepLabel}</p>
+                <TemplateGallery language={language} onSelect={onSelectTemplate} />
+              </div>
+            </>
+          )}
         </section>
       ) : (
         <section className="home-hero">

@@ -1,0 +1,303 @@
+/*
+ * The project list. Same glass-over-dark language as `home.css`, which is
+ * where it appears — a project card next to a template card should look like
+ * it was put there on purpose.
+ *
+ * The card's hierarchy is deliberate: name, then where it is, then what it is,
+ * then whether a plan exists yet. That last one sits lowest because it is the
+ * fact a card cannot otherwise show — area and floor count describe a building,
+ * they are not a floor plan.
+ */
+
+.project-list {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+
+.project-list-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.project-list-head h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #eaf4ff;
+}
+
+.project-list-head p {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 13px;
+  color: rgba(196, 216, 232, 0.75);
+}
+
+.project-list-head button {
+  padding: 9px 18px;
+  border: 1px solid rgba(242, 169, 59, 0.55);
+  border-radius: var(--product-radius-sm);
+  background: rgba(242, 169, 59, 0.14);
+  color: #ffd79a;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.project-list-head button:hover {
+  background: rgba(242, 169, 59, 0.24);
+}
+
+.project-list-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 75, 74, 0.5);
+  border-radius: var(--product-radius-sm);
+  background: rgba(226, 75, 74, 0.12);
+  color: #ffc9c8;
+  font-size: 13px;
+}
+
+.project-list > p[data-testid="project-list-empty"] {
+  margin: 0;
+  padding: 24px 18px;
+  border: 1px dashed rgba(126, 176, 215, 0.28);
+  border-radius: var(--product-radius-sm);
+  color: rgba(196, 216, 232, 0.7);
+  font-size: 14px;
+  text-align: center;
+}
+
+.project-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid rgba(126, 176, 215, 0.18);
+  border-radius: var(--product-radius-sm);
+  background: rgba(9, 22, 36, 0.78);
+}
+
+.project-card h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #eaf4ff;
+}
+
+.project-card-where {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(196, 216, 232, 0.66);
+}
+
+.project-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-card-tags span {
+  padding: 2px 8px;
+  border: 1px solid rgba(126, 176, 215, 0.24);
+  border-radius: 999px;
+  font-size: 11px;
+  color: #cfe6fb;
+}
+
+.project-card-plan {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(242, 169, 59, 0.85);
+}
+
+.project-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.project-card-actions button {
+  padding: 6px 12px;
+  border: 1px solid rgba(126, 176, 215, 0.3);
+  border-radius: var(--product-radius-sm);
+  background: transparent;
+  color: #cfe6fb;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.project-card-actions button:first-child {
+  border-color: rgba(242, 169, 59, 0.5);
+  color: #ffd79a;
+}
+
+.project-card-actions button:hover {
+  background: rgba(126, 176, 215, 0.12);
+}
+
+.project-card-actions button:first-child:hover {
+  background: rgba(242, 169, 59, 0.16);
+}
+
+@media (max-width: 720px) {
+  .project-list-head {
+    flex-direction: column;
+  }
+
+  .project-list-head button {
+    width: 100%;
+  }
+}
+/*
+ * Steps 2 and 3 of the new-project flow. Same sheet as the list on purpose:
+ * the three screens are one task, and a wizard that changes its visual
+ * language halfway through makes people stop to re-read it.
+ */
+
+.map-placement,
+.project-details {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.map-placement-nokey {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(242, 169, 59, 0.4);
+  border-radius: var(--product-radius-sm);
+  background: rgba(242, 169, 59, 0.08);
+  color: #ffd79a;
+  font-size: 13px;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 320px;
+  border: 1px solid rgba(126, 176, 215, 0.24);
+  border-radius: var(--product-radius-sm);
+  background: rgba(6, 14, 24, 0.9);
+}
+
+.map-placement-fields,
+.project-details > label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: #cfe6fb;
+}
+
+.map-placement-fields {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.map-placement input,
+.project-details input,
+.project-details select {
+  padding: 7px 10px;
+  border: 1px solid rgba(126, 176, 215, 0.3);
+  border-radius: var(--product-radius-sm);
+  background: rgba(6, 14, 24, 0.9);
+  color: #eaf4ff;
+  font-size: 14px;
+}
+
+.map-placement-note,
+.project-details-note {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(196, 216, 232, 0.66);
+}
+
+.map-placement-actions,
+.project-details-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.map-placement-actions button,
+.project-details-actions button {
+  padding: 9px 18px;
+  border: 1px solid rgba(126, 176, 215, 0.3);
+  border-radius: var(--product-radius-sm);
+  background: transparent;
+  color: #cfe6fb;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.project-details-actions button:last-child {
+  border-color: rgba(242, 169, 59, 0.55);
+  background: rgba(242, 169, 59, 0.14);
+  color: #ffd79a;
+}
+
+.project-details-actions button:disabled {
+  border-color: rgba(126, 176, 215, 0.16);
+  color: rgba(196, 216, 232, 0.4);
+  cursor: not-allowed;
+}
+
+.project-details-where {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(196, 216, 232, 0.66);
+}
+
+.plan-source {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid rgba(126, 176, 215, 0.24);
+  border-radius: var(--product-radius-sm);
+}
+
+.plan-source legend {
+  padding: 0 6px;
+  font-size: 13px;
+  color: #cfe6fb;
+}
+
+.plan-source-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  cursor: pointer;
+}
+
+/* The disclosure is load-bearing, not decoration: what each plan route
+ * produces is the difference between them, and the whole reason this is a
+ * radio with a paragraph rather than a select. */
+.plan-source-option strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #eaf4ff;
+}
+
+.plan-source-option small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(196, 216, 232, 0.72);
+}
+
+@media (max-width: 720px) {
+  .map-canvas {
+    height: 240px;
+  }
+}

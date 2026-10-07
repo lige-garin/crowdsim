@@ -10,9 +10,16 @@ afterEach(cleanup);
 function renderHome() {
   return render(
     <AppHome
+      creatingProject={false}
       language="en"
+      onCancelProjectCreate={vi.fn()}
+      onCreateProject={vi.fn()}
       onEnterLab={vi.fn()}
       onOpenNetwork={vi.fn()}
+      onOpenProject={vi.fn()}
+      onProjectSubmit={vi.fn()}
+      onProjectPlace={vi.fn()}
+      pendingLocation={null}
       onSelectTemplate={vi.fn()}
       onSetLanguage={vi.fn()}
       onToggleUiMode={vi.fn()}

@@ -1,6 +1,13 @@
 import { sceneFloors, sceneOnFloor, type CrowdSimScene } from "@crowdsim/scene-schema";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
+import {
+  createProject,
+  readProjects,
+  upsertProject,
+  writeProjects,
+} from "./projects/projectStore";
+import { sceneForNewProject } from "./projects/sceneForNewProject";
 import { AppWorkbench } from "./AppWorkbench";
 import type { EvacuationState, StageTab, StageViewMode } from "./AppTypes";
 import { createSystemSignals } from "./appSignals";
@@ -165,6 +172,16 @@ function AppContent() {
   const [stageTab, setStageTab] = useState<StageTab>("run");
   const [layers, setLayers] = useState(defaultViewportLayers);
   const [showHome, setShowHome] = useState(true);
+  // "Creating a project" is a mode on the home screen, not a route: there is no
+  // router here and adding one for a single flow would be a lot of machinery
+  // for a wizard with three steps. False means the list.
+  const [creatingProject, setCreatingProject] = useState(false);
+  // What the map step produced, waiting for the form step to consume it.
+  const [pendingLocation, setPendingLocation] = useState<{
+    lat: number;
+    lng: number;
+    radiusMeters: number;
+  } | null>(null);
   const [viewMode, setViewMode] = useState<StageViewMode>("3d");
   // Picking a tool is a request to build. In the 3D city it builds right there
   // under the cursor; tools the world cannot place yet (a multi-click wall), and
@@ -494,9 +511,63 @@ function AppContent() {
           {language === "zh" ? "跳到主内容" : "Skip to main content"}
         </a>
         <AppHome
+          creatingProject={creatingProject}
           language={language}
+          onCancelProjectCreate={() => setCreatingProject(false)}
+          onCreateProject={() => setCreatingProject(true)}
+          onProjectPlace={(point, radiusMeters) => {
+            // Held here rather than in the map component, so step 3 reads it
+            // from one place instead of it being threaded back through.
+            setPendingLocation({ ...point, radiusMeters });
+            setCreatingProject(false);
+          }}
+          onProjectSubmit={(details) => {
+            const location = pendingLocation;
+
+            if (!location) return;
+
+            const now = new Date().toISOString();
+            // Spelled out rather than spread: `details` is the form's shape
+            // and this is the record's, and spreading one into the other would
+            // make the difference invisible.
+            const project = createProject(
+              {
+                areaSquareMeters: details.areaSquareMeters,
+                businessCategory: details.businessCategory,
+                catchmentRadiusMeters: location.radiusMeters,
+                contractVersion: 1,
+                coordinateSystem: "GCJ-02",
+                createdAt: now,
+                floors: details.floors,
+                id: `p-${Date.now().toString(36)}`,
+                kind: details.kind,
+                lat: location.lat,
+                lng: location.lng,
+                name: details.name,
+                planSource: details.planSource,
+                updatedAt: now,
+              },
+              sceneForNewProject(details, location),
+            );
+
+            // A refused save is the list's problem to report, not this screen's:
+            // the project exists either way and the next read will say so.
+            writeProjects(upsertProject(project, readProjects()));
+            applyScene(project.scene);
+            setPendingLocation(null);
+            setCreatingProject(false);
+            setShowHome(false);
+          }}
+          pendingLocation={pendingLocation}
           onEnterLab={() => enterLab()}
           onOpenNetwork={() => enterLab("network")}
+          onOpenProject={(project) => {
+            // A project opens the scene it carries, which is the whole point of
+            // keeping one: the list is not a menu of scenes, it is a list of
+            // the things a person has been working on.
+            applyScene(project.scene);
+            setShowHome(false);
+          }}
           onSelectTemplate={(templateScene) => {
             applyScene(templateScene);
             enterLab();

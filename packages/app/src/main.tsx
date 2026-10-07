@@ -8,6 +8,7 @@ import { createRoot } from "react-dom/client";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/home.css";
+import "./styles/projectList.css";
 import "./styles/network.css";
 import "./styles/shell.css";
 import "./styles/stage.css";

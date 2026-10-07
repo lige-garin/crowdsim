@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A project, and the three steps that make one.** The home screen opens on
+  the projects you have rather than on a gallery of demo venues (metro
+  concourse, airport security, hospital outpatient — none of them a place
+  anyone is about to open). New project: pick a location on a map, fill in the
+  kind / category / area / floors, and choose where the floor plan comes from.
+  `packages/app/src/projects/`.
+
+  Projects live in `localStorage` as `{ record, scene }`, with no account and
+  nothing uploaded, the same way `SceneEditor`'s autosave already stores one
+  scene. A project record carries what a scene deliberately does not: where the
+  site is, what kind of place it is, and which of the four plan routes produced
+  its geometry.
+
+  **The map is optional and the coordinate is not.** With no Amap key
+  configured the step still works — the lat/lng and radius are typed in, and
+  the screen says why there is no base map rather than showing a broken frame.
+  A first run should be able to make a project.
+
+  **Area and floor count are recorded but never used to grow walls.** A floor
+  count is not a floor plan, and a building inferred from one would be
+  indistinguishable on screen from a measured one. The four plan routes differ
+  in what they actually produce, so the form states it per route: drawing
+  produces nothing yet, DXF gives walls with no openings, the skeleton
+  generator really does build (escalator positions included, which are its
+  own), and **a GLB is appearance only — it loads as a render asset and
+  produces no walls, so people walk through them**. That last one is labelled
+  "visual only" on the card and in the form.
+
 - `createMallSkeleton` (`packages/app/src/scenes/mallSkeleton.ts`) builds a
   shopping centre from a floor-and-zone description: floors with elevations,
   a walled perimeter per floor, zones cut into store lots and shops, an
