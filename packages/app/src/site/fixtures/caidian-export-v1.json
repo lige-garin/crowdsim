@@ -1,6 +1,6 @@
 {
   "contractVersion": 1,
-  "generatedAt": "2026-10-07T09:04:09Z",
+  "generatedAt": "2026-10-07T09:04:09.000Z",
   "provider": "amap+caidian",
   "site": {
     "coordinateSystem": "GCJ-02",
@@ -16,7 +16,11 @@
     "layers": {
       "residential": {
         "count": 42,
-        "ringCounts": [1, 1, 0]
+        "ringCounts": [
+          1,
+          1,
+          1
+        ]
       },
       "school": {
         "count": 6

@@ -41,6 +41,33 @@ const street = parseScene({
   ],
 });
 
+/**
+ * A street site imported from a bundle: one shop, no lot, a brand the importer
+ * gave priceTier 3, and no yuan figure anywhere — the importer writes
+ * `areaSquareMeters` and `tables` into customParameters, not a ticket.
+ */
+const bundled = parseScene({
+  schemaVersion: "1.0.0",
+  id: "bundled",
+  name: "Bundled site",
+  world: { width: 200, height: 120 },
+  shops: [
+    {
+      id: "bundled-shop",
+      name: "老四季",
+      position: { x: 100, y: 60 },
+      size: { width: 21.9, height: 14.6 },
+      brand: {
+        name: "老四季",
+        category: "restaurant",
+        priceTier: 3,
+        profileId: "site-shop-brand",
+      },
+      customParameters: { areaSquareMeters: 320, tables: {} },
+    },
+  ],
+});
+
 function renderPanel(scene: CrowdSimScene) {
   const applied: CrowdSimScene[] = [];
 
@@ -116,6 +143,93 @@ describe("ShopLayoutPanel", () => {
     renderPanel(street);
     expect(screen.getByTestId("shop-layout-area")).toBeEnabled();
     expect(screen.queryByTestId("shop-layout-area-locked")).toBeNull();
+  });
+
+  it("refuses to apply a shop with no tables instead of throwing", () => {
+    // The bundle path: tables come back empty, and `shopSchema.capacity` is
+    // positive. Applied, that is a ZodError thrown from a click handler.
+    const applied = renderPanel(bundled);
+
+    expect(screen.getByTestId("shop-layout-error").textContent).toMatch(
+      /No tables to place/,
+    );
+    expect(screen.getByTestId("shop-layout-apply")).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("shop-layout-apply"));
+    expect(applied).toHaveLength(0);
+  });
+
+  it("keeps a bundled shop's price tier when the ticket was never filled in", () => {
+    const applied = renderPanel(bundled);
+
+    set("shop-layout-table-fourSeat", "4");
+    fireEvent.click(screen.getByTestId("shop-layout-apply"));
+
+    // Not 1: an untouched empty box is not a price of zero, and reclassifying
+    // a mid-market shop as the cheapest tier is not something a click on
+    // "layout the tables" should do.
+    expect(applied[0]?.shops[0]?.brand?.priceTier).toBe(3);
+    expect(screen.getByTestId("shop-layout-ticket-unset")).toBeInTheDocument();
+  });
+
+  it("reclassifies the tier when a ticket is actually typed", () => {
+    const applied = renderPanel(bundled);
+
+    set("shop-layout-table-fourSeat", "4");
+    set("shop-layout-ticket", "300");
+    fireEvent.click(screen.getByTestId("shop-layout-apply"));
+
+    expect(applied[0]?.shops[0]?.brand?.priceTier).toBe(5);
+  });
+
+  it("drops the previous scene's form when it is keyed to a new scene", () => {
+    const other = parseScene({
+      schemaVersion: "1.0.0",
+      id: "other",
+      name: "Other site",
+      world: { width: 200, height: 120 },
+      shops: [
+        {
+          id: "other-shop",
+          name: "别的店",
+          position: { x: 100, y: 60 },
+          size: { width: 21.9, height: 14.6 },
+        },
+      ],
+    });
+    const applied: CrowdSimScene[] = [];
+    // Mounted the way the registry mounts it: keyed by scene id, so a scene
+    // swap is a fresh mount. This test would fail against a plain rerender,
+    // which is the point — it is the registry's key doing the work.
+    const { rerender } = render(
+      <I18nProvider>
+        <ShopLayoutPanel
+          key={street.id}
+          scene={street}
+          onApplyScene={(next) => applied.push(next)}
+        />
+      </I18nProvider>,
+    );
+
+    set("shop-layout-name", "老四季旗舰店");
+    set("shop-layout-table-fourSeat", "4");
+    rerender(
+      <I18nProvider>
+        <ShopLayoutPanel
+          key={other.id}
+          scene={other}
+          onApplyScene={(next) => applied.push(next)}
+        />
+      </I18nProvider>,
+    );
+
+    set("shop-layout-table-fourSeat", "2");
+    fireEvent.click(screen.getByTestId("shop-layout-apply"));
+
+    // Without the key the second scene's shop would be renamed and refurnished
+    // from the first one's form.
+    expect(applied[0]?.shops[0]?.name).toBe("别的店");
+    expect(applied[0]?.shops[0]?.capacity).toBe(8);
   });
 
   it("resizes a standalone shop to the area the form asked for", () => {

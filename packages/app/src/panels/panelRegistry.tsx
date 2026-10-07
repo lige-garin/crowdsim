@@ -112,8 +112,16 @@ export const panelRegistry: PanelRegistryEntry[] = [
     labelEn: "Shop layout",
     // Reads the open scene's shops and, when wired to onApplyScene, writes
     // the planned furniture back into it.
+    // Keyed by scene id, same reason as ValidationReportPanel above: the form
+    // holds the selected shop and the typed fields, and without a fresh mount
+    // those carry over to whichever scene comes next — the new scene's first
+    // shop then gets the old shop's name and table mix.
     render: (ctx) => (
-      <ShopLayoutPanel scene={ctx.scene} onApplyScene={ctx.onApplyScene} />
+      <ShopLayoutPanel
+        key={ctx.scene.id}
+        scene={ctx.scene}
+        onApplyScene={ctx.onApplyScene}
+      />
     ),
   },
   {
@@ -121,7 +129,10 @@ export const panelRegistry: PanelRegistryEntry[] = [
     id: "layout-compare",
     labelZh: "方案对比",
     labelEn: "Layout comparison",
-    render: (ctx) => <LayoutComparePanel scene={ctx.scene} />,
+    // Keyed by scene id: a report left on screen was measured from the scene
+    // that was open when it ran. Keeping it under the next scene's name would
+    // be a number about one scene sitting under another.
+    render: (ctx) => <LayoutComparePanel key={ctx.scene.id} scene={ctx.scene} />,
   },
   {
     dataSource: "live",

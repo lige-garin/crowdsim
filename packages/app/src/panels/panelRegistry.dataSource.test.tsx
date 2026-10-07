@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 import { PanelDock } from "./PanelDock";
 import { I18nProvider } from "../i18n";
 import { panelRegistry } from "./panelRegistry";
@@ -81,4 +82,59 @@ describe("panel dock data-source labelling", () => {
       "weather",
     ]);
   });
+
+  it("keys the scene-bound panels by scene id", () => {
+    // A live panel that keeps state across a scene swap shows one scene's
+    // numbers under another scene's name — a form filled in for one shop,
+    // applied to another. Keying by scene id makes the swap a fresh mount.
+    // Checked by rerendering the real registry output across two scenes and
+    // looking for the form coming back empty, because React's key string is
+    // an implementation detail and asserting on it would test React.
+    const other = parseScene({
+      ...defaultDemoScene,
+      id: "second-scene",
+      shops: defaultDemoScene.shops.map((shop) => ({
+        ...shop,
+        id: `${shop.id}-2`,
+        name: `${shop.name ?? shop.id}二号店`,
+      })),
+    });
+
+    for (const id of ["shop-layout", "layout-compare"]) {
+      cleanup();
+      const entry = panelRegistry.find((panel) => panel.id === id)!;
+      const nameInput = () =>
+        screen.queryByTestId("shop-layout-name") as HTMLInputElement | null;
+
+      const { rerender } = render(
+        <I18nProvider>{entry.render(contextFor(defaultDemoScene))}</I18nProvider>,
+      );
+
+      if (!nameInput()) continue; // a report panel has no form to carry over
+
+      fireEvent.change(nameInput()!, { target: { value: "写进去的名字" } });
+      rerender(<I18nProvider>{entry.render(contextFor(other))}</I18nProvider>);
+
+      expect(
+        nameInput()?.value,
+        `${id} kept a form filled in for the previous scene`,
+      ).not.toBe("写进去的名字");
+    }
+  });
 });
+
+function contextFor(scene: CrowdSimScene) {
+  return {
+    scene,
+    trajectoryRecording: createTrajectoryRecording({
+      id: "test",
+      runtime: createLiveSimulationRuntimeArtifact({
+        movementBackend: "cpu-compat",
+        sharedMemory: "fallback",
+        thread: "main",
+      }),
+      sceneId: scene.id,
+      seed: scene.seed,
+    }),
+  };
+}

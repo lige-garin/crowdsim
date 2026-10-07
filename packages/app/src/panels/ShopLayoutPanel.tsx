@@ -52,7 +52,12 @@ type Preview = { kind: "ok"; layout: ShopLayout } | { kind: "error"; error: stri
 
 type FormFields = {
   areaSquareMeters: number;
-  averageTicketYuan: number;
+  /**
+   * `null` means the scene never said — not the same as 0 yuan, and not the
+   * same as a shop with no brand to keep a tier on. Only a number the user
+   * actually typed is a price; anything else must leave the tier alone.
+   */
+  averageTicketYuan: number | null;
   doorEdge: DoorEdge;
   dwellMeanSeconds: number;
   name: string;
@@ -78,6 +83,17 @@ export function ShopLayoutPanel({
     shop ? fieldsFor(scene, shop) : emptyFields(),
   );
   const [applied, setApplied] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  /*
+   * What reaches the scene as a price. `null` is passed through as
+   * `undefined` on purpose: `writeLayout` skips the tier entirely when it is
+   * undefined, which is the difference between "the user never said" and "the
+   * user said 0". Sending 0 for the former quietly reclassified a mid-market
+   * shop as the cheapest tier in the schema.
+   */
+  const ticketYuan =
+    fields.averageTicketYuan === null ? undefined : fields.averageTicketYuan;
 
   /*
    * The rectangle the plan is laid out in. Both apply functions re-derive it
@@ -128,23 +144,38 @@ export function ShopLayoutPanel({
     if (next) setFields(fieldsFor(scene, next));
   };
 
+  /*
+   * The preview already refuses a mix that does not fit, so in practice this
+   * has nothing left to catch. It is here anyway because the alternative is a
+   * schema error thrown from a click handler: the panel would unmount and take
+   * the rest of the workbench with it, over a number someone typed into a
+   * field. A refused apply is a sentence on screen.
+   */
   const apply = () => {
     if (!onApplyScene) return;
 
-    onApplyScene(
-      lot
-        ? applyShopLayoutToLot(scene, lot.id, spec, {
-            averageTicketYuan: fields.averageTicketYuan,
-            dwellMeanSeconds: fields.dwellMeanSeconds,
-            name: fields.name,
-          })
-        : applyShopLayoutToShop(scene, shop.id, spec, {
-            averageTicketYuan: fields.averageTicketYuan,
-            dwellMeanSeconds: fields.dwellMeanSeconds,
-            name: fields.name,
-            size: sizeForArea(fields.areaSquareMeters),
-          }),
-    );
+    try {
+      onApplyScene(
+        lot
+          ? applyShopLayoutToLot(scene, lot.id, spec, {
+              averageTicketYuan: ticketYuan,
+              dwellMeanSeconds: fields.dwellMeanSeconds,
+              name: fields.name,
+            })
+          : applyShopLayoutToShop(scene, shop.id, spec, {
+              averageTicketYuan: ticketYuan,
+              dwellMeanSeconds: fields.dwellMeanSeconds,
+              name: fields.name,
+              size: sizeForArea(fields.areaSquareMeters),
+            }),
+      );
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : String(error));
+
+      return;
+    }
+
+    setApplyError(null);
     setApplied(true);
   };
 
@@ -204,12 +235,26 @@ export function ShopLayoutPanel({
         <input
           type="number"
           data-testid="shop-layout-ticket"
-          value={fields.averageTicketYuan}
+          placeholder={zh ? "未填" : "not set"}
+          value={fields.averageTicketYuan ?? ""}
           onChange={(event) =>
-            setFields({ ...fields, averageTicketYuan: Number(event.target.value) })
+            setFields({
+              ...fields,
+              // An emptied box is "not set" again, not 0. Reading the value
+              // rather than Number()-ing it is what tells those apart.
+              averageTicketYuan:
+                event.target.value === "" ? null : Number(event.target.value),
+            })
           }
         />
       </label>
+      {fields.averageTicketYuan === null && shop.brand ? (
+        <p data-testid="shop-layout-ticket-unset">
+          {zh
+            ? `没填就沿用场景里的价位档 ${shop.brand.priceTier}，不会当成 0 元。`
+            : `Left unset, the shop keeps its tier ${shop.brand.priceTier} — it is not read as 0 yuan.`}
+        </p>
+      ) : null}
       <label>
         {zh ? "平均停留（秒）" : "Dwell (s)"}
         <input
@@ -264,11 +309,16 @@ export function ShopLayoutPanel({
           {zh ? "㎡" : "sq m"}
           {" · "}
           {zh ? "价位档" : "price tier"}{" "}
-          {priceTierForAverageTicket(fields.averageTicketYuan)}
+          {fields.averageTicketYuan === null
+            ? (shop.brand?.priceTier ?? "—")
+            : priceTierForAverageTicket(fields.averageTicketYuan)}
         </p>
       ) : null}
       {preview?.kind === "error" ? (
         <code data-testid="shop-layout-error">{preview.error}</code>
+      ) : null}
+      {applyError ? (
+        <code data-testid="shop-layout-apply-error">{applyError}</code>
       ) : null}
       {onApplyScene ? (
         <button
@@ -303,7 +353,7 @@ function fieldsFor(
   return {
     areaSquareMeters: area,
     averageTicketYuan:
-      typeof stored.averageTicketYuan === "number" ? stored.averageTicketYuan : 0,
+      typeof stored.averageTicketYuan === "number" ? stored.averageTicketYuan : null,
     doorEdge: (stored.doorEdge as DoorEdge | undefined) ?? "south",
     dwellMeanSeconds: shop.dwellMeanSeconds,
     name: shop.name ?? shop.id,
@@ -314,7 +364,7 @@ function fieldsFor(
 function emptyFields(): FormFields {
   return {
     areaSquareMeters: 100,
-    averageTicketYuan: 0,
+    averageTicketYuan: null,
     doorEdge: "south",
     dwellMeanSeconds: 240,
     name: "",

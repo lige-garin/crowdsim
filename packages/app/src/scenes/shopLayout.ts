@@ -85,6 +85,11 @@ export type ShopLayout = {
  * path: "this area cannot hold these tables" is a check a scheme can be run
  * through, and it is one of the few things here that is arithmetic rather
  * than inference.
+ *
+ * Throws on an empty table mix for the same reason, one step earlier: a shop
+ * with no tables has no capacity, and `shopSchema.capacity` is positive, so
+ * writing one would be a scene the schema rejects. Said here, it arrives as
+ * the answer it is instead of a validation error thrown from inside `apply`.
  */
 export function planShopLayout(spec: ShopLayoutSpec): ShopLayout {
   const edge = spec.doorEdge ?? "south";
@@ -101,6 +106,15 @@ export function planShopLayout(spec: ShopLayoutSpec): ShopLayout {
   if (region.width <= 0 || region.height <= 0) {
     throw new Error(
       `Lot leaves no room behind the ${mainAisleMeters} m aisle (${spec.lot.width} x ${spec.lot.height} m)`,
+    );
+  }
+
+  // Last of the three refusals, so a lot too small to hold anything still says
+  // that rather than complaining about the tables it was never going to hold.
+  if (countTables(spec.tables) === 0) {
+    throw new Error(
+      "No tables to place. A shop with no tables has no capacity, and a " +
+        "capacity of zero is not a shop — give it at least one table.",
     );
   }
 
@@ -373,6 +387,14 @@ export function applyShopLayoutToLot(
     layout,
     spec,
     options,
+  );
+}
+
+/** How many tables the mix asks for, counting a missing kind as none. */
+function countTables(tables: TableCounts) {
+  return (["twoSeat", "fourSeat", "sixSeat", "privateRoom10"] as const).reduce(
+    (sum, kind) => sum + (tables[kind] ?? 0),
+    0,
   );
 }
 

@@ -134,6 +134,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `ShopLayoutPanel` applied a shop with no tables, and the schema rejected it:
+  `shopSchema.capacity` is positive and an empty table mix sums to zero, so
+  importing a site bundle and clicking "apply to scene" — the shortest possible
+  path through the panel — threw a `ZodError` out of a click handler and took
+  the workbench with it. `planShopLayout` now refuses an empty mix as plainly
+  as it refuses tables that do not fit, and the panel catches anything else
+  rather than letting it reach React.
+
+- The same panel passed `averageTicketYuan: 0` for a shop that had never been
+  given one, which `priceTierForAverageTicket` read as the cheapest tier. A
+  site bundle's shop carries `priceTier: 3` and no yuan figure, so opening the
+  panel and applying a layout silently reclassified a mid-market shop two
+  tiers down. An untouched box is now `null` and is passed through as
+  `undefined`, which is what `writeLayout`'s existing guard is for.
+
+- `ShopLayoutPanel` and `LayoutComparePanel` were registered without a
+  `key={scene.id}`, so their form and their report survived a scene swap: the
+  next scene's first shop got the previous shop's name, table mix and ticket,
+  or a comparison sat on screen under a scene it was not measured from.
+
 - `importSiteBundle` copied `site_geometry` coordinates straight into the
   scene. Those are metres **relative to the site origin**, so they are
   negative on two sides; on the checked-in fixture 10 of 17 points landed
