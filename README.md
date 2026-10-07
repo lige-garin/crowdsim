@@ -97,6 +97,31 @@ documented habit of catching and correcting its own overstated claims — see
   measured one. Area and floor count are recorded and are **not** used to
   draw anything.
 
+## Which browsers
+
+**Only Chromium is actually tested.** `playwright.config.ts` runs a single
+Chromium project, and every number in this README was measured there. The
+rest of this section is what the code requires, not what anyone has run.
+
+Two capabilities are optional, and both degrade rather than fail:
+
+| Capability       | Needed for                                   | Without it                                                            |
+| ---------------- | -------------------------------------------- | --------------------------------------------------------------------- |
+| WebGPU           | The experimental, default-off GPU movement toggle | Not offered; the CPU backend runs the same model and the same numbers |
+| `SharedArrayBuffer` | The crowd overlay sharing memory instead of copying | Falls back to a per-frame copy; slower, same results               |
+
+`SharedArrayBuffer` additionally needs COOP/COEP **response headers**, which
+is a server capability and not a browser one — see
+[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md). A browser that supports it will
+still take the slow path on a host that cannot send the headers.
+
+What that implies for other browsers is a reasonable expectation, not a
+result: Firefox and Safari 17+ have everything the CPU path needs, and
+Safari's WebGPU story is newer than Chrome's. **Nobody has loaded this app
+in either of them.** If you deploy somewhere that has to support them, run
+it once before promising it — and note that WebGPU is gated behind a
+default-off toggle, so the only thing at risk is that toggle.
+
 ## Quickstart
 
 Requires Node.js 24+ and pnpm 10 (see `packageManager` in `package.json`).
