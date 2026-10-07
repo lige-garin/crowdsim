@@ -61,7 +61,10 @@ export function CatchmentCounts({
 
   const ask = async () => {
     if (!stored.key) {
-      setStatus({ kind: "failed", message: zh ? "没有可用的 key" : "No key available" });
+      setStatus({
+        kind: "failed",
+        message: zh ? "没有可用的 key" : "No key available",
+      });
 
       return;
     }
@@ -99,21 +102,25 @@ export function CatchmentCounts({
   };
 
   return (
-    <section className="catchment-counts" aria-label={zh ? "周边实测" : "What is around the site"}>
+    <section
+      className="catchment-counts"
+      aria-label={zh ? "周边实测" : "What is around the site"}
+    >
       <p className="home-step-label">{zh ? "周边实测" : "Around the site"}</p>
 
       <p className="catchment-counts-intro">
         {zh ? (
           <>
-            这些是高德 POI 的<b>地点条目数</b>，不是人数。要人数得有标定过的系数，现在还没有
-            —— 所以这些数字不参与仿真，只帮你判断这个位置像什么。查询是手动触发的，每次都会消耗高德配额。
+            这些是高德 POI 的<b>地点条目数</b>
+            ，不是人数。要人数得有标定过的系数，现在还没有 ——
+            所以这些数字不参与仿真，只帮你判断这个位置像什么。查询是手动触发的，每次都会消耗高德配额。
           </>
         ) : (
           <>
-            These are Amap POI <b>listing counts</b>, not people. Turning them into people needs
-            coefficients that have not been calibrated, so these numbers stay out of the
-            simulation and only help you judge what the location is like. The query is manual and
-            each press spends Amap quota.
+            These are Amap POI <b>listing counts</b>, not people. Turning them into
+            people needs coefficients that have not been calibrated, so these numbers
+            stay out of the simulation and only help you judge what the location is
+            like. The query is manual and each press spends Amap quota.
           </>
         )}
       </p>
@@ -185,19 +192,23 @@ export function CatchmentCounts({
               : "Look up what's around"}
         </button>
         <span className="catchment-counts-radius">
-          {zh ? `半径 ${Math.round(radiusMeters)} m` : `${Math.round(radiusMeters)} m radius`}
+          {zh
+            ? `半径 ${Math.round(radiusMeters)} m`
+            : `${Math.round(radiusMeters)} m radius`}
         </span>
       </div>
 
       {/*
-        * The three states are kept apart on purpose. "Not asked" and "asked and
-        * found none" both render rows, and only the heading distinguishes them,
-        * because a panel that cannot tell those apart is how a missing number
-        * becomes a false one.
-        */}
+       * The three states are kept apart on purpose. "Not asked" and "asked and
+       * found none" both render rows, and only the heading distinguishes them,
+       * because a panel that cannot tell those apart is how a missing number
+       * becomes a false one.
+       */}
       {status.kind === "idle" ? (
         <p className="catchment-counts-idle" data-testid="catchment-idle">
-          {zh ? "还没有查询过 —— 上面的表是空的，不是零。" : "Not queried yet — the table above is empty, not zero."}
+          {zh
+            ? "还没有查询过 —— 上面的表是空的，不是零。"
+            : "Not queried yet — the table above is empty, not zero."}
         </p>
       ) : null}
 
@@ -232,7 +243,10 @@ function CatchmentTable({ result, zh }: { result: PoiQueryResult; zh: boolean })
             <tr key={layer.key} data-testid={`catchment-row-${layer.key}`}>
               <th scope="row">{zh ? layer.labelZh : layer.labelEn}</th>
               {layer.count === null ? (
-                <td className="catchment-row-failed" data-testid={`catchment-failed-${layer.key}`}>
+                <td
+                  className="catchment-row-failed"
+                  data-testid={`catchment-failed-${layer.key}`}
+                >
                   {zh ? "查询失败" : "failed"}
                   {layer.failure ? <small>{layer.failure}</small> : null}
                 </td>

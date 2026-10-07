@@ -109,8 +109,9 @@ describe("the placeholder shop a new project starts with", () => {
     const scene = sceneForNewProject(details({ planSource: "skeleton" }), place);
 
     for (const shop of scene.shops) {
-      expect(Number.isFinite(shop.capacity), `${shop.id} has no usable capacity`)
-        .toBe(true);
+      expect(Number.isFinite(shop.capacity), `${shop.id} has no usable capacity`).toBe(
+        true,
+      );
       expect(shop.capacity).toBeGreaterThan(0);
       expect(Number.isFinite(Math.ceil(shop.capacity * 0.35))).toBe(true);
     }

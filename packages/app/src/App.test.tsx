@@ -388,7 +388,9 @@ describe("the new-project wizard, through the real App", () => {
     // Submitting stores the project and opens its scene, so the workbench is
     // what comes next rather than the list.
     expect(screen.queryByTestId("details-name")).toBeNull();
-    expect(JSON.parse(localStorage.getItem("crowdsim.projects.v1") ?? "[]")).toHaveLength(1);
+    expect(
+      JSON.parse(localStorage.getItem("crowdsim.projects.v1") ?? "[]"),
+    ).toHaveLength(1);
   });
 
   it("cancelling step 2 goes back to the list rather than stranding step 3", () => {
@@ -429,9 +431,9 @@ describe("cancelling a new project and starting another", () => {
 
     expect(screen.getByTestId("map-lat")).toBeInTheDocument();
     expect(screen.queryByTestId("details-name")).toBeNull();
-    expect(
-      (screen.getByTestId("map-lat") as HTMLInputElement).value,
-    ).not.toBe("41.12345");
+    expect((screen.getByTestId("map-lat") as HTMLInputElement).value).not.toBe(
+      "41.12345",
+    );
   });
 });
 

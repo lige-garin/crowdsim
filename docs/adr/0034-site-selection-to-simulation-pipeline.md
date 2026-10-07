@@ -44,7 +44,7 @@ one commit (`8cd12a5`, 2026-06-05). What matters here:
   distance weighting `0.25 + 0.75·(1−ratio)^1.3`.
 - **It has no geometry at all.** Grepping `building|footprint|3d|geometry`  
   across `amapService.ts`, `routes/analysis.ts` and `prisma/schema.prisma`  
-  returns zero hits. It is POI *points* only.
+  returns zero hits. It is POI _points_ only.
 - **Its coefficients are invented, not calibrated.** `AVG_HOUSEHOLDS = 780`,  
   `AVG_PERSONS = 2.7`, `AVG_OFFICE_WORKERS = 560`, `AVG_SCHOOL_PERSONS = 780`,  
   and the `estimateDailyFlow` weights (subway ×11000, bus ×260, mall ×7600,  
@@ -104,7 +104,7 @@ source:
 4. **A 3 km radius cannot be the simulation domain.** π·3000² is 28.3 km².  
    caidian's own estimator turns ~50 residential POIs into ~105,000 residents.  
    Even a 1%-a-day capture rate spread over a 12-hour day is ~1.5 people a  
-   minute, which is simulatable — but the *scene* would be 3 km across,  
+   minute, which is simulatable — but the _scene_ would be 3 km across,  
    where nobody walks, and every arriving agent would have to be spawned  
    kilometres from the shop. Pedestrian simulation is meaningless at that  
    scale, and the arrival mechanism (car, bus, metro) is not modelled at all.
@@ -127,7 +127,7 @@ Reasons, in the order that matters:
   unit-testable offline with a checked-in fixture. That fits this project's  
   rule that every assertion is verified without needing to mock a network.
 
-### D2 — Two domains: a 3 km *catchment* (demand) and a ~300 m *site* (simulation)
+### D2 — Two domains: a 3 km _catchment_ (demand) and a ~300 m _site_ (simulation)
 
 This is the decision that makes the rest coherent, and it is a scale split,  
 not a simplification:
@@ -157,8 +157,8 @@ legally and technically available.
 | ------------------------ | ------------------------------------------ | ------------------------------- |
 | AMap POI (via caidian)   | **Ships.** caidian already calls it        | GCJ-02 coordinates              |
 | Overpass / OSM buildings | **Ships.** Free, no key, verified in map3d | WGS-84; needs GCJ-02 conversion |
-| 百度热力图                    | **Does not ship — no such open API**       | See below                       |
-| 美团                       | **Does not ship**                          | No public footfall API          |
+| 百度热力图               | **Does not ship — no such open API**       | See below                       |
+| 美团                     | **Does not ship**                          | No public footfall API          |
 
 On 百度热力图 specifically, because it was named: the Baidu Maps open platform  
 heatmap is a **rendering** layer, not a data API — Baidu's own SDK doc draws  
@@ -185,7 +185,6 @@ scale. The layer owns:
   coordinates through `toRenderX`/`toRenderY`  
   (`packages/app/src/viewport/simulationViewportGeometry.ts:21,25`). One  
   conversion, one place.
-
 
 ### D5 — Every inferred number is labelled as inferred
 
@@ -215,15 +214,15 @@ UI has to say so, not just the docs.
 
 ### D6 — The shop form maps onto existing schema fields where possible
 
-| Form field              | Destination                                                 | Status                                   |
-| ----------------------- | ----------------------------------------------------------- | ---------------------------------------- |
-| 店铺名称                    | `shop.name`                                                 | exists                                   |
-| 面积                      | `shop.size.{width,height}` (with an aspect ratio to choose) | exists                                   |
-| 客单价                     | `brand.priceTier` (1–5)                                     | exists — needs a documented ¥→tier table |
+| Form field                        | Destination                                                 | Status                                   |
+| --------------------------------- | ----------------------------------------------------------- | ---------------------------------------- |
+| 店铺名称                          | `shop.name`                                                 | exists                                   |
+| 面积                              | `shop.size.{width,height}` (with an aspect ratio to choose) | exists                                   |
+| 客单价                            | `brand.priceTier` (1–5)                                     | exists — needs a documented ¥→tier table |
 | 双人桌 / 4人桌 / 6人桌 / 10人包房 | `shop.capacity`                                             | **derivable**: `2n₂ + 4n₄ + 6n₆ + 10n₁₀` |
-| 业态（中餐厅）                 | `brand.category = "restaurant"`                             | exists in the enum                       |
-| —                       | `shop.dwellMeanSeconds`                                     | **new**: needs a cited range for 正餐      |
-| 桌型明细（保留原始数字）            | `shop.customParameters`                                     | exists, no schema change                 |
+| 业态（中餐厅）                    | `brand.category = "restaurant"`                             | exists in the enum                       |
+| —                                 | `shop.dwellMeanSeconds`                                     | **new**: needs a cited range for 正餐    |
+| 桌型明细（保留原始数字）          | `shop.customParameters`                                     | exists, no schema change                 |
 
 桌型 also gives something the engine has no notion of today: table-level  
 service. That is deliberately **out of scope for stage 1** — it is a new  

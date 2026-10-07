@@ -9,12 +9,12 @@
 1. **选点** — 在地图上点，或者直接填经纬度和半径。没配高德 key 时没有底图，但坐标输入照常能用：选址真正要的是经纬度，地图只是帮你挑位置。
 2. **填写** — 项目名、业态、楼层数、面积，以及**平面从哪来**，四选一：
 
-   | 来源        | 会生成什么                                                                 |
-   | ----------- | -------------------------------------------------------------------------- |
-   | 手绘平面图  | 什么都不会自动生成；进编辑器逐段画墙。最费事，但每一条墙都是你定的         |
-   | DXF 导入    | 抽出墙体和轮廓；**门要在导入后自己补**（门洞认不出来）                     |
-   | 按楼层生成  | 填每层用途，自动生成墙、店铺、扶梯和首层的门；**扶梯位置是猜的**，不是算出来的 |
-   | 导入 GLB    | 只有外观。人能在模型里走动，但仿真不知道墙在哪——**不产生墙体**             |
+   | 来源       | 会生成什么                                                                     |
+   | ---------- | ------------------------------------------------------------------------------ |
+   | 手绘平面图 | 什么都不会自动生成；进编辑器逐段画墙。最费事，但每一条墙都是你定的             |
+   | DXF 导入   | 抽出墙体和轮廓；**门要在导入后自己补**（门洞认不出来）                         |
+   | 按楼层生成 | 填每层用途，自动生成墙、店铺、扶梯和首层的门；**扶梯位置是猜的**，不是算出来的 |
+   | 导入 GLB   | 只有外观。人能在模型里走动，但仿真不知道墙在哪——**不产生墙体**                 |
 
    下面还有一块「周边实测」：配了 key 后可以查这个半径内有多少住宅小区、学校、写字楼、商场、地铁站、公交站、同类店铺。**这些是地点条目数，不是人数**——把条目变成人数需要标定过的系数，现在还没有，所以它们不参与仿真，只帮你判断这个位置像什么。没查过时面板写「还没有查询过」而不是显示 0，因为「没问过」和「问了是零」是两件事。
 
@@ -90,14 +90,15 @@
 
 默认离线。下面两处是唯一的例外，都**由你主动触发**，且都要你自己的 key：
 
-| 用途       | 什么时候发生                                       | 走哪里                     |
-| ---------- | -------------------------------------------------- | -------------------------- |
-| 天气面板   | 打开天气面板时                                     | 公开天气服务               |
+| 用途       | 什么时候发生                                                    | 走哪里               |
+| ---------- | --------------------------------------------------------------- | -------------------- |
+| 天气面板   | 打开天气面板时                                                  | 公开天气服务         |
 | 地图与周边 | 配置高德 key 后加载地图底图；在新建项目里点「查一下周边有什么」 | 高德（Amap）Web 服务 |
 
 没有配 key 时，地图没有底图、周边查不了，**但坐标输入照常可用**——选址真正需要的是经纬度，地图只是帮你挑位置的。查询一次会消耗一次高德配额，所以它是按钮而不是自动执行的。
 
 **关于 key**：浏览器要调用接口就必须持有 key，所以它会以明文存在这个浏览器的本地存储里，任何打开这台机器的人都能读到。控制台里请选带 **referer 白名单的「Web服务」类型**，不要用服务端 key。它不会写进你导出的项目文件里。
+
 ## 10. 出问题时
 
 | 现象            | 处理                                                         |
@@ -106,6 +107,7 @@
 | 仿真停了        | 出现「仿真已停止」卡片，点「重试」即可，场景和编辑不受影响   |
 | 没有WebGPU      | 自动进入标注清楚的兼容模式；完全无法渲染时显示说明卡         |
 | 反馈问题        | 实时分析 → 系统与记录 → 「复制诊断信息」，把文本贴给开发者   |
+
 ## 11. 边界
 
 - **人数上限 2000**（引擎硬顶）。模板卡上的推荐人数都在此范围内。
@@ -127,6 +129,6 @@
 
 **Honest limits:** 2,000-agent engine cap; GPU movement is wired but default-off (`?gpumove`, experimental); panels labelled 样例数据 are fixtures, not your scene. Offline by default: the only two calls out are the weather panel and, once you supply an Amap key, the map and a manual POI lookup (§9).
 
-**New project (§1):** project list → place (map click or type lat/lng and a radius) → name, category, floors, area and one of four plan sources → open. The 周边实测 counts are Amap *listing* counts, not people, and stay out of the simulation. Every source seeds one placeholder shop so the engine has a non-empty scene to run.
+**New project (§1):** project list → place (map click or type lat/lng and a radius) → name, category, floors, area and one of four plan sources → open. The 周边实测 counts are Amap _listing_ counts, not people, and stay out of the simulation. Every source seeds one placeholder shop so the engine has a non-empty scene to run.
 
 **Trouble:** a stopped simulation shows a retry card; any crash keeps a copy-diagnostics button; the Inspector's System & recording section has the same copy-diagnostics export.

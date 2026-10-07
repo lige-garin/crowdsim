@@ -77,7 +77,9 @@ function typedKey(): string | null {
 
     const stored = localStorage.getItem(STORAGE_KEY);
 
-    return typeof stored === "string" && stored.trim().length > 0 ? stored.trim() : null;
+    return typeof stored === "string" && stored.trim().length > 0
+      ? stored.trim()
+      : null;
   } catch {
     // Reading can throw in some private modes as well as writing.
     return null;

@@ -6,10 +6,7 @@ import { POI_LAYERS, queryPoisAround, type FetchLike } from "./amapPoi";
  * asked. The layer list is driven by `POI_LAYERS` so a new layer shows up here
  * as a missing handler rather than as a silent pass.
  */
-function fakeFetch(
-  respond: (url: string) => unknown,
-  calls: string[] = [],
-): FetchLike {
+function fakeFetch(respond: (url: string) => unknown, calls: string[] = []): FetchLike {
   return async (url) => {
     calls.push(url);
 
@@ -162,7 +159,10 @@ describe("queryPoisAround", () => {
   });
 
   it("carries both labels, because a bare layer key is not a thing a person reads", async () => {
-    const result = await queryPoisAround({ ...place, fetchImpl: fakeFetch(() => ok(0, 0)) });
+    const result = await queryPoisAround({
+      ...place,
+      fetchImpl: fakeFetch(() => ok(0, 0)),
+    });
 
     for (const layer of result.layers) {
       expect(layer.labelZh).not.toBe("");
@@ -176,9 +176,9 @@ describe("queryPoisAround", () => {
     // @ts-expect-error — removing the global to prove the guard, restored below.
     delete globalThis.fetch;
 
-    await expect(
-      queryPoisAround({ ...place, fetchImpl: undefined }),
-    ).rejects.toThrow(/cannot make the POI request/);
+    await expect(queryPoisAround({ ...place, fetchImpl: undefined })).rejects.toThrow(
+      /cannot make the POI request/,
+    );
 
     globalThis.fetch = original;
   });

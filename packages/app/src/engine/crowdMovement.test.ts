@@ -275,14 +275,17 @@ describe("stepCrowd", () => {
     it.each([
       ["zero", 0],
       ["not a number", Number.NaN],
-    ])("leaves both walkers finite after one step when the horizon is %s", (_label, horizon) => {
-      for (const agent of oneStep({ anticipationHorizonSeconds: horizon })) {
-        expect(Number.isFinite(agent.x), `agent ${agent.id} x`).toBe(true);
-        expect(Number.isFinite(agent.y), `agent ${agent.id} y`).toBe(true);
-        expect(Number.isFinite(agent.vx), `agent ${agent.id} vx`).toBe(true);
-        expect(Number.isFinite(agent.vy), `agent ${agent.id} vy`).toBe(true);
-      }
-    });
+    ])(
+      "leaves both walkers finite after one step when the horizon is %s",
+      (_label, horizon) => {
+        for (const agent of oneStep({ anticipationHorizonSeconds: horizon })) {
+          expect(Number.isFinite(agent.x), `agent ${agent.id} x`).toBe(true);
+          expect(Number.isFinite(agent.y), `agent ${agent.id} y`).toBe(true);
+          expect(Number.isFinite(agent.vx), `agent ${agent.id} vx`).toBe(true);
+          expect(Number.isFinite(agent.vy), `agent ${agent.id} vy`).toBe(true);
+        }
+      },
+    );
 
     // A negative horizon is deliberately absent from the list above. It is not
     // a NaN path: `exp(-tau/-3)` and `1/-3` are both finite, so the force comes

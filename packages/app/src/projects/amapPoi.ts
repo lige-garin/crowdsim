@@ -47,7 +47,12 @@ export const POI_LAYERS = [
   { key: "mall", code: "140101", labelZh: "商场", labelEn: "Malls" },
   { key: "subway", code: "150500", labelZh: "地铁站", labelEn: "Subway" },
   { key: "bus", code: "150100", labelZh: "公交站", labelEn: "Bus stops" },
-  { key: "competitor", code: "060000", labelZh: "购物餐饮", labelEn: "Shops to compete with" },
+  {
+    key: "competitor",
+    code: "060000",
+    labelZh: "购物餐饮",
+    labelEn: "Shops to compete with",
+  },
 ] as const;
 
 export type PoiLayerKey = (typeof POI_LAYERS)[number]["key"];
@@ -81,9 +86,7 @@ export type PoiQueryResult = {
   requested: number;
 };
 
-export type FetchLike = (
-  input: string,
-) => Promise<{
+export type FetchLike = (input: string) => Promise<{
   json: () => Promise<unknown>;
 }>;
 

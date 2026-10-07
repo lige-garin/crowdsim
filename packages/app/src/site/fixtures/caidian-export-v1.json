@@ -16,11 +16,7 @@
     "layers": {
       "residential": {
         "count": 42,
-        "ringCounts": [
-          1,
-          1,
-          1
-        ]
+        "ringCounts": [1, 1, 1]
       },
       "school": {
         "count": 6

@@ -61,8 +61,7 @@ const planChoices: {
     },
     en: {
       label: "Upload DXF / IFC",
-      produces:
-        "Extracts walls and outlines; doors have to be added afterwards.",
+      produces: "Extracts walls and outlines; doors have to be added afterwards.",
       warn: "Openings are not recognised",
     },
   },
@@ -247,14 +246,14 @@ export function ProjectDetailsForm({
       </p>
 
       {/*
-        * Said here because it is true the moment the workbench opens, and the
-        * workbench is the only place it can be seen: the engine needs a shop to
-        * simulate at all, so a new project shows one box in the middle of the
-        * world. Nothing measured it. `skeleton` is the one route that also
-        * produces real store lots, so there the box is one of several and the
-        * sentence says which — the shared half is written once because a
-        * caveat repeated in two strings is a caveat that will drift.
-        */}
+       * Said here because it is true the moment the workbench opens, and the
+       * workbench is the only place it can be seen: the engine needs a shop to
+       * simulate at all, so a new project shows one box in the middle of the
+       * world. Nothing measured it. `skeleton` is the one route that also
+       * produces real store lots, so there the box is one of several and the
+       * sentence says which — the shared half is written once because a
+       * caveat repeated in two strings is a caveat that will drift.
+       */}
       <p className="project-details-note" data-testid="details-placeholder-note">
         {zh
           ? `启动后场地中间会出现一个店铺方块：那是给仿真用的占位，没有墙也没有量测过的尺寸。${

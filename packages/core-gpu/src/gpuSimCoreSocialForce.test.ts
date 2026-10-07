@@ -752,13 +752,18 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
     }
 
     const isolated = (overrides: Partial<typeof params>) =>
-      stepGpuSimCoreSocialForceCpu(nearMiss(), new Float32Array([1000, 0, -1000, 0]), [], {
-        ...params,
-        anticipationRangeMeters: 5,
-        relaxationTime: 1e9,
-        maxSpeedRatio: 1000,
-        ...overrides,
-      });
+      stepGpuSimCoreSocialForceCpu(
+        nearMiss(),
+        new Float32Array([1000, 0, -1000, 0]),
+        [],
+        {
+          ...params,
+          anticipationRangeMeters: 5,
+          relaxationTime: 1e9,
+          maxSpeedRatio: 1000,
+          ...overrides,
+        },
+      );
 
     it.each([
       ["zero", 0],
@@ -783,7 +788,9 @@ describe("stage 4: anticipation (Karamouzas, Skinner & Guy 2014 time-to-collisio
       const forceOf = (result: { velocities: Float32Array }) =>
         (result.velocities[0] - 3) / params.dt;
 
-      expect(Math.abs(forceOf(isolated({ anticipationMaxAcceleration: Number.NaN })))).toBe(0);
+      expect(
+        Math.abs(forceOf(isolated({ anticipationMaxAcceleration: Number.NaN }))),
+      ).toBe(0);
       // Not vacuous: the same pair with a usable cap is pushed, so a zero here
       // is the guard refusing rather than the geometry contributing nothing.
       expect(

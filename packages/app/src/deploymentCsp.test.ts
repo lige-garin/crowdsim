@@ -35,7 +35,9 @@ const policyOf = (text: string) => {
   const start = text.indexOf("default-src");
   const end = text.indexOf("base-uri 'self'", start);
 
-  return start < 0 || end < 0 ? "" : flat(text.slice(start, end + "base-uri 'self'".length));
+  return start < 0 || end < 0
+    ? ""
+    : flat(text.slice(start, end + "base-uri 'self'".length));
 };
 
 const policy = policyOf(shipped);
@@ -71,7 +73,9 @@ describe("the Content-Security-Policy", () => {
       expect(hosts.size, `${file} should name at least one host`).toBeGreaterThan(0);
 
       for (const host of hosts) {
-        expect(allowed, `${host} (from ${file}) is not allowed by the CSP`).toContain(host);
+        expect(allowed, `${host} (from ${file}) is not allowed by the CSP`).toContain(
+          host,
+        );
       }
     }
   });

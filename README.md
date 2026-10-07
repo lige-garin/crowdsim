@@ -105,10 +105,10 @@ rest of this section is what the code requires, not what anyone has run.
 
 Two capabilities are optional, and both degrade rather than fail:
 
-| Capability       | Needed for                                   | Without it                                                            |
-| ---------------- | -------------------------------------------- | --------------------------------------------------------------------- |
-| WebGPU           | The experimental, default-off GPU movement toggle | Not offered; the CPU backend runs the same model and the same numbers |
-| `SharedArrayBuffer` | The crowd overlay sharing memory instead of copying | Falls back to a per-frame copy; slower, same results               |
+| Capability          | Needed for                                          | Without it                                                            |
+| ------------------- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| WebGPU              | The experimental, default-off GPU movement toggle   | Not offered; the CPU backend runs the same model and the same numbers |
+| `SharedArrayBuffer` | The crowd overlay sharing memory instead of copying | Falls back to a per-frame copy; slower, same results                  |
 
 `SharedArrayBuffer` additionally needs COOP/COEP **response headers**, which
 is a server capability and not a browser one — see

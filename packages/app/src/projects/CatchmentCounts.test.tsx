@@ -17,7 +17,11 @@ const place = { lat: 41.8057, lng: 123.4315, radiusMeters: 800 };
 function renderPanel() {
   render(
     <I18nProvider>
-      <CatchmentCounts lat={place.lat} lng={place.lng} radiusMeters={place.radiusMeters} />
+      <CatchmentCounts
+        lat={place.lat}
+        lng={place.lng}
+        radiusMeters={place.radiusMeters}
+      />
     </I18nProvider>,
   );
 }
@@ -57,7 +61,9 @@ describe("CatchmentCounts", () => {
 
     fireEvent.click(screen.getByTestId("catchment-ask"));
 
-    await waitFor(() => expect(screen.getByTestId("catchment-table")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByTestId("catchment-table")).toBeInTheDocument(),
+    );
     expect(fetchImpl).toHaveBeenCalledTimes(POI_LAYERS.length);
   });
 
@@ -151,9 +157,7 @@ describe("CatchmentCounts", () => {
     expect(screen.getByTestId("catchment-key-notice")).toBeInTheDocument();
     expect(screen.queryByTestId("catchment-key-input")).toBeNull();
     expect(screen.getByTestId("catchment-ask")).toBeEnabled();
-    expect(screen.getByTestId("catchment-key-state").textContent).toMatch(
-      /你输入的/,
-    );
+    expect(screen.getByTestId("catchment-key-state").textContent).toMatch(/你输入的/);
   });
 
   it("does not paint a saved key in the refusal style", () => {
@@ -224,7 +228,8 @@ describe("CatchmentCounts", () => {
     // One layer per request, sequentially, so this is seven awaits rather than
     // one — the wait has to be for the last of them.
     await waitFor(
-      () => expect(screen.getByTestId("catchment-failed-residential")).toBeInTheDocument(),
+      () =>
+        expect(screen.getByTestId("catchment-failed-residential")).toBeInTheDocument(),
       { timeout: 4000 },
     );
     expect(screen.getByTestId("catchment-table")).toBeInTheDocument();

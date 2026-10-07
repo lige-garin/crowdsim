@@ -81,8 +81,20 @@
       }
     ],
     "entrances": [
-      { "id": "d1", "name": "西门", "position": [-60, 2], "kind": "bidirectional", "widthMeters": 4 },
-      { "id": "d2", "name": "东门", "position": [60, 2], "kind": "bidirectional", "widthMeters": 4 }
+      {
+        "id": "d1",
+        "name": "西门",
+        "position": [-60, 2],
+        "kind": "bidirectional",
+        "widthMeters": 4
+      },
+      {
+        "id": "d2",
+        "name": "东门",
+        "position": [60, 2],
+        "kind": "bidirectional",
+        "widthMeters": 4
+      }
     ]
   },
   "shop": {
