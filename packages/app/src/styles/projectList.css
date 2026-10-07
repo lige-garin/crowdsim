@@ -67,7 +67,9 @@
   background: rgba(242, 169, 59, 0.24);
 }
 
-.project-list-error {
+/* Shared by the two screens that can be told a write was refused: the project
+ * list and the new-project form. Same red on purpose — it means one thing. */
+.storage-error {
   margin: 0;
   padding: 10px 12px;
   border: 1px solid rgba(226, 75, 74, 0.5);

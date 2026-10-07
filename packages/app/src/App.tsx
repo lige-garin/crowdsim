@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AppHome } from "./AppHome";
 import {
   createProject,
+  newProjectId,
   readProjects,
   upsertProject,
   writeProjects,
@@ -182,6 +183,11 @@ function AppContent() {
     lng: number;
     radiusMeters: number;
   } | null>(null);
+  // Why the last create did not stick, told by whoever refused it. Held here
+  // because the wizard's own screens own their errors: `ProjectList` reports
+  // its own refused saves, and the form is the one place that can say "your
+  // typing is still here" while it happens.
+  const [projectSaveError, setProjectSaveError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<StageViewMode>("3d");
   // Picking a tool is a request to build. In the 3D city it builds right there
   // under the cursor; tools the world cannot place yet (a multi-click wall), and
@@ -513,8 +519,18 @@ function AppContent() {
         <AppHome
           creatingProject={creatingProject}
           language={language}
-          onCancelProjectCreate={() => setCreatingProject(false)}
-          onCreateProject={() => setCreatingProject(true)}
+          onCancelProjectCreate={() => {
+            // Both, or the next "new project" skips the map: `pendingLocation`
+            // is what chooses between step 2 and step 3, so leaving it set
+            // would start the next project on the previous one's coordinate.
+            setCreatingProject(false);
+            setPendingLocation(null);
+            setProjectSaveError(null);
+          }}
+          onCreateProject={() => {
+            setCreatingProject(true);
+            setProjectSaveError(null);
+          }}
           onProjectPlace={(point, radiusMeters) => {
             // Held here rather than in the map component, so step 3 reads it
             // from one place instead of it being threaded back through.
@@ -542,7 +558,7 @@ function AppContent() {
                 coordinateSystem: "GCJ-02",
                 createdAt: now,
                 floors: details.floors,
-                id: `p-${Date.now().toString(36)}`,
+                id: newProjectId(),
                 kind: details.kind,
                 lat: location.lat,
                 lng: location.lng,
@@ -553,15 +569,28 @@ function AppContent() {
               sceneForNewProject(details, location),
             );
 
-            // A refused save is the list's problem to report, not this screen's:
-            // the project exists either way and the next read will say so.
-            writeProjects(upsertProject(project, readProjects()));
+            // A refused save must not fall through to the workbench. The scene
+            // would open and read as a project that exists, and the list the
+            // user comes back to would not contain it — the one failure this
+            // app has no way to make visible by itself.
+            if (!writeProjects(upsertProject(project, readProjects()))) {
+              setProjectSaveError(
+                language === "zh"
+                  ? "这个项目没有存下来（浏览器拒绝写入，可能是存储空间已满或隐私模式）。你填的内容还在上面，可以换个方式再试一次。"
+                  : "This project was not stored (the browser refused the write — storage may be full, or private mode). What you typed is still above, so you can try again.",
+              );
+
+              return;
+            }
+
             applyScene(project.scene);
             setPendingLocation(null);
             setCreatingProject(false);
+            setProjectSaveError(null);
             setShowHome(false);
           }}
           pendingLocation={pendingLocation}
+          projectSaveError={projectSaveError}
           onEnterLab={() => enterLab()}
           onOpenNetwork={() => enterLab("network")}
           onOpenProject={(project) => {

@@ -120,3 +120,30 @@ describe("ProjectDetailsForm", () => {
     }
   });
 });
+
+describe("the placeholder shop, told about before it appears", () => {
+  it("says the box in the middle of the site is a placeholder", () => {
+    renderForm();
+
+    // The engine needs a shop to simulate at all, so a new project opens with
+    // one in the middle of the world. Nobody measured it, and the workbench
+    // is the only screen where that is visible — so it is said here.
+    const note = screen.getByTestId("details-placeholder-note");
+
+    expect(note.textContent).toMatch(/占位/);
+    expect(note.textContent).toMatch(/没有量测过的尺寸/);
+  });
+
+  it("tells a skeleton project which parts of the plan are real", () => {
+    renderForm();
+
+    fireEvent.click(screen.getByTestId("details-plan-skeleton"));
+
+    // Skeleton also produces genuine store lots, so the honest sentence
+    // separates the two rather than calling the whole plan invented.
+    const note = screen.getByTestId("details-placeholder-note");
+
+    expect(note.textContent).toMatch(/店铺地块是真的/);
+    expect(note.textContent).toMatch(/扶梯位置是猜的/);
+  });
+});

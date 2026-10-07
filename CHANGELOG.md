@@ -162,6 +162,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backing out of step 3 and pressing "new project" reused the previous
+  run's coordinate.** `onCancelProjectCreate` cleared `creatingProject` but
+  not `pendingLocation`, and `pendingLocation` is what chooses between step 2
+  and step 3 — so the second attempt skipped the map and started from the last
+  coordinates. This came from the fix immediately above it: correcting one exit
+  from the location step left the other exit untouched.
+
+- **A project that failed to save opened as though it had been created.**
+  `ProjectList` reports a refused write, but creating a project writes through
+  `App` instead, where the `false` was dropped. The app moved into the
+  workbench carrying a project that was never stored, and the list the user
+  came back to did not contain it — with nothing said either time.
+
+- Reading the project store no longer deletes a corrupt key. `readProjects`
+  runs during render, and a render can be discarded or run twice, so clearing
+  the key belonged on the next write rather than in a read.
+
+- Two duplicates made in the same millisecond no longer overwrite each other.
+  `Date.now()` alone collides, and `upsertProject` reads a matching id as the
+  same project, so the second silently replaced the first.
+
+- The placeholder shop a new project opens with is now described where it can
+  be seen. The engine needs a shop to simulate at all, so a new project shows
+  a box in the middle of the world a third of the footprint across, with no
+  walls and nothing measured — and it read as a surveyed store. The form says
+  so before the workbench opens, distinguishing the skeleton route (whose store
+  lots are real and whose escalator positions are guesses) from the other
+  three.
+
 - **The new-project wizard closed one step early, so step 3 was unreachable.**
   `creatingProject` decides whether the wizard or the project list is on
   screen, and `onProjectPlace` set it to `false` after the map step — dropping

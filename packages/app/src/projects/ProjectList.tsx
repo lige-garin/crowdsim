@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useI18n } from "../i18n";
 import {
   categoryLabels,
+  newProjectId,
   readProjects,
   removeProject,
   upsertProject,
@@ -81,7 +82,7 @@ export function ProjectList({
   };
 
   const duplicate = (project: Project) => {
-    const id = `p-${Date.now().toString(36)}`;
+    const id = newProjectId();
     const copy: Project = {
       record: {
         ...project.record,
@@ -113,7 +114,7 @@ export function ProjectList({
       </div>
 
       {error ? (
-        <p className="project-list-error" data-testid="project-list-error">
+        <p className="storage-error" data-testid="project-list-error">
           {error}
         </p>
       ) : null}

@@ -109,10 +109,11 @@ export function readProjects(): Project[] {
       return project ? [project] : [];
     });
   } catch {
-    // Corrupt JSON. The key is the only thing this module owns, so replacing
-    // it is not destroying anything the user cannot get back from a file.
-    store?.removeItem(STORAGE_KEY);
-
+    // Corrupt JSON, so there is nothing to read. The key is not deleted here:
+    // this runs during render, and a render may be thrown away or run twice
+    // (React strict mode), so writing from it would be a side effect in the
+    // one place that must not have them. `writeProjects` overwrites the whole
+    // key on the next save anyway, which is when the cleanup belongs.
     return [];
   }
 }
@@ -133,6 +134,26 @@ export function writeProjects(projects: readonly Project[]): boolean {
     // catch.
     return false;
   }
+}
+
+/**
+ * A project id for two things that create one in a click: creating and
+ * duplicating.
+ *
+ * `crypto.randomUUID` would cover the same ground and is one line, but it needs
+ * a secure context, so it is absent on a plain-HTTP LAN address — and a
+ * time-based id with a counter works everywhere. Two clicks inside one
+ * millisecond is not something a hand does often, but when it happens
+ * `upsertProject` reads the matching id as the same project and the second
+ * silently replaces the first, so the counter is the whole point. It is not
+ * persisted: it only has to separate ids within one page load.
+ */
+let idSequence = 0;
+
+export function newProjectId(): string {
+  idSequence += 1;
+
+  return `p-${Date.now().toString(36)}-${idSequence.toString(36)}`;
 }
 
 export function upsertProject(project: Project, projects: readonly Project[]) {

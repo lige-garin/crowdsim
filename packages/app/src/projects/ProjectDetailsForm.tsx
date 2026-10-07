@@ -108,10 +108,13 @@ export function ProjectDetailsForm({
   onCancel,
   onSubmit,
   place,
+  saveError,
 }: {
   onCancel: () => void;
   onSubmit: (details: ProjectDetails) => void;
   place: { lat: number; lng: number; radiusMeters: number };
+  /** Set by the caller when the store refused the write, so nothing is lost. */
+  saveError?: string | null;
 }) {
   const { language } = useI18n();
   const zh = language === "zh";
@@ -241,6 +244,35 @@ export function ProjectDetailsForm({
           ? "面积和楼层数会被记下来，但不会拿去自动生成墙体 —— 楼层数不是平面图。"
           : "Area and floor count are recorded but not used to grow walls: a floor count is not a floor plan."}
       </p>
+
+      {/*
+        * Said here because it is true the moment the workbench opens, and the
+        * workbench is the only place it can be seen: the engine needs a shop to
+        * simulate at all, so a new project shows one box in the middle of the
+        * world. Nothing measured it. `skeleton` is the one route that also
+        * produces real store lots, so there the box is one of several and the
+        * sentence says which — the shared half is written once because a
+        * caveat repeated in two strings is a caveat that will drift.
+        */}
+      <p className="project-details-note" data-testid="details-placeholder-note">
+        {zh
+          ? `启动后场地中间会出现一个店铺方块：那是给仿真用的占位，没有墙也没有量测过的尺寸。${
+              planSource === "skeleton"
+                ? "生成的店铺地块是真的，扶梯位置是猜的。"
+                : "画了平面图之后它才会被真的店铺取代。"
+            }`
+          : `Once it starts, a shop box appears in the middle of the site: a placeholder so the engine has something to simulate, with no walls and no measured size. ${
+              planSource === "skeleton"
+                ? "The generated store lots are real; the escalator positions are guesses."
+                : "A drawn plan replaces it with real shops."
+            }`}
+      </p>
+
+      {saveError ? (
+        <p className="storage-error" data-testid="details-save-error">
+          {saveError}
+        </p>
+      ) : null}
 
       <div className="project-details-actions">
         <button type="button" data-testid="details-cancel" onClick={onCancel}>

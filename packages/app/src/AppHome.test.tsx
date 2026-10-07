@@ -20,6 +20,7 @@ function renderHome() {
       onProjectSubmit={vi.fn()}
       onProjectPlace={vi.fn()}
       pendingLocation={null}
+      projectSaveError={null}
       onSelectTemplate={vi.fn()}
       onSetLanguage={vi.fn()}
       onToggleUiMode={vi.fn()}

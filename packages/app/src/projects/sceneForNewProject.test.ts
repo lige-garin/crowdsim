@@ -99,3 +99,20 @@ describe("sceneForNewProject", () => {
     expect(drawn.id).not.toBe(glb.id);
   });
 });
+
+describe("the placeholder shop a new project starts with", () => {
+  it("carries a usable capacity, because the queue maths multiplies it", () => {
+    // The engine computes queue slots as `ceil(capacity * k)` and lets nobody
+    // in when that is NaN. Nothing here sets `capacity` — `shopSchema` defaults
+    // it to 12 on the way through `parseScene` — so this asserts the default
+    // reaches the engine rather than trusting that it does.
+    const scene = sceneForNewProject(details({ planSource: "skeleton" }), place);
+
+    for (const shop of scene.shops) {
+      expect(Number.isFinite(shop.capacity), `${shop.id} has no usable capacity`)
+        .toBe(true);
+      expect(shop.capacity).toBeGreaterThan(0);
+      expect(Number.isFinite(Math.ceil(shop.capacity * 0.35))).toBe(true);
+    }
+  });
+});

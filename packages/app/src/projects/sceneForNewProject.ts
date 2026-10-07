@@ -134,6 +134,17 @@ function baseScene(
  * One shop carrying the project's business category, so the engine has a
  * category to reason about before anyone has laid out tables. No capacity
  * claim: a shop with no plan has no seats to count.
+ *
+ * **It is a placeholder, and it is on screen from the first frame.** The engine
+ * has nothing to simulate without a shop, so a new project opens with a box in
+ * the middle of the world. The box is large — a third of the footprint in each
+ * dimension — and it is the only shop on screen while `drawn` has produced no
+ * geometry at all, which makes it read as a measured store rather than a
+ * stand-in. So it says so in the two places a reader will actually look: its
+ * own `name`, which every label reads, and `placeholderFor`, which is a
+ * machine-readable answer to "why does this box exist" for anything reading
+ * the scene later. `signText` would have been the natural place to show it in
+ * 3D, but nothing in the renderer reads that field.
  */
 function withBrand(scene: CrowdSimScene, details: ProjectDetails): CrowdSimScene {
   return parseScene({
@@ -154,6 +165,11 @@ function withBrand(scene: CrowdSimScene, details: ProjectDetails): CrowdSimScene
           category: details.businessCategory,
           name: details.name,
           profileId: `${scene.id}-brand`,
+        },
+        customParameters: {
+          placeholderFor: "no floor plan drawn yet",
+          // So a reader can tell this box from a store somebody measured.
+          sizeDerivedFrom: "world footprint / 3, not from a plan",
         },
       },
     ],

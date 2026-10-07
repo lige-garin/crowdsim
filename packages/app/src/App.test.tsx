@@ -400,3 +400,70 @@ describe("the new-project wizard, through the real App", () => {
     expect(screen.queryByTestId("details-name")).toBeNull();
   });
 });
+
+describe("cancelling a new project and starting another", () => {
+  // `onCancelProjectCreate` cleared `creatingProject` but not `pendingLocation`,
+  // and `pendingLocation` is what decides which step renders. So backing out of
+  // step 3 and pressing "new project" again skipped the map entirely and
+  // pre-filled the previous run's coordinate — the exact "a coordinate ends up
+  // on the wrong project" the wizard's own comment warns about.
+  it("asks for the location again instead of reusing the last one", () => {
+    render(<App />);
+
+    fireEvent.click(screen.getByTestId("project-create"));
+    fireEvent.change(screen.getByTestId("map-lat"), {
+      target: { value: "41.12345" },
+    });
+    fireEvent.click(screen.getByTestId("map-next"));
+    expect(screen.getByTestId("details-name")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("details-cancel"));
+    expect(screen.getByTestId("project-create")).toBeInTheDocument();
+
+    // Second run: the map step must be there, and empty of the last coordinate.
+    fireEvent.click(screen.getByTestId("project-create"));
+
+    expect(screen.getByTestId("map-lat")).toBeInTheDocument();
+    expect(screen.queryByTestId("details-name")).toBeNull();
+    expect(
+      (screen.getByTestId("map-lat") as HTMLInputElement).value,
+    ).not.toBe("41.12345");
+  });
+});
+
+describe("creating a project when the browser refuses to save", () => {
+  // `ProjectList` reports a refused save, but creating a project writes through
+  // `App` instead — so the boolean came back false and was dropped, and the app
+  // moved into the workbench carrying a project that was never stored. Coming
+  // home later showed a list that did not contain it, with nothing said.
+  it("says the project was not stored instead of opening it as if it were", () => {
+    const original = Storage.prototype.setItem;
+    const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      key: string,
+      value: string,
+    ) {
+      if (key === "crowdsim.projects.v1") {
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+
+      return original.call(this, key, value);
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByTestId("project-create"));
+    fireEvent.click(screen.getByTestId("map-next"));
+    fireEvent.change(screen.getByTestId("details-name"), {
+      target: { value: "中街商场" },
+    });
+    fireEvent.click(screen.getByTestId("details-submit"));
+
+    // The name is still on screen, so the work is not lost and can be retyped.
+    expect(screen.getByTestId("details-name")).toBeInTheDocument();
+    expect((screen.getByTestId("details-name") as HTMLInputElement).value).toBe(
+      "中街商场",
+    );
+
+    setItem.mockRestore();
+  });
+});

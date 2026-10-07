@@ -143,11 +143,18 @@ describe("project store", () => {
     expect(readProjects()).toEqual([]);
   });
 
-  it("replaces a corrupt store rather than throwing on every later read", () => {
+  it("reads a corrupt store as empty rather than throwing on every read", () => {
     localStorage.setItem("crowdsim.projects.v1", "{not json");
 
     expect(readProjects()).toEqual([]);
-    expect(localStorage.getItem("crowdsim.projects.v1")).toBeNull();
+    // Reading is the render path, so it must not write: a render can be
+    // discarded or run twice. The next save overwrites the key, which is when
+    // the cleanup happens.
+    expect(localStorage.getItem("crowdsim.projects.v1")).toBe("{not json");
+
+    writeProjects([project()]);
+
+    expect(readProjects()[0]?.record.id).toBe("p1");
   });
 
   it("upserts by id, and an edit does not reorder the list", () => {

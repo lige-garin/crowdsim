@@ -5,6 +5,7 @@ import { I18nProvider } from "../i18n";
 import { ProjectList } from "./ProjectList";
 import {
   createProject,
+  readProjects,
   writeProjects,
   type Project,
   type ProjectRecord,
@@ -192,5 +193,27 @@ describe("ProjectList", () => {
       .getAllByRole("heading", { level: 3 })
       .map((node) => node.textContent);
     expect(names).toEqual(["新", "旧"]);
+  });
+});
+
+describe("duplicating twice in the same millisecond", () => {
+  it("keeps both copies rather than letting the second overwrite the first", () => {
+    // Two clicks within one millisecond produce the same `Date.now()` id, and
+    // `upsertProject` treats a matching id as the same project — so the
+    // second duplicate silently replaced the first.
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_700_000_000_000);
+
+    writeProjects([project({ id: "a", name: "甲" })]);
+    renderList();
+
+    fireEvent.click(screen.getAllByText("复制")[0]!);
+    fireEvent.click(screen.getAllByText("复制")[0]!);
+
+    const stored = readProjects();
+
+    expect(stored).toHaveLength(3);
+    expect(new Set(stored.map((p) => p.record.id)).size).toBe(3);
+
+    now.mockRestore();
   });
 });

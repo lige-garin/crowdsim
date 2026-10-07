@@ -20,6 +20,8 @@ type AppHomeProps = {
   onOpenProject: (project: Project) => void;
   /** What step 2 produced, or null while the wizard is not on step 3. */
   pendingLocation: { lat: number; lng: number; radiusMeters: number } | null;
+  /** Why the last create was refused, or null if it was not. */
+  projectSaveError: string | null;
   onProjectPlace: (point: { lat: number; lng: number }, radiusMeters: number) => void;
   onProjectSubmit: (details: ProjectDetails) => void;
   onSelectTemplate: (scene: CrowdSimScene) => void;
@@ -91,6 +93,7 @@ export function AppHome({
   onOpenProject,
   onProjectPlace,
   onProjectSubmit,
+  projectSaveError,
   pendingLocation,
   onSelectTemplate,
   onSetLanguage,
@@ -172,6 +175,7 @@ export function AppHome({
                 onCancel={onCancelProjectCreate}
                 onSubmit={onProjectSubmit}
                 place={pendingLocation}
+                saveError={projectSaveError}
               />
             ) : (
               <MapPlacement onCancel={onCancelProjectCreate} onNext={onProjectPlace} />
