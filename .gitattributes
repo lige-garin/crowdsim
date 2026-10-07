@@ -1,0 +1,23 @@
+# Normalize line endings: the repository is LF, and Prettier's default
+# `endOfLine: "lf"` enforces it. Without this file, a fresh clone on Windows
+# checks out CRLF and `pnpm format:check` fails on every text file in the
+# repository (verified: 697 files on a Windows clone with core.autocrlf unset),
+# which reads as "the repo is broken" rather than "git rewrote the bytes".
+* text=auto eol=lf
+
+# Windows scripts genuinely need CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets: never normalize, never diff.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.wasm binary
+*.glb binary
+*.zip binary
+*.pdf binary
