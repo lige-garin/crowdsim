@@ -49,6 +49,7 @@ type AppWorkbenchProps = {
   controls: WorkbenchControls;
   inspectorProps: ComponentProps<typeof AppInspector>;
   language: Language;
+  persistenceError?: string | null;
   onHome: () => void;
   onStageTabChange: (tab: StageTab) => void;
   onViewModeChange: (viewMode: StageViewMode) => void;
@@ -77,6 +78,7 @@ export function AppWorkbench({
   controls,
   inspectorProps,
   language,
+  persistenceError,
   onHome,
   onStageTabChange,
   onViewModeChange,
@@ -121,6 +123,12 @@ export function AppWorkbench({
   return (
     <main className="workspace game-shell">
       <AppStage {...stageProps} />
+
+      {persistenceError ? (
+        <p className="storage-error workspace-storage-error" role="alert">
+          {persistenceError}
+        </p>
+      ) : null}
 
       <AppHudTop
         {...controls}

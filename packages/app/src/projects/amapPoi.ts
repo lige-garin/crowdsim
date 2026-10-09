@@ -44,9 +44,9 @@ export const POI_LAYERS = [
   { key: "residential", code: "120302", labelZh: "住宅小区", labelEn: "Residential" },
   { key: "school", code: "141200", labelZh: "学校", labelEn: "Schools" },
   { key: "office", code: "120201", labelZh: "写字楼", labelEn: "Offices" },
-  { key: "mall", code: "140101", labelZh: "商场", labelEn: "Malls" },
+  { key: "mall", code: "060100", labelZh: "商场", labelEn: "Malls" },
   { key: "subway", code: "150500", labelZh: "地铁站", labelEn: "Subway" },
-  { key: "bus", code: "150100", labelZh: "公交站", labelEn: "Bus stops" },
+  { key: "bus", code: "150700", labelZh: "公交站", labelEn: "Bus stops" },
   {
     key: "competitor",
     code: "060000",

@@ -21,6 +21,14 @@ import type { SimulationSnapshot } from "./engine/simulationEngine";
 import type { SimulationController } from "./useSimulationController";
 import { useRunScene } from "./useRunScene";
 
+// The engine keeps its 60 Hz fixed step; one 30 Hz request advances two steps
+// and avoids cloning a full agent snapshot into React every display frame.
+const workerPublishIntervalMs = 1_000 / 30;
+
+export function shouldAdvanceWorker(lastFrameAt: number | null, frameTime: number) {
+  return lastFrameAt === null || frameTime - lastFrameAt >= workerPublishIntervalMs;
+}
+
 export type SimulationWorkerControllerState = {
   mode: "inline" | "worker";
   sharedAgentOverlay?: ReturnType<typeof readAgentOverlay>;
@@ -248,7 +256,11 @@ export function useSimulationWorkerController(
     }
 
     function advance(frameTime: number) {
-      if (cancelled || tickInFlightRef.current) {
+      if (
+        cancelled ||
+        tickInFlightRef.current ||
+        !shouldAdvanceWorker(lastFrameAtRef.current, frameTime)
+      ) {
         return;
       }
 

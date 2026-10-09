@@ -12,6 +12,12 @@ import {
   type PosComparisonRow,
 } from "../analytics/realObservations";
 import type { MinuteFlow, RunAnalyticsSummary } from "../analytics/runAnalytics";
+import type { CrowdSimScene } from "@crowdsim/scene-schema";
+import {
+  applyArrivalCalibration,
+  calibrateArrivals,
+  describeArrivalCalibration,
+} from "../analytics/arrivalCalibration";
 
 const copy = {
   en: {
@@ -20,8 +26,9 @@ const copy = {
     forward: "→",
     importLines: "Import line counts (CSV)",
     importReceipts: "Import receipts (CSV)",
+    applyArrivals: "Apply measured arrivals to matching entrances",
     intro:
-      "Compares real counts you upload against this run's own measured output -- a plain difference, not data assimilation. See docs/superpowers/plans/2026-09-21-gap-closure-plan.md batch 4.2.",
+      "Compares uploaded counts with this run. Gate rows matching an entrance id or name can also replace that entrance's arrival profile; this is a measured input update, not live data assimilation.",
     lineCountsEmpty: "No line-count file imported yet.",
     mae: "Mean absolute error",
     matched: "matched minutes",
@@ -39,8 +46,9 @@ const copy = {
     forward: "→",
     importLines: "导入计数线数据（CSV）",
     importReceipts: "导入 POS 小票数据（CSV）",
+    applyArrivals: "把实测到达率应用到同名入口",
     intro:
-      "把你上传的真实计数与本次运行自己的实测结果直接相减——是一次性的数字对比，不是数据同化。见补齐计划批次 4.2。",
+      "把上传的真实计数与本次运行结果直接比较；与入口 ID 或名称相同的闸机数据还能写成入口到达曲线。这是实测输入更新，不是数据同化或实时纠偏。",
     lineCountsEmpty: "尚未导入计数线数据。",
     mae: "平均绝对误差",
     matched: "匹配分钟数",
@@ -67,10 +75,14 @@ export function RealObservationsPanel({
   language,
   minuteFlows,
   places,
+  scene,
+  onApplyScene,
 }: {
   language: Language;
   minuteFlows: () => MinuteFlow[];
   places: RunAnalyticsSummary["places"];
+  scene: CrowdSimScene;
+  onApplyScene?: (scene: CrowdSimScene) => void;
 }) {
   const text = copy[language];
   const [lineCounts, setLineCounts] = useState<ObservedLineCount[] | null>(null);
@@ -114,6 +126,7 @@ export function RealObservationsPanel({
   const receiptComparison: PosComparisonRow[] | null = receipts
     ? comparePosReceipts(receipts, places)
     : null;
+  const calibration = lineCounts ? calibrateArrivals(scene, lineCounts) : null;
 
   return (
     <section className="compact-panel real-observations" aria-label={text.title}>
@@ -154,31 +167,52 @@ export function RealObservationsPanel({
       ) : null}
 
       {lineSummary ? (
-        <div className="status-list" data-testid="line-count-summary">
-          <div>
-            <span>{text.matched}</span>
-            <strong>{lineSummary.matchedMinutes}</strong>
+        <>
+          <div className="status-list" data-testid="line-count-summary">
+            <div>
+              <span>{text.matched}</span>
+              <strong>{lineSummary.matchedMinutes}</strong>
+            </div>
+            <div>
+              <span>{text.mae}</span>
+              <strong>{lineSummary.meanAbsoluteError.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span>{text.total}</span>
+              <strong>
+                {text.observed} {lineSummary.totalObserved} · {text.simulated}{" "}
+                {lineSummary.totalSimulated}
+              </strong>
+            </div>
+            <div>
+              <span>
+                {text.observedOnly} / {text.simulatedOnly}
+              </span>
+              <strong>
+                {lineSummary.observedOnlyMinutes} / {lineSummary.simulatedOnlyMinutes}
+              </strong>
+            </div>
           </div>
-          <div>
-            <span>{text.mae}</span>
-            <strong>{lineSummary.meanAbsoluteError.toFixed(2)}</strong>
-          </div>
-          <div>
-            <span>{text.total}</span>
-            <strong>
-              {text.observed} {lineSummary.totalObserved} · {text.simulated}{" "}
-              {lineSummary.totalSimulated}
-            </strong>
-          </div>
-          <div>
-            <span>
-              {text.observedOnly} / {text.simulatedOnly}
-            </span>
-            <strong>
-              {lineSummary.observedOnlyMinutes} / {lineSummary.simulatedOnlyMinutes}
-            </strong>
-          </div>
-        </div>
+          {calibration ? (
+            <div className="arrival-calibration" data-testid="arrival-calibration">
+              {describeArrivalCalibration(calibration).map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+              <button
+                type="button"
+                disabled={
+                  !onApplyScene ||
+                  calibration.doors.every((door) => door.status === "no-data")
+                }
+                onClick={() =>
+                  onApplyScene?.(applyArrivalCalibration(scene, calibration))
+                }
+              >
+                {text.applyArrivals}
+              </button>
+            </div>
+          ) : null}
+        </>
       ) : (
         <p className="run-analytics-empty">{text.lineCountsEmpty}</p>
       )}

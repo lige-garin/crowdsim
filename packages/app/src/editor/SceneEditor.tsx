@@ -49,6 +49,12 @@ import { downloadSceneJson } from "./sceneFileExport";
 import { createSceneEditorParamActions } from "./SceneEditorParamActions";
 import { fileNameValues, makeStatus, sceneNameValues } from "./sceneEditorStatus";
 import { clamp, readFileAsDataUrl } from "./sceneEditorUtils";
+import {
+  addGlbVisualAsset,
+  fitsEmbeddedGlbBudget,
+  modelGeometryReview,
+  normalizeGlbDataUrl,
+} from "./glbImport";
 import type { LiveCrowd } from "../engine/liveCrowd";
 type DragState = {
   before: EditorDocument;
@@ -141,6 +147,7 @@ export function SceneEditor({
   const dxfInputRef = useRef<HTMLInputElement | null>(null);
   const ifcInputRef = useRef<HTMLInputElement | null>(null);
   const siteBundleInputRef = useRef<HTMLInputElement | null>(null);
+  const glbInputRef = useRef<HTMLInputElement | null>(null);
   const dragState = useRef<DragState | null>(null);
   /** A count line being dragged out: where it started, and where it is now. */
   const [draftCountLine, setDraftCountLine] = useState<{
@@ -327,12 +334,86 @@ export function SceneEditor({
     setUndoStack([]);
   }
   function applySceneToSimulation() {
+    const hasUploadedModel = currentScene.visualAssets.some(
+      (asset) => asset.customParameters.uploadedByUser === true,
+    );
+    const review = modelGeometryReview(currentScene);
+    if (hasUploadedModel && Object.values(review).some((confirmed) => !confirmed)) {
+      setSiteReport([
+        language === "zh"
+          ? "GLB 只提供外观。请先画好墙和出入口，并在模型面板确认墙体、门和可通行区域，再应用到仿真。"
+          : "A GLB only provides appearance. Draw walls and entrances, then confirm walls, doors and walkable space in the model panel before applying it.",
+      ]);
+      return;
+    }
     // Hand the editor's working copy upward; the shell owns the live scene and
     // re-inits the simulation with it.
     onApplyScene?.(currentScene);
     setAppliedScene(currentScene);
     setLiveSceneChanged(false);
     setStorageStatus(makeStatus("sceneApplied"));
+  }
+  async function importGlb(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!fitsEmbeddedGlbBudget(currentScene, file.size)) {
+      setStorageStatus({
+        zh: "GLB 总大小不能超过 1.5 MB。请先减面并压缩纹理后再导入。",
+        en: "Embedded GLBs cannot exceed 1.5 MB total. Reduce geometry and compress textures before importing.",
+      });
+      return;
+    }
+
+    try {
+      const sourceUrl = normalizeGlbDataUrl(await readFileAsDataUrl(file));
+      replaceScene(addGlbVisualAsset(currentScene, file.name, sourceUrl), {
+        zh: `已导入 ${file.name}；请调整位置并完成几何确认。`,
+        en: `Imported ${file.name}; adjust its placement and complete the geometry review.`,
+      });
+    } catch (error) {
+      setStorageStatus({
+        zh: `GLB 导入失败：${error instanceof Error ? error.message : "无法读取文件"}`,
+        en: `GLB import failed: ${error instanceof Error ? error.message : "could not read the file"}`,
+      });
+    }
+  }
+  function updateVisualAssetNumber(
+    id: string,
+    field: "x" | "y" | "z" | "rotationDegrees" | "scale",
+    value: number,
+  ) {
+    if (!Number.isFinite(value) || (field === "scale" && value <= 0)) return;
+    replaceScene(
+      parseScene({
+        ...currentScene,
+        visualAssets: currentScene.visualAssets.map((asset) =>
+          asset.id !== id
+            ? asset
+            : field === "rotationDegrees" || field === "scale"
+              ? { ...asset, [field]: value }
+              : { ...asset, anchor: { ...asset.anchor, [field]: value } },
+        ),
+      }),
+      { zh: "模型摆放已更新。", en: "Model placement updated." },
+    );
+  }
+  function updateModelReview(
+    field: "wallsConfirmed" | "entrancesConfirmed" | "walkableAreaConfirmed",
+    checked: boolean,
+  ) {
+    const review = { ...modelGeometryReview(currentScene), [field]: checked };
+    replaceScene(
+      parseScene({
+        ...currentScene,
+        customParameters: {
+          ...currentScene.customParameters,
+          modelGeometryReview: review,
+        },
+      }),
+      { zh: "模型几何确认已更新。", en: "Model geometry review updated." },
+    );
   }
   function switchTool(nextTool: EditorTool) {
     setTool(nextTool);
@@ -622,6 +703,7 @@ export function SceneEditor({
   function saveScene() {
     try {
       localStorage.setItem(storageKey, JSON.stringify(currentScene, null, 2));
+      onApplyScene?.(currentScene);
       setHasSavedScene(true);
       setStorageStatus(makeStatus("savedLocally"));
     } catch {
@@ -863,6 +945,7 @@ export function SceneEditor({
       ifcInputRef={ifcInputRef}
       fileInputRef={fileInputRef}
       geoJsonInputRef={geoJsonInputRef}
+      glbInputRef={glbInputRef}
       siteBundleInputRef={siteBundleInputRef}
       gridSize={gridSize}
       language={language}
@@ -894,6 +977,7 @@ export function SceneEditor({
       onExportScene={exportScene}
       onFinishWall={finishWall}
       onGeoJsonImport={importGeoJson}
+      onGlbImport={importGlb}
       onSiteBundleImport={importSiteBundleFile}
       onDxfImport={importDxf}
       onIfcImport={importIfc}
@@ -958,6 +1042,10 @@ export function SceneEditor({
       selectedShop={selectedShop}
       selectedTransitStop={selectedTransitStop}
       selectedZone={selectedZone}
+      visualAssets={currentScene.visualAssets}
+      modelReview={modelGeometryReview(currentScene)}
+      onVisualAssetNumberChange={updateVisualAssetNumber}
+      onModelReviewChange={updateModelReview}
       snapEnabled={snapEnabled}
       siteReport={siteReport}
       storageStatus={storageStatus}

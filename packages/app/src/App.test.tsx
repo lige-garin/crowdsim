@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -303,6 +310,63 @@ describe("App", () => {
 
     expect(twoDimensionalButton).toHaveAttribute("aria-pressed", "true");
     expect(threeDimensionalButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("pauses work while editing and resumes when returning to the run view", async () => {
+    renderWorkbench();
+    await waitFor(() =>
+      expect(screen.getByTestId("sim-toggle")).toHaveAttribute("data-state", "running"),
+    );
+
+    fireEvent.click(screen.getByTestId("stage-tab-edit"));
+    await waitFor(() =>
+      expect(screen.getByTestId("sim-toggle")).toHaveAttribute("data-state", "paused"),
+    );
+
+    fireEvent.click(screen.getByTestId("view-mode-3d"));
+    await waitFor(() =>
+      expect(screen.getByTestId("sim-toggle")).toHaveAttribute("data-state", "running"),
+    );
+  });
+
+  it("pauses a hidden tab and resumes it when visible again", async () => {
+    const originalHidden = Object.getOwnPropertyDescriptor(document, "hidden");
+    let hidden = false;
+    Object.defineProperty(document, "hidden", {
+      configurable: true,
+      get: () => hidden,
+    });
+
+    try {
+      renderWorkbench();
+      await waitFor(() =>
+        expect(screen.getByTestId("sim-toggle")).toHaveAttribute(
+          "data-state",
+          "running",
+        ),
+      );
+
+      hidden = true;
+      fireEvent(document, new Event("visibilitychange"));
+      await waitFor(() =>
+        expect(screen.getByTestId("sim-toggle")).toHaveAttribute(
+          "data-state",
+          "paused",
+        ),
+      );
+
+      hidden = false;
+      fireEvent(document, new Event("visibilitychange"));
+      await waitFor(() =>
+        expect(screen.getByTestId("sim-toggle")).toHaveAttribute(
+          "data-state",
+          "running",
+        ),
+      );
+    } finally {
+      if (originalHidden) Object.defineProperty(document, "hidden", originalHidden);
+      else Reflect.deleteProperty(document, "hidden");
+    }
   });
 
   describe("basic mode (uiMode.ts default)", () => {

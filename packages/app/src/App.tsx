@@ -5,6 +5,7 @@ import {
   createProject,
   newProjectId,
   readProjects,
+  updateProjectScene,
   upsertProject,
   writeProjects,
 } from "./projects/projectStore";
@@ -188,6 +189,7 @@ function AppContent() {
   // its own refused saves, and the form is the one place that can say "your
   // typing is still here" while it happens.
   const [projectSaveError, setProjectSaveError] = useState<string | null>(null);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<StageViewMode>("3d");
   // Picking a tool is a request to build. In the 3D city it builds right there
   // under the cursor; tools the world cannot place yet (a multi-click wall), and
@@ -196,7 +198,7 @@ function AppContent() {
     setEditorTool(tool);
     const inWorld = stageTab === "run" && viewMode === "3d" && placesInWorld(tool);
     if (tool !== "select" && !inWorld) {
-      setStageTab("edit");
+      changeStageTab("edit");
     }
   }
   // Going to a view is also a statement about the tool in your hand: a held
@@ -205,6 +207,10 @@ function AppContent() {
   // click silently did nothing.
   function showView(nextViewMode: StageViewMode) {
     setStageTab("run");
+    if (resumeAfterEditRef.current) {
+      resumeAfterEditRef.current = false;
+      simulation.start();
+    }
     setViewMode(nextViewMode);
     if (!(nextViewMode === "3d" && placesInWorld(editorTool))) {
       setEditorTool("select");
@@ -321,7 +327,10 @@ function AppContent() {
   const userPausedRef = useRef(false);
   /** Whether opening the replay was what stopped a live run — see `exitReplay`. */
   const resumeAfterReplayRef = useRef(false);
+  const resumeAfterEditRef = useRef(false);
+  const resumeAfterVisibilityRef = useRef(false);
   const startSimulation = simulation.start;
+  const pauseSimulationRuntime = simulation.pause;
   const simulationStatus = simulation.snapshot.status;
   useEffect(() => {
     if (autoStartedRef.current || userPausedRef.current) {
@@ -343,6 +352,13 @@ function AppContent() {
     setReplaying(false);
     simulation.start();
   }
+  function changeStageTab(nextTab: StageTab) {
+    if (nextTab === "edit" && stageTab !== "edit") {
+      resumeAfterEditRef.current = simulationStatus === "running";
+      if (resumeAfterEditRef.current) simulation.pause();
+    }
+    setStageTab(nextTab);
+  }
   /**
    * Opening the replay stops the run so the scrubbed frames are not fighting
    * live ones. Closing it used to leave the run stopped for good: `onClose`
@@ -363,6 +379,20 @@ function AppContent() {
     resumeAfterReplayRef.current = false;
     startSimulationFromControls();
   }
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        resumeAfterVisibilityRef.current = simulationStatus === "running";
+        if (resumeAfterVisibilityRef.current) pauseSimulationRuntime();
+      } else if (resumeAfterVisibilityRef.current) {
+        resumeAfterVisibilityRef.current = false;
+        startSimulation();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [pauseSimulationRuntime, simulationStatus, startSimulation]);
   useEffect(() => {
     if (!evacuation.active) {
       return;
@@ -393,8 +423,20 @@ function AppContent() {
     }, 1000);
     return () => window.clearInterval(intervalId);
   }, [evacuation.active]);
-  function applyScene(nextScene: CrowdSimScene) {
+  function applyScene(nextScene: CrowdSimScene, persist = true) {
     setScene(nextScene);
+    if (persist && activeProjectId) {
+      const saved = writeProjects(
+        updateProjectScene(activeProjectId, nextScene, readProjects()),
+      );
+      setProjectSaveError(
+        saved
+          ? null
+          : language === "zh"
+            ? "项目更改未能保存，浏览器存储可能已满。请先导出场景文件。"
+            : "Project changes could not be saved. Browser storage may be full; export the scene before leaving.",
+      );
+    }
     // Same world and seed: the controllers swap the geometry into the running
     // engine (ADR-0007). It is the same run, so its series, recording and
     // auto-start state all carry on.
@@ -583,7 +625,8 @@ function AppContent() {
               return;
             }
 
-            applyScene(project.scene);
+            setActiveProjectId(project.record.id);
+            applyScene(project.scene, false);
             setPendingLocation(null);
             setCreatingProject(false);
             setProjectSaveError(null);
@@ -591,17 +634,26 @@ function AppContent() {
           }}
           pendingLocation={pendingLocation}
           projectSaveError={projectSaveError}
-          onEnterLab={() => enterLab()}
-          onOpenNetwork={() => enterLab("network")}
+          onEnterLab={() => {
+            setActiveProjectId(null);
+            enterLab();
+          }}
+          onOpenNetwork={() => {
+            setActiveProjectId(null);
+            enterLab("network");
+          }}
           onOpenProject={(project) => {
             // A project opens the scene it carries, which is the whole point of
             // keeping one: the list is not a menu of scenes, it is a list of
             // the things a person has been working on.
-            applyScene(project.scene);
+            setActiveProjectId(project.record.id);
+            applyScene(project.scene, false);
+            setProjectSaveError(null);
             setShowHome(false);
           }}
           onSelectTemplate={(templateScene) => {
-            applyScene(templateScene);
+            setActiveProjectId(null);
+            applyScene(templateScene, false);
             enterLab();
           }}
           onSetLanguage={setLanguage}
@@ -662,6 +714,7 @@ function AppContent() {
                 `${scene.id}-${kind}-${Math.floor(simulation.snapshot.elapsedSeconds)}s.csv`,
                 runSeries.exportAnalyticsCsv(kind),
               ),
+            onApplyScene: applyScene,
             onToggleGpuMovement,
             runSummary,
             heatmapCells,
@@ -672,15 +725,12 @@ function AppContent() {
             webGpuProbe: probes.webGpuProbe,
           }}
           language={language}
+          persistenceError={projectSaveError}
           onHome={() => setShowHome(true)}
-          onStageTabChange={setStageTab}
+          onStageTabChange={changeStageTab}
           onViewModeChange={showView}
           panelDockProps={{
             context: {
-              brandInsight:
-                probes.shopDecisionProbe.status === "ready"
-                  ? probes.shopDecisionProbe.brandInsight
-                  : undefined,
               onApplyScene: applyScene,
               scene,
               trajectoryRecording,

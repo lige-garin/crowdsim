@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { safeParseScene } from "@crowdsim/scene-schema";
 import { sceneForNewProject } from "./sceneForNewProject";
 import type { ProjectDetails } from "./ProjectDetailsForm";
+import { demandCoefficients } from "../site/demandInference";
 
 const place = { lat: 41.8057, lng: 123.4315, radiusMeters: 800 };
 
@@ -87,6 +88,36 @@ describe("sceneForNewProject", () => {
 
       expect(reparsed.success, `${source} produced an unparseable scene`).toBe(true);
     }
+  });
+
+  it("writes a complete POI query into a runnable entrance profile", () => {
+    const poi = {
+      radiusMeters: 800,
+      requested: 7,
+      succeeded: 7,
+      layers: [
+        {
+          key: "residential" as const,
+          labelZh: "住宅小区",
+          labelEn: "Residential",
+          count: 12,
+          reportedTotal: 12,
+          truncated: false,
+        },
+      ],
+    };
+    const scene = sceneForNewProject(
+      details({ siteDemand: { coefficients: demandCoefficients, poi } }),
+      place,
+    );
+    const source = scene.entrances.find((entrance) => entrance.kind === "source");
+    const stored = scene.customParameters.siteDemand as {
+      siteVisitsPerDay: number;
+    };
+
+    expect(source?.arrivalProfile?.ratesPerMinute).toHaveLength(48);
+    expect(source?.name).toContain("待确认");
+    expect(stored.siteVisitsPerDay).toBeGreaterThan(0);
   });
 
   it("gives two projects with the same name different ids only by their plan", () => {

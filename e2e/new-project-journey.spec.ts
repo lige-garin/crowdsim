@@ -79,6 +79,29 @@ test("new project → place → fill in → it is still there when you come back
   // rather than sending you back to the list.
   await expect(page.getByTestId("sim-toggle")).toBeVisible({ timeout: 30_000 });
 
+  // Edit the project's own scene and apply it. This must update the project
+  // record, not only the editor's generic last-scene slot.
+  await page.getByTestId("stage-tab-edit").click();
+  const canvas = page.getByTestId("editor-canvas");
+  await page.getByRole("button", { name: "实时分析 ×" }).click();
+  const shopsBefore = await page.locator("g.editor-shop").count();
+  await page.getByTestId("editor-tool-shop").click();
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  await canvas.click({ position: { x: box!.width * 0.5, y: box!.height * 0.55 } });
+  await expect.poll(() => page.locator("g.editor-shop").count()).toBe(shopsBefore + 1);
+  await page.getByTestId("editor-apply-scene").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const projects = JSON.parse(
+          localStorage.getItem("crowdsim.projects.v1") ?? "[]",
+        ) as { scene?: { shops?: unknown[] } }[];
+        return projects[0]?.scene?.shops?.length ?? 0;
+      }),
+    )
+    .toBe(shopsBefore + 1);
+
   // Step 5 — and it is really stored, which is a different claim from "it
   // opened": a save that wrote nothing would look identical from in here. Back
   // home is where the store is read back.
@@ -91,6 +114,8 @@ test("new project → place → fill in → it is still there when you come back
   // be loadable, not just storable.
   await card.locator("button").first().click();
   await expect(page.getByTestId("sim-toggle")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("stage-tab-edit").click();
+  await expect(page.locator("g.editor-shop")).toHaveCount(shopsBefore + 1);
 
   expect(errors).toEqual([]);
 });

@@ -1,7 +1,10 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { demoScene } from "./scenes/demoScene";
-import { useSimulationWorkerController } from "./useSimulationWorkerController";
+import {
+  shouldAdvanceWorker,
+  useSimulationWorkerController,
+} from "./useSimulationWorkerController";
 
 const wasmMocks = vi.hoisted(() => ({
   createWasmSimulationDecisionBackend: vi.fn(),
@@ -82,6 +85,12 @@ describe("useSimulationWorkerController", () => {
     expect(result.current.worker.sharedMemory).toBe(false);
 
     unmount();
+  });
+
+  it("publishes worker snapshots at no more than 30 Hz", () => {
+    expect(shouldAdvanceWorker(null, 1_000)).toBe(true);
+    expect(shouldAdvanceWorker(1_000, 1_020)).toBe(false);
+    expect(shouldAdvanceWorker(1_000, 1_034)).toBe(true);
   });
 
   it("publishes SAB agent overlay frames for viewport consumers", async () => {

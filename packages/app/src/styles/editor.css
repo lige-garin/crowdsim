@@ -913,6 +913,42 @@
   line-height: 1.55;
 }
 
+.editor-model-panel {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 7px;
+  padding: 10px;
+  border: 1px solid rgba(126, 176, 215, 0.28);
+  border-radius: 8px;
+  color: var(--lab-muted);
+  font-size: var(--fs-micro);
+}
+
+.editor-model-placement {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.editor-model-placement label {
+  display: grid;
+  gap: 3px;
+}
+
+.editor-model-placement input {
+  width: 76px;
+}
+
+.workspace-storage-error {
+  position: fixed;
+  z-index: 1000;
+  top: 76px;
+  left: 50%;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
+}
+
 .editor-status {
   display: flex;
   flex-wrap: wrap;

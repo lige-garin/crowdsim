@@ -206,6 +206,19 @@ export function applyArrivalCalibration(
         },
       };
     }),
+    customParameters: {
+      ...scene.customParameters,
+      arrivalCalibration: {
+        source: "uploaded line counts",
+        intervalMinutes: calibration.intervalMinutes,
+        peopleObservedTotal: calibration.peopleObservedTotal,
+        coverageMinutes: calibration.coverageMinutes,
+        calibratedDoorIds: calibration.doors
+          .filter((door) => door.status === "calibrated")
+          .map((door) => door.entranceId),
+        uncalibratedDoorIds: calibration.uncalibratedDoorIds,
+      },
+    },
   });
 }
 

@@ -129,6 +129,8 @@ export type DemandInferenceOptions = {
   /** Slots in the modelled day. Default 48 (a 12-hour day at 15 minutes). */
   slotsPerDay?: number;
   coefficients?: DemandCoefficients;
+  /** True only when the supplied coefficients were fitted to measured footfall. */
+  coefficientsAreCalibrated?: boolean;
 };
 
 /**
@@ -141,11 +143,25 @@ export function catchmentToArrivalProfile(
   bundle: SiteContextBundle,
   options: DemandInferenceOptions = {},
 ): DemandInference {
+  return poiCountsToArrivalProfile(
+    Object.fromEntries(
+      Object.entries(bundle.catchment.layers).map(([key, layer]) => [
+        key,
+        layer?.count ?? 0,
+      ]),
+    ),
+    options,
+  );
+}
+
+export function poiCountsToArrivalProfile(
+  counts: Readonly<Record<string, number>>,
+  options: DemandInferenceOptions = {},
+): DemandInference {
   const slotMinutes = options.slotMinutes ?? 15;
   const slotsPerDay = options.slotsPerDay ?? 48;
   const k = options.coefficients ?? demandCoefficients;
-  const layers = bundle.catchment.layers;
-  const countOf = (key: string) => layers[key]?.count ?? 0;
+  const countOf = (key: string) => counts[key] ?? 0;
 
   const residents = countOf("residential") * k.peoplePerResidentialPoi;
   const workers = countOf("office") * k.workersPerOfficePoi;
@@ -167,9 +183,7 @@ export function catchmentToArrivalProfile(
     (impliedVisitsPerDay + populationVisits) * k.captureRate * competitionShare;
 
   const shape = defaultDayShape(slotsPerDay);
-  const ratesPerMinute = shape.map(
-    (share) => (siteVisitsPerDay * share) / (slotsPerDay * slotMinutes),
-  );
+  const ratesPerMinute = shape.map((share) => (siteVisitsPerDay * share) / slotMinutes);
 
   return {
     impliedPopulation,
@@ -178,7 +192,7 @@ export function catchmentToArrivalProfile(
     siteVisitsPerDay,
     ratesPerMinute,
     slotMinutes,
-    calibrated: bundle.catchment.inference.coefficientsAreCalibrated,
+    calibrated: options.coefficientsAreCalibrated ?? false,
     competitorCount,
   };
 }
@@ -201,7 +215,7 @@ export function describeDemandInference(inference: DemandInference): string[] {
 
   if (!inference.calibrated) {
     lines.push(
-      "系数来源：自拟未标定（导出方已声明 coefficientsAreCalibrated=false）。",
+      "系数来源：自拟未标定；只有导入实测入口计数后，相应入口曲线才属于实测输入。",
     );
   }
 

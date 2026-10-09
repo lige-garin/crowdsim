@@ -1,6 +1,10 @@
 import { parseScene, type CrowdSimScene } from "@crowdsim/scene-schema";
 import { createMallSkeleton } from "../scenes/mallSkeleton";
 import { sizeForArea } from "../scenes/shopLayout";
+import {
+  describeDemandInference,
+  poiCountsToArrivalProfile,
+} from "../site/demandInference";
 import type { ProjectDetails } from "./ProjectDetailsForm";
 
 /**
@@ -30,10 +34,84 @@ export function sceneForNewProject(
   place: { lat: number; lng: number; radiusMeters: number },
 ): CrowdSimScene {
   if (details.planSource === "skeleton") {
-    return skeleton(details, place);
+    return withSiteDemand(skeleton(details, place), details);
   }
 
-  return emptyWorld(details, place);
+  return withSiteDemand(emptyWorld(details, place), details);
+}
+
+function withSiteDemand(scene: CrowdSimScene, details: ProjectDetails): CrowdSimScene {
+  if (!details.siteDemand) return scene;
+
+  const counts = Object.fromEntries(
+    details.siteDemand.poi.layers.map((layer) => [
+      layer.key,
+      layer.reportedTotal ?? layer.count ?? 0,
+    ]),
+  );
+  const demand = poiCountsToArrivalProfile(counts, {
+    coefficients: details.siteDemand.coefficients,
+  });
+  const existingSources = scene.entrances.filter(
+    (entrance) => entrance.kind !== "sink",
+  );
+  const sourceCount = Math.max(1, existingSources.length);
+  const entrances =
+    scene.entrances.length > 0
+      ? scene.entrances.map((entrance) =>
+          entrance.kind === "sink"
+            ? entrance
+            : {
+                ...entrance,
+                arrivalRatePerMinute: demand.ratesPerMinute[0] / sourceCount,
+                arrivalProfile: {
+                  intervalMinutes: demand.slotMinutes,
+                  ratesPerMinute: demand.ratesPerMinute.map(
+                    (rate) => rate / sourceCount,
+                  ),
+                },
+              },
+        )
+      : [
+          {
+            id: `${scene.id}-source`,
+            name: "待确认入口",
+            kind: "source" as const,
+            position: { x: 1, y: scene.world.height / 2 },
+            width: 2,
+            arrivalRatePerMinute: demand.ratesPerMinute[0],
+            arrivalProfile: {
+              intervalMinutes: demand.slotMinutes,
+              ratesPerMinute: demand.ratesPerMinute,
+            },
+          },
+          {
+            id: `${scene.id}-sink`,
+            name: "待确认出口",
+            kind: "sink" as const,
+            position: { x: scene.world.width - 1, y: scene.world.height / 2 },
+            width: 2,
+          },
+        ];
+
+  return parseScene({
+    ...scene,
+    entrances,
+    customParameters: {
+      ...scene.customParameters,
+      siteDemand: {
+        source: "Amap POI listings",
+        queriedRadiusMeters: details.siteDemand.poi.radiusMeters,
+        counts,
+        coefficients: details.siteDemand.coefficients,
+        coefficientsAreCalibrated: false,
+        siteVisitsPerDay: demand.siteVisitsPerDay,
+        slotMinutes: demand.slotMinutes,
+        ratesPerMinute: demand.ratesPerMinute,
+        notes: describeDemandInference(demand),
+      },
+    },
+  });
 }
 
 /**

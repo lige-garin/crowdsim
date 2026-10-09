@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useI18n } from "../i18n";
 import { CatchmentCounts } from "./CatchmentCounts";
+import { demandCoefficients, type DemandCoefficients } from "../site/demandInference";
+import type { PoiQueryResult } from "./amapPoi";
 import {
   businessCategories,
   categoryLabels,
@@ -102,6 +104,10 @@ export type ProjectDetails = {
   kind: ProjectKind;
   name: string;
   planSource: PlanSource;
+  siteDemand?: {
+    coefficients: DemandCoefficients;
+    poi: PoiQueryResult;
+  };
 };
 
 export function ProjectDetailsForm({
@@ -124,6 +130,15 @@ export function ProjectDetailsForm({
   const [floors, setFloors] = useState(1);
   const [businessCategory, setBusinessCategory] = useState<BrandCategory>("dining");
   const [planSource, setPlanSource] = useState<PlanSource>("drawn");
+  const [catchment, setCatchment] = useState<PoiQueryResult | null>(null);
+  const [captureRatePercent, setCaptureRatePercent] = useState(
+    demandCoefficients.captureRate * 100,
+  );
+  const [populationVisitRatePercent, setPopulationVisitRatePercent] = useState(
+    demandCoefficients.populationVisitRate * 100,
+  );
+  const completeCatchment =
+    catchment !== null && catchment.succeeded === catchment.requested;
 
   // The only thing that blocks submission is a name. Everything else has a
   // defensible default, and blocking on area or floor count would be asking
@@ -272,7 +287,49 @@ export function ProjectDetailsForm({
         lat={place.lat}
         lng={place.lng}
         radiusMeters={place.radiusMeters}
+        onResult={setCatchment}
       />
+
+      {catchment ? (
+        <fieldset className="demand-assumptions">
+          <legend>{zh ? "情景客流参数" : "Scenario demand assumptions"}</legend>
+          <label>
+            {zh ? "本站捕获率（%）" : "Site capture rate (%)"}
+            <input
+              data-testid="details-capture-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={captureRatePercent}
+              onChange={(event) => setCaptureRatePercent(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            {zh ? "人口日出行率（%）" : "Population daily visit rate (%)"}
+            <input
+              data-testid="details-population-visit-rate"
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={populationVisitRatePercent}
+              onChange={(event) =>
+                setPopulationVisitRatePercent(Number(event.target.value))
+              }
+            />
+          </label>
+          <p className="project-details-note">
+            {completeCatchment
+              ? zh
+                ? "这组参数会写入项目并生成入口分时到达率；未标定，只能用于情景比较。"
+                : "These assumptions are stored in the project and generate the entrance profile. They are uncalibrated and only support scenario comparisons."
+              : zh
+                ? "POI 查询不完整，本次不会生成到达率，避免把查询失败当成零。"
+                : "The POI query is incomplete, so no arrival profile will be generated; a failed layer is not treated as zero."}
+          </p>
+        </fieldset>
+      ) : null}
 
       {saveError ? (
         <p className="storage-error" data-testid="details-save-error">
@@ -296,6 +353,16 @@ export function ProjectDetailsForm({
               kind,
               name: name.trim(),
               planSource,
+              siteDemand: completeCatchment
+                ? {
+                    coefficients: {
+                      ...demandCoefficients,
+                      captureRate: captureRatePercent / 100,
+                      populationVisitRate: populationVisitRatePercent / 100,
+                    },
+                    poi: catchment,
+                  }
+                : undefined,
             })
           }
         >

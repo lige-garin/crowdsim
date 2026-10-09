@@ -4,6 +4,7 @@ import {
   createProject,
   readProjects,
   removeProject,
+  updateProjectScene,
   upsertProject,
   writeProjects,
   type Project,
@@ -177,6 +178,34 @@ describe("project store", () => {
 
     expect(removeProject("a", list).map((p) => p.record.id)).toEqual(["b"]);
     expect(removeProject("missing", list)).toHaveLength(2);
+  });
+
+  it("updates the scene inside the active project", () => {
+    const projects = [project({ id: "a" }), project({ id: "b" })];
+    const edited = parseScene({
+      ...scene("edited"),
+      shops: [
+        {
+          id: "shop-1",
+          name: "新增店铺",
+          position: { x: 8, y: 8 },
+          size: { width: 4, height: 4 },
+        },
+      ],
+    });
+
+    const updated = updateProjectScene(
+      "a",
+      edited,
+      projects,
+      "2026-10-08T00:00:00.000Z",
+    );
+
+    expect(updated.find((item) => item.record.id === "a")?.scene.shops).toHaveLength(1);
+    expect(updated.find((item) => item.record.id === "a")?.record.updatedAt).toBe(
+      "2026-10-08T00:00:00.000Z",
+    );
+    expect(updated.find((item) => item.record.id === "b")?.scene.id).toBe("b");
   });
 
   it("never lets an unrecognised business category through to the scene", () => {

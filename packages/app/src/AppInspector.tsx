@@ -36,6 +36,7 @@ type AppInspectorProps = {
   journeyDurations: () => number[];
   minuteFlows: () => MinuteFlow[];
   onExportRunAnalytics: (kind: RunAnalyticsExport) => void;
+  onApplyScene?: (scene: CrowdSimScene) => void;
   placeOccupancyOverTime: (
     kind: StayKind,
     placeId: string,
@@ -60,6 +61,7 @@ export function AppInspector({
   journeyDurations,
   minuteFlows,
   onExportRunAnalytics,
+  onApplyScene,
   onToggleGpuMovement,
   placeOccupancyOverTime,
   runSummary,
@@ -115,6 +117,8 @@ export function AppInspector({
         language={language}
         minuteFlows={minuteFlows}
         places={runSummary.places}
+        scene={scene}
+        onApplyScene={onApplyScene}
       />
 
       <RetailAnalyticsPanel

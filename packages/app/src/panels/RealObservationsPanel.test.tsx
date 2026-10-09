@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RealObservationsPanel } from "./RealObservationsPanel";
 import type { MinuteFlow, RunAnalyticsSummary } from "../analytics/runAnalytics";
+import { parseScene } from "@crowdsim/scene-schema";
 
 afterEach(cleanup);
 
@@ -18,10 +19,30 @@ const places: RunAnalyticsSummary["places"] = [
     visits: 5,
   },
 ];
+const scene = parseScene({
+  schemaVersion: "1.0.0",
+  id: "observations",
+  name: "Observations",
+  world: { width: 20, height: 20 },
+  entrances: [
+    {
+      id: "gate",
+      name: "Main gate",
+      kind: "source",
+      position: { x: 1, y: 10 },
+      width: 2,
+    },
+  ],
+});
 
 function renderPanel(minuteFlows: () => MinuteFlow[] = () => simulatedFlows) {
   return render(
-    <RealObservationsPanel language="zh" minuteFlows={minuteFlows} places={places} />,
+    <RealObservationsPanel
+      language="zh"
+      minuteFlows={minuteFlows}
+      places={places}
+      scene={scene}
+    />,
   );
 }
 
@@ -68,6 +89,31 @@ describe("RealObservationsPanel", () => {
     expect(summary).toHaveTextContent("5"); // 5 simulated service visits
   });
 
+  it("applies measured entry counts to the matching project entrance", async () => {
+    const onApplyScene = vi.fn();
+    render(
+      <RealObservationsPanel
+        language="zh"
+        minuteFlows={() => simulatedFlows}
+        places={places}
+        scene={scene}
+        onApplyScene={onApplyScene}
+      />,
+    );
+    const csv = "line_id,minute_start_s,forward,backward\ngate,0,30,0";
+    fireEvent.change(screen.getByTestId("import-line-counts-input"), {
+      target: { files: [new File([csv], "counts.csv")] },
+    });
+
+    fireEvent.click(await screen.findByText("把实测到达率应用到同名入口"));
+
+    expect(onApplyScene).toHaveBeenCalledTimes(1);
+    expect(onApplyScene.mock.calls[0][0].entrances[0].arrivalRatePerMinute).toBe(2);
+    expect(
+      onApplyScene.mock.calls[0][0].customParameters.arrivalCalibration,
+    ).toMatchObject({ peopleObservedTotal: 30, calibratedDoorIds: ["gate"] });
+  });
+
   it("recomputes the comparison against whatever minuteFlows returns each render, not a fixed snapshot", async () => {
     let flows: MinuteFlow[] = simulatedFlows;
     const { rerender } = renderPanel(() => flows);
@@ -87,7 +133,12 @@ describe("RealObservationsPanel", () => {
       },
     ];
     rerender(
-      <RealObservationsPanel language="zh" minuteFlows={() => flows} places={places} />,
+      <RealObservationsPanel
+        language="zh"
+        minuteFlows={() => flows}
+        places={places}
+        scene={scene}
+      />,
     );
     expect(screen.getByTestId("line-count-summary")).toHaveTextContent("5.00"); // |10-20|/2
   });

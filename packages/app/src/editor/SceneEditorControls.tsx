@@ -62,6 +62,7 @@ type SceneEditorControlsProps = {
   ifcInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
+  glbInputRef: RefObject<HTMLInputElement | null>;
   siteBundleInputRef: RefObject<HTMLInputElement | null>;
   language: Language;
   onTemplateDraft: () => void;
@@ -73,6 +74,7 @@ type SceneEditorControlsProps = {
   onIfcImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onExportScene: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onGlbImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onSiteBundleImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
   onLoadSavedScene: () => void;
@@ -95,6 +97,21 @@ type SceneEditorControlsProps = {
   tool: EditorTool;
   tools: readonly EditorTool[];
   viewMode: "isometric" | "topDown";
+  visualAssets: CrowdSimScene["visualAssets"];
+  modelReview: {
+    wallsConfirmed: boolean;
+    entrancesConfirmed: boolean;
+    walkableAreaConfirmed: boolean;
+  };
+  onVisualAssetNumberChange: (
+    id: string,
+    field: "x" | "y" | "z" | "rotationDegrees" | "scale",
+    value: number,
+  ) => void;
+  onModelReviewChange: (
+    field: "wallsConfirmed" | "entrancesConfirmed" | "walkableAreaConfirmed",
+    checked: boolean,
+  ) => void;
 };
 
 export function SceneEditorControls({
@@ -110,6 +127,7 @@ export function SceneEditorControls({
   ifcInputRef,
   fileInputRef,
   geoJsonInputRef,
+  glbInputRef,
   siteBundleInputRef,
   language,
   onTemplateDraft,
@@ -121,6 +139,7 @@ export function SceneEditorControls({
   onIfcImport,
   onExportScene,
   onGeoJsonImport,
+  onGlbImport,
   onSiteBundleImport,
   onImportScene,
   onLoadSavedScene,
@@ -143,6 +162,10 @@ export function SceneEditorControls({
   tools,
   viewMode,
   statusTrailing,
+  visualAssets,
+  modelReview,
+  onVisualAssetNumberChange,
+  onModelReviewChange,
 }: SceneEditorControlsProps) {
   const [countsOpen, setCountsOpen] = useState(false);
   const [fileMenuOpen, setFileMenuOpen] = useState(false);
@@ -209,6 +232,16 @@ export function SceneEditorControls({
                 if (event.key === "Escape") setFileMenuOpen(false);
               }}
             >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setFileMenuOpen(false);
+                  glbInputRef.current?.click();
+                }}
+              >
+                {language === "zh" ? "导入 GLB 模型" : "Import GLB model"}
+              </button>
               <button
                 type="button"
                 role="menuitem"
@@ -303,6 +336,13 @@ export function SceneEditorControls({
           ) : null}
         </div>
         <input
+          ref={glbInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".glb,model/gltf-binary"
+          onChange={onGlbImport}
+        />
+        <input
           ref={fileInputRef}
           className="visually-hidden"
           type="file"
@@ -352,6 +392,69 @@ export function SceneEditorControls({
             <li key={line}>{line}</li>
           ))}
         </ul>
+      ) : null}
+      {visualAssets.some((asset) => asset.customParameters.uploadedByUser === true) ? (
+        <fieldset className="editor-model-panel" data-testid="editor-model-panel">
+          <legend>
+            {language === "zh"
+              ? "3D 模型摆放与几何确认"
+              : "3D model placement and geometry"}
+          </legend>
+          {visualAssets
+            .filter((asset) => asset.customParameters.uploadedByUser === true)
+            .map((asset) => (
+              <div key={asset.id} className="editor-model-placement">
+                <strong>{asset.name ?? asset.id}</strong>
+                {(
+                  [
+                    ["x", asset.anchor.x],
+                    ["y", asset.anchor.y],
+                    ["z", asset.anchor.z],
+                    ["rotationDegrees", asset.rotationDegrees],
+                    ["scale", asset.scale],
+                  ] as const
+                ).map(([field, value]) => (
+                  <label key={field}>
+                    {field === "rotationDegrees" ? "旋转°" : field}
+                    <input
+                      type="number"
+                      step={field === "scale" ? "0.1" : "1"}
+                      min={field === "scale" ? "0.01" : undefined}
+                      value={value}
+                      onChange={(event) =>
+                        onVisualAssetNumberChange(
+                          asset.id,
+                          field,
+                          Number(event.target.value),
+                        )
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
+            ))}
+          <p>
+            {language === "zh"
+              ? "GLB 不会自动产生碰撞。画完仿真几何后逐项确认，三项完成前不能应用到仿真。"
+              : "A GLB creates no collision geometry. Confirm each item after drawing it; the scene cannot be applied before all three are complete."}
+          </p>
+          {(
+            [
+              ["wallsConfirmed", "墙体已按模型复核"],
+              ["entrancesConfirmed", "入口和出口已放置并复核"],
+              ["walkableAreaConfirmed", "可通行区域已复核"],
+            ] as const
+          ).map(([field, label]) => (
+            <label key={field}>
+              <input
+                type="checkbox"
+                checked={modelReview[field]}
+                onChange={(event) => onModelReviewChange(field, event.target.checked)}
+              />
+              {language === "zh" ? label : field.replace(/Confirmed$/, " confirmed")}
+            </label>
+          ))}
+        </fieldset>
       ) : null}
       <div className="editor-toolbar" aria-label={t("editorTools")}>
         {tools.map((toolId) => (

@@ -247,11 +247,15 @@ export const visualAssetSourceUrlSchema = z
   .string()
   .min(1)
   .refine(
-    (sourceUrl) => sourceUrl.startsWith("/"),
-    "visual asset URL must be a relative application route",
+    (sourceUrl) =>
+      sourceUrl.startsWith("/") ||
+      sourceUrl.startsWith("data:model/gltf-binary;base64,"),
+    "visual asset URL must be a relative application route or embedded GLB",
   )
   .refine(
-    (sourceUrl) => /\.(gltf|glb|json)$/i.test(sourceUrl),
+    (sourceUrl) =>
+      /\.(gltf|glb|json)$/i.test(sourceUrl) ||
+      sourceUrl.startsWith("data:model/gltf-binary;base64,"),
     "visual asset URL must reference glTF, GLB, or tileset JSON",
   )
   .refine(

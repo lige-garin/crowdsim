@@ -215,6 +215,12 @@ describe("catchmentToArrivalProfile", () => {
     expect(inferred.slotMinutes).toBe(15);
     expect(inferred.ratesPerMinute).toHaveLength(48);
     expect(inferred.ratesPerMinute.every((rate) => Number.isFinite(rate))).toBe(true);
+    expect(
+      inferred.ratesPerMinute.reduce(
+        (visits, rate) => visits + rate * inferred.slotMinutes,
+        0,
+      ),
+    ).toBeCloseTo(inferred.siteVisitsPerDay);
   });
 
   it("peaks twice, the way a service day does", () => {
@@ -261,6 +267,18 @@ describe("catchmentToArrivalProfile", () => {
     expect(lines[0]).toContain("不是客流预测");
     expect(lines.some((line) => line.includes("未标定"))).toBe(true);
     expect(inferred.calibrated).toBe(false);
+  });
+
+  it("does not borrow calibration provenance from the imported bundle", () => {
+    const claimed = catchmentToArrivalProfile({
+      ...bundle,
+      catchment: {
+        ...bundle.catchment,
+        inference: { coefficientsAreCalibrated: true },
+      },
+    });
+
+    expect(claimed.calibrated).toBe(false);
   });
 
   it("grows with the catchment and shrinks with the competition, monotonically", () => {

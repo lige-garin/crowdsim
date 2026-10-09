@@ -113,12 +113,12 @@ describe("CatchmentCounts", () => {
     expect(screen.getByTestId("catchment-row-residential").textContent).toContain("25");
   });
 
-  it("says the counts are listings and stay out of the simulation", () => {
+  it("says the counts are listings and the scenario is uncalibrated", () => {
     // The line that keeps this panel from being read as a demand model.
     renderPanel();
 
     expect(document.body.textContent).toMatch(/条目数/);
-    expect(document.body.textContent).toMatch(/不参与仿真/);
+    expect(document.body.textContent).toMatch(/不能当客流预测/);
   });
 
   it("says a listing count is not de-duplicated and stops at 25", async () => {

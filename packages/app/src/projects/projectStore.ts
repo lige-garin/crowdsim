@@ -171,6 +171,26 @@ export function upsertProject(project: Project, projects: readonly Project[]) {
   return next;
 }
 
+/** Replace the scene carried by one project after an editor save/apply. */
+export function updateProjectScene(
+  id: string,
+  scene: CrowdSimScene,
+  projects: readonly Project[],
+  updatedAt = new Date().toISOString(),
+) {
+  const project = projects.find((candidate) => candidate.record.id === id);
+
+  if (!project) return projects;
+
+  return upsertProject(
+    {
+      record: { ...project.record, updatedAt },
+      scene: parseScene(scene),
+    },
+    projects,
+  );
+}
+
 export function removeProject(id: string, projects: readonly Project[]) {
   return projects.filter((candidate) => candidate.record.id !== id);
 }

@@ -20,10 +20,8 @@ import { queryPoisAround, type PoiQueryResult } from "./amapPoi";
  *   says "listings" rather than "residents" throughout, and the counts are
  *   capped at one page of 25 per layer with a note when there are more.
  *
- * It deliberately does not feed the simulation. Arrival rates from POI counts
- * need coefficients that are not calibrated (ADR-0034 Stage 2, not shipped),
- * and a panel that looked connected to the run would be claiming a link that
- * does not exist yet.
+ * A complete result can feed a scenario arrival profile. Its coefficients are
+ * exposed beside the form and remain explicitly uncalibrated.
  */
 
 type Status =
@@ -36,10 +34,12 @@ export function CatchmentCounts({
   lat,
   lng,
   radiusMeters,
+  onResult,
 }: {
   lat: number;
   lng: number;
   radiusMeters: number;
+  onResult?: (result: PoiQueryResult) => void;
 }) {
   const { language } = useI18n();
   const zh = language === "zh";
@@ -72,10 +72,14 @@ export function CatchmentCounts({
     setStatus({ kind: "running" });
 
     try {
-      setStatus({
-        kind: "done",
-        result: await queryPoisAround({ key: stored.key, lat, lng, radiusMeters }),
+      const result = await queryPoisAround({
+        key: stored.key,
+        lat,
+        lng,
+        radiusMeters,
       });
+      setStatus({ kind: "done", result });
+      onResult?.(result);
     } catch (error) {
       setStatus({
         kind: "failed",
@@ -112,15 +116,14 @@ export function CatchmentCounts({
         {zh ? (
           <>
             这些是高德 POI 的<b>地点条目数</b>
-            ，不是人数。要人数得有标定过的系数，现在还没有 ——
-            所以这些数字不参与仿真，只帮你判断这个位置像什么。查询是手动触发的，每次都会消耗高德配额。
+            ，不是人数。完整查询会用下方可调、尚未标定的系数生成情景客流；结果只能比较方案，不能当客流预测。查询是手动触发的，每次都会消耗高德配额。
           </>
         ) : (
           <>
             These are Amap POI <b>listing counts</b>, not people. Turning them into
-            people needs coefficients that have not been calibrated, so these numbers
-            stay out of the simulation and only help you judge what the location is
-            like. The query is manual and each press spends Amap quota.
+            people uses the adjustable, uncalibrated assumptions below. A complete query
+            feeds a scenario profile for comparisons, not a footfall forecast. The query
+            is manual and each press spends Amap quota.
           </>
         )}
       </p>

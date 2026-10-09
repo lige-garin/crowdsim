@@ -61,6 +61,7 @@ type SceneEditorLayoutProps = {
   ifcInputRef: RefObject<HTMLInputElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
   geoJsonInputRef: RefObject<HTMLInputElement | null>;
+  glbInputRef: RefObject<HTMLInputElement | null>;
   siteBundleInputRef: RefObject<HTMLInputElement | null>;
   gridSize: number;
   language: Language;
@@ -103,6 +104,7 @@ type SceneEditorLayoutProps = {
   onExportScene: () => void;
   onFinishWall: () => void;
   onGeoJsonImport: (event: ChangeEvent<HTMLInputElement>) => void;
+  onGlbImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onSiteBundleImport: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportScene: (event: ChangeEvent<HTMLInputElement>) => void;
   onShowTracingFixture: () => void;
@@ -152,6 +154,21 @@ type SceneEditorLayoutProps = {
   onUndo: () => void;
   onZoneCategoryChange: (category: EditorZoneCategory) => void;
   onZoneNumberChange: (field: ZoneNumberField, value: number) => void;
+  visualAssets: CrowdSimScene["visualAssets"];
+  modelReview: {
+    wallsConfirmed: boolean;
+    entrancesConfirmed: boolean;
+    walkableAreaConfirmed: boolean;
+  };
+  onVisualAssetNumberChange: (
+    id: string,
+    field: "x" | "y" | "z" | "rotationDegrees" | "scale",
+    value: number,
+  ) => void;
+  onModelReviewChange: (
+    field: "wallsConfirmed" | "entrancesConfirmed" | "walkableAreaConfirmed",
+    checked: boolean,
+  ) => void;
   selectableScenes: readonly CrowdSimScene[];
   selectedBuilding: EditorDocument["buildings"][number] | undefined;
   selectedConnector: EditorDocument["connectors"][number] | undefined;
@@ -202,6 +219,7 @@ export function SceneEditorLayout({
   ifcInputRef,
   fileInputRef,
   geoJsonInputRef,
+  glbInputRef,
   siteBundleInputRef,
   gridSize,
   language,
@@ -240,6 +258,7 @@ export function SceneEditorLayout({
   onExportScene,
   onFinishWall,
   onGeoJsonImport,
+  onGlbImport,
   onSiteBundleImport,
   onImportScene,
   onShowTracingFixture,
@@ -305,6 +324,10 @@ export function SceneEditorLayout({
   tools,
   visibleHeatmapCells,
   viewMode,
+  visualAssets,
+  modelReview,
+  onVisualAssetNumberChange,
+  onModelReviewChange,
 }: SceneEditorLayoutProps) {
   const drawnFloor = documentOnActiveFloor(document);
   // The run simulates the lowest floor, so only that floor has a crowd to show.
@@ -368,6 +391,7 @@ export function SceneEditorLayout({
         ifcInputRef={ifcInputRef}
         fileInputRef={fileInputRef}
         geoJsonInputRef={geoJsonInputRef}
+        glbInputRef={glbInputRef}
         siteBundleInputRef={siteBundleInputRef}
         language={language}
         templatePrompt={templatePrompt}
@@ -380,6 +404,7 @@ export function SceneEditorLayout({
         onIfcImport={onIfcImport}
         onExportScene={onExportScene}
         onGeoJsonImport={onGeoJsonImport}
+        onGlbImport={onGlbImport}
         onSiteBundleImport={onSiteBundleImport}
         onImportScene={onImportScene}
         onShowTracingFixture={onShowTracingFixture}
@@ -395,6 +420,10 @@ export function SceneEditorLayout({
         selectedLabel={selectedLabel}
         snapEnabled={snapEnabled}
         siteReport={siteReport}
+        visualAssets={visualAssets}
+        modelReview={modelReview}
+        onVisualAssetNumberChange={onVisualAssetNumberChange}
+        onModelReviewChange={onModelReviewChange}
         storageStatus={storageStatus}
         t={t}
         text={text}

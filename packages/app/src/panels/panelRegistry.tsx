@@ -1,7 +1,7 @@
 import type { CrowdSimScene } from "@crowdsim/scene-schema";
 import type { ReactNode } from "react";
 import type { TrajectoryRecording } from "../analytics/trajectoryRecording";
-import type { BrandDecisionInsight } from "../brandDecisionProbe";
+import { createBrandDecisionInsight } from "../brandDecisionProbe";
 import { ScenarioDiffPanel } from "./ScenarioDiffPanel";
 import { ExperimentSweepPanel } from "./ExperimentSweepPanel";
 import { SensitivityPanel } from "./SensitivityPanel";
@@ -18,7 +18,6 @@ export type PanelDockContext = {
   /** The scene the app is running, for panels that report on the user's own project. */
   scene: CrowdSimScene;
   trajectoryRecording: TrajectoryRecording;
-  brandInsight?: BrandDecisionInsight;
   /** Only present for panels that actually mutate the open scene (currently
    * just WeatherPanel) — every other panel here is read-only by design. */
   onApplyScene?: (scene: CrowdSimScene) => void;
@@ -89,7 +88,9 @@ export const panelRegistry: PanelRegistryEntry[] = [
     id: "brand-intelligence",
     labelZh: "品牌智能",
     labelEn: "Brand intelligence",
-    render: (ctx) => <BrandIntelligencePanel insight={ctx.brandInsight} />,
+    render: ({ scene }) => (
+      <BrandIntelligencePanel insight={createBrandDecisionInsight(scene)} />
+    ),
   },
   {
     dataSource: "fixture",

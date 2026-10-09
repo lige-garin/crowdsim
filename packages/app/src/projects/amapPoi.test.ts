@@ -35,6 +35,12 @@ describe("queryPoisAround", () => {
     expect(calls[0]).toContain("location=123.4315,41.8057");
     expect(calls[0]).toContain("radius=800");
     expect(calls[0]).toContain("key=test-key");
+
+    const byLayer = new Map(
+      POI_LAYERS.map((layer, index) => [layer.key, calls[index] ?? ""]),
+    );
+    expect(byLayer.get("mall")).toContain("types=060100");
+    expect(byLayer.get("bus")).toContain("types=150700");
   });
 
   it("reads a layer's listings, and does not confuse a failure with a zero", async () => {
@@ -139,7 +145,7 @@ describe("queryPoisAround", () => {
     const result = await queryPoisAround({
       ...place,
       fetchImpl: fakeFetch((url) =>
-        url.includes("types=120302") || url.includes("types=150100")
+        url.includes("types=120302") || url.includes("types=150700")
           ? ok(3, 3)
           : { status: "0", info: "quota" },
       ),
