@@ -18,6 +18,10 @@ packages/core-behavior/target/
 # Local-only e2e scratch: sandbox fs patch, screenshot scripts, dev logs
 e2e-fs-patch.cjs
 output/
+# Simulation run output (result/scenario/timeseries per run). A run is
+# reproducible from the committed scene + seed, so the artifacts are not
+# history -- keeping them out also keeps real site coordinates out of git.
+runs/
 dev-server.log
 .claude/
 # Third-party calibration dataset, fetched on demand -- see

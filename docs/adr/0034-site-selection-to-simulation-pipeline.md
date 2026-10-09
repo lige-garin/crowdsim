@@ -1,15 +1,31 @@
 # ADR 0034: Site selection → generated 3D scene → POI-driven simulation
 
-- Status: **Proposed — design only, no code written** (2026-10-05). Awaiting  
-  approval. Everything below is a decision record and a data contract, not a  
-  claim that any of it works.
-- Touches: nothing yet. Proposed homes are listed under Stage plan.
+- Status: **Accepted and implemented, with D1 superseded** (2026-10-08).
+- Touches: `packages/app/src/projects/`, `packages/app/src/site/`,
+  `packages/app/src/editor/`, and the scene schema.
 - Related: ADR-0006 (no silent degradation; labelled fallbacks), ADR-0011  
   (population profiles), ADR-0008 (entrance/exit constraints),  
   ADR-0033 (the 2,000-agent cap this design has to respect),  
   `docs/CLAIMS_LEDGER.md` (every inferred quantity must be disclosed there).
 
 ## Context
+
+### 2026-10-08 implementation update
+
+The current product flow is now: local project list → map point and radius →
+optional direct Amap POI query → adjustable uncalibrated demand assumptions →
+draw/import/generate geometry → simulation and reports. A complete query writes
+its counts, coefficients and 15-minute arrival profile into the project scene.
+Measured gate-count CSV can replace matching entrance profiles.
+
+D1's file-only coupling is superseded for the interactive project flow. The
+browser may call Amap only after a key is configured and the user explicitly
+opens the map or starts a POI query. The site-context bundle remains a supported
+offline import format. No CrowdSim account or server is required.
+
+The GLB route now embeds and positions the model, but keeps the original
+boundary: a visual model creates no collision geometry. The editor blocks
+application until walls, entrances/exits and walkable space are confirmed.
 
 The product shape changes: instead of the user hand-building a scene, the  
 user picks a place on a map and the app produces both the scene and its  

@@ -16,6 +16,8 @@ Source of truth:
 Current profile:
 
 - Movement cadence: 60 Hz fixed step.
+- Worker snapshot/UI cadence: at most 30 Hz; one publish may contain two fixed
+  movement steps, so simulated time and the 60 Hz model are unchanged.
 - Decision cadence: 10 Hz.
 - Live simulation cap: 2,000 agents.
 - Render benchmark cap: 100,000 visual agents, separate from live simulation.
@@ -128,7 +130,8 @@ Verification:
 Remaining transport limitation:
 
 - The app still publishes full `SimulationSnapshot` objects through postMessage
-  for most UI state. The 2D viewport overlay can consume SAB agent frames, but
+  for most UI state, now capped at 30 Hz to avoid cloning and React work twice
+  per display frame. The 2D viewport overlay can consume SAB agent frames, but
   full React rendering has not been switched to consume only shared memory.
 
 ## Replay, benchmark, and validation binding

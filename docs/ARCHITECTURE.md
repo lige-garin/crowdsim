@@ -1,4 +1,4 @@
-# Architecture (actual; rewritten 2026-10-02 at `90f0b14`, working tree clean)
+# Architecture (actual; updated 2026-10-08)
 
 Direction and boundaries live in `docs/adr/` (34 ADRs); the claims audit
 trail is `docs/CLAIMS_LEDGER.md`.
@@ -23,10 +23,22 @@ trail is `docs/CLAIMS_LEDGER.md`.
 
 `packages/backend` and `packages/collab` (an optional auth/projects/share
 backend) were deleted in 2026-09 — see `docs/CLAIMS_LEDGER.md` if you are
-looking for them. The app makes no network requests except the user-triggered
-live-weather panel (Open-Meteo).
+looking for them. The app has no required backend. Optional, user-triggered
+network paths are Open-Meteo weather and Amap map/POI queries when a key is
+configured.
 
 ## Data flow
+
+- **Project and demand.** `projects/` owns the local project list and the
+  map → details → scene flow. A complete Amap POI query is stored on the
+  scene with its uncalibrated coefficients and is converted into the entry
+  doors' 15-minute `arrivalProfile`. Failed POI layers never become zero.
+  Imported gate-count CSV can replace matching entry profiles with measured
+  rates through `analytics/arrivalCalibration.ts`.
+- **Geometry and GLB.** DXF/IFC and hand drawing produce simulation geometry.
+  GLB upload produces a self-contained visual asset. The editor requires a
+  separate confirmation of walls, entrances/exits and walkable space before
+  an uploaded model can be applied to the simulation.
 
 - **Movement (default: CPU).** Social-force model in `engine/crowdMovement.ts`
   (parameters fitted to the Weidmann fundamental diagram — see

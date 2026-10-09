@@ -1,9 +1,10 @@
 # CrowdSim Web
 
-A browser-based, multi-agent pedestrian/crowd simulation engine: draw a floor
-plan (or import one), populate it with a social-force crowd model, and watch
-people walk, queue, shop, evacuate, and take the stairs — entirely client
-side, no server required to run or save your work.
+A browser-based site-selection and pedestrian-flow sandbox. Pick a location,
+query nearby residential compounds, schools, offices, malls and transit stops,
+fill in the project assumptions, then draw/import the site model and run a
+crowd scenario. The app runs and saves locally; inferred POI demand remains an
+explicitly uncalibrated scenario until real gate counts replace it.
 
 This README states plainly what is real and what is not. The project has a
 documented habit of catching and correcting its own overstated claims — see
@@ -26,18 +27,17 @@ documented habit of catching and correcting its own overstated claims — see
   cannot be built because the guideline's own figure for it has no usable
   dimensions.
 - **The GPU movement kernel is wired into the app — behind an experimental,
-  default-off toggle — and at today's scale it is a wash, not a win.**
+  default-off toggle — but the complete live path is currently slower than CPU.**
   `packages/core-gpu`'s `gpuSimCore` (benchmarked at 0.45 ms/step for
   100,000 agents in isolation) is connected to the live engine (ADR-0033):
   a labelled "GPU movement (experimental)" toggle / `?gpumove` URL flag,
   worker-side device lifecycle with CPU fallback on device loss, and
-  fail-loud async APIs. Measured on real hardware, the crossover is at
-  roughly **750–1000 agents** — below it the CPU path is faster, above it the
-  GPU path is, and at the shipping 2,000-agent cap the GPU path stays near
-  6 ms/step while the CPU path exceeds the frame budget. The shipping
-  default remains the CPU path (`movementBackend: "cpu-compat"`), so "100k"
-  is still a kernel-only benchmark number, not a claim about the running
-  application. See `docs/adr/0033-gpu-core-engine-wiring.md`.
+  fail-loud async APIs. The isolated kernel is fast, but the live worker → GPU
+  submit → readback → UI path measured 31–48 ms/tick at 0–600 agents and lost
+  to CPU in every reachable bucket tested. The shipping default therefore
+  remains `movementBackend: "cpu-compat"`; "100k" is a kernel-only benchmark,
+  not a claim about the running application. See
+  `docs/adr/0033-gpu-core-engine-wiring.md`.
 - **Pedestrians nearest the camera can be real skinned, animated 3D
   characters (CC0 assets, ADR-0032), not a claim about the whole crowd.**
   Only the closest 12 agents within 20 m of the camera get one; everyone
@@ -56,15 +56,14 @@ documented habit of catching and correcting its own overstated claims — see
   no real capability over the two buttons that survived. Each surviving
   module carries its own `HONESTY NOTE` explaining what it actually does.
 - **Most of the analysis panel dock reports on built-in sample scenarios,
-  not your project.** 5 of 9 panels are labeled `dataSource: "fixture"`
+  not your project.** Fixture panels are labeled `dataSource: "fixture"`
   in the UI itself, not just in this README — the label is load-bearing,
   not decorative.
 - **There is no account system, and none is required.** The app persists
   your work to `localStorage` and to files you export/import
-  (`.csim.json`). A default build makes no network requests of its own —
-  the only outbound call in a default build is the live-weather panel,
-  which fetches from the Open-Meteo API when (and only when) you click
-  its button. An earlier optional backend for projects/versions/share
+  (`.csim.json`). Weather and POI lookups are user-triggered network calls;
+  map/POI calls occur only when an Amap key is configured and the user opens
+  or runs the corresponding action. An earlier optional backend for projects/versions/share
   links existed at one point but was never deployable as shipped and was
   never reachable from the client — it was removed rather than kept
   around unmaintained; see `docs/CLAIMS_LEDGER.md` if you're looking for
@@ -82,19 +81,22 @@ documented habit of catching and correcting its own overstated claims — see
   embedded in the built JavaScript, so a public deployment needs a key
   type that restricts it by referer; a key without that restriction is
   usable by anyone who loads the page. Coordinates are **GCJ-02**
-  throughout — the same system Amap serves, and what any future POI
-  query will return. It is not converted to WGS-84, which would move
+  throughout — the same system Amap serves and the direct POI query uses.
+  It is not converted to WGS-84, which would move
   every point ~570 m in Shenyang.
 - **The four plan routes are not variations on one thing, and the app says
   what each one produced.** A DXF import yields walls with no door openings.
   The generated skeleton yields walls, shop lots, escalators and doors at
   positions its own layout logic chose — nobody surveyed them. A hand-drawn
   plan has no source file. A GLB is a **render asset with no walls in it**:
-  it loads and looks right, and the simulation does not know where the walls
-  are. Only the skeleton route generates geometry; the other three open an
-  empty world sized to the footprint, because a scene whose walls were grown
-  from an area and a floor count would be indistinguishable on screen from a
-  measured one. Area and floor count are recorded and are **not** used to
+  it can be embedded, positioned, rotated and scaled, but the app blocks
+  applying it until the user confirms walls, entrances/exits and walkable
+  space. Embedded GLBs are capped at 1.5 MB total because the browser may keep
+  both a project and an editor-autosave copy inside a roughly 5 MB local
+  storage quota. Only the skeleton route generates geometry; the other three
+  open an empty world sized to the footprint, because a scene whose walls were
+  grown from an area and a floor count would be indistinguishable on screen
+  from a measured one. Area and floor count are recorded and are **not** used to
   draw anything.
 
 ## Which browsers
@@ -144,7 +146,7 @@ back to a slower per-frame-copy path rather than failing.
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/app`           | The React app: 3D/2D viewport (three.js), scene editor, analysis panels, the CPU simulation engine and its Web Worker.                                           |
 | `packages/scene-schema`  | The `.csim.json` scene format (Zod schema), shared TS/Rust types.                                                                                                |
-| `packages/core-gpu`      | WGSL/WebGPU compute utilities (spatial hashing, flow fields, a full 100k-agent movement kernel that is benchmarked but not wired into the app).                  |
+| `packages/core-gpu`      | WGSL/WebGPU compute utilities, including the experimental default-off live movement backend and its CPU test mirrors.                                            |
 | `packages/core-behavior` | A Rust→WASM discrete-event/state-machine behavior kernel. Real, tested (11 Rust tests), but not used by the shipping app's default decision backend — see below. |
 
 ## Testing
@@ -153,7 +155,7 @@ back to a slower per-frame-copy path rather than failing.
 pnpm format:check
 pnpm lint
 pnpm typecheck
-pnpm test        # vitest across every package, ~1,200 tests
+pnpm test        # vitest across every package
 pnpm e2e         # Playwright smoke tests
 ```
 
